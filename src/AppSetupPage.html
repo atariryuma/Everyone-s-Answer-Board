@@ -94,14 +94,14 @@
                 type="text"
                 id="login-url"
                 readonly
-                class="w-full px-3 py-2 bg-theme-base text-theme-accent-cyan rounded border border-theme-normal text-sm font-mono truncate"
+                class="modern-input w-full"
                 value="読み込み中..."
               />
             </div>
             <button
               type="button"
               onclick="copyLoginUrl()"
-              class="btn bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg text-sm whitespace-nowrap"
+              class="btn btn-primary text-sm whitespace-nowrap"
             > コピー
             </button>
           </div>
@@ -134,7 +134,7 @@
                 type="text"
                 id="disable-reason"
                 placeholder="停止理由（例：システムメンテナンス）"
-                class="w-full px-3 py-2 bg-theme-elevated text-theme rounded border border-theme-normal focus:border-red-500 focus:outline-none text-sm"
+                class="modern-input w-full"
               />
               <button
                 id="disable-app-btn"
@@ -153,7 +153,7 @@
               <button
                 id="enable-app-btn"
                 onclick="enableApp()"
-                class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                class="btn btn-success w-full"
               > アプリケーションを再開
               </button>
             </div>
@@ -178,7 +178,7 @@
             <h2 class="text-2xl font-semibold text-theme"> システム統計</h2>
             <p class="text-theme-muted">登録ユーザーの概要情報</p>
           </div>
-          <button onclick="loadSystemStats()" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"> 更新
+          <button onclick="loadSystemStats()" class="btn btn-primary text-sm"> 更新
           </button>
         </div>
 
@@ -224,14 +224,14 @@
                 type="button"
                 id="run-diagnosis-btn"
                 onclick="runSystemDiagnosis()"
-                class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
+                class="btn btn-primary flex-1"
               > 診断実行
               </button>
               <button
                 type="button"
                 id="run-repair-btn"
                 onclick="runAutoRepair()"
-                class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
+                class="btn btn-secondary flex-1"
               > 自動修復
               </button>
             </div>
@@ -249,7 +249,7 @@
                   type="button"
                   id="run-monitoring-btn"
                   onclick="runSystemMonitoring()"
-                  class="btn bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg w-full text-sm"
+                  class="btn btn-secondary w-full text-sm"
                 > 監視実行
                 </button>
               </div>
@@ -261,7 +261,7 @@
                   type="button"
                   id="run-integrity-btn"
                   onclick="runIntegrityCheck()"
-                  class="btn bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg w-full text-sm"
+                  class="btn btn-success w-full text-sm"
                 > 整合性チェック
                 </button>
               </div>
@@ -275,7 +275,7 @@
               <button
                 type="button"
                 onclick="copyDiagnosticResult()"
-                class="btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-1 px-3 rounded text-sm flex items-center gap-2"
+                class="btn btn-secondary"
               > コピー
               </button>
             </div>
@@ -302,13 +302,13 @@
 
           <div class="flex flex-wrap gap-2">
             <button type="button" id="sa-pool-refresh-btn"
-              class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm"> 一覧を更新
+              class="btn btn-primary text-sm"> 一覧を更新
             </button>
             <button type="button" id="sa-pool-usage-btn"
-              class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"> 使用状況
+              class="btn btn-secondary text-sm"> 使用状況
             </button>
             <button type="button" id="sa-pool-migrate-btn"
-              class="btn bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm"
+              class="btn btn-secondary text-sm"
               title="既存ボード全件に SA pool 全員を editor 追加 + 旧 domain 共有を revoke"> 既存ボードを cleanup
             </button>
           </div>
@@ -322,7 +322,7 @@
               </p>
               <textarea id="sa-pool-add-input" rows="6"
                 placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
-                class="w-full px-3 py-2 bg-theme-base border border-theme-normal rounded text-theme text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
+                class="modern-input w-full"></textarea>
               <button type="button" id="sa-pool-add-btn"
                 class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm"> pool に追加
               </button>
@@ -347,7 +347,7 @@
                   type="button"
                   id="refresh-users-btn"
                   onclick="loadUserList()"
-                  class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
+                  class="btn btn-primary text-sm"
                 > 更新
                 </button>
               </div>
@@ -542,13 +542,13 @@
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserStatus(this.dataset.userId)"
-                                        class="btn ${isActive ? 'bg-orange-600 hover:bg-orange-700': 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        class="btn ${isActive ? 'btn-secondary' : 'btn-success'} text-xs"
                                         title="${isActive ? 'ユーザーを非アクティブに': 'ユーザーをアクティブに'}"> ${isActive ? '無効化': '有効化'}
                                     </button>
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserBoard(this.dataset.userId)"
-                                        class="btn ${boardPublished ? 'bg-theme-elevated hover:bg-theme-elevated-hover': 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        class="btn ${boardPublished ? 'btn-secondary' : 'btn-primary'} text-xs"
                                         title="${boardPublished ? 'ボードを非公開に': 'ボードを公開に'}"> ${boardPublished ? '非公開': '公開'}
                                     </button>
                                     <button

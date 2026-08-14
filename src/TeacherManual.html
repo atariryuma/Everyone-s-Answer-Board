@@ -116,16 +116,14 @@
         <aside class="md:w-56 md:flex-shrink-0">
           <nav class="toc">
             <h4> 目次</h4>
-            <a href="#start"> はじめての授業 (3分)</a>
-            <a href="#modes"> 可視化モード</a>
-            <a href="#discussion-tools"> 議論支援ツール</a>
-            <a href="#columns"> 列設定とは？</a>
-            <a href="#publish"> 公開と URL 共有</a>
-            <a href="#reactions">⭐ 反応・ハイライト</a>
-            <a href="#lessons"> レッスン (複数フェーズ)</a>
-            <a href="#profiles"> プロファイル (複数ボード)</a>
-            <a href="#privacy"> プライバシー設定</a>
-            <a href="#troubleshooting">🆘 困ったとき</a>
+            <a href="#start">はじめての授業 (3分)</a>
+            <a href="#lessons">授業を進める</a>
+            <a href="#modes">表示モード</a>
+            <a href="#columns">列設定とは？</a>
+            <a href="#publish">公開と URL 共有</a>
+            <a href="#reactions">反応・ハイライト</a>
+            <a href="#privacy">プライバシー設定</a>
+            <a href="#troubleshooting">困ったとき</a>
           </nav>
         </aside>
 
@@ -152,7 +150,7 @@
               <div class="step-num">2</div>
               <div class="step-body">
                 <h4>「 新しい授業を作る」をクリック</h4>
-                <p>画面上部の <strong> レッスン</strong> セクションでボタンを押すと、授業フローのテンプレートが選べます:</p>
+                <p>画面上部の <strong>授業</strong> セクションで「新しい授業をつくる」を押すと、授業フローのテンプレートが選べます:</p>
                 <p>
                   <strong>授業の定番（3段階）</strong>・<strong>低学年向け</strong>・<strong>探究（田村モデル）</strong>・<strong>議論前後（2段階）</strong>
                 </p>
@@ -176,9 +174,42 @@
             </div>
 
             <div class="callout tip">
-              <strong> 単発のボードを使いたいときは：</strong> レッスン機能を使わず「フォームを連携」欄に Google フォームの URL を貼り付けるだけでも始められます。
+              <strong>単発のボードを使いたいときは：</strong>「詳細設定」を開き、「フォームを連携」欄に Google フォームの URL を貼り付けるだけでも始められます。
               新規 Form は「 他の方法」を展開して「 テンプレートを作成」から
               <strong>シンプル掲示板 / 数直線 / マトリクス / 円グラフ</strong> の 4 種類のいずれかを選んで作れます。
+            </div>
+          </section>
+
+          <!-- §2 授業を進める -->
+          <section id="lessons">
+            <h2 class="manual-h2">授業を進める</h2>
+            <p class="manual-p"> 1 つの授業を「導入 → 本時 → 振り返り」のように複数フェーズに分けて記録できます。
+              フェーズを切り替えると、児童画面の質問も自動で切り替わります。
+              授業終了後、各フェーズの回答が時系列で保存され、後日「振り返り画面」で再生できます。
+            </p>
+
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>授業をつくる</h4>
+                <p>「新しい授業をつくる」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>授業を実行</h4>
+                <p>「すべて作成して開始」を押すと、フェーズ 1 のフォームが自動公開されます。
+                  授業の進行に合わせて <strong>「次のフェーズへ」</strong> を押し、児童画面の質問を切り替えていきます。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>授業を終了 → 振り返り</h4>
+                <p><strong>「授業終了」</strong> を押すと全フォームの受付が締め切られ、各フェーズの回答が保存されます。
+                  授業一覧の <strong>「振り返り」</strong> ボタンから後日いつでも開けます。</p>
+              </div>
             </div>
           </section>
 
@@ -234,56 +265,6 @@
             </div>
           </section>
 
-          <!-- §3 議論支援ツール -->
-          <section id="discussion-tools">
-            <h2 class="manual-h2"> 議論支援ツール</h2>
-            <p class="manual-p"> 児童画面の上部に出るツールバーで、議論の進行を支援できます。すべて<strong>教師が意図的に押したときだけ</strong>動くので、
-              児童に「いつ何を見せるか」は先生が制御できます。
-            </p>
-
-            <div class="step-card">
-              <div class="step-num"></div>
-              <div class="step-body">
-                <h4>議論前</h4>
-                <p>議論を始める前に押すと、その時点の分布をスナップショットとして保存します。
-                  あとで「⇄ 比較」や「→ 動き」を使うときの基準点になります。</p>
-              </div>
-            </div>
-            <div class="step-card">
-              <div class="step-num">⇄</div>
-              <div class="step-body">
-                <h4>比較</h4>
-                <p>議論前と現在を左右 2 画面で並べて見せます。
-                  「クラス全体としてどう変わったか」を集団的に把握するのに向いています。</p>
-              </div>
-            </div>
-            <div class="step-card">
-              <div class="step-num">→</div>
-              <div class="step-body">
-                <h4>動き <span class="text-sm text-theme-muted">(マトリクス専用)</span></h4>
-                <p>議論前 → 現在 の動きを軌跡 (細い線) で重ね描きします。1.5 秒のアニメーションで「動きが起きた」を直感的に伝えます。
-                  <strong>クリック</strong>で再生、<strong>Shift+クリック</strong>で OFF。</p>
-                <p class="text-sm text-theme-muted mt-2"> 動きが小さい児童・動かなかった児童は軌跡が無いだけで、「考えを保持した」も等価な学びとして扱う設計です。
-                  「大きく動いた = 正解」という見方にならないよう、強調色は使っていません。
-                </p>
-              </div>
-            </div>
-            <div class="step-card">
-              <div class="step-num">⏱</div>
-              <div class="step-body">
-                <h4>軌跡スライダー</h4>
-                <p>1 投稿 = 1 ステップ単位で過去の任意時点を再生できます。
-                  「どの瞬間に意見が動いたか」を時系列で振り返るのに使います。「↺ 現在」ボタンで最新に戻ります。</p>
-              </div>
-            </div>
-
-            <div class="callout info">
-              <strong>使う順番の目安：</strong> 授業冒頭で <code> 議論前</code> を押す → 議論 → <code>→ 動き</code> または <code>⇄ 比較</code> で振り返り。
-              プロファイル切替や軸ラベル変更で議論前スナップは自動でリセットされます (違うフォーム間の座標を結ばない安全弁)。
-            </div>
-          </section>
-
-          <!-- §4 列設定 -->
           <section id="columns">
             <h2 class="manual-h2"> 列設定とは？</h2>
             <p class="manual-p"> スプレッドシートの「どの列」に「どんなデータ」が入っているかをアプリに教える設定です。
@@ -355,69 +336,7 @@
             </div>
           </section>
 
-          <!-- §6 レッスン -->
-          <section id="lessons">
-            <h2 class="manual-h2"> レッスン (複数フェーズ授業)</h2>
-            <p class="manual-p"> 1 つの授業を「導入 → 本時 → 振り返り」のように複数フェーズに分けて記録できます。
-              フェーズを切り替えると、児童画面の質問も自動で切り替わります。
-              授業終了後、各フェーズの回答が時系列で保存され、後日「振り返り画面」で再生できます。
-            </p>
 
-            <div class="step-card">
-              <div class="step-num">1</div>
-              <div class="step-body">
-                <h4>授業を作成</h4>
-                <p>「 新しい授業を作る」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
-              </div>
-            </div>
-            <div class="step-card">
-              <div class="step-num">2</div>
-              <div class="step-body">
-                <h4>授業を実行</h4>
-                <p>「 すべて作成して開始」を押すと、フェーズ 1 のフォームが自動公開されます。
-                  授業の進行に合わせて <strong>「▶ 次のフェーズへ」</strong> を押し、児童画面の質問を切り替えていきます。</p>
-              </div>
-            </div>
-            <div class="step-card">
-              <div class="step-num">3</div>
-              <div class="step-body">
-                <h4>授業を終了 → 振り返り</h4>
-                <p><strong>「⏹ 授業終了」</strong> を押すと全フォームの受付が締め切られ、各フェーズの回答が時系列で保存されます。
-                  レッスン一覧の <strong>「振り返り」</strong> ボタンから後日いつでも再生できます。</p>
-              </div>
-            </div>
-          </section>
-
-          <!-- §7 プロファイル -->
-          <section id="profiles">
-            <h2 class="manual-h2"> プロファイル (複数ボード)</h2>
-            <p class="manual-p"> 1 つのユーザーアカウントで複数の回答ボードを切り替えて使えます。
-              例: 「5年1組 国語」「5年1組 道徳」「6年2組 算数」を別々のプロファイルとして保存。
-            </p>
-
-            <h3 class="manual-h3">右パネル「 保存済みボード」の見方</h3>
-            <p class="manual-p"> 現在編集中の行には水色の枠と次のバッジが表示されます:
-            </p>
-            <ul class="manual-p list-disc list-inside">
-              <li><strong> 公開中</strong> — このボードが児童に公開されている</li>
-              <li><strong>「現在」</strong> — 編集中だが未公開</li>
-            </ul>
-
-            <h3 class="manual-h3">プロファイルの操作</h3>
-            <ul class="manual-p list-disc list-inside">
-              <li><strong>保存:</strong> 管理パネル下部の「 [プロファイル名] に保存」(現在のプロファイルに上書き)</li>
-              <li><strong>切替:</strong> 一覧の <strong></strong> アイコン (非アクティブ行のみ)</li>
-              <li><strong>名前変更:</strong> 一覧の名前部分をダブルクリック</li>
-              <li><strong>削除:</strong> 一覧の <strong></strong> アイコン</li>
-              <li><strong>別名で保存:</strong> 「 別名で保存」を展開してプロファイル名を入力 → 新規保存</li>
-            </ul>
-
-            <div class="callout tip">
-              <strong> 入力は自動保存:</strong> 設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です (プロファイルへの保存は別操作)。
-            </div>
-          </section>
-
-          <!-- §8 プライバシー -->
           <section id="privacy">
             <h2 class="manual-h2"> プライバシー設定</h2>
             <p class="manual-p"> 既定では児童のプライバシーを最大限保護する設定になっています:
@@ -468,7 +387,7 @@
 
               <details>
                 <summary>授業を再公開したい (一度終了した後)</summary>
-                <p class="answer"> 右パネル「保存済みボード」の対象プロファイルを  で開き、「 公開する」を再度押してください。
+                <p class="answer">「詳細設定」を開いて「公開する」を再度押してください。
                   公開状態は明示操作でのみ変わります。
                 </p>
               </details>
@@ -482,7 +401,7 @@
 
               <details>
                 <summary>1 ヶ月以上前の授業データを見たい</summary>
-                <p class="answer"> 終了済みのレッスンは画面上部「 レッスン」一覧の <strong>「振り返り」</strong> ボタンから時系列再生できます。
+                <p class="answer">終了済みの授業は画面上部「授業」一覧の <strong>「振り返り」</strong> ボタンから開けます。
                   回答データはスプレッドシートに保存され続けるため、Drive から直接開くこともできます。
                 </p>
               </details>
@@ -503,7 +422,7 @@
 
               <details>
                 <summary>複数クラスで同じフォームを使い分けたい</summary>
-                <p class="answer"> レッスン作成時に <strong>対象クラス</strong> を複数選ぶと、1 つのフォームを全クラスで共有できます (児童が回答時にクラスを選択)。
+                <p class="answer">授業の作成時に <strong>対象クラス</strong> を複数選ぶと、1 つのフォームを全クラスで共有できます (児童が回答時にクラスを選択)。
                   クラス別に集計したいときは、ボード画面のクラスフィルタで切り替えられます。
                 </p>
               </details>
