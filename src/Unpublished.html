@@ -53,7 +53,7 @@
         <p class="text-sm text-theme-muted mb-2">生徒用URL:</p>
         <div class="flex gap-2">
           <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined'? boardUrl : '' ?>"
-            class="flex-1 p-2 bg-theme-elevated border border-theme-strong rounded text-sm cursor-pointer hover:bg-theme-elevated-hover focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
+            class="modern-input flex-1"
             onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
           <button type="button" onclick="copyBoardUrl()"
             class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm"> コピー
@@ -69,7 +69,7 @@
 
       <!-- 管理パネル遷移ボタン -->
       <a id="admin-panel-btn" target="_top"
-        class="block w-full mt-3 px-6 py-3 bg-theme-elevated text-theme-muted rounded-lg font-medium text-base text-center pointer-events-none"> 読み込み中...
+        class="btn btn-secondary w-full mt-3 is-disabled"> 読み込み中...
       </a>
 
     </div>
@@ -87,7 +87,7 @@
 
       <div class="mt-6">
         <a id="refresh-btn" target="_top"
-          class="inline-block px-6 py-2 bg-theme-elevated text-theme-muted rounded-lg font-semibold text-center pointer-events-none"> 読み込み中...
+          class="btn btn-secondary is-disabled"> 読み込み中...
         </a>
       </div>
     </div>

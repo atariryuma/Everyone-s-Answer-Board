@@ -58,11 +58,11 @@
         <!-- 管理者 -->
         <div class="space-y-3">
           <a id="admin-login-link" target="_top"
-            class="block w-full px-6 py-3 bg-theme-card-3 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
+            class="btn btn-secondary w-full is-disabled">
             読み込み中...
           </a>
           <a id="app-setup-link" target="_top"
-            class="block w-full px-6 py-3 bg-theme-elevated text-theme-muted font-medium rounded-xl text-center pointer-events-none">
+            class="btn btn-secondary w-full is-disabled">
             読み込み中...
           </a>
         </div>
@@ -70,7 +70,7 @@
         <? } else if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
         <!-- 登録済みユーザー -->
         <a id="editor-login-link" target="_top"
-          class="block w-full px-6 py-3 bg-theme-card-3 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
+          class="btn btn-secondary w-full is-disabled">
           読み込み中...
         </a>
         <? } ?>

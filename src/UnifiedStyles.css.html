@@ -961,6 +961,57 @@
    *   .modal-card 単体で modal の全レイアウト (bg/border/radius/padding/max-width/margin) を提供。
    * 用途別: modal-card-sm (確認 dialog) / modal-card-md (form modal) / modal-card-lg (content modal)。
    * .modal-card-prominent: 答え modal 等の primary content modal 用 cyan accent。 */
+  /* modal-overlay: モーダルの背面。旧実装は fixed inset-0 bg-black/80 backdrop-blur-sm
+     … の utility 連結を 5 箇所で重複させていた。1 クラスに集約する。 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    background: var(--theme-bg-overlay);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  /* icon-btn: アイコンだけの円形ボタン (閉じる / 小さな操作)。
+     旧実装は bg-white/20 hover:bg-white/30 … とハードコード色を並べており、
+     ライトテーマで見えなくなっていた。theme token に統一する。 */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-full);
+    border: var(--border-primary);
+    background: var(--theme-bg-surface);
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: background var(--transition-quick), color var(--transition-quick);
+  }
+  .icon-btn:hover { background: var(--theme-bg-elevated); color: var(--theme-text-primary); }
+  .icon-btn:focus-visible { outline: 2px solid var(--theme-accent-cyan); outline-offset: 2px; }
+
+  /* 回答モーダルの本文領域 */
+  .modal-answer-body {
+    flex-grow: 1;
+    min-height: 200px;
+    margin-bottom: var(--space-4);
+    overflow-y: auto;
+    padding-right: var(--space-4);
+  }
+
+  /* is-disabled: 「まだ押せない」ボタン (読み込み中 / 前提未達)。
+     disabled 属性が付けられない <a> でも同じ見た目にするため class で表現する。 */
+  .is-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
   .modal-card {
     background: var(--theme-bg-surface);
     border: var(--border-primary);
@@ -1555,6 +1606,16 @@
   .box-success {
     background: color-mix(in srgb, var(--status-success) 12%, transparent);
     border: var(--border-status-success);
+  }
+
+  /* box-warning / box-info: 注意喚起・補足情報。box-success と同じ組み立て。 */
+  .box-warning {
+    background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
+  }
+  .box-info {
+    background: color-mix(in srgb, var(--status-info) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-info) 45%, transparent);
   }
 
   .config-summary {

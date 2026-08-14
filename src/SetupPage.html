@@ -30,7 +30,7 @@
 
 
     <!-- セットアップフォーム -->
-    <div class="glass-panel rounded-xl p-6 mb-6">
+    <div class="card">
       <h2 class="text-xl font-semibold text-theme mb-4"> システム設定</h2>
 
       <form id="setup-form" class="space-y-6">
@@ -39,7 +39,7 @@
           <label for="service-account-json" class="block text-sm font-medium text-theme-secondary mb-2"> サービスアカウントJSONキー
           </label>
           <textarea id="service-account-json" name="serviceAccountJson" rows="8"
-            class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme font-mono text-xs resize-vertical focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="modern-input w-full"
             placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
             required></textarea>
           <p class="text-xs text-theme-muted mt-1"> Google Cloud
@@ -53,11 +53,11 @@
           </label>
           <div class="flex gap-2">
             <input type="text" id="database-id" name="databaseId"
-              class="flex-1 p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              class="modern-input flex-1"
               placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
               required />
             <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
-              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors"> 自動作成
+              class="btn btn-success"> 自動作成
             </button>
           </div>
           <p class="text-xs text-theme-muted mt-1"> 既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
@@ -69,7 +69,7 @@
           <label for="admin-email" class="block text-sm font-medium text-theme-secondary mb-2"> 管理者メールアドレス
           </label>
           <input type="email" id="admin-email" name="adminEmail"
-            class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="modern-input w-full"
             placeholder="admin@example.com" required />
           <p class="text-xs text-theme-muted mt-1"> システム管理者のメールアドレスを入力してください
           </p>
@@ -80,7 +80,7 @@
           <label for="google-client-id" class="block text-sm font-medium text-theme-secondary mb-2"> Google Client ID <span class="text-theme-muted">(オプション)</span>
           </label>
           <input type="text" id="google-client-id" name="googleClientId"
-            class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="modern-input w-full"
             placeholder="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" />
           <p class="text-xs text-theme-muted mt-1"> Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
           </p>
@@ -96,7 +96,7 @@
     </div>
 
     <!-- テストセクション（セットアップ後に表示） -->
-    <div id="test-section" class="glass-panel rounded-xl p-6 hidden">
+    <div id="test-section" class="card hidden">
       <h3 class="text-lg font-semibold text-theme mb-4"> セットアップ完了</h3>
       <p class="text-theme-secondary mb-4"> セットアップが正常に完了しました。システムの動作確認を行えます。
       </p>
@@ -105,13 +105,13 @@
       </button>
       <div class="mt-4">
         <a id="start-studyquest-btn" target="_top"
-          class="inline-block btn bg-theme-card-3 text-theme-muted font-bold py-2 px-4 rounded-lg text-center pointer-events-none"> 読み込み中...
+          class="btn btn-secondary is-disabled"> 読み込み中...
         </a>
       </div>
     </div>
 
     <!-- ヘルプセクション -->
-    <div class="glass-panel rounded-xl p-6">
+    <div class="card">
       <h3 class="text-lg font-semibold text-theme mb-4"> セットアップでお困りの場合</h3>
       <div class="space-y-3 text-sm text-theme-secondary">
         <details class="cursor-pointer">
