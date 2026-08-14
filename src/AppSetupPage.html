@@ -29,355 +29,216 @@
       ></div>
     </div>
 
-    <div class="max-w-6xl mx-auto p-6">
-      <!-- ヘッダー -->
-      <div class="text-center mb-6">
-        <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2"> みんなの回答ボード アプリ設定</h1>
-        <p class="text-xl text-theme-secondary">アプリケーションの運用設定を管理します</p>
-        <p class="text-sm text-theme-muted mt-2"> このページでアプリの有効/無効を切り替えることができます
+    <div class="admin-page">
+      <header class="admin-page-header">
+        <h1>アプリ設定</h1>
+        <p>アプリ全体の運用設定。ここは管理者だけが開く画面です。</p>
+      </header>
+
+      <!-- ── 状態 ───────────────────────────────────────────── -->
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-circle-dot"></use></svg> 状態</h2>
+        <div id="status-display">
+          <dl class="admin-kv">
+            <dt>アプリ</dt>
+            <dd>
+              <span id="app-status-indicator" class="admin-dot"></span>
+              <span id="app-status-text">確認中…</span>
+              </dd>
+            <dt>管理者</dt>
+            <dd id="current-admin">読み込み中…</dd>
+            <dt>最終更新</dt>
+            <dd id="last-updated">読み込み中…</dd>
+          </dl>
+        </div>
+        <div id="restriction-info" class="hidden mt-3">
+          <dl class="admin-kv">
+            <dt>停止理由</dt><dd id="restriction-reason">-</dd>
+            <dt>停止者</dt><dd id="restriction-by">-</dd>
+            <dt>停止日時</dt><dd id="restriction-at">-</dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- ── 配布用 URL ─────────────────────────────────────── -->
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> 配布用 URL</h2>
+        <p class="admin-hint">
+          ボードを作る先生にこの URL を渡します。組織内の Google アカウントでログインすると、自分のボードを編集できます。
         </p>
-      </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="login-url" readonly class="modern-input flex-1" value="読み込み中..." aria-label="ログイン URL" />
+          <button type="button" onclick="copyLoginUrl()" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> コピー</button>
+        </div>
+      </section>
 
-
-      <!-- 現在のステータス表示 -->
-      <div class="card">
-        <h2 class="text-xl font-semibold text-theme mb-4"> 現在のステータス</h2>
-        <div id="status-display" class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
-            <div class="flex items-center">
-              <span class="text-theme-secondary mr-3">アプリ状態:</span>
-              <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
-                <span
-                  class="spinner-small mr-2"
-                ></span> 読み込み中...
-              </span>
-            </div>
+      <!-- ── 利用の停止 / 再開 ───────────────────────────────── -->
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg> 利用の停止 / 再開</h2>
+        <p class="admin-hint">
+          停止すると管理者以外の全アクセスを遮断します。メンテナンス時に使います。
+        </p>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            停止する
+            <small>理由は停止中の画面に表示されます</small>
           </div>
-          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
-            <div class="flex items-center">
-              <span class="text-theme-secondary mr-3">管理者:</span>
-              <span id="current-admin" class="text-theme">読み込み中...</span>
-            </div>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
-            <div class="flex items-center">
-              <span class="text-theme-secondary mr-3">最終更新:</span>
-              <span id="last-updated" class="text-theme-muted">読み込み中...</span>
-            </div>
+          <div class="admin-actions">
+            <input type="text" id="disable-reason" placeholder="例: システムメンテナンス" class="modern-input" style="min-width:16rem;" />
+            <button id="disable-app-btn" onclick="disableApp()" class="btn btn-danger">停止</button>
           </div>
         </div>
-      </div>
-
-      <!-- ユーザー配布用URL -->
-      <div class="card">
-        <h2 class="text-xl font-semibold text-theme mb-4"> ユーザー配布用URL</h2>
-        <p class="text-sm text-theme-muted mb-4"> ボード編集者となるユーザーに以下のログインURLを配布してください
-        </p>
-
-        <div class="bg-theme-card-1 rounded-lg p-4">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex-1 min-w-0">
-              <label class="block text-xs text-theme-muted mb-1">ログインURL</label>
-              <input
-                type="text"
-                id="login-url"
-                readonly
-                class="modern-input w-full"
-                value="読み込み中..."
-              />
-            </div>
-            <button
-              type="button"
-              onclick="copyLoginUrl()"
-              class="btn btn-primary text-sm whitespace-nowrap"
-            > コピー
-            </button>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            再開する
+            <small>全ユーザーのアクセスを元に戻します</small>
           </div>
-          <p class="text-xs text-theme-muted mt-2"> ※ このURLにアクセスすると、組織内ユーザーはGoogleアカウントでログインし、自分のボードを編集できます
+          <div class="admin-actions">
+            <button id="enable-app-btn" onclick="enableApp()" class="btn btn-secondary">再開</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 統計 ───────────────────────────────────────────── -->
+      <section class="admin-section">
+        <div class="flex items-center justify-between">
+          <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-bar-chart"></use></svg> 統計</h2>
+          <button onclick="loadSystemStats()" class="btn btn-secondary text-sm"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> 更新</button>
+        </div>
+        <div class="admin-stats mt-3">
+          <div>
+            <div class="admin-stat-value" id="total-users">-</div>
+            <div class="admin-stat-label">総ユーザー</div>
+          </div>
+          <div>
+            <div class="admin-stat-value" id="active-users">-</div>
+            <div class="admin-stat-label">アクティブ</div>
+          </div>
+          <div>
+            <div class="admin-stat-value" id="published-boards">-</div>
+            <div class="admin-stat-label">公開中のボード</div>
+          </div>
+          <div>
+            <div class="admin-stat-value" id="recent-activity">-</div>
+            <div class="admin-stat-label">24時間の活動</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 診断 ───────────────────────────────────────────── -->
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg> 診断</h2>
+        <p class="admin-hint">
+          結果は下に JSON で表示されます。同じ内容は <code>npm run api -- systemDiagnosis</code> でも取得できます。
+        </p>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            健康診断
+            <small>DB 接続・設定・権限をまとめて確認</small>
+          </div>
+          <div class="admin-actions">
+            <button type="button" id="run-diagnosis-btn" onclick="runSystemDiagnosis()" class="btn btn-secondary">実行</button>
+          </div>
+        </div>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            自動修復
+            <small>診断で見つかった不整合を可能な範囲で直す</small>
+          </div>
+          <div class="admin-actions">
+            <button type="button" id="run-repair-btn" onclick="runAutoRepair()" class="btn btn-secondary">実行</button>
+          </div>
+        </div>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            リソース監視
+            <small>使用状況・実行ログ・エラー率</small>
+          </div>
+          <div class="admin-actions">
+            <button type="button" id="run-monitoring-btn" onclick="runSystemMonitoring()" class="btn btn-secondary">実行</button>
+          </div>
+        </div>
+        <div class="admin-row">
+          <div class="admin-row-label">
+            データ整合性
+            <small>ユーザーデータと設定の突き合わせ</small>
+          </div>
+          <div class="admin-actions">
+            <button type="button" id="run-integrity-btn" onclick="runIntegrityCheck()" class="btn btn-secondary">実行</button>
+          </div>
+        </div>
+
+        <div id="diagnostic-results" class="hidden mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-theme-muted">結果</span>
+            <button type="button" onclick="copyDiagnosticResult()" class="btn btn-secondary text-xs"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> コピー</button>
+          </div>
+          <pre id="diagnostic-output" class="admin-output"></pre>
+        </div>
+      </section>
+
+      <!-- ── Service Account pool ───────────────────────────── -->
+      <section class="admin-section">
+        <div class="flex items-center justify-between">
+          <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg> Service Account pool</h2>
+          <span id="sa-pool-summary" class="text-xs text-theme-muted">読み込み中…</span>
+        </div>
+        <p class="admin-hint">
+          ボードのスプレッドシートへ横断アクセスするための Service Account 群。700 人規模なら 3〜5 個が目安です。
+        </p>
+        <div id="sa-pool-list" class="space-y-2"></div>
+        <div class="admin-actions mt-3">
+          <button type="button" id="sa-pool-refresh-btn" class="btn btn-secondary text-sm"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> 一覧を更新</button>
+          <button type="button" id="sa-pool-usage-btn" class="btn btn-secondary text-sm">使用状況</button>
+          <button type="button" id="sa-pool-migrate-btn" class="btn btn-secondary text-sm"
+            title="既存ボード全件に SA pool 全員を editor 追加し、旧 domain 共有を revoke します">既存ボードを整理</button>
+        </div>
+
+        <details class="mt-3">
+          <summary class="cursor-pointer text-xs text-theme-muted hover:text-theme select-none py-1">SA を追加する</summary>
+          <p class="admin-hint">
+            GCP Console (IAM &amp; Admin → Service Accounts) で作成し、JSON キーを全文貼り付けます。
+            登録時に DB への editor 共有と疎通確認が自動で走ります。
           </p>
+          <textarea id="sa-pool-add-input" rows="5"
+            placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
+            class="modern-input w-full"></textarea>
+          <button type="button" id="sa-pool-add-btn" class="btn btn-secondary text-sm mt-2">pool に追加</button>
+        </details>
+
+        <div id="sa-pool-status" class="text-xs text-theme-muted whitespace-pre-wrap min-h-[1.5rem] mt-2"></div>
+      </section>
+
+      <!-- ── ユーザー ───────────────────────────────────────── -->
+      <section class="admin-section">
+        <div class="flex items-center justify-between">
+          <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> ユーザー</h2>
+          <button type="button" id="refresh-users-btn" onclick="loadUserList()" class="btn btn-secondary text-sm"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> 更新</button>
         </div>
-      </div>
-
-      <!-- アプリ状態切り替えパネル -->
-      <div class="card">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h2 class="text-2xl font-semibold text-theme"> アプリケーション制御</h2>
-            <p class="text-theme-muted">アプリケーション全体のアクセス制御を管理します</p>
+        <div id="user-list-container" class="mt-3">
+          <div id="user-loading" class="py-8 text-center text-sm text-theme-muted">
+            <div class="spinner mx-auto mb-2"></div> 読み込み中…
           </div>
-          <div class="flex items-center space-x-2">
-            <div id="app-status-indicator" class="w-3 h-3 rounded-full bg-theme-normal"></div>
-            <span id="app-status-text" class="text-sm text-theme-muted">状態確認中...</span>
-          </div>
-        </div>
-
-        <!-- アプリ制御ボタン -->
-        <div class="grid md:grid-cols-2 gap-4 mb-6">
-          <div class="p-4 bg-theme-card-1 rounded-lg">
-            <h3 class="text-lg font-medium text-theme-status-error mb-3"> アプリケーション停止</h3>
-            <p class="text-sm text-theme-muted mb-4"> 全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
-            </p>
-            <div class="space-y-3">
-              <input
-                type="text"
-                id="disable-reason"
-                placeholder="停止理由（例：システムメンテナンス）"
-                class="modern-input w-full"
-              />
-              <button
-                id="disable-app-btn"
-                onclick="disableApp()"
-                class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-              > アプリケーションを停止
-              </button>
-            </div>
-          </div>
-
-          <div class="p-4 bg-theme-card-1 rounded-lg">
-            <h3 class="text-lg font-medium text-theme-status-success mb-3"> アプリケーション再開</h3>
-            <p class="text-sm text-theme-muted mb-4"> 停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
-            </p>
-            <div class="pt-8">
-              <button
-                id="enable-app-btn"
-                onclick="enableApp()"
-                class="btn btn-success w-full"
-              > アプリケーションを再開
-              </button>
-            </div>
+          <div id="user-table-content" class="hidden overflow-x-auto">
+            <table class="admin-table min-w-[640px]">
+              <thead>
+                <tr>
+                  <th>メールアドレス</th>
+                  <th>登録日</th>
+                  <th>ユーザー</th>
+                  <th>ボード</th>
+                  <th>最終アクセス</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="user-table-body"></tbody>
+            </table>
           </div>
         </div>
+      </section>
 
-        <!-- 現在の制限情報表示 -->
-        <div id="restriction-info" class="hidden p-4 bg-theme-status-error-soft border border-theme-status-error-strong rounded-lg">
-          <h4 class="text-md font-medium text-theme-status-error-text-on-soft mb-2"> 現在のアクセス制限</h4>
-          <div class="text-sm text-theme-status-error-text-on-soft opacity-90 space-y-1">
-            <div>理由: <span id="restriction-reason">-</span></div>
-            <div>停止者: <span id="restriction-by">-</span></div>
-            <div>停止日時: <span id="restriction-at">-</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- システム管理ダッシュボード -->
-      <div class="card">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h2 class="text-2xl font-semibold text-theme"> システム統計</h2>
-            <p class="text-theme-muted">登録ユーザーの概要情報</p>
-          </div>
-          <button onclick="loadSystemStats()" class="btn btn-primary text-sm"> 更新
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-theme-status-info" id="total-users">-</div>
-            <div class="text-sm text-theme-muted">総ユーザー数</div>
-          </div>
-          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-theme-status-success" id="active-users">-</div>
-            <div class="text-sm text-theme-muted">アクティブユーザー</div>
-          </div>
-          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-theme-status-highlight" id="published-boards">-</div>
-            <div class="text-sm text-theme-muted">公開ボード数</div>
-          </div>
-          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-theme-status-warning" id="recent-activity">-</div>
-            <div class="text-sm text-theme-muted">24時間以内の活動</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- システム診断・監視セクション -->
-      <div class="card">
-        <h2 class="text-xl font-semibold text-theme mb-4"> システム診断・監視</h2>
-        <p class="text-sm text-theme-muted mb-4">システムの健全性確認と問題解決のためのツールです</p>
-
-        <div class="space-y-4">
-          <!-- 基本診断（よく使う機能） -->
-          <div class="p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 class="text-lg font-medium text-theme-status-info-text-on-soft"> 基本診断</h3>
-                <p class="text-sm text-theme-status-info-text-on-soft opacity-80">まずはこちらを実行してください</p>
-              </div>
-              <span class="px-2 py-1 bg-blue-600/30 text-theme-status-info rounded text-xs">推奨</span>
-            </div>
-            <p class="text-sm text-theme-secondary mb-4"> システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
-            </p>
-            <div class="flex gap-3">
-              <button
-                type="button"
-                id="run-diagnosis-btn"
-                onclick="runSystemDiagnosis()"
-                class="btn btn-primary flex-1"
-              > 診断実行
-              </button>
-              <button
-                type="button"
-                id="run-repair-btn"
-                onclick="runAutoRepair()"
-                class="btn btn-secondary flex-1"
-              > 自動修復
-              </button>
-            </div>
-          </div>
-
-          <!-- 詳細診断（折りたたみ） -->
-          <details class="bg-theme-card-1 rounded-lg">
-            <summary class="p-4 cursor-pointer text-theme-secondary hover:text-white"> 詳細診断ツール（クリックで展開）
-            </summary>
-            <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
-              <div class="p-4 bg-theme-card-2 rounded-lg">
-                <h4 class="text-md font-medium text-theme-status-highlight mb-2"> システム監視</h4>
-                <p class="text-xs text-theme-muted mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
-                <button
-                  type="button"
-                  id="run-monitoring-btn"
-                  onclick="runSystemMonitoring()"
-                  class="btn btn-secondary w-full text-sm"
-                > 監視実行
-                </button>
-              </div>
-
-              <div class="p-4 bg-theme-card-2 rounded-lg">
-                <h4 class="text-md font-medium text-theme-status-success mb-2"> データ整合性</h4>
-                <p class="text-xs text-theme-muted mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
-                <button
-                  type="button"
-                  id="run-integrity-btn"
-                  onclick="runIntegrityCheck()"
-                  class="btn btn-success w-full text-sm"
-                > 整合性チェック
-                </button>
-              </div>
-            </div>
-          </details>
-
-          <!-- 結果表示エリア -->
-          <div id="diagnostic-results" class="hidden mt-6">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-lg font-medium text-theme"> 診断結果</h3>
-              <button
-                type="button"
-                onclick="copyDiagnosticResult()"
-                class="btn btn-secondary"
-              > コピー
-              </button>
-            </div>
-            <div class="bg-theme-base rounded-lg p-4 max-h-96 overflow-y-auto">
-              <pre id="diagnostic-output" class="text-sm text-theme-secondary whitespace-pre-wrap"></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SA pool 管理セクション (v2782+) -->
-      <div class="card">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-xl font-semibold text-theme"> SA pool 管理</h2>
-            <p class="text-sm text-theme-muted"> ボード SS への cross-user アクセスを担う Service Account の pool。 700 人規模で 3-5 個推奨。
-            </p>
-          </div>
-          <div id="sa-pool-summary" class="text-sm text-theme-secondary">読み込み中...</div>
-        </div>
-
-        <div class="space-y-3">
-          <div id="sa-pool-list" class="space-y-2"></div>
-
-          <div class="flex flex-wrap gap-2">
-            <button type="button" id="sa-pool-refresh-btn"
-              class="btn btn-primary text-sm"> 一覧を更新
-            </button>
-            <button type="button" id="sa-pool-usage-btn"
-              class="btn btn-secondary text-sm"> 使用状況
-            </button>
-            <button type="button" id="sa-pool-migrate-btn"
-              class="btn btn-secondary text-sm"
-              title="既存ボード全件に SA pool 全員を editor 追加 + 旧 domain 共有を revoke"> 既存ボードを cleanup
-            </button>
-          </div>
-
-          <details class="bg-theme-card-1 rounded-lg">
-            <summary class="p-3 cursor-pointer text-theme-secondary hover:text-white text-sm select-none"> ＋ SA JSON を追加 (GCP Console で発行)
-            </summary>
-            <div class="p-4 pt-0">
-              <p class="text-xs text-theme-muted mb-2"> GCP Console (IAM &amp; Admin → Service Accounts) で SA を新規作成、 JSON キーをダウンロードして全文貼り付け。
-                登録時に DB editor 共有 + verify が自動実行されます。
-              </p>
-              <textarea id="sa-pool-add-input" rows="6"
-                placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
-                class="modern-input w-full"></textarea>
-              <button type="button" id="sa-pool-add-btn"
-                class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm"> pool に追加
-              </button>
-            </div>
-          </details>
-
-          <div id="sa-pool-status" class="text-sm text-theme-secondary whitespace-pre-wrap min-h-[1.5rem] p-2 bg-theme-card-1 rounded"></div>
-        </div>
-      </div>
-
-      <!-- ユーザー管理セクション -->
-      <div class="card">
-        <h2 class="text-xl font-semibold text-theme mb-4"> ユーザー管理</h2>
-
-        <div class="space-y-4">
-          <!-- ユーザー一覧表示エリア -->
-          <div id="user-list-container">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-medium text-theme">登録ユーザー一覧</h3>
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  id="refresh-users-btn"
-                  onclick="loadUserList()"
-                  class="btn btn-primary text-sm"
-                > 更新
-                </button>
-              </div>
-            </div>
-
-            <div id="user-table-wrapper" class="bg-theme-card-1 rounded-lg overflow-hidden">
-              <div id="user-loading" class="p-8 text-center text-theme-muted">
-                <div
-                  class="spinner mx-auto mb-2"
-                ></div> ユーザー一覧を読み込み中...
-              </div>
-              <div id="user-table-content" class="hidden overflow-x-auto">
-                <table class="w-full min-w-[640px]">
-                  <thead class="bg-theme-base">
-                    <tr>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary"> メールアドレス
-                      </th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">登録日</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">ユーザー状態</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">ボード状態</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary"> 最終アクセス
-                      </th>
-                      <th class="px-4 py-3 text-center text-sm font-medium text-theme-secondary">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody id="user-table-body" class="divide-y divide-theme"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- 戻るボタン -->
-      <div class="text-center">
-        <button
-          type="button"
-          onclick="goBackToAdminPanel()"
-          class="btn btn-secondary font-bold py-2 px-6"
-        > ← 管理パネルに戻る
-        </button>
+      <div class="pt-6">
+        <button type="button" onclick="goBackToAdminPanel()" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg> 管理パネルに戻る</button>
       </div>
     </div>
 
@@ -427,7 +288,7 @@
             type="button"
             id="confirm-delete-btn"
             onclick="confirmDeletion()"
-            class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg"
+            class="btn btn-danger flex-1"
           > 削除実行
           </button>
         </div>
@@ -497,7 +358,7 @@
             .map((user) => {
               const isActive = user.isActive === true;
               const statusBadge = isActive
-                ? '<span class="px-2 py-1 bg-green-600 text-theme-status-success rounded-full text-xs">アクティブ</span>'                : '<span class="px-2 py-1 bg-red-600 text-theme-status-error rounded-full text-xs">非アクティブ</span>';
+                ? '<span class="admin-badge admin-badge-on">アクティブ</span>'                : '<span class="admin-badge admin-badge-off">停止</span>';
 
               let boardPublished = false;
               try {
@@ -506,7 +367,7 @@
               } catch (_) {}
 
               const boardBadge = boardPublished
-                ? '<span class="px-2 py-1 bg-purple-600 text-theme-status-highlight rounded-full text-xs">公開中</span>'                : '<span class="px-2 py-1 bg-theme-elevated text-theme rounded-full text-xs">非公開</span>';
+                ? '<span class="admin-badge admin-badge-on">公開中</span>'                : '<span class="admin-badge admin-badge-off">非公開</span>';
 
               const registrationDate = user.createdAt
                 ? new Date(user.createdAt).toLocaleDateString('ja-JP')
@@ -541,7 +402,7 @@
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         data-user-email="${window.sharedUtilities.security.escapeHtml(user.userEmail || '')}"
                                         onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
-                                        class="btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        class="btn btn-danger text-xs"
                                         title="ユーザーを削除"> 削除
                                     </button>
                                 </div>
@@ -785,15 +646,8 @@
         const data = result.data;
         const isDisabled = data.isDisabled;
 
-        const currentStatus = document.getElementById('current-status');
         const currentAdmin = document.getElementById('current-admin');
         const lastUpdated = document.getElementById('last-updated');
-
-        if (isDisabled) {
-          currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium"> 停止中</span>';
-        } else {
-          currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium"> 運用中</span>';
-        }
 
         currentAdmin.textContent = data.adminEmail || currentAdmin.textContent;
 
@@ -814,9 +668,8 @@
         const restrictionInfo = document.getElementById('restriction-info');
 
         if (isDisabled) {
-          statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+          statusIndicator.className = 'admin-dot admin-dot-error';
           statusText.textContent = '停止中';
-          statusText.className = 'text-sm text-red-400';
           disableBtn.disabled = true;
           enableBtn.disabled = false;
 
@@ -830,9 +683,8 @@
             restrictionInfo.classList.remove('hidden');
           }
         } else {
-          statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+          statusIndicator.className = 'admin-dot admin-dot-ok';
           statusText.textContent = '運用中';
-          statusText.className = 'text-sm text-green-400';
           disableBtn.disabled = false;
           enableBtn.disabled = true;
           restrictionInfo.classList.add('hidden');
@@ -970,7 +822,7 @@
             listEl.innerHTML = slots.map(function(s) {
               var roleColor = s.role === 'primary'? 'text-cyan-400': 'text-theme-muted';
               var emailShort = (s.clientEmail || '(invalid)').split('@')[0];
-              var removeBtn = s.role === 'primary'                ? ''                : '<button data-sa-remove="'+ esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
+              var removeBtn = s.role === 'primary'                ? ''                : '<button data-sa-remove="'+ esc(s.slot) + '" class="btn btn-danger text-xs ml-2">削除</button>';
               return '<div class="flex items-center gap-2 p-2 bg-theme-card-1 rounded text-sm">'                + '<span class="text-theme-muted w-8">['+ esc(s.index) + ']</span>'                + '<span class="'+ roleColor + ' w-20">'+ esc(s.role) + '</span>'                + '<span class="text-theme font-mono truncate flex-1" title="'+ esc(s.clientEmail || '(invalid)') + '">'                + esc(emailShort) + '</span>'                + '<button data-sa-reverify="'+ esc(s.slot) + '" class="px-2 py-1 bg-theme-elevated hover:bg-theme-elevated-hover text-theme text-xs rounded">再 verify</button>'
                 + removeBtn
                 + '</div>';

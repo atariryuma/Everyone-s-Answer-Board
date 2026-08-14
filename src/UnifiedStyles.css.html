@@ -963,6 +963,211 @@
    * .modal-card-prominent: 答え modal 等の primary content modal 用 cyan accent。 */
   /* modal-overlay: モーダルの背面。旧実装は fixed inset-0 bg-black/80 backdrop-blur-sm
      … の utility 連結を 5 箇所で重複させていた。1 クラスに集約する。 */
+  /* ============================================================
+   * Admin UI primitives (v2902)
+   *
+   * Why: 管理画面 (アプリ設定 / 初期設定 / 詳細設定) は児童が見る画面と同じ
+   *   装飾レベルで作られていた。カード枠・色付きボックス・バッジ・大きな見出しが
+   *   並び、どこが操作対象かを読み取るのに時間がかかる。管理画面に必要なのは
+   *   「装飾」ではなく「一覧性と密度」なので、業界標準の設定画面 (GitHub Settings /
+   *   Vercel / Stripe Dashboard 等) と同じ構成要素に置き換える。
+   *
+   * 構成:
+   *   .admin-page      全体の幅と余白
+   *   .admin-section   区切り線で仕切るセクション (カード枠を使わない)
+   *   .admin-title     セクション見出し (小さめ・色を持たない)
+   *   .admin-row       ラベル / 説明 / 操作 の 3 要素を 1 行に置く設定行
+   *   .admin-actions   行末のボタン群
+   *   .admin-hint      補足文 (muted 一色。色付きボックスにしない)
+   *   .admin-table     一覧表
+   *   .admin-kv        key-value の読み取り専用表示
+   *   .admin-stat      数値サマリ
+   * ============================================================ */
+  .admin-page {
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-4) var(--space-16);
+  }
+
+  .admin-page-header {
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-2);
+    border-bottom: var(--border-primary);
+  }
+  .admin-page-header h1 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    margin: 0;
+  }
+  .admin-page-header p {
+    font-size: var(--font-size-sm);
+    color: var(--theme-text-muted);
+    margin: var(--space-1) 0 0;
+  }
+
+  .admin-section {
+    padding: var(--space-5) 0;
+    border-bottom: 1px solid var(--theme-border-subtle);
+  }
+  .admin-section:last-child { border-bottom: none; }
+
+  .admin-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    letter-spacing: 0.02em;
+    margin: 0 0 var(--space-1);
+  }
+  .admin-title .icon { color: var(--theme-text-muted); }
+
+  .admin-section > .admin-hint:first-of-type { margin-top: 0; }
+
+  .admin-hint {
+    font-size: var(--font-size-xs);
+    line-height: var(--leading-relaxed);
+    color: var(--theme-text-muted);
+    margin: var(--space-1) 0 var(--space-3);
+  }
+
+  /* 設定行: 左にラベル+説明、右に操作。狭い画面では縦積み。 */
+  .admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--theme-border-subtle);
+  }
+  .admin-row:first-of-type { border-top: none; }
+  .admin-row-label {
+    font-size: var(--font-size-sm);
+    color: var(--theme-text-primary);
+    min-width: 0;
+  }
+  .admin-row-label small {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    margin-top: 0.15rem;
+  }
+  .admin-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
+    flex-wrap: wrap;
+  }
+  @media (max-width: 640px) {
+    .admin-row { flex-direction: column; align-items: stretch; }
+    .admin-actions { justify-content: flex-start; }
+  }
+
+  /* key-value の読み取り専用表示 */
+  .admin-kv {
+    display: grid;
+    grid-template-columns: minmax(6rem, 12rem) 1fr;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+  .admin-kv dt { color: var(--theme-text-muted); }
+  .admin-kv dd { color: var(--theme-text-primary); margin: 0; word-break: break-all; }
+
+  /* 数値サマリ。装飾を持たず数字と見出しだけ。 */
+  .admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: var(--space-4);
+  }
+  .admin-stat-value {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .admin-stat-label {
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    margin-top: 0.15rem;
+  }
+
+  /* 一覧表 */
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+  }
+  .admin-table th {
+    text-align: left;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--theme-border-subtle);
+    white-space: nowrap;
+  }
+  .admin-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--theme-border-subtle);
+    color: var(--theme-text-primary);
+    vertical-align: middle;
+  }
+  .admin-table tbody tr:last-child td { border-bottom: none; }
+  .admin-table tbody tr:hover { background: var(--theme-card-1); }
+
+  /* 出力欄 (診断結果 / ログ) */
+  .admin-output {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: var(--font-size-xs);
+    line-height: var(--leading-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    max-height: 24rem;
+    overflow: auto;
+    color: var(--theme-text-secondary);
+    margin: 0;
+  }
+
+  /* 状態ドット。色数を絞り、意味のあるものだけに使う。 */
+  .admin-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--theme-text-muted);
+    flex: none;
+  }
+  .admin-dot-ok { background: var(--status-success); }
+  .admin-dot-warn { background: var(--status-warning); }
+  .admin-dot-error { background: var(--status-error); }
+
+  /* 状態バッジ (admin 一覧表内)。色は 2 値だけに絞り、面ではなく文字色で表す。 */
+  .admin-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    border: 1px solid var(--theme-border-subtle);
+    color: var(--theme-text-muted);
+    white-space: nowrap;
+  }
+  .admin-badge-on {
+    color: var(--theme-text-confirm);
+    border-color: color-mix(in srgb, var(--status-success) 45%, transparent);
+  }
+  .admin-badge-off {
+    color: var(--theme-text-muted);
+  }
+
   /* app-body: 全ページ共通の body 基本色。
      旧実装は 8 ページが同じ inline style="background: var(--theme-bg-base); …" を
      書いており、テーマ変更のたびに 8 箇所を直す必要があった。1 クラスに集約する。 */

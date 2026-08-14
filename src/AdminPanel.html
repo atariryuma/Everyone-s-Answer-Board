@@ -115,15 +115,19 @@
       border-top: none;
     }
 
+    /* 詳細設定の中の見出し。児童は見ない領域なので、装飾より一覧性を優先し
+       アプリ設定画面 (.admin-title) と同じ密度・同じ色数に揃える。 */
     .subsection-title {
       display: flex;
       align-items: center;
       gap: var(--space-2);
-      font-size: var(--font-size-base);
+      font-size: var(--font-size-sm);
       font-weight: var(--font-weight-semibold);
       color: var(--theme-text-primary);
-      margin: 0 0 var(--space-3);
+      letter-spacing: 0.02em;
+      margin: 0 0 var(--space-2);
     }
+    .subsection-title .icon { color: var(--theme-text-muted); }
 
     /* ヘッダー内のアカウントメニュー */
     .account-menu { position: relative; }
@@ -444,8 +448,8 @@
           </div>
 
           <!-- 検出情報の inline 表示 -->
-          <div id="form-detection-info" class="hidden mt-3 p-3 bg-theme-status-detection-soft border border-theme-status-detection-strong rounded-lg">
-            <div class="text-sm text-theme-status-detection">
+          <div id="form-detection-info" class="hidden mt-3">
+            <div class="text-sm text-theme-secondary">
               <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg> フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
               <div><svg class="icon icon-sm" aria-hidden="true"><use href="#i-table"></use></svg> 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
             </div>
@@ -495,8 +499,8 @@
                   <option value="">-- クリックして読み込み --</option>
                 </select>
                 <div id="form-info" class="form-info hidden">
-                  <div class="bg-theme-status-detection-soft border border-theme-status-detection-strong rounded-lg p-3">
-                    <div class="text-sm text-theme-status-detection">
+                  <div class="mt-2">
+                    <div class="text-sm text-theme-secondary">
                       <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg> <span id="form-title" class="font-medium">-</span></div>
                       <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-table"></use></svg> <span id="form-spreadsheet-status" class="font-medium">-</span></div>
                       <div><a id="form-url" href="#" target="_blank" class="text-theme-status-info hover:underline text-xs">フォームを開く</a></div>
@@ -536,7 +540,7 @@
                「最初の必須列」になる。任意列 (reason/class/name) より上に配置することで
                「必須を先に決める」自然な flow を維持する。 -->
           <div id="numeric-mapping-container" class="hidden space-y-4">
-            <div id="numeric-candidates-info" class="hidden p-3 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg">
+            <div id="numeric-candidates-info" class="hidden">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-theme-status-info-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-number-line"></use></svg></span>
                 <span class="text-sm font-medium text-theme-status-info-text-on-soft">検出された数値列</span>
@@ -607,7 +611,7 @@
         </div>
 
         <!-- 手動変更通知 + 自動推定に戻すボタン (見出しだけの装飾は廃止 / 動作するボタンを併設) -->
-        <div id="manual-override-info" class="hidden mb-4 p-2 bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg flex items-center justify-between gap-2">
+        <div id="manual-override-info" class="hidden mb-4 flex items-center justify-between gap-2">
           <span class="text-xs text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-hand"></use></svg> 手動で変更されました。</span>
           <button id="reset-to-ai" class="text-xs text-theme-status-info hover:text-theme-status-info underline-offset-2 hover:underline transition-colors flex-shrink-0" type="button">
             ↩ 自動推定に戻す
@@ -624,13 +628,10 @@
         <div class="space-y-4">
           <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
           <div class="mb-4">
-            <div class="bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg p-3 mb-4">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-lock"></use></svg></span>
-                <span class="text-sm font-medium text-theme-status-warning-text-on-soft">心理的安全性への配慮</span>
-              </div>
-              <p class="text-xs text-theme-status-warning-text-on-soft">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
-            </div>
+            <p class="admin-hint">
+              既定では回答者名もリアクション数も伏せています。児童が安心して書けることを優先した設定です。
+              必要なときだけ開いてください。
+            </p>
             <div class="toggle-group">
               <label class="toggle-switch">
                 <input type="checkbox" id="show-names" data-autosave />

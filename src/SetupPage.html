@@ -9,102 +9,86 @@
 <body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
-  <div class="max-w-2xl mx-auto">
-    <!-- ヘッダー -->
-    <div class="text-center mb-6">
-      <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2"> みんなの回答ボード</h1>
-      <p class="text-xl text-theme-secondary">初回セットアップ</p>
-      <p class="text-sm text-theme-muted mt-2">システムを使用開始するための設定を行います</p>
-    </div>
+  <div class="admin-page" style="max-width:44rem;">
+    <header class="admin-page-header">
+      <h1>初回セットアップ</h1>
+      <p>このアプリを使い始めるために必要な設定です。一度だけ行います。</p>
+    </header>
 
+    <form id="setup-form">
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg> サービスアカウント</h2>
+        <p class="admin-hint">
+          Google Cloud Console でダウンロードした JSON キーの内容をそのまま貼り付けます。
+          スプレッドシートへのアクセスに使います。
+        </p>
+        <textarea id="service-account-json" name="serviceAccountJson" rows="7"
+          class="modern-input w-full"
+          placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
+          required></textarea>
+      </section>
 
-    <!-- セットアップフォーム -->
-    <div class="card">
-      <h2 class="text-xl font-semibold text-theme mb-4"> システム設定</h2>
-
-      <form id="setup-form" class="space-y-6">
-        <!-- サービスアカウントJSON -->
-        <div>
-          <label for="service-account-json" class="block text-sm font-medium text-theme-secondary mb-2"> サービスアカウントJSONキー
-          </label>
-          <textarea id="service-account-json" name="serviceAccountJson" rows="8"
-            class="modern-input w-full"
-            placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
-            required></textarea>
-          <p class="text-xs text-theme-muted mt-1"> Google Cloud
-            ConsoleからダウンロードしたサービスアカウントのJSONファイルの内容を貼り付けてください
-          </p>
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-table"></use></svg> データベース</h2>
+        <p class="admin-hint">
+          ユーザーと設定を保存するスプレッドシートです。既存の ID を貼るか、自動作成できます。
+        </p>
+        <div class="flex gap-2">
+          <input type="text" id="database-id" name="databaseId"
+            class="modern-input flex-1"
+            placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH"
+            pattern="[a-zA-Z0-9_\-]{44}" maxlength="44" required
+            aria-label="データベーススプレッドシート ID" />
+          <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
+            class="btn btn-secondary whitespace-nowrap">自動作成</button>
         </div>
+      </section>
 
-        <!-- データベーススプレッドシートID -->
-        <div>
-          <label for="database-id" class="block text-sm font-medium text-theme-secondary mb-2"> データベーススプレッドシートID
-          </label>
-          <div class="flex gap-2">
-            <input type="text" id="database-id" name="databaseId"
-              class="modern-input flex-1"
-              placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
-              required />
-            <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
-              class="btn btn-success"> 自動作成
-            </button>
-          </div>
-          <p class="text-xs text-theme-muted mt-1"> 既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
-          </p>
-        </div>
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> 管理者</h2>
+        <p class="admin-hint">
+          アプリ設定を開けるアカウントです。ここで指定したドメインが、利用できる組織の範囲になります。
+        </p>
+        <input type="email" id="admin-email" name="adminEmail"
+          class="modern-input w-full" placeholder="admin@example.ed.jp" required
+          aria-label="管理者メールアドレス" />
+      </section>
 
-        <!-- 管理者メールアドレス -->
-        <div>
-          <label for="admin-email" class="block text-sm font-medium text-theme-secondary mb-2"> 管理者メールアドレス
-          </label>
-          <input type="email" id="admin-email" name="adminEmail"
-            class="modern-input w-full"
-            placeholder="admin@example.com" required />
-          <p class="text-xs text-theme-muted mt-1"> システム管理者のメールアドレスを入力してください
-          </p>
-        </div>
+      <section class="admin-section">
+        <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg> Google Client ID</h2>
+        <p class="admin-hint">
+          任意。OAuth 2.0 クライアント ID を使う場合のみ入力します。空欄のままで問題ありません。
+        </p>
+        <input type="text" id="google-client-id" name="googleClientId"
+          class="modern-input w-full"
+          placeholder="123456789012-abc….apps.googleusercontent.com"
+          aria-label="Google Client ID (任意)" />
+      </section>
 
-        <!-- Google Client ID（オプション） -->
-        <div>
-          <label for="google-client-id" class="block text-sm font-medium text-theme-secondary mb-2"> Google Client ID <span class="text-theme-muted">(オプション)</span>
-          </label>
-          <input type="text" id="google-client-id" name="googleClientId"
-            class="modern-input w-full"
-            placeholder="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" />
-          <p class="text-xs text-theme-muted mt-1"> Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
-          </p>
-        </div>
-
-        <!-- セットアップボタン -->
-        <button type="submit" id="setup-btn"
-          class="btn btn-primary w-full">
-          <span id="setup-text"> セットアップを開始</span>
+      <div class="pt-4">
+        <button type="submit" id="setup-btn" class="btn btn-primary">
+          <span id="setup-text">セットアップを開始</span>
           <div id="setup-spinner" class="spinner-xs mx-auto hidden"></div>
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
 
     <!-- テストセクション（セットアップ後に表示） -->
-    <div id="test-section" class="card hidden">
-      <h3 class="text-lg font-semibold text-theme mb-4"> セットアップ完了</h3>
-      <p class="text-theme-secondary mb-4"> セットアップが正常に完了しました。システムの動作確認を行えます。
-      </p>
-      <button type="button" id="test-btn"
-        class="btn btn-secondary"> システムテスト実行
-      </button>
-      <div class="mt-4">
-        <a id="start-studyquest-btn" target="_top"
-          class="btn btn-secondary is-disabled"> 読み込み中...
-        </a>
+    <section id="test-section" class="admin-section hidden">
+      <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg> セットアップ完了</h2>
+      <p class="admin-hint">設定を保存しました。動作確認をしてから使い始められます。</p>
+      <div class="admin-actions">
+        <button type="button" id="test-btn" class="btn btn-secondary">動作確認</button>
+        <a id="start-studyquest-btn" target="_top" class="btn btn-primary is-disabled">読み込み中...</a>
       </div>
-    </div>
+    </section>
 
-    <!-- ヘルプセクション -->
-    <div class="card">
-      <h3 class="text-lg font-semibold text-theme mb-4"> セットアップでお困りの場合</h3>
-      <div class="space-y-3 text-sm text-theme-secondary">
+    <!-- ヘルプ -->
+    <section class="admin-section">
+      <h2 class="admin-title"><svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg> 取得方法</h2>
+      <div class="space-y-2 text-sm text-theme-secondary">
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover"> サービスアカウントJSONの取得方法
+          <summary class="text-sm text-theme-secondary hover:text-theme select-none py-1">サービスアカウント JSON
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
             <ol class="list-decimal list-inside space-y-1">
@@ -117,7 +101,7 @@
           </div>
         </details>
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover"> スプレッドシートIDの取得方法
+          <summary class="text-sm text-theme-secondary hover:text-theme select-none py-1">スプレッドシート ID
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
             <ol class="list-decimal list-inside space-y-1">
@@ -128,7 +112,7 @@
           </div>
         </details>
       </div>
-    </div>
+    </section>
   </div>
 
   <script> let setupInProgress = false;
