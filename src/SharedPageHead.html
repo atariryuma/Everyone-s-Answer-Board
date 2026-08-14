@@ -2842,8 +2842,13 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    /* 授業名 + 操作ボタン 3 つは狭い画面で 1 行に収まらない。折り返さないと
+       行が縮まず、375px 幅の管理画面が 79px 横に溢れてスクロールしていた。 */
+    flex-wrap: wrap;
     transition: background var(--transition-fast) ease;
   }
+  /* 授業名は余った幅を占め、狭いときは折り返し先の行を独占する */
+  #lesson-list li > .flex-1 { min-width: 8rem; }
   #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
     font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
@@ -2915,6 +2920,15 @@
        溢れ、ボードの右端カードが切れて横スクロールが出ていた。
        他の utility と違い「使われているクラス」から検出できない類なので、常に出力する。 */
   *, ::before, ::after { box-sizing: border-box; }
+  /* 画像がカードや親要素を突き破らないようにする (教材画像は任意サイズで入ってくる) */
+  img, video { max-width: 100%; height: auto; }
+  /* 押せるものはカーソルで分かるようにする */
+  button, [role="button"] { cursor: pointer; }
+  table { border-collapse: collapse; }
+  /* hidden 属性はブラウザ既定の [hidden]{display:none} がクラス指定に負ける。
+     .class-chip-row{display:flex} の要素に hidden を付けても消えず、JS の
+     表示制御が無言で効かなくなっていた。.hidden クラスと同じ扱いに揃える。 */
+  [hidden] { display: none !important; }
 
   /* ── keyframes (animate-spin / animate-pulse) ── */
   @keyframes tw-spin { to { transform: rotate(360deg); } }
@@ -2985,7 +2999,7 @@
   .h-5 { height: 1.25rem; }
   .h-6 { height: 1.5rem; }
   .h-8 { height: 2rem; }
-  .hidden { display: none; }
+  .hidden { display: none !important; }
   .inline-block { display: inline-block; }
   .inline-flex { display: inline-flex; }
   .inset-0 { top: 0px; right: 0px; bottom: 0px; left: 0px; }

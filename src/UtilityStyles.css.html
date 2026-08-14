@@ -22,6 +22,15 @@
        溢れ、ボードの右端カードが切れて横スクロールが出ていた。
        他の utility と違い「使われているクラス」から検出できない類なので、常に出力する。 */
   *, ::before, ::after { box-sizing: border-box; }
+  /* 画像がカードや親要素を突き破らないようにする (教材画像は任意サイズで入ってくる) */
+  img, video { max-width: 100%; height: auto; }
+  /* 押せるものはカーソルで分かるようにする */
+  button, [role="button"] { cursor: pointer; }
+  table { border-collapse: collapse; }
+  /* hidden 属性はブラウザ既定の [hidden]{display:none} がクラス指定に負ける。
+     .class-chip-row{display:flex} の要素に hidden を付けても消えず、JS の
+     表示制御が無言で効かなくなっていた。.hidden クラスと同じ扱いに揃える。 */
+  [hidden] { display: none !important; }
 
   /* ── keyframes (animate-spin / animate-pulse) ── */
   @keyframes tw-spin { to { transform: rotate(360deg); } }
@@ -92,7 +101,7 @@
   .h-5 { height: 1.25rem; }
   .h-6 { height: 1.5rem; }
   .h-8 { height: 2rem; }
-  .hidden { display: none; }
+  .hidden { display: none !important; }
   .inline-block { display: inline-block; }
   .inline-flex { display: inline-flex; }
   .inset-0 { top: 0px; right: 0px; bottom: 0px; left: 0px; }

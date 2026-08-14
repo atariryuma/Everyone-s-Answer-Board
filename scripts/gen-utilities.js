@@ -418,8 +418,15 @@ for (const cls of [...used].sort()) {
   if (!decl) { if (!ownClasses.has(bare)) skipped.push(cls); continue; }
 
   const sel = decl.__selector ? decl.__selector.replace(cssEscape(bare), cssEscape(cls)) : `.${cssEscape(cls)}`;
+  // hidden だけは !important を付ける。
+  //   Why: ページ固有 CSS (page.css 等) は SharedPageHead より後に読まれるため、
+  //   同じ詳細度なら後勝ちで utility が負ける。display を持つ既存クラス
+  //   (.eab-identity-pill { display: inline-flex } 等) に .hidden を足しても
+  //   隠れず、JS の表示制御が無言で効かなくなる。「隠す」はレイアウト指定に
+  //   負けてよい種類の指定ではないので、ここだけ強制する。
+  const forceImportant = bare === 'hidden';
   const body = Object.entries(decl).filter(([k]) => k !== '__selector')
-    .map(([k, v]) => `${k}: ${v};`).join(' ');
+    .map(([k, v]) => `${k}: ${v}${forceImportant ? ' !important' : ''};`).join(' ');
 
   if (prefixes.length === 0) { base.push(`  ${sel} { ${body} }`); continue; }
   const bp = prefixes.find((p) => BREAKPOINT[p]);
@@ -456,6 +463,15 @@ const header = `<!-- ===========================================================
        溢れ、ボードの右端カードが切れて横スクロールが出ていた。
        他の utility と違い「使われているクラス」から検出できない類なので、常に出力する。 */
   *, ::before, ::after { box-sizing: border-box; }
+  /* 画像がカードや親要素を突き破らないようにする (教材画像は任意サイズで入ってくる) */
+  img, video { max-width: 100%; height: auto; }
+  /* 押せるものはカーソルで分かるようにする */
+  button, [role="button"] { cursor: pointer; }
+  table { border-collapse: collapse; }
+  /* hidden 属性はブラウザ既定の [hidden]{display:none} がクラス指定に負ける。
+     .class-chip-row{display:flex} の要素に hidden を付けても消えず、JS の
+     表示制御が無言で効かなくなっていた。.hidden クラスと同じ扱いに揃える。 */
+  [hidden] { display: none !important; }
 
   /* ── keyframes (animate-spin / animate-pulse) ── */
   @keyframes tw-spin { to { transform: rotate(360deg); } }

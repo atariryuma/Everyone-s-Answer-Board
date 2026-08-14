@@ -2715,8 +2715,13 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    /* 授業名 + 操作ボタン 3 つは狭い画面で 1 行に収まらない。折り返さないと
+       行が縮まず、375px 幅の管理画面が 79px 横に溢れてスクロールしていた。 */
+    flex-wrap: wrap;
     transition: background var(--transition-fast) ease;
   }
+  /* 授業名は余った幅を占め、狭いときは折り返し先の行を独占する */
+  #lesson-list li > .flex-1 { min-width: 8rem; }
   #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
     font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
