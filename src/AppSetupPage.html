@@ -15,8 +15,7 @@
     
     <!-- Shared Styles -->
     <?!= include('UnifiedStyles.css'); ?>
-    <script>
-      function getUrlParameterUserId() {
+    <script> function getUrlParameterUserId() {
         try {
           const urlParams = new URLSearchParams(window.location.search);
           return urlParams.get('userId') || '';
@@ -45,17 +44,16 @@
     <div class="max-w-6xl mx-auto p-6">
       <!-- ヘッダー -->
       <div class="text-center mb-6">
-        <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2">⚙️ みんなの回答ボード アプリ設定</h1>
+        <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2"> みんなの回答ボード アプリ設定</h1>
         <p class="text-xl text-theme-secondary">アプリケーションの運用設定を管理します</p>
-        <p class="text-sm text-theme-muted mt-2">
-          このページでアプリの有効/無効を切り替えることができます
+        <p class="text-sm text-theme-muted mt-2"> このページでアプリの有効/無効を切り替えることができます
         </p>
       </div>
 
 
       <!-- 現在のステータス表示 -->
       <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-theme mb-4">📊 現在のステータス</h2>
+        <h2 class="text-xl font-semibold text-theme mb-4"> 現在のステータス</h2>
         <div id="status-display" class="space-y-3">
           <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <div class="flex items-center">
@@ -63,8 +61,7 @@
               <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
                 <span
                   class="spinner-small mr-2"
-                ></span>
-                読み込み中...
+                ></span> 読み込み中...
               </span>
             </div>
           </div>
@@ -85,9 +82,8 @@
 
       <!-- ユーザー配布用URL -->
       <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-theme mb-4">🔗 ユーザー配布用URL</h2>
-        <p class="text-sm text-theme-muted mb-4">
-          ボード編集者となるユーザーに以下のログインURLを配布してください
+        <h2 class="text-xl font-semibold text-theme mb-4"> ユーザー配布用URL</h2>
+        <p class="text-sm text-theme-muted mb-4"> ボード編集者となるユーザーに以下のログインURLを配布してください
         </p>
 
         <div class="bg-theme-card-1 rounded-lg p-4">
@@ -106,12 +102,10 @@
               type="button"
               onclick="copyLoginUrl()"
               class="btn bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg text-sm whitespace-nowrap"
-            >
-              📋 コピー
+            > コピー
             </button>
           </div>
-          <p class="text-xs text-theme-muted mt-2">
-            ※ このURLにアクセスすると、組織内ユーザーはGoogleアカウントでログインし、自分のボードを編集できます
+          <p class="text-xs text-theme-muted mt-2"> ※ このURLにアクセスすると、組織内ユーザーはGoogleアカウントでログインし、自分のボードを編集できます
           </p>
         </div>
       </div>
@@ -120,7 +114,7 @@
       <div class="glass-panel rounded-xl p-6 mb-6">
         <div class="flex items-center justify-between mb-6">
           <div>
-            <h2 class="text-2xl font-semibold text-theme">🔒 アプリケーション制御</h2>
+            <h2 class="text-2xl font-semibold text-theme"> アプリケーション制御</h2>
             <p class="text-theme-muted">アプリケーション全体のアクセス制御を管理します</p>
           </div>
           <div class="flex items-center space-x-2">
@@ -132,9 +126,8 @@
         <!-- アプリ制御ボタン -->
         <div class="grid md:grid-cols-2 gap-4 mb-6">
           <div class="p-4 bg-theme-card-1 rounded-lg">
-            <h3 class="text-lg font-medium text-theme-status-error mb-3">🚫 アプリケーション停止</h3>
-            <p class="text-sm text-theme-muted mb-4">
-              全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
+            <h3 class="text-lg font-medium text-theme-status-error mb-3"> アプリケーション停止</h3>
+            <p class="text-sm text-theme-muted mb-4"> 全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
             </p>
             <div class="space-y-3">
               <input
@@ -147,24 +140,21 @@
                 id="disable-app-btn"
                 onclick="disableApp()"
                 class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                🚫 アプリケーションを停止
+              > アプリケーションを停止
               </button>
             </div>
           </div>
 
           <div class="p-4 bg-theme-card-1 rounded-lg">
-            <h3 class="text-lg font-medium text-theme-status-success mb-3">✅ アプリケーション再開</h3>
-            <p class="text-sm text-theme-muted mb-4">
-              停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
+            <h3 class="text-lg font-medium text-theme-status-success mb-3"> アプリケーション再開</h3>
+            <p class="text-sm text-theme-muted mb-4"> 停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
             </p>
             <div class="pt-8">
               <button
                 id="enable-app-btn"
                 onclick="enableApp()"
                 class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                ✅ アプリケーションを再開
+              > アプリケーションを再開
               </button>
             </div>
           </div>
@@ -172,7 +162,7 @@
 
         <!-- 現在の制限情報表示 -->
         <div id="restriction-info" class="hidden p-4 bg-theme-status-error-soft border border-theme-status-error-strong rounded-lg">
-          <h4 class="text-md font-medium text-theme-status-error-text-on-soft mb-2">⚠️ 現在のアクセス制限</h4>
+          <h4 class="text-md font-medium text-theme-status-error-text-on-soft mb-2"> 現在のアクセス制限</h4>
           <div class="text-sm text-theme-status-error-text-on-soft opacity-90 space-y-1">
             <div>理由: <span id="restriction-reason">-</span></div>
             <div>停止者: <span id="restriction-by">-</span></div>
@@ -185,11 +175,10 @@
       <div class="glass-panel rounded-xl p-6 mb-6">
         <div class="flex items-center justify-between mb-6">
           <div>
-            <h2 class="text-2xl font-semibold text-theme">📊 システム統計</h2>
+            <h2 class="text-2xl font-semibold text-theme"> システム統計</h2>
             <p class="text-theme-muted">登録ユーザーの概要情報</p>
           </div>
-          <button onclick="loadSystemStats()" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-            🔄 更新
+          <button onclick="loadSystemStats()" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"> 更新
           </button>
         </div>
 
@@ -215,7 +204,7 @@
 
       <!-- システム診断・監視セクション -->
       <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-theme mb-4">🔍 システム診断・監視</h2>
+        <h2 class="text-xl font-semibold text-theme mb-4"> システム診断・監視</h2>
         <p class="text-sm text-theme-muted mb-4">システムの健全性確認と問題解決のためのツールです</p>
 
         <div class="space-y-4">
@@ -223,13 +212,12 @@
           <div class="p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg">
             <div class="flex items-center justify-between mb-3">
               <div>
-                <h3 class="text-lg font-medium text-theme-status-info-text-on-soft">🩺 基本診断</h3>
+                <h3 class="text-lg font-medium text-theme-status-info-text-on-soft"> 基本診断</h3>
                 <p class="text-sm text-theme-status-info-text-on-soft opacity-80">まずはこちらを実行してください</p>
               </div>
               <span class="px-2 py-1 bg-blue-600/30 text-theme-status-info rounded text-xs">推奨</span>
             </div>
-            <p class="text-sm text-theme-secondary mb-4">
-              システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
+            <p class="text-sm text-theme-secondary mb-4"> システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
             </p>
             <div class="flex gap-3">
               <button
@@ -237,49 +225,44 @@
                 id="run-diagnosis-btn"
                 onclick="runSystemDiagnosis()"
                 class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
-              >
-                診断実行
+              > 診断実行
               </button>
               <button
                 type="button"
                 id="run-repair-btn"
                 onclick="runAutoRepair()"
                 class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
-              >
-                自動修復
+              > 自動修復
               </button>
             </div>
           </div>
 
           <!-- 詳細診断（折りたたみ） -->
           <details class="bg-theme-card-1 rounded-lg">
-            <summary class="p-4 cursor-pointer text-theme-secondary hover:text-white">
-              🔬 詳細診断ツール（クリックで展開）
+            <summary class="p-4 cursor-pointer text-theme-secondary hover:text-white"> 詳細診断ツール（クリックで展開）
             </summary>
             <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
               <div class="p-4 bg-theme-card-2 rounded-lg">
-                <h4 class="text-md font-medium text-theme-status-highlight mb-2">📈 システム監視</h4>
+                <h4 class="text-md font-medium text-theme-status-highlight mb-2"> システム監視</h4>
                 <p class="text-xs text-theme-muted mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
                 <button
                   type="button"
                   id="run-monitoring-btn"
                   onclick="runSystemMonitoring()"
                   class="btn bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg w-full text-sm"
-                >
-                  監視実行
+                > 監視実行
                 </button>
               </div>
 
               <div class="p-4 bg-theme-card-2 rounded-lg">
-                <h4 class="text-md font-medium text-theme-status-success mb-2">✅ データ整合性</h4>
+                <h4 class="text-md font-medium text-theme-status-success mb-2"> データ整合性</h4>
                 <p class="text-xs text-theme-muted mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
                 <button
                   type="button"
                   id="run-integrity-btn"
                   onclick="runIntegrityCheck()"
                   class="btn bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg w-full text-sm"
-                >
-                  整合性チェック
+                > 整合性チェック
                 </button>
               </div>
             </div>
@@ -288,13 +271,12 @@
           <!-- 結果表示エリア -->
           <div id="diagnostic-results" class="hidden mt-6">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-lg font-medium text-theme">📋 診断結果</h3>
+              <h3 class="text-lg font-medium text-theme"> 診断結果</h3>
               <button
                 type="button"
                 onclick="copyDiagnosticResult()"
                 class="btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-1 px-3 rounded text-sm flex items-center gap-2"
-              >
-                📋 コピー
+              > コピー
               </button>
             </div>
             <div class="bg-theme-base rounded-lg p-4 max-h-96 overflow-y-auto">
@@ -308,9 +290,8 @@
       <div class="glass-panel rounded-xl p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h2 class="text-xl font-semibold text-theme">🔐 SA pool 管理</h2>
-            <p class="text-sm text-theme-muted">
-              ボード SS への cross-user アクセスを担う Service Account の pool。 700 人規模で 3-5 個推奨。
+            <h2 class="text-xl font-semibold text-theme"> SA pool 管理</h2>
+            <p class="text-sm text-theme-muted"> ボード SS への cross-user アクセスを担う Service Account の pool。 700 人規模で 3-5 個推奨。
             </p>
           </div>
           <div id="sa-pool-summary" class="text-sm text-theme-secondary">読み込み中...</div>
@@ -321,35 +302,29 @@
 
           <div class="flex flex-wrap gap-2">
             <button type="button" id="sa-pool-refresh-btn"
-              class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm">
-              🔄 一覧を更新
+              class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm"> 一覧を更新
             </button>
             <button type="button" id="sa-pool-usage-btn"
-              class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm">
-              📊 使用状況
+              class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"> 使用状況
             </button>
             <button type="button" id="sa-pool-migrate-btn"
               class="btn bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm"
-              title="既存ボード全件に SA pool 全員を editor 追加 + 旧 domain 共有を revoke">
-              🧹 既存ボードを cleanup
+              title="既存ボード全件に SA pool 全員を editor 追加 + 旧 domain 共有を revoke"> 既存ボードを cleanup
             </button>
           </div>
 
           <details class="bg-theme-card-1 rounded-lg">
-            <summary class="p-3 cursor-pointer text-theme-secondary hover:text-white text-sm select-none">
-              ＋ SA JSON を追加 (GCP Console で発行)
+            <summary class="p-3 cursor-pointer text-theme-secondary hover:text-white text-sm select-none"> ＋ SA JSON を追加 (GCP Console で発行)
             </summary>
             <div class="p-4 pt-0">
-              <p class="text-xs text-theme-muted mb-2">
-                GCP Console (IAM &amp; Admin → Service Accounts) で SA を新規作成、 JSON キーをダウンロードして全文貼り付け。
+              <p class="text-xs text-theme-muted mb-2"> GCP Console (IAM &amp; Admin → Service Accounts) で SA を新規作成、 JSON キーをダウンロードして全文貼り付け。
                 登録時に DB editor 共有 + verify が自動実行されます。
               </p>
               <textarea id="sa-pool-add-input" rows="6"
                 placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
                 class="w-full px-3 py-2 bg-theme-base border border-theme-normal rounded text-theme text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
               <button type="button" id="sa-pool-add-btn"
-                class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm">
-                pool に追加
+                class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm"> pool に追加
               </button>
             </div>
           </details>
@@ -360,7 +335,7 @@
 
       <!-- ユーザー管理セクション -->
       <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-theme mb-4">👥 ユーザー管理</h2>
+        <h2 class="text-xl font-semibold text-theme mb-4"> ユーザー管理</h2>
 
         <div class="space-y-4">
           <!-- ユーザー一覧表示エリア -->
@@ -373,8 +348,7 @@
                   id="refresh-users-btn"
                   onclick="loadUserList()"
                   class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-                >
-                  🔄 更新
+                > 更新
                 </button>
               </div>
             </div>
@@ -383,21 +357,18 @@
               <div id="user-loading" class="p-8 text-center text-theme-muted">
                 <div
                   class="spinner mx-auto mb-2"
-                ></div>
-                ユーザー一覧を読み込み中...
+                ></div> ユーザー一覧を読み込み中...
               </div>
               <div id="user-table-content" class="hidden overflow-x-auto">
                 <table class="w-full min-w-[640px]">
                   <thead class="bg-theme-base">
                     <tr>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">
-                        メールアドレス
+                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary"> メールアドレス
                       </th>
                       <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">登録日</th>
                       <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">ユーザー状態</th>
                       <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">ボード状態</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary">
-                        最終アクセス
+                      <th class="px-4 py-3 text-left text-sm font-medium text-theme-secondary"> 最終アクセス
                       </th>
                       <th class="px-4 py-3 text-center text-sm font-medium text-theme-secondary">操作</th>
                     </tr>
@@ -417,8 +388,7 @@
           type="button"
           onclick="goBackToAdminPanel()"
           class="btn btn-secondary font-bold py-2 px-6"
-        >
-          ← 管理パネルに戻る
+        > ← 管理パネルに戻る
         </button>
       </div>
     </div>
@@ -429,7 +399,7 @@
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50"
     >
       <div class="modal-card">
-        <h3 class="text-xl font-semibold text-theme mb-4">⚠️ ユーザーアカウント削除</h3>
+        <h3 class="text-xl font-semibold text-theme mb-4"> ユーザーアカウント削除</h3>
 
         <div class="mb-4">
           <p class="text-theme-secondary mb-2">以下のユーザーを削除しますか？</p>
@@ -454,8 +424,7 @@
         </div>
 
         <div class="bg-theme-status-error-soft border border-theme-status-error-strong p-3 rounded-lg mb-4">
-          <p class="text-theme-status-error-text-on-soft text-sm">
-            ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
+          <p class="text-theme-status-error-text-on-soft text-sm"> この操作は取り消せません。ユーザーのデータが完全に削除されます。
           </p>
         </div>
 
@@ -464,25 +433,21 @@
             type="button"
             onclick="cancelDeletion()"
             class="flex-1 btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-2 px-4 rounded-lg"
-          >
-            キャンセル
+          > キャンセル
           </button>
           <button
             type="button"
             id="confirm-delete-btn"
             onclick="confirmDeletion()"
             class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg"
-          >
-            削除実行
+          > 削除実行
           </button>
         </div>
       </div>
     </div>
 
 
-    <script>
-
-      function showMessage(message, type = 'info', duration = 5000) {
+    <script> function showMessage(message, type = 'info', duration = 5000) {
         if (window.notifications) {
           window.notifications.showMessage(message, type, { duration });
         }
@@ -493,7 +458,7 @@
       function goBackToAdminPanel() {
         // プリフェッチ済みURLがあれば即遷移（ユーザーのクリックイベント内）
         const baseUrl = _cachedWebAppUrl || window.location.href.split('?')[0];
-        window.open(baseUrl + '?mode=admin&userId=' + __USER_ID__, '_top');
+        window.open(baseUrl + '?mode=admin&userId='+ __USER_ID__, '_top');
       }
 
 
@@ -538,18 +503,15 @@
         if (users.length === 0) {
           tableBody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-theme-muted">
-                            登録ユーザーが見つかりません
+                        <td colspan="5" class="px-4 py-8 text-center text-theme-muted"> 登録ユーザーが見つかりません
                         </td>
-                    </tr>
-                `;
+                    </tr> `;
         } else {
           tableBody.innerHTML = users
             .map((user) => {
               const isActive = user.isActive === true;
               const statusBadge = isActive
-                ? '<span class="px-2 py-1 bg-green-600 text-theme-status-success rounded-full text-xs">アクティブ</span>'
-                : '<span class="px-2 py-1 bg-red-600 text-theme-status-error rounded-full text-xs">非アクティブ</span>';
+                ? '<span class="px-2 py-1 bg-green-600 text-theme-status-success rounded-full text-xs">アクティブ</span>'                : '<span class="px-2 py-1 bg-red-600 text-theme-status-error rounded-full text-xs">非アクティブ</span>';
 
               let boardPublished = false;
               try {
@@ -558,8 +520,7 @@
               } catch (_) {}
 
               const boardBadge = boardPublished
-                ? '<span class="px-2 py-1 bg-purple-600 text-theme-status-highlight rounded-full text-xs">公開中</span>'
-                : '<span class="px-2 py-1 bg-theme-elevated text-theme rounded-full text-xs">非公開</span>';
+                ? '<span class="px-2 py-1 bg-purple-600 text-theme-status-highlight rounded-full text-xs">公開中</span>'                : '<span class="px-2 py-1 bg-theme-elevated text-theme rounded-full text-xs">非公開</span>';
 
               const registrationDate = user.createdAt
                 ? new Date(user.createdAt).toLocaleDateString('ja-JP')
@@ -581,29 +542,25 @@
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserStatus(this.dataset.userId)"
-                                        class="btn ${isActive ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
-                                        title="${isActive ? 'ユーザーを非アクティブに' : 'ユーザーをアクティブに'}">
-                                        ${isActive ? '無効化' : '有効化'}
+                                        class="btn ${isActive ? 'bg-orange-600 hover:bg-orange-700': 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        title="${isActive ? 'ユーザーを非アクティブに': 'ユーザーをアクティブに'}"> ${isActive ? '無効化': '有効化'}
                                     </button>
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserBoard(this.dataset.userId)"
-                                        class="btn ${boardPublished ? 'bg-theme-elevated hover:bg-theme-elevated-hover' : 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
-                                        title="${boardPublished ? 'ボードを非公開に' : 'ボードを公開に'}">
-                                        ${boardPublished ? '非公開' : '公開'}
+                                        class="btn ${boardPublished ? 'bg-theme-elevated hover:bg-theme-elevated-hover': 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        title="${boardPublished ? 'ボードを非公開に': 'ボードを公開に'}"> ${boardPublished ? '非公開': '公開'}
                                     </button>
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         data-user-email="${window.sharedUtilities.security.escapeHtml(user.userEmail || '')}"
                                         onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
                                         class="btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
-                                        title="ユーザーを削除">
-                                        削除
+                                        title="ユーザーを削除"> 削除
                                     </button>
                                 </div>
                             </td>
-                        </tr>
-                    `;
+                        </tr> `;
             })
             .join('');
         }
@@ -708,7 +665,7 @@
           showDiagnosticResult(result, functionName);
         } catch (error) {
           outputElement.textContent = `エラーが発生しました:\n${error.message || error}`;
-          showMessage(`❌ ${functionName} でエラーが発生しました: ${error.message || error}`, 'error');
+          showMessage(` ${functionName} でエラーが発生しました: ${error.message || error}`, 'error');
         } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
@@ -724,8 +681,8 @@
         output.textContent = `【${functionName} 実行結果】\n実行時間: ${timestamp}\n\n${JSON.stringify(result, null, 2)}`;
 
         showMessage(
-          result.success ? `✅ ${functionName}: 実行完了` : `❌ ${functionName}: エラーが発生`,
-          result.success ? 'success' : 'error'
+          result.success ? ` ${functionName}: 実行完了` : ` ${functionName}: エラーが発生`,
+          result.success ? 'success': 'error'
         );
       }
 
@@ -740,7 +697,7 @@
 
         navigator.clipboard.writeText(text)
           .then(() => {
-            showMessage('📋 診断結果をクリップボードにコピーしました', 'success');
+            showMessage('診断結果をクリップボードにコピーしました', 'success');
           })
           .catch((err) => {
             // フォールバック: テキストエリアを使用
@@ -752,7 +709,7 @@
             textarea.select();
             try {
               document.execCommand('copy');
-              showMessage('📋 診断結果をクリップボードにコピーしました', 'success');
+              showMessage('診断結果をクリップボードにコピーしました', 'success');
             } catch (e) {
               showMessage('コピーに失敗しました', 'error');
             }
@@ -847,9 +804,9 @@
         const lastUpdated = document.getElementById('last-updated');
 
         if (isDisabled) {
-          currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">🚫 停止中</span>';
+          currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium"> 停止中</span>';
         } else {
-          currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">✅ 運用中</span>';
+          currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium"> 運用中</span>';
         }
 
         currentAdmin.textContent = data.adminEmail || currentAdmin.textContent;
@@ -913,19 +870,19 @@
         try {
           const result = await runServer('disableAppAccess', reason);
           if (result && result.success) {
-            showMessage('✅ アプリケーションを停止しました', 'success');
+            showMessage('アプリケーションを停止しました', 'success');
             reasonInput.value = '';
             updateAppControlStatus();
           } else {
-            showMessage('❌ アプリケーション停止に失敗しました', 'error');
+            showMessage('アプリケーション停止に失敗しました', 'error');
           }
         } catch (error) {
           console.error('アプリ停止エラー:', error);
-          showMessage('❌ アプリケーション停止でエラーが発生しました', 'error');
+          showMessage('アプリケーション停止でエラーが発生しました', 'error');
         } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
-          button.textContent = '🚫 アプリケーションを停止';
+          button.textContent = 'アプリケーションを停止';
         }
       }
 
@@ -943,18 +900,18 @@
         try {
           const result = await runServer('enableAppAccess');
           if (result && result.success) {
-            showMessage('✅ アプリケーションを再開しました', 'success');
+            showMessage('アプリケーションを再開しました', 'success');
             updateAppControlStatus();
           } else {
-            showMessage('❌ アプリケーション再開に失敗しました', 'error');
+            showMessage('アプリケーション再開に失敗しました', 'error');
           }
         } catch (error) {
           console.error('アプリ再開エラー:', error);
-          showMessage('❌ アプリケーション再開でエラーが発生しました', 'error');
+          showMessage('アプリケーション再開でエラーが発生しました', 'error');
         } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
-          button.textContent = '✅ アプリケーションを再開';
+          button.textContent = 'アプリケーションを再開';
         }
       }
 
@@ -972,21 +929,21 @@
         const urlInput = document.getElementById('login-url');
         const url = urlInput.value;
 
-        if (!url || url === '読み込み中...' || url === 'URL取得エラー') {
+        if (!url || url === '読み込み中...'|| url === 'URL取得エラー') {
           showMessage('コピーするURLがありません', 'warning');
           return;
         }
 
         navigator.clipboard.writeText(url)
           .then(() => {
-            showMessage('📋 ログインURLをクリップボードにコピーしました', 'success');
+            showMessage('ログインURLをクリップボードにコピーしました', 'success');
           })
           .catch((err) => {
             // フォールバック
             urlInput.select();
             try {
               document.execCommand('copy');
-              showMessage('📋 ログインURLをクリップボードにコピーしました', 'success');
+              showMessage('ログインURLをクリップボードにコピーしました', 'success');
             } catch (e) {
               showMessage('コピーに失敗しました', 'error');
             }
@@ -1007,7 +964,7 @@
         if (!el) return;
         el.textContent = msg || '';
         // status コードのみ、 error は赤系 / 成功は緑系 — 両モード共通 brand-status の薄色
-        el.style.color = isError ? 'var(--status-error)' : 'var(--status-success)';
+        el.style.color = isError ? 'var(--status-error)': 'var(--status-success)';
       }
       function saPool_refresh() {
         saPool_setStatus('一覧取得中...');
@@ -1020,22 +977,15 @@
             return;
           }
           var slots = result.slots || [];
-          summary.textContent = slots.length + ' / ' + (result.maxSize || 10) + ' slot';
+          summary.textContent = slots.length + '/ ' + (result.maxSize || 10) + 'slot';
           if (!slots.length) {
             listEl.innerHTML = '<div class="text-theme-muted text-sm">(pool が空です。 まず primary SA を Setup 画面から登録してください)</div>';
           } else {
             listEl.innerHTML = slots.map(function(s) {
-              var roleColor = s.role === 'primary' ? 'text-cyan-400' : 'text-theme-muted';
+              var roleColor = s.role === 'primary'? 'text-cyan-400': 'text-theme-muted';
               var emailShort = (s.clientEmail || '(invalid)').split('@')[0];
-              var removeBtn = s.role === 'primary'
-                ? ''
-                : '<button data-sa-remove="' + esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
-              return '<div class="flex items-center gap-2 p-2 bg-theme-card-1 rounded text-sm">'
-                + '<span class="text-theme-muted w-8">[' + esc(s.index) + ']</span>'
-                + '<span class="' + roleColor + ' w-20">' + esc(s.role) + '</span>'
-                + '<span class="text-theme font-mono truncate flex-1" title="' + esc(s.clientEmail || '(invalid)') + '">'
-                + esc(emailShort) + '</span>'
-                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-theme-elevated hover:bg-theme-elevated-hover text-theme text-xs rounded">再 verify</button>'
+              var removeBtn = s.role === 'primary'                ? ''                : '<button data-sa-remove="'+ esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
+              return '<div class="flex items-center gap-2 p-2 bg-theme-card-1 rounded text-sm">'                + '<span class="text-theme-muted w-8">['+ esc(s.index) + ']</span>'                + '<span class="'+ roleColor + ' w-20">'+ esc(s.role) + '</span>'                + '<span class="text-theme font-mono truncate flex-1" title="'+ esc(s.clientEmail || '(invalid)') + '">'                + esc(emailShort) + '</span>'                + '<button data-sa-reverify="'+ esc(s.slot) + '" class="px-2 py-1 bg-theme-elevated hover:bg-theme-elevated-hover text-theme text-xs rounded">再 verify</button>'
                 + removeBtn
                 + '</div>';
             }).join('');
@@ -1053,11 +1003,9 @@
             return;
           }
           var lines = (result.pool || []).map(function(u) {
-            return '  ' + u.clientEmail.split('@')[0] + ': ' + u.picks + ' 回 / 5分'
-              + (u.cooling ? ' (cooling!)' : '');
+            return ' ' + u.clientEmail.split('@')[0] + ': '+ u.picks + ' 回 / 5分'              + (u.cooling ? ' (cooling!)': '');
           });
-          saPool_setStatus('直近 5分: 計 ' + result.total + ' 回, cooling ' + result.coolingCount + ' 個\n'
-            + lines.join('\n'));
+          saPool_setStatus('直近 5分: 計 '+ result.total + ' 回, cooling '+ result.coolingCount + ' 個\n'            + lines.join('\n'));
         }).catch(function(err) {
           saPool_setStatus('エラー: ' + (err && err.message), true);
         });
@@ -1072,7 +1020,7 @@
             saPool_setStatus('登録失敗: ' + (result && result.message), true);
             return;
           }
-          var msg = '登録完了: ' + result.clientEmail + ' (' + result.slot + '). verified=' + result.verified;
+          var msg = '登録完了: '+ result.clientEmail + ' ('+ result.slot + '). verified=' + result.verified;
           if (result.verifyError) msg += ', verify error: ' + result.verifyError;
           if (result.migrationHint) msg += '\n' + result.migrationHint;
           saPool_setStatus(msg);
@@ -1091,27 +1039,27 @@
             return;
           }
           var d = result.data || {};
-          saPool_setStatus('migration 完了: total=' + d.total + ', SA 追加=' + d.saAddedCount
-            + ', domain revoke=' + d.domainRevokedCount + ', error=' + d.errorCount);
+          saPool_setStatus('migration 完了: total='+ d.total + ', SA 追加=' + d.saAddedCount
+            + ', domain revoke='+ d.domainRevokedCount + ', error=' + d.errorCount);
         }).catch(function(err) {
           saPool_setStatus('エラー: ' + (err && err.message), true);
         });
       }
       function saPool_reverify(slot) {
-        saPool_setStatus(slot + ' を再 verify 中...');
+        saPool_setStatus(slot + 'を再 verify 中...');
         saPool_callAdmin('reverifyServiceAccountInPool', { slot: slot }).then(function(result) {
           saPool_setStatus(slot + ': verified=' + (result && result.verified)
-            + (result && result.error ? ', ' + result.error : ''));
+            + (result && result.error ? ', '+ result.error : ''));
         }).catch(function(err) {
           saPool_setStatus('エラー: ' + (err && err.message), true);
         });
       }
       function saPool_remove(slot) {
-        if (!confirm(slot + ' を pool から削除しますか? (GCP 側の SA key は別途 revoke が必要)')) return;
-        saPool_setStatus(slot + ' を削除中...');
+        if (!confirm(slot + 'を pool から削除しますか? (GCP 側の SA key は別途 revoke が必要)')) return;
+        saPool_setStatus(slot + 'を削除中...');
         saPool_callAdmin('removeServiceAccountFromPool', { slot: slot }).then(function(result) {
           if (result && result.success) {
-            saPool_setStatus(slot + ' を削除しました');
+            saPool_setStatus(slot + 'を削除しました');
             saPool_refresh();
           } else {
             saPool_setStatus('削除失敗: ' + (result && result.message), true);

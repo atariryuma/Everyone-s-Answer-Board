@@ -36,7 +36,7 @@
   //   しうる。 page.js は全 URL 代入前にこの gate を敷いており、 AdminPanel も揃える。
   //   非 https は '#' に落とす (リンクは無害化、 表示テキストは別途設定済)。
   function safeHttpsHref_(url) {
-    return (typeof url === 'string' && /^https:\/\//i.test(url)) ? url : '#';
+    return (typeof url === 'string'&& /^https:\/\//i.test(url)) ? url : '#';
   }
 
   function getUrlParameterUserId() {
@@ -100,12 +100,12 @@
   }
 
   // ============== 公開トグル / 設定保存 wrapper ==============
-  // Why: 「💾 設定を保存」+「📣 公開する/🔒 公開を終了する (state-aware)」の 2 ボタンに集約。
+  // Why: 「 設定を保存」+「 公開する/ 公開を終了する (state-aware)」の 2 ボタンに集約。
   //   内部では legacy save-draft / publish-now / unpublishBoardBtn を click 呼び出しする
   //   wrapper なので、既存の保存・公開・終了ロジックは変更しない。
 
   /**
-   * 「💾 設定を保存」ボタン → 既存 save-draft の wrapper。
+   * 「 設定を保存」ボタン → 既存 save-draft の wrapper。
    * 公開状態は変えずに config + active profile を上書き保存。
    */
   function initSaveConfigWrapper() {
@@ -124,7 +124,7 @@
   }
 
   /**
-   * 「📣 公開する / 🔒 公開を終了する」トグルボタン → 状態に応じて
+   * 「 公開する /  公開を終了する」トグルボタン → 状態に応じて
    * publish-now or unpublishBoardBtn を click 呼び出し。
    * 文言とスタイルは MutationObserver で app-publish-status に追従する。
    */
@@ -140,10 +140,10 @@
     let lastPubState = null;
     const sync = () => {
       const isPub = srcPublish.classList.contains('published') || /公開中/.test(srcPublish.textContent || '');
-      label.textContent = isPub ? '🔒 公開を終了する' : '📣 公開する';
+      label.textContent = isPub ? '公開を終了する': '公開する';
       btn.classList.toggle('btn-primary', !isPub);
       btn.classList.toggle('btn-danger', isPub);
-      btn.dataset.publishState = isPub ? 'published' : 'unpublished';
+      btn.dataset.publishState = isPub ? 'published': 'unpublished';
       btn.setAttribute('aria-pressed', String(isPub));
       if (lastPubState !== isPub) {
         lastPubState = isPub;
@@ -155,8 +155,7 @@
 
     btn.addEventListener('click', () => {
       const state = btn.dataset.publishState;
-      const target = state === 'published'
-        ? document.getElementById('unpublishBoardBtn')
+      const target = state === 'published'        ? document.getElementById('unpublishBoardBtn')
         : document.getElementById('publish-now');
       if (target && !target.disabled) {
         target.click();
@@ -207,7 +206,7 @@
 
     // 他の経路 (view ヘッダーの sun/moon toggle 等) で変更された場合に追従
     window.themeManager.subscribe((resolved, raw) => {
-      // raw は localStorage 値 ('dark' | 'light' | 'auto')
+      // raw は localStorage 値 ('dark'| 'light'| 'auto')
       if (select.value !== raw) select.value = raw;
     });
   }
@@ -233,7 +232,7 @@
       systemState.initialized = true;
     } catch (error) {
       try {
-        showError('初期化エラー: ' + systemState.initializationStep + ' - ' + error.message);
+        showError('初期化エラー: '+ systemState.initializationStep + ' - ' + error.message);
       } catch (uiError) {
         if (window.notifications) {
           window.notifications.error('管理パネルの初期化に失敗しました。ページを再読み込みしてください。', 7000);
@@ -245,7 +244,7 @@
   }
 
   /**
-   * ✅ CLAUDE.md準拠: Batched AdminPanel initialization for 70x performance improvement
+   *  CLAUDE.md準拠: Batched AdminPanel initialization for 70x performance improvement
    * Combines multiple sequential operations into efficient batch processing:
    * - Panel initialization
    * - Administrator access check
@@ -451,7 +450,7 @@
   }
 
   /**
-   * ✅ CLAUDE.md準拠: Event listeners initialization (moved from duplicate DOMContentLoaded)
+   *  CLAUDE.md準拠: Event listeners initialization (moved from duplicate DOMContentLoaded)
    */
   // dropdown 系 details の click-outside auto-close。
   //   要素クラスで限定 (admin-collapsible や form alternative の details は閉じない)。
@@ -459,8 +458,7 @@
     'details.lesson-template-picker',
     'details.profile-more-menu',
     'details.phase-add-picker',
-    'details.template-form-picker'
-  ].join(',');
+    'details.template-form-picker'  ].join(',');
 
   function initializeEventListeners() {
     // dropdown 系 details の click-outside auto-close + open 中の親カード z-index 持ち上げ。
@@ -495,7 +493,7 @@
     const formSelect = document.getElementById('form-select');
     if (formSelect) {
       // Lazy load: select を最初に開く / focus する時に一覧をロード。
-      // 旧来は「🔄 一覧を更新」 ボタンを押さないと選択肢が出ず、 select 自体を
+      // 旧来は「 一覧を更新」 ボタンを押さないと選択肢が出ず、 select 自体を
       // クリックしても 「-- クリックして読み込み --」 placeholder のままだった (user 報告)。
       let formsLoaded = false;
       const lazyLoadForms = () => {
@@ -614,7 +612,7 @@
     } catch (error) {
       select.innerHTML = '<option value="">読み込みエラー</option>';
       setPartialLoading(false);
-      console.error('📝 getForms通信エラー:', error);
+      console.error('getForms通信エラー:', error);
       throw new Error('フォーム一覧の読み込みに失敗しました: ' + error.message);
     }
     setPartialLoading(false);
@@ -709,7 +707,7 @@
       //   存在しない（実装は show-names checkbox に一本化されている）。残しても無効コード。
       //   showNames の復元は applyVisualizationConfig 内で行う（read/write 対称）。
 
-      // 左パネル末尾の「💾 プロファイル『〇』に保存」ボタンを active profile に同期。
+      // 左パネル末尾の「 プロファイル『〇』に保存」ボタンを active profile に同期。
       //   毎 applyConfig で再生成することで row drift / textContent 読み出しの罠を回避。
       try {
         const btn = document.getElementById('save-to-profile-btn');
@@ -719,7 +717,7 @@
           if (active && typeof active === 'string') {
             btn.hidden = false;
             btn.dataset.profileName = active;
-            if (nameSpan) nameSpan.textContent = '「' + active + '」';
+            if (nameSpan) nameSpan.textContent = '「'+ active + '」';
           } else {
             btn.hidden = true;
             delete btn.dataset.profileName;
@@ -737,8 +735,8 @@
             formTitle: config.formTitle || '',
             editUrl: config.formUrl ? config.formUrl.replace('/viewform', '/edit') : '',
             spreadsheetId: config.spreadsheetId || '',
-            spreadsheetUrl: config.spreadsheetId ? ('https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit') : '',
-            spreadsheetName: config.formTitle ? (config.formTitle + ' (回答)') : '',
+            spreadsheetUrl: config.spreadsheetId ? ('https://docs.google.com/spreadsheets/d/'+ config.spreadsheetId + '/edit') : '',
+            spreadsheetName: config.formTitle ? (config.formTitle + '(回答)') : '',
             sheetName: config.sheetName || ''
           });
         } catch (e) { console.warn('updateFormInfo from applyConfig failed:', e && e.message); }
@@ -774,7 +772,7 @@
       applyVisualizationConfig(config);
 
     } catch (error) {
-      console.error('❌ 設定反映エラー:', error.message);
+      console.error('設定反映エラー:', error.message);
     }
   }
 
@@ -802,7 +800,7 @@
     // 2) 軸ラベル
     const setText = (id, v) => {
       const el = document.getElementById(id);
-      if (el) el.value = typeof v === 'string' ? v : '';
+      if (el) el.value = typeof v === 'string'? v : '';
     };
     const x = config.xAxisLabels || {};
     const y = config.yAxisLabels || {};
@@ -836,9 +834,9 @@
           const target = formId || formUrl;
           if (!target) return; // Form 未連携時は config 保存のみで OK (新規 Form 作成時に反映される)
           runServer('setFormAllowResubmit', target, allowEl.checked).then((res) => {
-            if (res && res.success) setAutoSaveStatus('✓ Form 設定も更新しました', 'success');
-            else setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error');
-          }, () => setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error'));
+            if (res && res.success) setAutoSaveStatus('Form 設定も更新しました', 'success');
+            else setAutoSaveStatus('Form 設定の更新に失敗', 'error');
+          }, () => setAutoSaveStatus('Form 設定の更新に失敗', 'error'));
         });
       }
     }
@@ -860,7 +858,7 @@
     const setSelect = (id, v) => {
       const el = document.getElementById(id);
       if (!el) return;
-      const val = typeof v === 'number' ? String(v) : '';
+      const val = typeof v === 'number'? String(v) : '';
       // option が存在するかを軽くチェック（無ければ空のまま）
       const exists = Array.from(el.options).some(o => o.value === val);
       el.value = exists ? val : '';
@@ -878,12 +876,12 @@
    *
    * | mode       | answer | reason | class | name | numericX | numericY | axis-X | axis-Y | 象限 | resubmit |
    * |------------|--------|--------|-------|------|----------|----------|--------|--------|------|----------|
-   * | board      |   ✅   |   ✅   |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
-   * | pie        |   ✅   |   –    |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
-   * | wordcloud  |   ✅   |   ✅   |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
-   * | numberline |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    –     |   ✅   |   –    |  –   |    ✅    |
-   * | matrix     |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    ✅    |   ✅   |   ✅   |  ✅  |    ✅    |
-   * | auto       |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    ✅    |   ✅   |   ✅   |  –   |    ✅    |
+   * | board      |   ●    |   ●    |  ●    |  ●   |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | pie        |   ●    |   –    |  ●    |  ●   |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | wordcloud  |   ●    |   ●    |  ●    |  ●   |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | numberline |   ●    |   ●    |  ●    |  ●   |    ●     |    –     |   ●    |   –    |  –   |    ●     |
+   * | matrix     |   ●    |   ●    |  ●    |  ●   |    ●     |    ●     |   ●    |   ●    |  ●   |    ●     |
+   * | auto       |   ●    |   ●    |  ●    |  ●   |    ●     |    ●     |   ●    |   ●    |  –   |    ●     |
    *
    * answer/class/name は全モード必須。reason は pie のみ hide (集計用途で使われないため)。
    * numericX/Y は viz モード (numberline/matrix/auto) のみ。allow-resubmit は軸あるモードのみ。
@@ -896,7 +894,7 @@
     };
 
     const isMatrix = mode === 'matrix';
-    const isViz = isMatrix || mode === 'numberline' || mode === 'auto';
+    const isViz = isMatrix || mode === 'numberline'|| mode === 'auto';
     const config = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
 
     // 列 row の表示/非表示は COLUMN_MODE_CONFIG[mode] の key 有無で完全駆動。
@@ -954,7 +952,7 @@
     try {
       const result = await getColumnAnalysis(spreadsheetId, sheetName);
       if (!result || !result.success || !Array.isArray(result.headers)) {
-        setStatus('⚠ フォーム情報取得失敗: ' + ((result && (result.message || result.error)) || '不明'), 'warning');
+        setStatus('フォーム情報取得失敗: ' + ((result && (result.message || result.error)) || '不明'), 'warning');
         return;
       }
       const mapping = (savedMapping && Object.keys(savedMapping).length > 0)
@@ -967,7 +965,7 @@
       if (ys) ys.value = (savedMapping && typeof savedMapping.numericY === 'number') ? String(savedMapping.numericY) : '';
     } catch (e) {
       console.warn('silentlyRestoreColumnMapping failed:', e && e.message);
-      setStatus('⚠ 自動接続に失敗。「検証して接続」を押すか URL を貼り直してください', 'warning');
+      setStatus('自動接続に失敗。「検証して接続」を押すか URL を貼り直してください', 'warning');
     }
   }
 
@@ -979,7 +977,7 @@
     try {
       return await runServer('getColumnAnalysis', spreadsheetId, sheetName);
     } catch (error) {
-      console.error('❌ getColumnAnalysis direct error:', error);
+      console.error('getColumnAnalysis direct error:', error);
       throw error;
     } finally {
       ClientMutex.release(gateKey);
@@ -1016,7 +1014,7 @@
           }
         });
       }
-      return base + '?' + qs.join('&');
+      return base + '?'+ qs.join('&');
     };
     if (_cachedWebAppUrl) {
       try { onReady(buildQuery(_cachedWebAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
@@ -1037,7 +1035,7 @@
 
   function openManualGuide() {
     if (window.notifications) {
-      window.notifications.info('📚 使い方ガイドを開いています...', 2000);
+      window.notifications.info('使い方ガイドを開いています...', 2000);
     }
     buildWebAppUrl('manual', null,
       (url) => { window.open(url, '_blank'); },
@@ -1061,7 +1059,7 @@
     if (saveDraftBtn) {
       if (hasSpreadsheetConfig) {
         saveDraftBtn.disabled = false;
-        saveDraftBtn.textContent = hasColumnMapping ? '下書き保存' : '下書き保存（列設定推奨）';
+        saveDraftBtn.textContent = hasColumnMapping ? '下書き保存': '下書き保存（列設定推奨）';
         saveDraftBtn.classList.remove('opacity-50');
       } else {
         saveDraftBtn.disabled = true;
@@ -1096,7 +1094,7 @@
         spreadsheetBtn.onclick = () => {
           // 連打抑制: 新タブが複数開かないよう 800ms gate
           if (!window.sharedUtilities?.buttons?.navOnce(spreadsheetBtn)) return;
-          window.open('https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit', '_blank');
+          window.open('https://docs.google.com/spreadsheets/d/'+ config.spreadsheetId + '/edit', '_blank');
         };
       }
     }
@@ -1135,14 +1133,14 @@
 
     if (canAnalyze) {
       aiAnalyzeBtn.disabled = false;
-      aiAnalyzeBtn.textContent = '🤖 自動推定';
+      aiAnalyzeBtn.textContent = '自動推定';
       aiAnalyzeBtn.classList.remove('opacity-50');
     } else {
       aiAnalyzeBtn.disabled = true;
       if (!hasSpreadsheetConfig) {
-        aiAnalyzeBtn.textContent = '🤖 自動推定（データソース接続が必要）';
+        aiAnalyzeBtn.textContent = '自動推定（データソース接続が必要）';
       } else {
-        aiAnalyzeBtn.textContent = '🤖 自動推定（ヘッダー取得が必要）';
+        aiAnalyzeBtn.textContent = '自動推定（ヘッダー取得が必要）';
       }
       aiAnalyzeBtn.classList.add('opacity-50');
     }
@@ -1377,11 +1375,11 @@
         </head>
         <body style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <div style="text-align:center;max-width:500px;padding:24px;">
-            <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner">⚙️</div>
+            <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner"></div>
             <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレート（${typeLabel}）を作成中...</p>
 
             <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;"><!-- theme:exempt: 独立 popup window — 親の CSS 変数が届かないので literal 値が正 -->
-              <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;">⚠️ 編集が必要な項目</p>
+              <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;"> 編集が必要な項目</p>
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li><strong>クラス</strong> → 実際のクラス名に変更</li>
                 ${view.editLi}
@@ -1389,7 +1387,7 @@
             </div>
 
             <div style="background:rgba(255,255,255,0.1);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;">
-              <p style="font-size:14px;color:#a0aec0;margin:0 0 12px 0;">📝 そのまま使える項目</p>
+              <p style="font-size:14px;color:#a0aec0;margin:0 0 12px 0;"> そのまま使える項目</p>
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li>名前（テキスト入力）</li>
                 <li>理由（長文入力）</li>
@@ -1398,17 +1396,17 @@
             </div>
 
             <div style="background:rgba(134,239,172,0.12);border:1px solid rgba(134,239,172,0.3);border-radius: 0.75rem;padding:20px;text-align:left;">
-              <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;">✅ 次のステップ</p>
+              <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;"> 次のステップ</p>
               <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
                 <li>下のボタンでフォーム編集画面を開く</li>
                 <li>クラス名と${view.editStepTarget}を編集</li>
-                <li>管理パネルに戻り「<strong>🔍 検証して接続</strong>」をクリック</li>
+                <li>管理パネルに戻り「<strong> 検証して接続</strong>」をクリック</li>
                 <li>「<strong>今すぐ公開</strong>」で完了！</li>
               </ol>
             </div>
 
             <button id="open-form-btn" class="btn-primary" style="margin-top:24px;">
-              📝 フォームを編集する
+               フォームを編集する
             </button>
           </div>
         </body>
@@ -1421,7 +1419,7 @@
       if (btn) {
         btn.disabled = false;
         btn.classList.remove('btn-busy');
-        btn.textContent = '✨ テンプレート作成';
+        btn.textContent = 'テンプレート作成';
       }
 
       if (!(result && result.success)) {
@@ -1434,7 +1432,7 @@
       showSuccess(result.message || 'テンプレートフォームを作成しました');
 
       // URL入力欄にフォームURLと接続情報をセット
-      // ユーザーが「🔍 検証して接続」をクリックした際に使用される
+      // ユーザーが「 検証して接続」をクリックした際に使用される
       const formUrlInput = document.getElementById('form-url-input');
       if (formUrlInput) {
         formUrlInput.value = result.editUrl;
@@ -1456,7 +1454,7 @@
       // Why: 数直線(M1)/マトリクス(M2) テンプレートを作ったら、公開設定の
       //      boardMode セレクトをその種別に合わせて先回りで設定する。
       const boardModeSelect = document.getElementById('board-mode-select');
-      if (boardModeSelect && (result.templateType === 'numberline' || result.templateType === 'matrix' || result.templateType === 'pie')) {
+      if (boardModeSelect && (result.templateType === 'numberline'|| result.templateType === 'matrix'|| result.templateType === 'pie')) {
         boardModeSelect.value = result.templateType;
         try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
       }
@@ -1482,7 +1480,7 @@
           const statusIcon = doc.getElementById('status-icon');
           const statusText = doc.getElementById('status-text');
           const openFormBtn = doc.getElementById('open-form-btn');
-          if (statusIcon) { statusIcon.textContent = '✅'; statusIcon.classList.remove('spinner'); }
+          if (statusIcon) { statusIcon.textContent = ''; statusIcon.classList.remove('spinner'); }
           if (statusText) statusText.textContent = 'フォームの作成が完了しました！';
           if (openFormBtn) {
             openFormBtn.style.display = 'inline-block';
@@ -1496,14 +1494,14 @@
       // フォーム編集後に手動で接続してもらうため、自動接続は行わない
       // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
       // 編集完了後に接続（自動推定）を行う必要がある
-      showInfo('フォーム編集後、「🔍 検証して接続」ボタンをクリックしてください', 5000);
+      showInfo('フォーム編集後、「 検証して接続」ボタンをクリックしてください', 5000);
     }, (error) => {
       // エラー時はローディング画面を閉じる
       if (newWindow && !newWindow.closed) newWindow.close();
       if (btn) {
         btn.disabled = false;
         btn.classList.remove('btn-busy');
-        btn.textContent = '✨ テンプレート作成';
+        btn.textContent = 'テンプレート作成';
       }
       showError(error.message || 'フォーム作成中にエラーが発生しました');
     });
@@ -1512,7 +1510,7 @@
   function checkAdministratorAccess() {
     runServer('isAdmin').then((isAdmin) => {
       const appSetupBtn = document.getElementById('app-setup-btn');
-      if (appSetupBtn) appSetupBtn.style.display = isAdmin ? 'block' : 'none';
+      if (appSetupBtn) appSetupBtn.style.display = isAdmin ? 'block': 'none';
     }, (error) => {
       console.warn('システム管理者確認エラー:', error);
       const appSetupBtn = document.getElementById('app-setup-btn');
@@ -1527,7 +1525,7 @@
   function autoAnalyzeFormUrl(fullUrl) {
     if (!fullUrl || fullUrl.trim() === '') {
       hideFormDetectionInfo();
-      updateUrlValidationMessage('💡 GoogleフォームのURLを貼り付けてください', 'info');
+      updateUrlValidationMessage('GoogleフォームのURLを貼り付けてください', 'info');
       return;
     }
 
@@ -1535,7 +1533,7 @@
 
     if (!urlInfo.isValid) {
       hideFormDetectionInfo();
-      updateUrlValidationMessage('⚠ GoogleフォームのURLを入力してください', 'warning');
+      updateUrlValidationMessage('GoogleフォームのURLを入力してください', 'warning');
       return;
     }
 
@@ -1545,7 +1543,7 @@
       return;
     }
 
-    updateUrlValidationMessage('🔍 自動検証中...', 'info');
+    updateUrlValidationMessage('自動検証中...', 'info');
     window.sharedUtilities.debounce.debounce(
       () => validateCompleteUrl(),
       'auto-validate-url',
@@ -1646,14 +1644,14 @@
 
     if (!formUrl) {
       // 自動検証経路では showError を出さない (空入力時に呼ばれない設計)
-      updateUrlValidationMessage('⚠ GoogleフォームのURLを入力してください', 'warning');
+      updateUrlValidationMessage('GoogleフォームのURLを入力してください', 'warning');
       return;
     }
 
     // クライアント側で簡易チェック
     const urlInfo = parseFormUrlClientSide(formUrl);
     if (!urlInfo.isValid) {
-      updateUrlValidationMessage('⚠ GoogleフォームのURLを入力してください', 'warning');
+      updateUrlValidationMessage('GoogleフォームのURLを入力してください', 'warning');
       return;
     }
 
@@ -1672,7 +1670,7 @@
         hideFormDetectionInfo();
         // 自動検証経路ではトーストを出さず、メッセージ欄だけに留める (URL 入力途中で
         // server が一時的に失敗するケースで連続トーストが鬱陶しくならないように)。
-        updateUrlValidationMessage('⚠ ' + ((result && result.error) || '検証に失敗しました'), 'error');
+        updateUrlValidationMessage(' '+ ((result && result.error) || '検証に失敗しました'), 'error');
         return;
       }
 
@@ -1688,7 +1686,7 @@
       urlInput.dataset.lastValidatedUrl = formUrl;
 
       if (result.wasCreated) showSuccess('回答先スプレッドシートを作成しました');
-      updateUrlValidationMessage('✓ 接続しました', 'success');
+      updateUrlValidationMessage('接続しました', 'success');
 
       // 検証完了表示を読ませる短い遅延の後に自動接続
       setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
@@ -1697,8 +1695,8 @@
         validateBtn.disabled = false;
         validateBtn.classList.remove('btn-busy');
       }
-      console.error('❌ processFormUrlInput error:', error);
-      updateUrlValidationMessage('⚠ ' + ((error && error.message) || 'エラーが発生しました'), 'error');
+      console.error('processFormUrlInput error:', error);
+      updateUrlValidationMessage(' '+ ((error && error.message) || 'エラーが発生しました'), 'error');
     });
   }
 
@@ -1754,7 +1752,7 @@
 
           return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
         } else {
-          console.error('🚫 最大リトライ回数に到達、品質不足の結果を使用');
+          console.error('最大リトライ回数に到達、品質不足の結果を使用');
           showWarning('自動推定の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
         }
       }
@@ -1783,7 +1781,7 @@
       updateCompletionStatus();
 
     } catch (error) {
-      console.error(`❌ 列分析エラー (試行 ${retryCount + 1}):`, error);
+      console.error(` 列分析エラー (試行 ${retryCount + 1}):`, error);
 
       if (retryCount < maxRetries && isRetryableError(error)) {
         showInfo(`接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
@@ -1792,19 +1790,19 @@
         return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
       }
 
-      console.error('🚫 列分析の全試行が失敗しました');
+      console.error('列分析の全試行が失敗しました');
 
       try {
         await attemptEmergencyFallback(spreadsheetId, sheetName);
       } catch (fallbackError) {
-        console.error('🚫 緊急フォールバックも失敗:', fallbackError.message);
+        console.error('緊急フォールバックも失敗:', fallbackError.message);
         throw new Error(`分析に失敗しました (全${maxRetries + 1}回試行): ${error.message}`);
       }
     }
   }
 
   /**
-   * 🔍 分析結果品質検証
+   *  分析結果品質検証
    *
    * Why mode-aware: 現在の表示モード (COLUMN_MODE_CONFIG) から「必須列」を抽出する。
    *   matrix なら numericX/Y、pie なら answer のみ、と動的に変化させる。
@@ -1838,7 +1836,7 @@
   }
 
   /**
-   * 🔄 リトライ可能エラー判定
+   *  リトライ可能エラー判定
    */
   function isRetryableError(error) {
     const retryableMessages = [
@@ -1874,7 +1872,7 @@
   }
 
   /**
-   * 📊 分析品質レポート表示
+   *  分析品質レポート表示
    */
   function displayAnalysisQualityReport(result, quality) {
     const detectedFields = Object.keys(result.mapping || {}).length;
@@ -1886,10 +1884,10 @@
     if (avgConfidence < 20) qualityLevel = 'poor';
 
     const qualityIcons = {
-      excellent: '🎯',
-      good: '✅',
-      fair: '⚠️',
-      poor: '🔍'
+      excellent: '',
+      good: '',
+      fair: '',
+      poor: ''
     };
 
     const qualityMessages = {
@@ -1946,8 +1944,8 @@
     if (statusElement) {
       const isRequiredComplete = required.length === 0 || requiredCompleted === required.length;
       const statusIcon = isRequiredComplete
-        ? (optional.length === 0 || optionalCompleted === optional.length ? '🟢' : '🟡')
-        : '⚪';
+        ? (optional.length === 0 || optionalCompleted === optional.length ? '': '')
+        : '';
       statusElement.textContent = `${statusIcon} 必須: ${requiredCompleted}/${required.length} 任意: ${optionalCompleted}/${optional.length}`;
     }
   }
@@ -1961,7 +1959,7 @@
 
     let spreadsheetId = getCurrentSpreadsheetId() || '';
     let sheetName = getCurrentSheetName() || '';
-    const method = document.getElementById('form-url-input')?.dataset?.spreadsheetId ? 'URL' : 'dropdown';
+    const method = document.getElementById('form-url-input')?.dataset?.spreadsheetId ? 'URL': 'dropdown';
 
     try {
 
@@ -1981,17 +1979,17 @@
 
       if (result.success) {
         const successDetails = [];
-        successDetails.push('✅ データソース接続完了');
+        successDetails.push('データソース接続完了');
 
         if (result.batchResults && result.batchResults.formInfo) {
-          successDetails.push('📋 フォーム連携確認済み');
+          successDetails.push('フォーム連携確認済み');
           displayFormInfo(result.batchResults.formInfo.formData, {
             status: 'linked',
             spreadsheetName: result.batchResults.formInfo.spreadsheetName
           });
         }
 
-        showSuccess(successDetails.join(' | '));
+        showSuccess(successDetails.join('| '));
 
         // フォーム情報を取得
         const formInfo = result.batchResults?.formInfo?.formData || getCurrentFormInfoSafe();
@@ -2047,7 +2045,7 @@
             _knownProfileNames.add(autoProfileName);
             runServer('saveCurrentAsProfile', autoProfileName).then((res) => {
               if (res && res.success) {
-                showSuccess(`📋 プロファイル「${autoProfileName}」として自動保存しました`, 4000);
+                showSuccess(` プロファイル「${autoProfileName}」として自動保存しました`, 4000);
                 if (typeof loadProfileList === 'function') loadProfileList();
               }
               // 失敗時は silent (set からも削除しない: 同 session 内の連打を防ぐ)
@@ -2106,7 +2104,7 @@
       }
 
       if (validationDetails.formInfoVerified === false) {
-        userMessage += ' フォーム情報の取得にも失敗しました。';
+        userMessage += 'フォーム情報の取得にも失敗しました。';
         suggestions.push('フォームとスプレッドシートの連携を確認してください');
 
         if (validationDetails.formInfoError) {
@@ -2115,7 +2113,7 @@
       }
 
       if (validationDetails.formUrlMatches === false && validationDetails.detectedFormUrl) {
-        userMessage += ' 入力URLとシステム検出URLが異なります。';
+        userMessage += '入力URLとシステム検出URLが異なります。';
         suggestions.push(`検出されたURL: ${validationDetails.detectedFormUrl}`);
         suggestions.push('正しいフォームURLを使用しているか確認してください');
       }
@@ -2136,7 +2134,7 @@
     }
 
     const fullMessage =
-      userMessage + '\n\n推奨対処法:\n' + suggestions.map((s) => '• ' + s).join('\n');
+      userMessage + '\n\n推奨対処法:\n'+ suggestions.map((s) => '• '+ s).join('\n');
     showError(fullMessage);
 
     showInfo('ドロップダウンを使用して手動で列を設定できます。');
@@ -2179,42 +2177,42 @@
   }
   const COLUMN_MODE_CONFIG = {
     board: {
-      answer:   { label: '💬 メイン質問列', hint: 'カードに大きく表示する列／集計の対象列', required: true },
-      reason:   { label: '📋 補助質問列', hint: 'カード下部に小さく表示する列', required: false },
-      class:    { label: '🏫 クラス列', hint: '所属クラス情報が入っている列', required: false },
-      name:     { label: '👤 名前列', hint: '回答者の名前が入っている列', required: false }
+      answer:   { label: 'メイン質問列', hint: 'カードに大きく表示する列／集計の対象列', required: true },
+      reason:   { label: '補助質問列', hint: 'カード下部に小さく表示する列', required: false },
+      class:    { label: 'クラス列', hint: '所属クラス情報が入っている列', required: false },
+      name:     { label: '名前列', hint: '回答者の名前が入っている列', required: false }
     },
     pie: {
-      answer:   { label: '🥧 集計する選択肢列', hint: '円グラフで集計する選択肢', required: true },
-      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタに使用', required: false },
-      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+      answer:   { label: '集計する選択肢列', hint: '円グラフで集計する選択肢', required: true },
+      class:    { label: 'クラス列', hint: 'クラス別フィルタに使用', required: false },
+      name:     { label: '名前列', hint: '個別追跡用', required: false }
     },
     wordcloud: {
-      answer:   { label: '💭 自由記述列', hint: 'ワードランキングで集計する自由記述', required: true },
-      reason:   { label: '📋 補足列', hint: 'ホバー時表示用', required: false },
-      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタに使用', required: false },
-      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+      answer:   { label: '自由記述列', hint: 'ワードランキングで集計する自由記述', required: true },
+      reason:   { label: '補足列', hint: 'ホバー時表示用', required: false },
+      class:    { label: 'クラス列', hint: 'クラス別フィルタに使用', required: false },
+      name:     { label: '名前列', hint: '個別追跡用', required: false }
     },
     numberline: {
-      numericX: { label: '📏 X軸の数値列', hint: '数直線上の位置 (1〜5 等)', required: true },
-      reason:   { label: '📋 理由列', hint: 'ホバー時表示用', required: false },
-      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
-      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+      numericX: { label: 'X軸の数値列', hint: '数直線上の位置 (1〜5 等)', required: true },
+      reason:   { label: '理由列', hint: 'ホバー時表示用', required: false },
+      class:    { label: 'クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '名前列', hint: '個別追跡用', required: false }
     },
     matrix: {
-      numericX: { label: '📏 X軸の数値列', hint: '横軸の数値', required: true },
-      numericY: { label: '📐 Y軸の数値列', hint: '縦軸の数値', required: true },
-      reason:   { label: '📋 理由列', hint: 'ホバー時表示用', required: false },
-      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
-      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+      numericX: { label: 'X軸の数値列', hint: '横軸の数値', required: true },
+      numericY: { label: 'Y軸の数値列', hint: '縦軸の数値', required: true },
+      reason:   { label: '理由列', hint: 'ホバー時表示用', required: false },
+      class:    { label: 'クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '名前列', hint: '個別追跡用', required: false }
     },
     auto: {
-      answer:   { label: '💬 メイン質問列', hint: 'モードに応じて自動判定', required: true },
-      reason:   { label: '📋 補助質問列', hint: 'カード下部や補足表示で使用', required: false },
-      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
-      name:     { label: '👤 名前列', hint: '個別追跡用', required: false },
-      numericX: { label: '📏 X軸の数値列', hint: '数直線/散布図で使用', required: false },
-      numericY: { label: '📐 Y軸の数値列', hint: '散布図で使用', required: false }
+      answer:   { label: 'メイン質問列', hint: 'モードに応じて自動判定', required: true },
+      reason:   { label: '補助質問列', hint: 'カード下部や補足表示で使用', required: false },
+      class:    { label: 'クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '名前列', hint: '個別追跡用', required: false },
+      numericX: { label: 'X軸の数値列', hint: '数直線/散布図で使用', required: false },
+      numericY: { label: 'Y軸の数値列', hint: '散布図で使用', required: false }
     }
   };
 
@@ -2228,14 +2226,14 @@
     const config = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
     Object.keys(COLUMN_SELECT_IDS).forEach(key => {
       const selectId = COLUMN_SELECT_IDS[key];
-      const labelEl = document.querySelector('label[for="' + selectId + '"]');
+      const labelEl = document.querySelector('label[for="'+ selectId + '"]');
       const def = config[key];
       if (!labelEl || !def) return;
       while (labelEl.firstChild) labelEl.removeChild(labelEl.firstChild);
       labelEl.appendChild(document.createTextNode(def.label + ': '));
       const hintSpan = document.createElement('span');
-      hintSpan.className = 'text-xs ml-2 ' + (def.required ? 'text-red-300' : 'text-theme-muted');
-      hintSpan.textContent = (def.required ? '【必須】 ' : '(任意) ') + def.hint;
+      hintSpan.className = 'text-xs ml-2 '+ (def.required ? 'text-red-300': 'text-theme-muted');
+      hintSpan.textContent = (def.required ? '【必須】 ': '(任意) ') + def.hint;
       labelEl.appendChild(hintSpan);
     });
   }
@@ -2279,9 +2277,8 @@
 
       // Why: numericX/Y は「（自動判定）」を空 value のプレースホルダーとして使う。
       //      他の必須列は「選択してください...」表示で UX を分ける。
-      const placeholderFor = (k) => (k === 'numericX' || k === 'numericY')
-        ? '<option value="">（自動判定 / 未使用）</option>'
-        : '<option value="">選択してください...</option>';
+      const placeholderFor = (k) => (k === 'numericX'|| k === 'numericY')
+        ? '<option value="">（自動判定 / 未使用）</option>'        : '<option value="">選択してください...</option>';
 
       Object.keys(dropdowns).forEach((columnType) => {
         const dropdown = dropdowns[columnType];
@@ -2357,9 +2354,9 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     list.innerHTML = candidates.slice(0, 4).map((c, i) => {
-      const role = i === 0 ? 'X軸' : (i === 1 ? 'Y軸' : '候補');
+      const role = i === 0 ? 'X軸': (i === 1 ? 'Y軸': '候補');
       const header = c.header || (Array.isArray(headers) ? headers[c.index] : '') || '';
-      return `<div>📏 <strong>${role}</strong>: ${colLabel(c.index)}「${safe(header)}」`
+      return `<div> <strong>${role}</strong>: ${colLabel(c.index)}「${safe(header)}」`
            + ` (範囲 ${c.min}-${c.max}, 信頼度 ${c.confidence}%)</div>`;
     }).join('');
     panel.classList.remove('hidden');
@@ -2414,13 +2411,13 @@
         dropdown.classList.add('has-ai-selection');
         // Why: savedMapping は存在するが backend が再推定できないヘッダー (児童独自の質問文等) では
         //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示。
-        showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai' : 'saved');
+        showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai': 'saved');
         return;
       }
     }
     if (columnConfidence > 0) {
       const threshold = COLUMN_CONFIDENCE_THRESHOLDS[columnType] || 75;
-      const badgeType = columnConfidence >= threshold ? 'candidate' : 'low-confidence';
+      const badgeType = columnConfidence >= threshold ? 'candidate': 'low-confidence';
       showConfidenceBadge(columnType, columnConfidence, badgeType);
     }
   }
@@ -2491,12 +2488,12 @@
     const pct = Math.round(confidence);
 
     switch (type) {
-      case 'manual':       badgeClass = 'manual'; badgeText = '✋ 手動設定'; break;
-      case 'saved':        badgeClass = 'manual'; badgeText = '📌 保存済み'; break;
-      case 'ai':           badgeClass = 'high'; badgeText = `🎯 自動推定 ${pct}%`; break;
-      case 'candidate':    badgeClass = 'candidate'; badgeText = `🔍 候補 ${pct}%`; break;
-      case 'low-confidence': badgeClass = 'low'; badgeText = `📊 検討中 ${pct}%`; break;
-      default:             badgeClass = 'low'; badgeText = `🤖 自動推定 ${pct}%`;
+      case 'manual':       badgeClass = 'manual'; badgeText = '手動設定'; break;
+      case 'saved':        badgeClass = 'manual'; badgeText = '保存済み'; break;
+      case 'ai':           badgeClass = 'high'; badgeText = ` 自動推定 ${pct}%`; break;
+      case 'candidate':    badgeClass = 'candidate'; badgeText = ` 候補 ${pct}%`; break;
+      case 'low-confidence': badgeClass = 'low'; badgeText = ` 検討中 ${pct}%`; break;
+      default:             badgeClass = 'low'; badgeText = ` 自動推定 ${pct}%`;
     }
 
     badge.className = `confidence-badge ${badgeClass}`;
@@ -2518,7 +2515,7 @@
 
     const resetButton = document.getElementById('reset-to-ai');
     if (resetButton) {
-      resetButton.style.display = hasManualSelection ? 'inline-block' : 'none';
+      resetButton.style.display = hasManualSelection ? 'inline-block': 'none';
     }
   }
 
@@ -2642,7 +2639,7 @@
   //   - lastSavedHash: 直前保存時の config hash (etag 除外)。同 hash なら server 往復を skip
   const { setupAutoSave, scheduleAutoSave, autoSaveDraft } = (() => {
     const DEBOUNCE_MS = 900;        // 連続キー入力を吸収する debounce
-    const STATUS_CLEAR_MS = 2500;   // 「✓ 自動保存しました」表示の自然消滅時間
+    const STATUS_CLEAR_MS = 2500;   // 「 自動保存しました」表示の自然消滅時間
     const attached = new WeakSet();
     let lastSavedHash = null;
 
@@ -2650,8 +2647,8 @@
       document.querySelectorAll('[data-autosave]').forEach((el) => {
         if (attached.has(el)) return;
         attached.add(el);
-        const isTextLike = el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'url');
-        const ev = isTextLike ? 'input' : 'change';
+        const isTextLike = el.tagName === 'INPUT'&& (el.type === 'text'|| el.type === 'url');
+        const ev = isTextLike ? 'input': 'change';
         if (el.hasAttribute('data-lesson-field')) {
           // Lesson Workspace 用 dispatch shim: 個別 field を debounce 後に
           //   lesson.updateDraft で送信。saveDraft とは独立。
@@ -2676,7 +2673,7 @@
       }
       const answerSel = document.getElementById('answer-column-select');
       if (!answerSel || !answerSel.value) {
-        setAutoSaveStatus('💡 メイン質問列を選んでください', 'warning');
+        setAutoSaveStatus('メイン質問列を選んでください', 'warning');
         return;
       }
       const { config } = getValidatedConfig();
@@ -2695,12 +2692,12 @@
       saveDraft({
         silent: true,
         onComplete: (ok) => {
-          setAutoSaveStatus(ok ? '✓ 自動保存しました' : '⚠ 保存失敗', ok ? 'success' : 'error');
+          setAutoSaveStatus(ok ? '自動保存しました' : '保存失敗', ok ? 'success': 'error');
           if (!ok) lastSavedHash = null;
           if (ok) {
             setTimeout(() => {
               const el = document.getElementById('autosave-status');
-              if (el && el.textContent === '✓ 自動保存しました') {
+              if (el && el.textContent === '自動保存しました') {
                 setAutoSaveStatus('', 'info');
               }
             }, STATUS_CLEAR_MS);
@@ -2717,10 +2714,7 @@
     if (!el) return;
     const next = msg || '';
     const cls = 'text-xs ' + (
-      level === 'success' ? 'text-green-400'
-      : level === 'warning' ? 'text-yellow-400'
-      : level === 'error' ? 'text-red-400'
-      : 'text-theme-muted'
+      level === 'success'? 'text-green-400'      : level === 'warning'? 'text-yellow-400'      : level === 'error'? 'text-red-400'      : 'text-theme-muted'
     );
     if (el.textContent === next && el.className === cls) return;
     el.textContent = next;
@@ -2804,7 +2798,7 @@
         }
         next(config);
       }, (error) => {
-        console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+        console.warn('フォーム自動検出エラー（安全に継続）:', error.message);
         next(config);
       });
     } else {
@@ -2820,7 +2814,7 @@
 
     // Why cancel pending autosave: publish 直後に 900ms 前のキー入力で trigger された
     //   autosave が遅延 fire すると、stale etag/publishedAt で server に send され
-    //   "⚠ 保存失敗" toast や race を引き起こす (Profile lifecycle audit #c)。
+    //   " 保存失敗" toast や race を引き起こす (Profile lifecycle audit #c)。
     try {
       if (window.sharedUtilities && window.sharedUtilities.debounce
           && typeof window.sharedUtilities.debounce.clear === 'function') {
@@ -2971,7 +2965,7 @@
       fillEmpty('y-max-label', items[1].rightLabel);
     }
     if (filled > 0) {
-      try { showInfo('🧭 軸ラベルをフォームから自動取得しました', 4000); } catch (_) {}
+      try { showInfo('軸ラベルをフォームから自動取得しました', 4000); } catch (_) {}
       try { scheduleAutoSave(); } catch (_) {}
     }
   }
@@ -2997,7 +2991,7 @@
   function getVisualizationSettings() {
     const readText = (id) => {
       const el = document.getElementById(id);
-      return el && typeof el.value === 'string' ? el.value.trim() : '';
+      return el && typeof el.value === 'string'? el.value.trim() : '';
     };
     const xMin = readText('x-min-label');
     const xMax = readText('x-max-label');
@@ -3100,7 +3094,7 @@
     //   「ヘッダー読み込み未完 / dropdown 初期状態」でも表示・公開設定の保存を可能にする。
     const existingMapping = (systemState && systemState.config && systemState.config.columnMapping) || {};
     Object.keys(COLUMN_SELECT_IDS).forEach((key) => {
-      if (typeof columnMapping[key] !== 'number' && typeof existingMapping[key] === 'number') {
+      if (typeof columnMapping[key] !== 'number'&& typeof existingMapping[key] === 'number') {
         columnMapping[key] = existingMapping[key];
       }
     });
@@ -3108,7 +3102,7 @@
     // matrix / numberline では answer dropdown を hide しているため、numericX を answer にコピー。
     // viz code は answer をホバー時のラベル等で使うので、空にすると tooltip が崩れる。
     const mode = (document.getElementById('board-mode-select') || {}).value || 'auto';
-    if ((mode === 'matrix' || mode === 'numberline') && typeof columnMapping.numericX === 'number') {
+    if ((mode === 'matrix'|| mode === 'numberline') && typeof columnMapping.numericX === 'number') {
       columnMapping.answer = columnMapping.numericX;
     }
 
@@ -3119,7 +3113,7 @@
     const badge = document.querySelector('.status-badge.unpublished') || document.querySelector('.status-badge.published');
     if (badge) {
       badge.className = 'status-badge ' + status;
-      badge.textContent = status === 'published' ? '公開中' : '未公開';
+      badge.textContent = status === 'published'? '公開中': '未公開';
     }
   }
 
@@ -3182,14 +3176,14 @@
 
     const showNamesEl = document.getElementById('current-show-names');
     if (showNamesEl) {
-      showNamesEl.textContent = ds.showNames ? '実名表示' : '匿名';
-      showNamesEl.className = 'text-sm ' + (ds.showNames ? 'text-cyan-300' : 'text-theme-secondary');
+      showNamesEl.textContent = ds.showNames ? '実名表示': '匿名';
+      showNamesEl.className = 'text-sm '+ (ds.showNames ? 'text-cyan-300': 'text-theme-secondary');
     }
 
     const showReactionsEl = document.getElementById('current-show-reactions');
     if (showReactionsEl) {
-      showReactionsEl.textContent = ds.showReactions ? '表示' : '非表示';
-      showReactionsEl.className = 'text-sm ' + (ds.showReactions ? 'text-cyan-300' : 'text-theme-secondary');
+      showReactionsEl.textContent = ds.showReactions ? '表示': '非表示';
+      showReactionsEl.className = 'text-sm '+ (ds.showReactions ? 'text-cyan-300': 'text-theme-secondary');
     }
 
     const activeProfileEl = document.getElementById('current-active-profile');
@@ -3197,7 +3191,7 @@
       const profiles = Array.isArray(config.profiles) ? config.profiles : [];
       const active = config.activeProfile;
       if (active && profiles.length > 0) {
-        activeProfileEl.textContent = active + ' (' + profiles.length + ' boards)';
+        activeProfileEl.textContent = active + '(' + profiles.length + 'boards)';
         activeProfileEl.className = 'text-sm text-cyan-300';
       } else {
         activeProfileEl.textContent = '単一ボード';
@@ -3261,45 +3255,41 @@
       const modeLabel = PROFILE_MODE_LABELS[p.boardMode] || p.boardMode || 'auto';
       const safeName = escapeProfileText(p.name);
       const safeTitle = escapeProfileText(p.formTitle || '');
-      // status badge: active 行は「現在」 or 「🟢 公開中」、非 active は何も出さない
+      // status badge: active 行は「現在」 or 「 公開中」、非 active は何も出さない
       const statusBadge = isActive
         ? (published
-            ? '<span class="profile-badge profile-badge-published" title="このボードが公開中">🟢 公開中</span>'
-            : '<span class="profile-badge profile-badge-active" title="現在編集中（未公開）">現在</span>')
+            ? '<span class="profile-badge profile-badge-published" title="このボードが公開中"> 公開中</span>'            : '<span class="profile-badge profile-badge-active" title="現在編集中（未公開）">現在</span>')
         : '';
       // インラインアイコン:
-      //   - 非 active 行: 📥 切替 + 🗑 削除
-      //   - active 行: 🗑 削除のみ (active への「保存」は左パネル末尾の「💾 プロファイル『〇』に保存」へ集約)
+      //   - 非 active 行:  切替 +  削除
+      //   - active 行:  削除のみ (active への「保存」は左パネル末尾の「 プロファイル『〇』に保存」へ集約)
       //   右パネルは「ナビゲーション (どの profile を見るか)」、左パネルは「エディタ (編集と保存)」
       //   と役割を分担。保存系ボタンを左パネルにまとめることで「編集 → 保存」のフローが自然になる。
       const loadIcon = !isActive
-        ? '<button type="button" class="profile-icon-btn profile-icon-load" data-profile-action="load" data-profile-name="' + safeName + '" title="このプロファイルに切替">📥</button>'
-        : '';
-      const deleteIcon = '<button type="button" class="profile-icon-btn profile-icon-delete" data-profile-action="delete" data-profile-name="' + safeName + '" title="削除">🗑</button>';
+        ? '<button type="button" class="profile-icon-btn profile-icon-load" data-profile-action="load" data-profile-name="'+ safeName + '" title="このプロファイルに切替"></button>'        : '';
+      const deleteIcon = '<button type="button" class="profile-icon-btn profile-icon-delete" data-profile-action="delete" data-profile-name="'+ safeName + '" title="削除"></button>';
       // active 行は opaque vibrant pale cyan bg なので、 default text (slate-200) では contrast 不足
       //   → text-on-soft (cyan-900) に切り替え。 v2854 で他 status box と統一。
-      const textCls = isActive ? 'text-theme-status-accent-text-on-soft' : 'text-theme';
-      const mutedCls = isActive ? 'text-theme-status-accent-text-on-soft opacity-70' : 'text-theme-muted';
+      const textCls = isActive ? 'text-theme-status-accent-text-on-soft': 'text-theme';
+      const mutedCls = isActive ? 'text-theme-status-accent-text-on-soft opacity-70': 'text-theme-muted';
       const titleLine = safeTitle
-        ? '<div class="text-[10px] ' + mutedCls + ' truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
-        : '';
+        ? '<div class="text-[10px] '+ mutedCls + ' truncate" title="'+ safeTitle + '">'+ safeTitle + '</div>'        : '';
       return [
         '<div class="profile-row flex items-center gap-1 p-1.5 rounded border ',
         // theme-aware: light mode で dark slate / dark cyan が出ない pairing
-        isActive ? 'border-theme-status-accent-strong bg-theme-status-accent-soft' : 'border-theme-subtle bg-theme-card-1',
-        '" data-profile-row="' + safeName + '">',
-        '  <div class="flex-1 min-w-0">',
-        '    <div class="text-xs font-semibold ' + textCls + ' truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
+        isActive ? 'border-theme-status-accent-strong bg-theme-status-accent-soft': 'border-theme-subtle bg-theme-card-1',
+        '" data-profile-row="'+ safeName + '">',
+        ' <div class="flex-1 min-w-0">',
+        '   <div class="text-xs font-semibold ' + textCls + 'truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
         safeName,
-        '      <span class="ml-1 text-[10px] ' + mutedCls + '">[' + modeLabel + ']</span>',
-        '    </div>',
+        '     <span class="ml-1 text-[10px] ' + mutedCls + '">['+ modeLabel + ']</span>',
+        '   </div>',
         titleLine,
-        '  </div>',
+        ' </div>',
         statusBadge,
         loadIcon,
         deleteIcon,
-        '</div>'
-      ].join('');
+        '</div>'      ].join('');
     }).join('');
   }
 
@@ -3313,7 +3303,7 @@
         setProfileActionStatus(res && res.message ? res.message : 'プロファイル一覧取得に失敗しました', 'error');
       }
     }, (err) => {
-      setProfileActionStatus('プロファイル一覧取得エラー: ' + ((err && err.message) || err), 'error');
+      setProfileActionStatus('プロファイル一覧取得エラー: '+ ((err && err.message) || err), 'error');
     });
   }
 
@@ -3359,23 +3349,23 @@
         loadProfileList();
       }
     } catch (err) {
-      setProfileActionStatus(opts.failureMsg + ': ' + ((err && err.message) || err), 'error');
+      setProfileActionStatus(opts.failureMsg + ': '+ ((err && err.message) || err), 'error');
       loadProfileList();
     } finally {
       if (opts.btn) { opts.btn.disabled = false; opts.btn.classList.remove('btn-busy'); }
     }
   }
 
-  // 切替 (📥): non-destructive。reload は使わず in-place で左パネルを再ハイドレートする。
+  // 切替 (): non-destructive。reload は使わず in-place で左パネルを再ハイドレートする。
   //   safeReload は sessionStorage.clear() を実行する副作用があり、ログイン session が
   //   失われてリダイレクトされる事故が起きていた。in-place refresh ならその副作用が無い。
   function handleProfileLoad(name) {
     if (!name) return;
-    const row = document.querySelector('[data-profile-row="' + CSS.escape(name) + '"]');
+    const row = document.querySelector('[data-profile-row="'+ CSS.escape(name) + '"]');
     if (row) row.classList.add('profile-row-loading');
     runProfileOp({
-      busyMsg: 'プロファイル「' + name + '」を読み込み中...',
-      successMsg: 'プロファイル「' + name + '」に切り替えました',
+      busyMsg: 'プロファイル「'+ name + '」を読み込み中...',
+      successMsg: 'プロファイル「'+ name + '」に切り替えました',
       failureMsg: '読み込みに失敗しました',
       invoke: () => runServer('loadProfileForView', name),
       afterSuccess: async () => {
@@ -3385,33 +3375,33 @@
     });
   }
 
-  // 削除 (🗑): 取り消せないので confirm あり
+  // 削除 (): 取り消せないので confirm あり
   async function handleProfileDelete(name) {
     if (!name) return;
     const ok = await window.modals.confirm(
-      'プロファイル「' + name + '」を削除しますか？\n\nこの操作は取り消せません。',
+      'プロファイル「'+ name + '」を削除しますか？\n\nこの操作は取り消せません。',
       { title: 'プロファイル削除', variant: 'danger', okLabel: '削除' }
     );
     if (!ok) return;
     runProfileOp({
-      busyMsg: 'プロファイル「' + name + '」を削除中...',
+      busyMsg: 'プロファイル「'+ name + '」を削除中...',
       successMsg: '削除しました',
       failureMsg: '削除に失敗しました',
       invoke: () => runServer('deleteMyProfile', name)
     });
   }
 
-  // 更新 (💾 on active row): 現在の編集内容を当該 profile snapshot に上書き。
+  // 更新 ( on active row): 現在の編集内容を当該 profile snapshot に上書き。
   //   name は row の data-profile-name から渡される (旧 editBar の textContent ではないので drift 不可)。
   function handleActiveProfileUpdate(name) {
     if (!name) {
       setProfileActionStatus('プロファイルが特定できません', 'warning');
       return;
     }
-    const row = document.querySelector('[data-profile-row="' + CSS.escape(name) + '"]');
+    const row = document.querySelector('[data-profile-row="'+ CSS.escape(name) + '"]');
     const btn = row ? row.querySelector('.profile-icon-update') : null;
     runProfileOp({
-      busyMsg: 'プロファイル「' + name + '」を更新中...',
+      busyMsg: 'プロファイル「'+ name + '」を更新中...',
       successMsg: 'プロファイルを更新しました',
       failureMsg: '更新に失敗しました',
       btn,
@@ -3430,7 +3420,7 @@
       return;
     }
     runProfileOp({
-      busyMsg: 'プロファイル「' + name + '」を保存中...',
+      busyMsg: 'プロファイル「'+ name + '」を保存中...',
       successMsg: '保存しました',
       failureMsg: '保存に失敗しました',
       btn: document.getElementById('save-current-as-profile-btn'),
@@ -3504,7 +3494,7 @@
       saveBtn.addEventListener('click', handleProfileSave);
     }
 
-    // 左パネル末尾の「💾 プロファイル『〇』に保存」ボタン (drift-proof)。
+    // 左パネル末尾の「 プロファイル『〇』に保存」ボタン (drift-proof)。
     //   ボタンの dataset.profileName は applyConfig で activeProfile から毎回再生成される。
     const saveToProfileBtn = document.getElementById('save-to-profile-btn');
     if (saveToProfileBtn && !saveToProfileBtn.__handlerAttached) {
@@ -3565,7 +3555,7 @@
       copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
 
       if (statusText) {
-        statusText.textContent = '最終更新: ' + (boardInfo.lastUpdated || '不明');
+        statusText.textContent = '最終更新: '+ (boardInfo.lastUpdated || '不明');
       }
     } else {
       openBtn.style.display = 'none';
@@ -3590,7 +3580,7 @@
           showSuccess('閲覧用URLをコピーしました！');
           const btn = document.getElementById('copyViewUrlBtn');
           const originalText = btn.textContent;
-          btn.textContent = '✅ コピー完了';
+          btn.textContent = 'コピー完了';
           btn.disabled = true;
 
           createPromiseDelay(2000).then(() => {
@@ -3686,23 +3676,21 @@
           hintEl.classList.toggle('hidden', !isFirstTime);
         }
         if (lessons.length === 0) {
-          listEl.innerHTML = '<li class="text-theme-muted italic">まだレッスンがありません。「🎒 新しい授業を作る」から始めましょう。</li>';
+          listEl.innerHTML = '<li class="text-theme-muted italic">まだレッスンがありません。「 新しい授業を作る」から始めましょう。</li>';
           return;
         }
         listEl.innerHTML = lessons.map(l => {
-          const stateLabel = l.state === 'draft' ? '下書き' : l.state === 'active' ? '実行中' : '完了';
+          const stateLabel = l.state === 'draft'? '下書き': l.state === 'active'? '実行中': '完了';
           const dateStr = l.createdAt ? l.createdAt.slice(0, 10) : '';
           const safeName = window.sharedUtilities.security.escapeHtml(l.name || '無題');
           const safeId = window.sharedUtilities.security.escapeHtml(l.lessonId);
-          const action = l.state === 'completed' ? '振り返り'
-                       : l.state === 'active' ? '続きから'
-                       : '編集';
+          const action = l.state === 'completed'? '振り返り'                       : l.state === 'active'? '続きから'                       : '編集';
           return `<li>
             <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
-            <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="このレッスンをテンプレとして複製">📋 複製</button>
-            <button class="btn btn-secondary text-xs" data-lesson-delete="${safeId}" title="削除">🗑</button>
+            <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="このレッスンをテンプレとして複製"> 複製</button>
+            <button class="btn btn-secondary text-xs" data-lesson-delete="${safeId}" title="削除"></button>
           </li>`;
         }).join('');
       }).catch((err) => {
@@ -3787,7 +3775,7 @@
     function enterLessonCreateMode(templateKey, sourceBtn) {
       const template = templateKey || 'doutoku-3phase';
       const tpl = (lessonTemplatesCache || []).find(t => t.key === template);
-      const baseName = (tpl && tpl.label) ? '新しい授業 (' + tpl.label + ')' : '新しい授業';
+      const baseName = (tpl && tpl.label) ? '新しい授業 ('+ tpl.label + ')': '新しい授業';
       const task = () => gasRun('lesson.create', { userId, name: baseName, template }).then((res) => {
         if (!res || !res.success) {
           window.showError((res && res.message) || 'レッスン作成失敗');
@@ -3833,12 +3821,11 @@
         lessonTemplatesCache = res.data.templates || [];
         const esc = window.sharedUtilities.security.escapeHtml;
         menu.innerHTML = lessonTemplatesCache.map(t => (
-          '<button type="button" class="lesson-template-item" data-lesson-template="' + esc(t.key) + '">' +
-            '<span class="lesson-template-label">' + esc(t.label) + '</span>' +
-            '<span class="lesson-template-desc">' + esc(t.description || '') +
-              ' <span class="lesson-template-phase-count">(' + t.phaseCount + ' フェーズ)</span></span>' +
-          '</button>'
-        )).join('');
+          '<button type="button" class="lesson-template-item" data-lesson-template="'+ esc(t.key) + '">' +
+            '<span class="lesson-template-label">'+ esc(t.label) + '</span>' +
+            '<span class="lesson-template-desc">'+ esc(t.description || '') +
+              '<span class="lesson-template-phase-count">(' + t.phaseCount + 'フェーズ)</span></span>' +
+          '</button>'        )).join('');
       }).catch((err) => {
         menu.innerHTML = '<p class="lesson-template-loading text-theme-status-error">' +
           window.sharedUtilities.security.escapeHtml((err && err.message) || String(err)) + '</p>';
@@ -3872,7 +3859,7 @@
       loadLessonThen(lessonId, preloaded, (lesson) => {
         document.body.classList.add('mode-create-lesson');
         document.body.classList.remove('mode-run-lesson');
-        history.pushState({ lesson: lessonId, mode: 'create' }, '', '#lesson/' + lessonId);
+        history.pushState({ lesson: lessonId, mode: 'create'}, '', '#lesson/' + lessonId);
         renderWizardStep(1);
         hydrateWizardFromLesson(lesson);
       });
@@ -3949,9 +3936,8 @@
       const esc = window.sharedUtilities.security.escapeHtml;
       wrap.innerHTML = selectedClasses.map((c) => (
         '<span class="class-chip">' + esc(c) +
-          '<button type="button" class="class-chip-remove" data-class="' + esc(c) + '" aria-label="削除">×</button>' +
-        '</span>'
-      )).join('');
+          '<button type="button" class="class-chip-remove" data-class="'+ esc(c) + '" aria-label="削除">×</button>' +
+        '</span>'      )).join('');
       wrap.querySelectorAll('.class-chip-remove').forEach((btn) => {
         btn.addEventListener('click', () => removeClass(btn.dataset.class));
       });
@@ -3970,8 +3956,7 @@
       wrap.hidden = false;
       const esc = window.sharedUtilities.security.escapeHtml;
       inner.innerHTML = remaining.map((c) => (
-        '<button type="button" class="class-chip class-chip-known" data-class="' + esc(c) + '">+ ' + esc(c) + '</button>'
-      )).join('');
+        '<button type="button" class="class-chip class-chip-known" data-class="'+ esc(c) + '">+ '+ esc(c) + '</button>'      )).join('');
       inner.querySelectorAll('.class-chip-known').forEach((btn) => {
         btn.addEventListener('click', () => addClass(btn.dataset.class));
       });
@@ -3986,20 +3971,20 @@
       const buttons = [1, 2, 3, 4, 5, 6].map((n) => {
         const name = grade + '-' + n;
         const isSelected = selectedClasses.includes(name);
-        return '<button type="button" class="class-chip class-chip-known' + (isSelected ? ' active' : '') +
-          '" data-class="' + esc(name) + '">' +
-          (isSelected ? '✓ ' : '+ ') + esc(name) + '</button>';
+        return '<button type="button" class="class-chip class-chip-known'+ (isSelected ? ' active': '') +
+          '" data-class="'+ esc(name) + '">' +
+          (isSelected ? ' ': '+ ') + esc(name) + '</button>';
       }).join('');
       wrap.innerHTML =
-        '<span class="class-preset-label">' + grade + '年:</span>' +
+        '<span class="class-preset-label">'+ grade + '年:</span>' +
         buttons +
-        '<button type="button" class="class-chip class-chip-known" data-action="add-all" data-grade="' + grade + '">▶ 1〜6組をまとめて追加</button>';
+        '<button type="button" class="class-chip class-chip-known" data-action="add-all" data-grade="'+ grade + '">▶ 1〜6組をまとめて追加</button>';
       wrap.querySelectorAll('[data-class]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const name = btn.dataset.class;
           if (selectedClasses.includes(name)) removeClass(name);
           else addClass(name);
-          renderGradeExpand(grade); // 再描画して ✓ 反映
+          renderGradeExpand(grade); // 再描画して  反映
         });
       });
       const addAllBtn = wrap.querySelector('[data-action="add-all"]');
@@ -4044,7 +4029,7 @@
       }
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target && e.target.id === 'lesson-class-custom-input') {
+      if (e.key === 'Enter'&& e.target && e.target.id === 'lesson-class-custom-input') {
         e.preventDefault();
         const btn = document.getElementById('lesson-class-custom-btn');
         if (btn) btn.click();
@@ -4054,7 +4039,7 @@
     function renderWizardStep(step) {
       document.querySelectorAll('.lesson-step-dot').forEach((dot) => {
         const s = Number(dot.dataset.step);
-        dot.textContent = s <= step ? '●' : '○';
+        dot.textContent = s <= step ? '●': '○';
         dot.classList.toggle('active', s === step);
       });
       document.querySelectorAll('.lesson-step').forEach((el) => {
@@ -4067,10 +4052,10 @@
     //   phases 配列を currentPhases に保持して、UI 操作 → 配列更新 → renderPhaseCards 再描画 →
     //   phases 全体を 1 回 autosave、という単純な data-flow。
     const PHASE_TEMPLATE_OPTIONS = [
-      { value: 'numberline', label: '📊 数直線 (1〜5 で立場)' },
-      { value: 'matrix', label: '🎯 マトリクス (2 軸の散布図)' },
-      { value: 'pie', label: '🥧 円グラフ (選択肢 + 理由)' },
-      { value: 'board', label: '📝 掲示板 (回答を一覧)' }
+      { value: 'numberline', label: '数直線 (1〜5 で立場)' },
+      { value: 'matrix', label: 'マトリクス (2 軸の散布図)' },
+      { value: 'pie', label: '円グラフ (選択肢 + 理由)' },
+      { value: 'board', label: '掲示板 (回答を一覧)' }
     ];
     const PHASE_MIN = 1;
     const PHASE_MAX = 5;
@@ -4109,10 +4094,9 @@
         if (typeof o.yLow !== 'string') o.yLow = '低い';
         if (typeof o.yHigh !== 'string') o.yHigh = '高い';
         if (!SCALE_POINTS_ALLOWED.includes(o.scalePoints)) o.scalePoints = 5;
-      } else if (formTemplate === 'pie' || formTemplate === 'board') {
+      } else if (formTemplate === 'pie'|| formTemplate === 'board') {
         if (!Array.isArray(o.choices) || o.choices.length < 2) {
-          o.choices = formTemplate === 'pie'
-            ? ['A', 'B', 'どちらとも言えない']
+          o.choices = formTemplate === 'pie'            ? ['A', 'B', 'どちらとも言えない']
             : ['賛成', '反対', 'どちらでもない'];
         }
       }
@@ -4126,37 +4110,36 @@
       const canDelete = currentPhases.length > PHASE_MIN;
       const cards = currentPhases.map((p, i) => {
         const options = PHASE_TEMPLATE_OPTIONS.map((opt) => {
-          const sel = opt.value === p.formTemplate ? ' selected' : '';
-          return '<option value="' + opt.value + '"' + sel + '>' + esc(opt.label) + '</option>';
+          const sel = opt.value === p.formTemplate ? 'selected' : '';
+          return '<option value="'+ opt.value + '"'+ sel + '>'+ esc(opt.label) + '</option>';
         }).join('');
         const deleteBtn = canDelete
-          ? '<button type="button" class="phase-delete-btn" data-phase-action="delete" data-phase-index="' + i + '" title="このフェーズを削除">×</button>'
-          : '';
+          ? '<button type="button" class="phase-delete-btn" data-phase-action="delete" data-phase-index="'+ i + '" title="このフェーズを削除">×</button>'          : '';
         return (
           '<div class="lesson-phase-card">' +
             '<div class="phase-card-header">' +
-              '<span class="phase-number">フェーズ ' + (i + 1) + '</span>' +
+              '<span class="phase-number">フェーズ '+ (i + 1) + '</span>' +
               deleteBtn +
             '</div>' +
             '<div class="phase-field">' +
               '<label class="phase-label">フェーズ名:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-field="name" data-phase-index="' + i +
-                '" value="' + esc(p.name) + '" maxlength="40" placeholder="例: 導入" />' +
+                '" value="'+ esc(p.name) + '" maxlength="40" placeholder="例: 導入" />' +
             '</div>' +
             '<div class="phase-field">' +
               '<label class="phase-label">形式:</label>' +
-              '<select class="modern-input text-sm" data-phase-field="formTemplate" data-phase-index="' + i + '">' +
+              '<select class="modern-input text-sm" data-phase-field="formTemplate" data-phase-index="'+ i + '">' +
                 options +
               '</select>' +
             '</div>' +
             '<div class="phase-field">' +
               '<label class="phase-label">質問:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-field="question" data-phase-index="' + i +
-                '" value="' + esc(p.question) + '" maxlength="200" placeholder="生徒に問いかける文" />' +
+                '" value="'+ esc(p.question) + '" maxlength="200" placeholder="生徒に問いかける文" />' +
             '</div>' +
             renderPhaseDetailFields(p, i) +
             // プレビューは「設定の結果として何が見えるか」を示すので、設定 UI の後に置く
-            '<div class="phase-preview-label">📺 生徒に見える形:</div>' +
+            '<div class="phase-preview-label"> 生徒に見える形:</div>' +
             renderPhasePreview(p) +
             renderPhaseCommonOptions(p, i) +
           '</div>'
@@ -4168,15 +4151,14 @@
             '<summary class="phase-add-btn">＋ フェーズを追加 ▾</summary>' +
             '<div class="phase-add-menu">' +
               PHASE_TEMPLATE_OPTIONS.map((opt) => (
-                '<button type="button" class="phase-add-menu-item" data-phase-action="add" data-phase-add-template="' + opt.value + '">' +
+                '<button type="button" class="phase-add-menu-item" data-phase-action="add" data-phase-add-template="'+ opt.value + '">' +
                   esc(opt.label) +
-                '</button>'
-              )).join('') +
+                '</button>'              )).join('') +
             '</div>' +
           '</details>'
         )
-        : '<p class="text-xs text-theme-muted text-center">フェーズは最大 ' + PHASE_MAX + ' 個までです</p>';
-      container.innerHTML = cards + '<div class="phase-add-wrap">' + addBtn + '</div>';
+        : '<p class="text-xs text-theme-muted text-center">フェーズは最大 '+ PHASE_MAX + ' 個までです</p>';
+      container.innerHTML = cards + '<div class="phase-add-wrap">'+ addBtn + '</div>';
     }
 
     // ミニプレビュー: 形式ごとに「生徒に何が見えるか」を視覚化する小さなSVG/text。
@@ -4188,9 +4170,9 @@
         const hi = esc(o.highLabel || '高');
         return (
           '<div class="phase-preview phase-preview-numberline">' +
-            '<span class="phase-preview-end">' + lo + '</span>' +
+            '<span class="phase-preview-end">'+ lo + '</span>' +
             '<span class="phase-preview-track">━━━●━━━</span>' +
-            '<span class="phase-preview-end">' + hi + '</span>' +
+            '<span class="phase-preview-end">'+ hi + '</span>' +
           '</div>'
         );
       }
@@ -4201,7 +4183,7 @@
         //   軸の意味と「点が動く範囲」を直感させる。
         return (
           '<div class="phase-preview phase-preview-matrix">' +
-            '<div class="matrix-y-high">' + yh + ' ↑</div>' +
+            '<div class="matrix-y-high">'+ yh + ' ↑</div>' +
             '<div class="matrix-grid">' +
               '<span class="matrix-quad q1"></span><span class="matrix-quad q2">' +
                 '<span class="matrix-sample-dot" style="top:25%;right:20%;">A</span>' +
@@ -4210,8 +4192,8 @@
                 '<span class="matrix-sample-dot" style="bottom:20%;left:25%;">B</span>' +
               '</span><span class="matrix-quad q4"></span>' +
             '</div>' +
-            '<div class="matrix-x-axis">' + xl + ' ← X → ' + xh + '</div>' +
-            '<div class="matrix-y-low">↓ ' + yl + '</div>' +
+            '<div class="matrix-x-axis">'+ xl + ' ← X → '+ xh + '</div>' +
+            '<div class="matrix-y-low">↓ '+ yl + '</div>' +
           '</div>'
         );
       }
@@ -4226,12 +4208,11 @@
             '<div class="phase-preview-pie-list">' +
               choices.slice(0, 3).map((c, k) => (
                 '<span class="phase-preview-pie-item">' +
-                  '<span class="phase-preview-pie-dot phase-preview-pie-dot-' + (k % 4) + '"></span>' +
+                  '<span class="phase-preview-pie-dot phase-preview-pie-dot-'+ (k % 4) + '"></span>' +
                   esc(c) +
-                '</span>'
-              )).join('') +
-              (choices.length > 3 ? '<span class="phase-preview-pie-item">…</span>' : '') +
-              (o.includeOther ? '<span class="phase-preview-pie-item">+ その他</span>' : '') +
+                '</span>'              )).join('') +
+              (choices.length > 3 ? '<span class="phase-preview-pie-item">…</span>': '') +
+              (o.includeOther ? '<span class="phase-preview-pie-item">+ その他</span>': '') +
             '</div>' +
           '</div>'
         );
@@ -4242,7 +4223,7 @@
         '<div class="phase-preview phase-preview-board">' +
           '<div class="phase-preview-sample-card">' +
             '<div class="sample-card-name">5-1 山田さん</div>' +
-            '<div class="sample-card-answer">' + esc(sampleChoice) + '</div>' +
+            '<div class="sample-card-answer">'+ esc(sampleChoice) + '</div>' +
             '<div class="sample-card-reason">理由: みんなで考えたい話題だから…</div>' +
           '</div>' +
           '<div class="phase-preview-board-hint">… のような回答カードが児童の数だけ並ぶ</div>' +
@@ -4257,7 +4238,7 @@
       const cx = 20, cy = 20, r = 18;
       const colors = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#fb923c'];
       if (n === 1) {
-        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + colors[0] + '" opacity="0.8" />';
+        return '<circle cx="'+ cx + '" cy="'+ cy + '" r="'+ r + '" fill="'+ colors[0] + '" opacity="0.8" />';
       }
       const slices = [];
       for (let k = 0; k < n; k++) {
@@ -4267,9 +4248,9 @@
         const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
         const large = a2 - a1 > Math.PI ? 1 : 0;
         slices.push(
-          '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(2) + ',' + y1.toFixed(2) +
-          ' A' + r + ',' + r + ' 0 ' + large + ',1 ' + x2.toFixed(2) + ',' + y2.toFixed(2) + ' Z"' +
-          ' fill="' + colors[k % colors.length] + '" opacity="0.8" />'
+          '<path d="M'+ cx + ','+ cy + ' L'+ x1.toFixed(2) + ',' + y1.toFixed(2) +
+          'A' + r + ','+ r + ' 0 '+ large + ',1 '+ x2.toFixed(2) + ','+ y2.toFixed(2) + ' Z"' +
+          'fill="' + colors[k % colors.length] + '" opacity="0.8" />'
         );
       }
       return slices.join('');
@@ -4277,7 +4258,7 @@
 
     // 共通: 画像入力 (drop / pick / paste) + スケール粒度 (numberline/matrix のみ)
     function hasScaleForTemplate(formTemplate) {
-      return formTemplate === 'numberline' || formTemplate === 'matrix';
+      return formTemplate === 'numberline'|| formTemplate === 'matrix';
     }
 
     // 任意拡張: 教材画像 + スケール粒度。形式詳細と区別するため「+ もっと細かく」で集約。
@@ -4293,20 +4274,20 @@
         : null;
       const imageBlock = (
         '<div class="phase-extra-section">' +
-          '<div class="phase-extra-label">🖼 教材画像 (任意)</div>' +
-          '<div class="phase-image-zone" data-phase-image-zone data-phase-index="' + i + '" tabindex="0" ' +
+          '<div class="phase-extra-label"> 教材画像 (任意)</div>' +
+          '<div class="phase-image-zone" data-phase-image-zone data-phase-index="'+ i + '" tabindex="0" ' +
             'aria-label="画像をドラッグ&ドロップ、ペースト、またはクリックして選択">' +
             (hasImage
               ? ('<div class="phase-image-preview">' +
-                  (previewSrc ? '<img src="' + esc(previewSrc) + '" alt="教材プレビュー" />' : '<span>🖼 画像登録済</span>') +
-                  '<button type="button" class="phase-image-clear" data-phase-action="image-clear" data-phase-index="' + i + '">× 削除</button>' +
+                  (previewSrc ? '<img src="'+ esc(previewSrc) + '" alt="教材プレビュー" />': '<span> 画像登録済</span>') +
+                  '<button type="button" class="phase-image-clear" data-phase-action="image-clear" data-phase-index="'+ i + '">× 削除</button>' +
                 '</div>')
               : ('<div class="phase-image-hint">' +
-                  '<span class="phase-image-hint-icon">📂</span>' +
+                  '<span class="phase-image-hint-icon"></span>' +
                   '<span class="phase-image-hint-text">画像をここにドロップ / クリックして選択 / Cmd+V でペースト</span>' +
                 '</div>')
             ) +
-            '<input type="file" accept="image/*" class="phase-image-file" data-phase-image-file data-phase-index="' + i + '" />' +
+            '<input type="file" accept="image/*" class="phase-image-file" data-phase-image-file data-phase-index="'+ i + '" />' +
           '</div>' +
           '<p class="phase-image-note text-xs text-theme-muted mt-1">png / jpeg / gif / webp、5MB まで</p>' +
         '</div>'
@@ -4315,16 +4296,15 @@
       if (hasScale) {
         scaleBlock = (
           '<div class="phase-extra-section">' +
-            '<div class="phase-extra-label">📏 スケールの段階 (' + pts + ')</div>' +
+            '<div class="phase-extra-label"> スケールの段階 ('+ pts + ')</div>' +
             '<div class="phase-scale-grid">' +
               SCALE_POINTS_ALLOWED.map((n) => (
                 '<label class="phase-scale-opt">' +
-                  '<input type="radio" name="phase-scale-' + i + '" data-phase-opt="scalePoints" data-phase-index="' + i +
-                    '" value="' + n + '"' + (pts === n ? ' checked' : '') + ' />' +
-                  ' ' + n + ' 段階' +
-                  ' <span class="phase-scale-hint">(' + (SCALE_POINTS_HINT[n] || '') + ')</span>' +
-                '</label>'
-              )).join('') +
+                  '<input type="radio" name="phase-scale-'+ i + '" data-phase-opt="scalePoints" data-phase-index="' + i +
+                    '" value="'+ n + '"'+ (pts === n ? ' checked': '') + '/>' +
+                  ' '+ n + ' 段階' +
+                  '<span class="phase-scale-hint">(' + (SCALE_POINTS_HINT[n] || '') + ')</span>' +
+                '</label>'              )).join('') +
             '</div>' +
           '</div>'
         );
@@ -4332,14 +4312,14 @@
       // 画像が登録済なら open、それ以外は閉じる (画面ノイズ削減)。
       // summary に状態バッジを出すことで、閉じた状態でも「何が設定済か」が一目でわかる。
       const badges = [];
-      if (hasImage) badges.push('🖼 画像あり');
-      if (hasScale && pts !== 5) badges.push('📏 ' + pts + '段階');
+      if (hasImage) badges.push('画像あり');
+      if (hasScale && pts !== 5) badges.push(' '+ pts + '段階');
       const summaryText = '＋ もっと細かく (任意)' +
-        (badges.length ? ' <span class="phase-extra-badges">' + badges.join(' / ') + '</span>' : '');
+        (badges.length ? '<span class="phase-extra-badges">' + badges.join('/ ') + '</span>': '');
       return (
-        '<details class="phase-detail phase-extra-details"' + (hasImage ? ' open' : '') + '>' +
-          '<summary>' + summaryText + '</summary>' +
-          '<div class="phase-extra-list">' + imageBlock + scaleBlock + '</div>' +
+        '<details class="phase-detail phase-extra-details"'+ (hasImage ? ' open': '') + '>' +
+          '<summary>'+ summaryText + '</summary>' +
+          '<div class="phase-extra-list">'+ imageBlock + scaleBlock + '</div>' +
         '</details>'
       );
     }
@@ -4356,10 +4336,10 @@
             '<div class="phase-detail-row">' +
               '<label class="phase-detail-tag">軸:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="lowLabel" data-phase-index="' + i +
-                '" value="' + esc(o.lowLabel || '') + '" maxlength="20" placeholder="例: 反対" />' +
+                '" value="'+ esc(o.lowLabel || '') + '" maxlength="20" placeholder="例: 反対" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="highLabel" data-phase-index="' + i +
-                '" value="' + esc(o.highLabel || '') + '" maxlength="20" placeholder="例: 賛成" />' +
+                '" value="'+ esc(o.highLabel || '') + '" maxlength="20" placeholder="例: 賛成" />' +
             '</div>' +
           '</details>'
         );
@@ -4371,49 +4351,46 @@
             '<div class="phase-detail-row">' +
               '<label class="phase-detail-tag">X:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xLow" data-phase-index="' + i +
-                '" value="' + esc(o.xLow || '') + '" maxlength="20" placeholder="例: 効率↓" />' +
+                '" value="'+ esc(o.xLow || '') + '" maxlength="20" placeholder="例: 効率↓" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xHigh" data-phase-index="' + i +
-                '" value="' + esc(o.xHigh || '') + '" maxlength="20" placeholder="例: 効率↑" />' +
+                '" value="'+ esc(o.xHigh || '') + '" maxlength="20" placeholder="例: 効率↑" />' +
             '</div>' +
             '<div class="phase-detail-row">' +
               '<label class="phase-detail-tag">Y:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="yLow" data-phase-index="' + i +
-                '" value="' + esc(o.yLow || '') + '" maxlength="20" placeholder="例: 倫理↓" />' +
+                '" value="'+ esc(o.yLow || '') + '" maxlength="20" placeholder="例: 倫理↓" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="yHigh" data-phase-index="' + i +
-                '" value="' + esc(o.yHigh || '') + '" maxlength="20" placeholder="例: 倫理↑" />' +
+                '" value="'+ esc(o.yHigh || '') + '" maxlength="20" placeholder="例: 倫理↑" />' +
             '</div>' +
           '</details>'
         );
       }
-      if (p.formTemplate === 'pie' || p.formTemplate === 'board') {
+      if (p.formTemplate === 'pie'|| p.formTemplate === 'board') {
         const choices = Array.isArray(o.choices) ? o.choices : [];
         const includeOther = Boolean(o.includeOther);
         const items = choices.map((c, j) => (
           '<div class="phase-choice-row">' +
-            '<input type="text" class="modern-input text-sm" data-phase-choice="' + j + '" data-phase-index="' + i +
-              '" value="' + esc(c) + '" maxlength="40" placeholder="選択肢 ' + (j + 1) + '" />' +
+            '<input type="text" class="modern-input text-sm" data-phase-choice="'+ j + '" data-phase-index="' + i +
+              '" value="'+ esc(c) + '" maxlength="40" placeholder="選択肢 '+ (j + 1) + '" />' +
             (choices.length > 2
-              ? '<button type="button" class="phase-choice-del" data-phase-action="choice-delete" data-phase-index="' + i + '" data-choice-index="' + j + '" title="削除">×</button>'
-              : '') +
-          '</div>'
-        )).join('');
+              ? '<button type="button" class="phase-choice-del" data-phase-action="choice-delete" data-phase-index="'+ i + '" data-choice-index="'+ j + '" title="削除">×</button>'              : '') +
+          '</div>'        )).join('');
         const addBtn = choices.length < 6
-          ? '<button type="button" class="phase-choice-add" data-phase-action="choice-add" data-phase-index="' + i + '">＋ 選択肢</button>'
-          : '<p class="text-xs text-theme-muted">最大 6 つまで</p>';
+          ? '<button type="button" class="phase-choice-add" data-phase-action="choice-add" data-phase-index="'+ i + '">＋ 選択肢</button>'          : '<p class="text-xs text-theme-muted">最大 6 つまで</p>';
         // 「その他」(児童が自由記述で回答できる Forms 標準オプション)
         const otherToggle = (
           '<label class="phase-choice-other">' +
             '<input type="checkbox" data-phase-opt-bool="includeOther" data-phase-index="' + i +
-              '"' + (includeOther ? ' checked' : '') + ' />' +
-            ' 「その他」(児童が自由に書ける) を加える' +
+              '"'+ (includeOther ? ' checked': '') + '/>' +
+            '「その他」(児童が自由に書ける) を加える' +
           '</label>'
         );
         return (
           '<details class="phase-detail" open>' +
-            '<summary>選択肢 (' + choices.length + (includeOther ? ' + その他' : '') + ' つ)</summary>' +
-            '<div class="phase-choice-list">' + items + addBtn + '</div>' +
+            '<summary>選択肢 ('+ choices.length + (includeOther ? ' + その他': '') + 'つ)</summary>' +
+            '<div class="phase-choice-list">'+ items + addBtn + '</div>' +
             otherToggle +
           '</details>'
         );
@@ -4467,9 +4444,9 @@
         if (tmp.firstChild) old.replaceWith(tmp.firstChild);
       }
       const summary = card.querySelector('.phase-detail summary');
-      if (summary && (currentPhases[idx].formTemplate === 'pie' || currentPhases[idx].formTemplate === 'board')) {
+      if (summary && (currentPhases[idx].formTemplate === 'pie'|| currentPhases[idx].formTemplate === 'board')) {
         const choices = (currentPhases[idx].templateOptions || {}).choices || [];
-        summary.textContent = '選択肢 (' + choices.length + ' つ)';
+        summary.textContent = '選択肢 ('+ choices.length + ' つ)';
       }
     }
 
@@ -4481,7 +4458,7 @@
       const idx = Number(el.dataset.phaseIndex);
       if (Number.isNaN(idx) || !currentPhases[idx]) return;
       // 1) 基本フィールド (name / question)
-      if (el.dataset.phaseField === 'name' || el.dataset.phaseField === 'question') {
+      if (el.dataset.phaseField === 'name'|| el.dataset.phaseField === 'question') {
         currentPhases[idx][el.dataset.phaseField] = el.value;
         savePhasesNow();
         return;
@@ -4534,7 +4511,7 @@
               const t = s.textContent || '';
               if (/^選択肢/.test(t)) {
                 const choices = (currentPhases[idx].templateOptions.choices || []).length;
-                s.textContent = '選択肢 (' + choices + (el.checked ? ' + その他' : '') + ' つ)';
+                s.textContent = '選択肢 ('+ choices + (el.checked ? ' + その他': '') + 'つ)';
               }
             });
           }
@@ -4546,7 +4523,7 @@
       // 2) scalePoints radio (3/5/7 段階切替)
       //   radio の checked 状態はブラウザが自動更新、summary テキストだけ in-place で書き換える。
       //   フル再描画すると base64 imageDataUrl まで再シリアライズするので避ける。
-      if (el.dataset.phaseOpt === 'scalePoints' && el.type === 'radio') {
+      if (el.dataset.phaseOpt === 'scalePoints'&& el.type === 'radio') {
         const idx = Number(el.dataset.phaseIndex);
         if (!currentPhases[idx]) return;
         currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
@@ -4555,7 +4532,7 @@
         if (card) {
           card.querySelectorAll('.phase-detail summary').forEach((s) => {
             if (/スケールの段階/.test(s.textContent)) {
-              s.textContent = '📏 スケールの段階 (' + el.value + ')';
+              s.textContent = 'スケールの段階 (' + el.value + ')';
             }
           });
         }
@@ -4572,7 +4549,7 @@
       if (action === 'add') {
         if (currentPhases.length >= PHASE_MAX) return;
         const tpl = btn.dataset.phaseAddTemplate || 'numberline';
-        const defaultName = ({ numberline: '新しい数直線', matrix: '新しいマトリクス', pie: '新しい円グラフ', board: '新しい掲示板' })[tpl] || '新しいフェーズ';
+        const defaultName = ({ numberline: '新しい数直線', matrix: '新しいマトリクス', pie: '新しい円グラフ', board: '新しい掲示板'})[tpl] || '新しいフェーズ';
         currentPhases.push({
           name: defaultName, formTemplate: tpl, question: '',
           templateOptions: normalizeTemplateOptions({}, tpl)
@@ -4619,7 +4596,7 @@
     function uploadPhaseImage(idx, file) {
       if (!file || !/^image\//.test(file.type)) return;
       if (file.size > IMAGE_MAX_BYTES) {
-        setAutoSaveStatus('⚠ 画像サイズが 5MB を超えています', 'error');
+        setAutoSaveStatus('画像サイズが 5MB を超えています', 'error');
         return;
       }
       const reader = new FileReader();
@@ -4636,16 +4613,16 @@
           .then((res) => {
             if (res && res.success) {
               currentPhases[idx].templateOptions.imageFileId = res.data.fileId;
-              setAutoSaveStatus('✓ 画像を Drive に保存しました', 'success');
+              setAutoSaveStatus('画像を Drive に保存しました', 'success');
               savePhasesNow();
             } else {
-              setAutoSaveStatus('⚠ 画像アップロード失敗: ' + ((res && res.message) || 'unknown'), 'error');
+              setAutoSaveStatus('画像アップロード失敗: ' + ((res && res.message) || 'unknown'), 'error');
               delete currentPhases[idx].templateOptions.imageDataUrl;
               renderPhaseCardsInner();
             }
           })
           .catch((err) => {
-            setAutoSaveStatus('⚠ 画像アップロード失敗: ' + (err && err.message || err), 'error');
+            setAutoSaveStatus('画像アップロード失敗: ' + (err && err.message || err), 'error');
             delete currentPhases[idx].templateOptions.imageDataUrl;
             renderPhaseCardsInner();
           });
@@ -4730,15 +4707,15 @@
         const detailFor = (p) => {
           const o = p.templateOptions || {};
           if (p.formTemplate === 'numberline') {
-            return esc(o.lowLabel || '?') + ' ↔ ' + esc(o.highLabel || '?');
+            return esc(o.lowLabel || '?') + '↔ ' + esc(o.highLabel || '?');
           }
           if (p.formTemplate === 'matrix') {
-            return 'X: ' + esc(o.xLow || '?') + '↔' + esc(o.xHigh || '?') +
-                   ' / Y: ' + esc(o.yLow || '?') + '↔' + esc(o.yHigh || '?');
+            return 'X: '+ esc(o.xLow || '?') + '↔'+ esc(o.xHigh || '?') +
+                   '/ Y: ' + esc(o.yLow || '?') + '↔'+ esc(o.yHigh || '?');
           }
-          if (p.formTemplate === 'pie' || p.formTemplate === 'board') {
+          if (p.formTemplate === 'pie'|| p.formTemplate === 'board') {
             const cs = Array.isArray(o.choices) ? o.choices : [];
-            return cs.length ? cs.map(c => esc(c)).join(' / ') : '(選択肢なし)';
+            return cs.length ? cs.map(c => esc(c)).join('/ ') : '(選択肢なし)';
           }
           return '';
         };
@@ -4748,14 +4725,13 @@
         };
         phaseListEl.innerHTML = phases.map((p, i) => (
           '<li class="confirm-phase-row">' +
-            '<span class="confirm-phase-idx">フェーズ ' + (i + 1) + '</span>' +
+            '<span class="confirm-phase-idx">フェーズ '+ (i + 1) + '</span>' +
             '<span class="confirm-phase-body">' +
-              '<strong>' + esc(p.name || '(無題)') + '</strong> · ' + labelFor(p.formTemplate) + '<br>' +
-              '<span class="confirm-phase-q">Q: ' + esc(p.question || '(質問未設定)') + '</span><br>' +
-              '<span class="confirm-phase-detail">' + detailFor(p) + '</span>' +
+              '<strong>'+ esc(p.name || '(無題)') + '</strong> · '+ labelFor(p.formTemplate) + '<br>' +
+              '<span class="confirm-phase-q">Q: '+ esc(p.question || '(質問未設定)') + '</span><br>' +
+              '<span class="confirm-phase-detail">'+ detailFor(p) + '</span>' +
             '</span>' +
-          '</li>'
-        )).join('');
+          '</li>'        )).join('');
       }
 
       // 設定漏れ警告
@@ -4763,17 +4739,16 @@
         const warnings = [];
         if (classes.length === 0) warnings.push('対象クラスが選択されていません');
         phases.forEach((p, i) => {
-          if (!p.name) warnings.push('フェーズ ' + (i + 1) + ' の名前が空です');
-          if (!p.question) warnings.push('フェーズ ' + (i + 1) + ' の質問が空です');
+          if (!p.name) warnings.push('フェーズ '+ (i + 1) + ' の名前が空です');
+          if (!p.question) warnings.push('フェーズ '+ (i + 1) + ' の質問が空です');
           const o = p.templateOptions || {};
-          if ((p.formTemplate === 'pie' || p.formTemplate === 'board') && (!Array.isArray(o.choices) || o.choices.length < 2)) {
-            warnings.push('フェーズ ' + (i + 1) + ' の選択肢が 2 つ未満です');
+          if ((p.formTemplate === 'pie'|| p.formTemplate === 'board') && (!Array.isArray(o.choices) || o.choices.length < 2)) {
+            warnings.push('フェーズ '+ (i + 1) + ' の選択肢が 2 つ未満です');
           }
         });
         const esc = window.sharedUtilities.security.escapeHtml;
         warningsEl.innerHTML = warnings.length
-          ? '<ul class="confirm-warnings">' + warnings.map(w => '<li>⚠️ ' + esc(w) + '</li>').join('') + '</ul>'
-          : '<p class="confirm-ok">✓ 設定漏れはありません</p>';
+          ? '<ul class="confirm-warnings">'+ warnings.map(w => '<li> '+ esc(w) + '</li>').join('') + '</ul>'          : '<p class="confirm-ok"> 設定漏れはありません</p>';
       }
     }
 
@@ -4816,7 +4791,7 @@
           }).then((res) => {
             if (res && res.success) {
               currentLessonEtag = res.data.lesson.etag;
-              if (indicator) indicator.textContent = '✓ 自動保存';
+              if (indicator) indicator.textContent = '自動保存';
               renderConfirmStep(res.data.lesson.lessonJson);
             } else if (res && res.error === 'etag_mismatch') {
               // 直列化していれば原則発生しないが、念のため refetch & 1 回 retry。
@@ -4829,17 +4804,17 @@
                   }).then((r3) => {
                     if (r3 && r3.success) {
                       currentLessonEtag = r3.data.lesson.etag;
-                      if (indicator) indicator.textContent = '✓ 自動保存';
+                      if (indicator) indicator.textContent = '自動保存';
                       renderConfirmStep(r3.data.lesson.lessonJson);
-                    } else if (indicator) indicator.textContent = '⚠ 保存失敗';
+                    } else if (indicator) indicator.textContent = '保存失敗';
                   });
                 }
               });
             } else if (indicator) {
-              indicator.textContent = '⚠ 保存失敗';
+              indicator.textContent = '保存失敗';
             }
           }).catch((err) => {
-            if (indicator) indicator.textContent = '⚠ 保存失敗';
+            if (indicator) indicator.textContent = '保存失敗';
             console.warn('lesson.updateDraft error:', err && err.message);
           }).then(resolve, resolve);
         }));
@@ -4878,32 +4853,31 @@
           errBox.hidden = false;
           errBox.innerHTML =
             '<div class="lesson-start-error-box">' +
-              '<div class="lesson-start-error-title">⚠️ 作成中にエラーが発生しました</div>' +
-              '<div class="lesson-start-error-detail">' + esc(msg) + '</div>' +
+              '<div class="lesson-start-error-title"> 作成中にエラーが発生しました</div>' +
+              '<div class="lesson-start-error-detail">'+ esc(msg) + '</div>' +
               (completed
-                ? '<div class="lesson-start-error-progress">✓ ' + completed + ' 個まで作成済み。残りから再開できます。</div>'
-                : '') +
-              '<button type="button" id="lesson-start-retry-btn" class="btn btn-primary mt-2">🔄 再試行</button>' +
+                ? '<div class="lesson-start-error-progress"> '+ completed + ' 個まで作成済み。残りから再開できます。</div>'                : '') +
+              '<button type="button" id="lesson-start-retry-btn" class="btn btn-primary mt-2"> 再試行</button>' +
             '</div>';
           const retryBtn = document.getElementById('lesson-start-retry-btn');
           if (retryBtn) retryBtn.addEventListener('click', lessonStartNow);
         }
-        if (btn) { btn.disabled = false; btn.textContent = '🎬 すべて作成して開始'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'すべて作成して開始'; }
       }).catch((err) => {
         const msg = (err && err.message) || String(err);
         if (errBox) {
           errBox.hidden = false;
           errBox.innerHTML =
             '<div class="lesson-start-error-box">' +
-              '<div class="lesson-start-error-title">⚠️ ネットワークエラー</div>' +
+              '<div class="lesson-start-error-title"> ネットワークエラー</div>' +
               '<div class="lesson-start-error-detail">' +
                 window.sharedUtilities.security.escapeHtml(msg) + '</div>' +
-              '<button type="button" id="lesson-start-retry-btn" class="btn btn-primary mt-2">🔄 再試行</button>' +
+              '<button type="button" id="lesson-start-retry-btn" class="btn btn-primary mt-2"> 再試行</button>' +
             '</div>';
           const retryBtn = document.getElementById('lesson-start-retry-btn');
           if (retryBtn) retryBtn.addEventListener('click', lessonStartNow);
         }
-        if (btn) { btn.disabled = false; btn.textContent = '🎬 すべて作成して開始'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'すべて作成して開始'; }
       });
     }
     window.lessonStartNow = lessonStartNow;
@@ -4913,7 +4887,7 @@
       loadLessonThen(lessonId, preloaded, (lesson) => {
         document.body.classList.remove('mode-create-lesson');
         document.body.classList.add('mode-run-lesson');
-        history.pushState({ lesson: lessonId, mode: 'run' }, '', '#lesson/' + lessonId);
+        history.pushState({ lesson: lessonId, mode: 'run'}, '', '#lesson/' + lessonId);
         renderRunner(lesson);
       });
     }
@@ -4927,12 +4901,12 @@
       const container = document.getElementById('lesson-runner-phases');
       if (container) {
         container.innerHTML = phases.map((p, i) => {
-          const cls = i < activeIdx ? 'completed' : i === activeIdx ? 'active' : '';
-          const marker = i < activeIdx ? '✓' : i === activeIdx ? '▶' : '';
+          const cls = i < activeIdx ? 'completed': i === activeIdx ? 'active': '';
+          const marker = i < activeIdx ? '': i === activeIdx ? '▶': '';
           return `<div class="lesson-phase-card ${cls}">
             <div class="phase-number">${marker} フェーズ ${i + 1}</div>
             <div class="phase-name">${window.sharedUtilities.security.escapeHtml(p.name || '')}</div>
-            <div class="phase-meta">📊 ${p.formTemplate}</div>
+            <div class="phase-meta"> ${p.formTemplate}</div>
           </div>`;
         }).join('');
       }
@@ -4946,8 +4920,8 @@
       if (!currentLessonId) return;
       // Why: onclick="lessonAdvance(...)" の inline 呼出から this を渡す代わりに、
       //   既知の DOM id で button を引いて withBusy にかける (連打抑制 + spinner)。
-      const btn = document.getElementById(direction === 'next' ? 'lesson-next-btn' : 'lesson-prev-btn');
-      const busyText = direction === 'next' ? '切替中...' : '戻し中...';
+      const btn = document.getElementById(direction === 'next'? 'lesson-next-btn': 'lesson-prev-btn');
+      const busyText = direction === 'next'? '切替中...': '戻し中...';
       const task = () => gasRun('lesson.advance', { userId, lessonId: currentLessonId, direction }).then((res) => {
         if (res && res.success) {
           currentLessonEtag = res.data.lesson.etag;

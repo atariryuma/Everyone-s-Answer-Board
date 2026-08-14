@@ -1,5 +1,4 @@
-<script>
-  /* =====================================================================
+<script> /* =====================================================================
    * page.js — 生徒・教師向け回答ボードのメインクラス (StudyQuestApp)
    *
    * 責任範囲:
@@ -25,9 +24,9 @@
       return {
         REACTION_RATE_LIMIT_MS: isLowEndDevice ? 800 : 500,
         HIGHLIGHT_RATE_LIMIT_MS: isLowEndDevice ? 800 : 500,
-        CACHE_TTL_MS: perfLevel === 'high' ? 2000 : perfLevel === 'low' ? 500 : 1000,
+        CACHE_TTL_MS: perfLevel === 'high'? 2000 : perfLevel === 'low' ? 500 : 1000,
         RETRY_DELAY_MS: perfLevel === 'low' ? 3000 : 2000,
-        POLLING_INTERVAL_MS: perfLevel === 'high' ? 5000 : perfLevel === 'low' ? 12000 : 8000,
+        POLLING_INTERVAL_MS: perfLevel === 'high'? 5000 : perfLevel === 'low' ? 12000 : 8000,
         INIT_TIMEOUT_MS: isLowEndDevice ? 45000 : 30000
       };
     }
@@ -38,7 +37,7 @@
      * @returns {string} 有効なユーザーID、またはフォールバック値
      */
     validId(userId) {
-      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      if (!userId || typeof userId !== 'string'|| userId.trim() === '') {
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const fallbackUserId = urlParams.get('userId');
@@ -165,13 +164,11 @@
         window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
       const safeSheetName = (typeof window.SHEET_NAME !== 'undefined' && window.SHEET_NAME) ?
         window.SHEET_NAME.trim() : 'default';
-      this.reactionStorageKey = 'reactions_' + currentUserIdentifier + '_' + safeSheetName;
+      this.reactionStorageKey = 'reactions_'+ currentUserIdentifier + '_' + safeSheetName;
 
       this.gas = {
-        getPublishedSheetData: (classFilter, sort, adminMode, targetUserId) =>
-          this.runGas('getPublishedSheetData', classFilter, sort, adminMode, targetUserId),
-        getNotificationUpdate: (targetUserId, options) =>
-          this.runGas('getNotificationUpdate', targetUserId, options),
+        getPublishedSheetData: (classFilter, sort, adminMode, targetUserId) => this.runGas('getPublishedSheetData', classFilter, sort, adminMode, targetUserId),
+        getNotificationUpdate: (targetUserId, options) => this.runGas('getNotificationUpdate', targetUserId, options),
         addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
         toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
         checkAdmin: () => this.runGas('isAdmin'),
@@ -181,7 +178,7 @@
       this.initializeSimplePolling();
 
       this.init().catch(error => {
-        console.error('❌ StudyQuestApp: Fatal initialization error:', error);
+        console.error('StudyQuestApp: Fatal initialization error:', error);
         this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
       });
     }
@@ -331,14 +328,14 @@
         this.setupMessageListeners();
 
       } catch (error) {
-        console.error('❌ StudyQuestApp: Critical error in init():', error);
+        console.error('StudyQuestApp: Critical error in init():', error);
         this.handleError(error, 'initialization', true);
         this.hideLoadingOverlay();
       }
     }
 
     /**
-     * ✅ Restore form button display functionality
+     *  Restore form button display functionality
      * Initialize form button display in the UI
      */
     async initializeFormButton() {
@@ -348,7 +345,7 @@
     }
 
     /**
-     * ✅ CLAUDE.md準拠: Simplified editor state setup
+     *  CLAUDE.md準拠: Simplified editor state setup
      */
     setupEditorState() {
       // body class で editor/viewer 表示制御を統一。.editor-only クラスが CSS で
@@ -387,7 +384,7 @@
     }
 
     /**
-     * ✅ CLAUDE.md準拠: Unified message handler (no duplicate code)
+     *  CLAUDE.md準拠: Unified message handler (no duplicate code)
      */
     async handleMessage(data) {
       if (!data || !data.type) return;
@@ -697,7 +694,7 @@
       const hapticPulse = () => {
         // Why: しきい値到達で触覚フィードバックを出す。Android 実機と一部 iOS デバイスで
         //      効く。非対応ブラウザは silent (undefined を返す) のでガードだけでよい。
-        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        if (typeof navigator !== 'undefined'&& typeof navigator.vibrate === 'function') {
           try { navigator.vibrate(10); } catch (_) { /* privacy mode: ignore */ }
         }
       };
@@ -755,7 +752,7 @@
         triggered = pull >= THRESHOLD_PX;
         if (triggered !== prevTriggered) {
           indicator.classList.toggle('ready', triggered);
-          textEl.textContent = triggered ? '離して更新' : '引き下げて更新';
+          textEl.textContent = triggered ? '離して更新': '引き下げて更新';
           if (triggered) hapticPulse();
         }
 
@@ -817,7 +814,7 @@
 
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
-          e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
+          e.stopPropagation(); // 重要: イベントの伝播を止め、カード本体のクリックと分離
           if (!reactionBtn.disabled) {
             this.addReaction(rowIndex, reactionBtn.dataset.reaction);
           }
@@ -833,7 +830,7 @@
 
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
-          e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
+          e.stopPropagation(); // 重要: 同様にイベントの伝播を停止
           if (!highlightBtn.disabled) {
             this.handleHighlight(rowIndex);
           }
@@ -911,7 +908,7 @@
               this.cache.delete(cacheKey);
             }
 
-            console.error(`❌ handleError for ${funcName}`, {
+            console.error(` handleError for ${funcName}`, {
               error: error.message || error.toString(),
               errorType: typeof error,
               isEnhanced: !!error.functionName,
@@ -938,14 +935,14 @@
                   return;
                 }
 
-                if (typeof result === 'object' && result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
+                if (typeof result === 'object'&& result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
                   result.success = Boolean(result.success);
                 }
 
                 handleSuccess(result);
               })
               .withFailureHandler((error) => {
-                console.error(`❌ google.script.run failure for ${funcName}:`, {
+                console.error(` google.script.run failure for ${funcName}:`, {
                   funcName,
                   originalArgs: args,
                   mappedArgs,
@@ -971,7 +968,7 @@
         maxDelay: 5000, // Reduced max delay for faster failure
         context: `GAS API (${funcName || 'unknown'})`,
         retryCondition: (error) => {
-          // 🔧 CRITICAL FIX: Don't retry on timeout errors
+          //  CRITICAL FIX: Don't retry on timeout errors
           if (error.message.includes('timeout')) {
             return false;
           }
@@ -980,8 +977,7 @@
             'network', 'temporarily unavailable',
             'script runtime', 'service invoked'
           ];
-          const shouldRetry = retryableErrors.some(errorType =>
-            error.message.toLowerCase().includes(errorType)
+          const shouldRetry = retryableErrors.some(errorType => error.message.toLowerCase().includes(errorType)
           );
 
           return shouldRetry;
@@ -1047,7 +1043,7 @@
 
       const errorMsg = error.message || error;
 
-      console.error(`❌ ${type} error:`, errorMsg);
+      console.error(` ${type} error:`, errorMsg);
 
       if (showUser) {
         this.showNotification(`操作に失敗しました: ${errorMsg}`, 'error');
@@ -1085,7 +1081,7 @@
         }
 
       } catch (error) {
-        console.warn('⚠️ Cache clear failed:', error.message);
+        console.warn('Cache clear failed:', error.message);
       }
     }
 
@@ -1227,7 +1223,7 @@
         } catch (error) {
           this.polling.errorCount++;
 
-          console.warn('❌ 通知ポーリングエラー:', {
+          console.warn('通知ポーリングエラー:', {
             errorCount: `${this.polling.errorCount}/3`,
             errorMessage: error.message,
             errorStack: error.stack?.substring(0, 200) + '...',
@@ -1237,7 +1233,7 @@
           });
 
           if (this.polling.errorCount >= 3) {
-            console.error('💥 通知ポーリング: 連続エラー上限に達したため5分間停止');
+            console.error('通知ポーリング: 連続エラー上限に達したため5分間停止');
             this.stopSimplePolling();
             // Capture the resume timer on polling state so stopSimplePolling
             // during the cooldown can cancel it (otherwise a user navigating
@@ -1301,8 +1297,8 @@
         setTimeout(() => {
           if (funcName === 'getPublishedSheetData') {
               const currentDisplayMode = window.displayMode || this.state.displayMode;
-              const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
-              const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
+              const studentName1 = currentDisplayMode === 'named'? '田中太郎': '';
+              const studentName2 = currentDisplayMode === 'named'? '佐藤花子': '';
               resolve({
                 header: 'テスト問題',
                 sheetName: 'テストシート',
@@ -1350,7 +1346,7 @@
                 success: true,
                 highlight: currentHighlight
               });
-            } else if (funcName === 'checkAdmin' || funcName === 'isAdmin') {
+            } else if (funcName === 'checkAdmin'|| funcName === 'isAdmin') {
               resolve(true);
             }
         }, mockDelay);
@@ -1402,7 +1398,7 @@
         }
 
       } catch (error) {
-        console.warn('⚠️ Cleanup failed:', error.message || error);
+        console.warn('Cleanup failed:', error.message || error);
       }
     }
 
@@ -1429,7 +1425,7 @@
       // 値が同じなら何もしない（DOM 更新を最小化）
       if (btn.href !== url) btn.href = url;
       const span = btn.querySelector('span');
-      const labelText = title ? '📝 ' + title : '📝 回答フォーム';
+      const labelText = title ? ' '+ title : ' 回答フォーム';
       if (span && span.textContent !== labelText) span.textContent = labelText;
       // ellipsis 表示時の full text 確認用に title 属性に格納 (変更時のみ更新で DOM 触らない)。
       const tooltipText = title ? title : '回答フォーム';
@@ -1447,7 +1443,7 @@
         : String(title || '').replace(/</g, '&lt;');
       if (!window.notifications) return;
       window.notifications.banner('', {
-        html: '🔄 <strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>',
+        html: '<strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>',
         duration: 5000,
       });
     }
@@ -1591,12 +1587,10 @@
           <button 
             data-action="reload" 
             class="inline-flex items-center px-4 py-2 border border-theme-normal text-sm font-medium rounded-md text-theme-secondary bg-theme-elevated hover:bg-theme-elevated-hover focus:outline-none focus:ring-2 focus:ring-slate-500"
-          >
-            ページを再読み込み
+          > ページを再読み込み
           </button>
         </div>
-      </div>
-    `;
+      </div> `;
     }
 
     /**
@@ -1618,18 +1612,15 @@
           <button 
             data-action="reload" 
             class="inline-flex items-center px-4 py-2 border border-theme-normal text-sm font-medium rounded-md text-theme-secondary bg-theme-elevated hover:bg-theme-elevated-hover"
-          >
-            ページを再読み込み
+          > ページを再読み込み
           </button>
           <button 
             data-action="retry-load" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-theme-status-info bg-blue-700 hover:bg-blue-600"
-          >
-            再試行
+          > 再試行
           </button>
         </div>
-      </div>
-    `;
+      </div> `;
     }
 
     showMinimalSkeleton() {
@@ -1692,8 +1683,7 @@
                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200">
               <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              回答フォームに記入する
+              </svg> 回答フォームに記入する
             </a>
           </div>` :
             `<div class="mt-4"><p class="text-sm text-theme-secondary">回答フォームの準備中です...</p></div>`;
@@ -1705,12 +1695,10 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h3>
-          <p class="mt-1 text-sm text-theme-secondary">あなたが最初の回答者になってディスカッションを始めましょう！</p>
-          ${formLinkHtml}
-        </div>
-      `;
+          <p class="mt-1 text-sm text-theme-secondary">あなたが最初の回答者になってディスカッションを始めましょう！</p> ${formLinkHtml}
+        </div> `;
       } catch (error) {
-        console.warn('⚠️ フォームURL取得エラー:', error);
+        console.warn('フォームURL取得エラー:', error);
         container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
           <svg class="mx-auto h-12 w-12 text-theme-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1718,8 +1706,7 @@
           </svg>
           <h3 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h3>
           <p class="mt-1 text-sm text-theme-secondary">あなたが最初の回答者になってディスカッションを始めましょう！</p>
-        </div>
-      `;
+        </div> `;
       }
     }
 
@@ -1728,7 +1715,7 @@
         const result = await this.runGas('getActiveFormInfo', this.state.userId);
         return (result && result.shouldShow) ? result.formUrl : null;
       } catch (error) {
-        console.error('❌ フォームURL取得エラー:', error);
+        console.error('フォームURL取得エラー:', error);
         return null;
       }
     }
@@ -1793,7 +1780,7 @@
 
       try {
       } catch (error) {
-        console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
+        console.warn('サーバーキャッシュクリアでエラー:', error);
       }
 
       await this.loadSheetData({ bypassCache: true });
@@ -1826,7 +1813,7 @@
 
         return true;
       } catch (error) {
-        console.warn('⚠️ データ判定エラー:', error);
+        console.warn('データ判定エラー:', error);
         return false;
       }
     }
@@ -1966,13 +1953,12 @@
         <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-theme-status-error">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
+        <h3 class="mt-2 text-lg font-medium text-theme-status-error">${isUserNotFoundError ? 'ユーザー情報が見つかりません': 'アクセスエラー'}</h3>
         <p class="mt-1 text-sm text-theme-secondary">${isUserNotFoundError ?
           'この回答ボードは存在しないか、アクセス権限が不正です' :
-          'この回答ボードにアクセスする権限がありません'}</p>
-        ${isUserNotFoundError ? `
+          'この回答ボードにアクセスする権限がありません'}</p> ${isUserNotFoundError ? `
         <div class="mt-4 p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-info-text-on-soft mb-2">🔍 考えられる原因：</h4>
+          <h4 class="text-sm font-medium text-theme-status-info-text-on-soft mb-2"> 考えられる原因：</h4>
           <ul class="text-xs text-theme-status-info-text-on-soft opacity-90 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
             <li>• ボードが削除されたか非アクティブ化された</li>
@@ -1982,7 +1968,7 @@
           </ul>
         </div>
         <div class="mt-4 p-4 bg-theme-status-success-soft border border-theme-status-success-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-success-text-on-soft mb-2">💡 解決方法：</h4>
+          <h4 class="text-sm font-medium text-theme-status-success-text-on-soft mb-2"> 解決方法：</h4>
           <ul class="text-xs text-theme-status-success-text-on-soft opacity-90 space-y-1">
             <li>• まずページを再読み込みしてみる</li>
             <li>• 正しいボードURLを管理者に確認</li>
@@ -1992,7 +1978,7 @@
           </ul>
         </div>
         <div class="mt-4 p-3 bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-warning-text-on-soft mb-2">🛠️ 自動修復：</h4>
+          <h4 class="text-sm font-medium text-theme-status-warning-text-on-soft mb-2"> 自動修復：</h4>
           <p class="text-xs text-theme-status-warning-text-on-soft opacity-90">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
         <p class="mt-2 text-xs text-theme-muted">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
@@ -2003,12 +1989,10 @@
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            ページを再読み込み
+            </svg> ページを再読み込み
           </button>
         </div>
-      </div>
-    `;
+      </div> `;
 
     }
 
@@ -2076,7 +2060,7 @@
         await this.performDataLoad(config, oldAnswers);
 
       } catch (error) {
-        console.error('❌ loadSheetData error:', error);
+        console.error('loadSheetData error:', error);
         this.handleError(error, 'data_load', true);
       } finally {
         this.state.isLoading = false;
@@ -2160,7 +2144,7 @@
         if (result.profiles && result.profiles.list) {
           this.state.profiles = result.profiles.list;
           this.state.activeProfile = result.profiles.active || null;
-          // teacher pill の「✓ 過去 active 経験あり」表示に使う。server profileSummary に同梱。
+          // teacher pill の「 過去 active 経験あり」表示に使う。server profileSummary に同梱。
           this.state.profileHistory = Array.isArray(result.profiles.history) ? result.profiles.history : [];
         } else {
           this.state.profiles = [];
@@ -2289,10 +2273,9 @@
       if (!classFilter) return;
       const escape = window.sharedUtilities.security.escapeHtml;
       const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
-      // 優先順: 現在 DOM 値 > sessionStorage 前回値 > 'すべて'
-      // 選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
+      // 優先順: 現在 DOM 値 > sessionStorage 前回値 > 'すべて'      // 選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
       const desired = classFilter.value || this.loadPersistedClassFilter() || 'すべて';
-      classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + escape(c) + '">' + escape(c) + '</option>').join('');
+      classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escape(c) + '">'+ escape(c) + '</option>').join('');
       classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
       // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
@@ -2318,8 +2301,7 @@
       } else {
       }
 
-      const active = this.reactionTypes.filter(rt =>
-        data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
+      const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
       ).map(rt => rt.key);
 
       if (active.length === 1) {
@@ -2328,9 +2310,9 @@
         else if (active[0] === 'CURIOUS') element.classList.add('reaction-bg-curious');
       } else if (active.length === 2) {
         const sorted = active.sort();
-        if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE') element.classList.add('reaction-bg-like-curious');
-        else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-like-understand');
-        else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-understand-curious');
+        if (sorted[0] === 'CURIOUS'&& sorted[1] === 'LIKE') element.classList.add('reaction-bg-like-curious');
+        else if (sorted[0] === 'LIKE'&& sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-like-understand');
+        else if (sorted[0] === 'CURIOUS'&& sorted[1] === 'UNDERSTAND') element.classList.add('reaction-bg-understand-curious');
       } else if (active.length === 3) {
         element.classList.add('reaction-bg-like-understand-curious');
       }
@@ -2371,16 +2353,16 @@
       const mode = this.state && this.state.boardMode ? this.state.boardMode : 'board';
 
       const renderOne = async () => {
-        if (mode === 'numberline' && typeof this.renderNumberLine === 'function') {
+        if (mode === 'numberline'&& typeof this.renderNumberLine === 'function') {
           return await this.renderNumberLine(isInitialLoad, oldRows);
         }
-        if (mode === 'matrix' && typeof this.renderMatrix === 'function') {
+        if (mode === 'matrix'&& typeof this.renderMatrix === 'function') {
           return await this.renderMatrix(isInitialLoad, oldRows);
         }
-        if (mode === 'wordcloud' && typeof this.renderWordRanking === 'function') {
+        if (mode === 'wordcloud'&& typeof this.renderWordRanking === 'function') {
           return await this.renderWordRanking(isInitialLoad, oldRows);
         }
-        if (mode === 'pie' && typeof this.renderPie === 'function') {
+        if (mode === 'pie'&& typeof this.renderPie === 'function') {
           return await this.renderPie(isInitialLoad, oldRows);
         }
         return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
@@ -2404,7 +2386,7 @@
             this._renderedHeartbeats.add(beaconKey);
             window.ClientErrorReporter.report({
               level: 'log',
-              message: '[viz/dispatched] ' + mode + ' rendered',
+              message: '[viz/dispatched] '+ mode + ' rendered',
               context: 'dispatcher',
               source: JSON.stringify({
                 profile: this.state.activeProfile || null,
@@ -2416,13 +2398,13 @@
         } catch (_) {}
         return result;
       } catch (error) {
-        console.error('❌ renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
+        console.error('renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
         // Why: viz レンダラーが落ちた場合は Cloud Logging まで届けないと debug できない。
         //      window.ErrorHandler 経由で reportClientError を呼び、サーバの
         //      `[client/error]` ログに記録する。falling-back そのものは UX を壊さない。
         try {
           if (window.ErrorHandler && typeof window.ErrorHandler.logError === 'function') {
-            window.ErrorHandler.logError(error, 'renderBoard dispatcher (mode=' + mode + ')', {
+            window.ErrorHandler.logError(error, 'renderBoard dispatcher (mode='+ mode + ')', {
               filename: 'page.js.html',
               boardMode: mode,
               rowCount: (this.state && this.state.currentAnswers && this.state.currentAnswers.length) || 0,
@@ -2433,7 +2415,7 @@
         try {
           return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
         } catch (fallbackError) {
-          console.error('❌ renderBoard: fallback also failed:', fallbackError);
+          console.error('renderBoard: fallback also failed:', fallbackError);
           this.handleRenderingError(fallbackError);
         }
       }
@@ -2464,7 +2446,7 @@
         }, { timeout: 300 });
 
       } catch (error) {
-        console.error('❌ renderBoardCards: レンダリングエラー:', error);
+        console.error('renderBoardCards: レンダリングエラー:', error);
         this.handleRenderingError(error);
       }
     }
@@ -2494,7 +2476,7 @@
         }
       }
       if (this.elements.answerCount) {
-        const countHtml = this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + newRows.length + '件</span>';
+        const countHtml = this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ newRows.length + '件</span>';
         if (this.elements.answerCount.innerHTML !== countHtml) {
           updates.push(() => this.elements.answerCount.innerHTML = countHtml);
         }
@@ -2574,10 +2556,8 @@
     shouldUpdateCard(newData, oldData) {
       if (!oldData) return true;
 
-      const newReactionCount = this.reactionTypes.reduce((sum, rt) =>
-        sum + (newData.reactions?.[rt.key]?.count || 0), 0);
-      const oldReactionCount = this.reactionTypes.reduce((sum, rt) =>
-        sum + (oldData.reactions?.[rt.key]?.count || 0), 0);
+      const newReactionCount = this.reactionTypes.reduce((sum, rt) => sum + (newData.reactions?.[rt.key]?.count || 0), 0);
+      const oldReactionCount = this.reactionTypes.reduce((sum, rt) => sum + (oldData.reactions?.[rt.key]?.count || 0), 0);
 
       return newReactionCount !== oldReactionCount ||
         newData.highlight !== oldData.highlight ||
@@ -2599,7 +2579,7 @@
         : 0;
       const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
       this.elements.answerCount.innerHTML =
-        userIcon + '<span>' + count + '件</span>';
+        userIcon + '<span>'+ count + '件</span>';
     }
 
     applyAnimations() {
@@ -2632,11 +2612,9 @@
         container.innerHTML = `
         <div class="text-center py-8 col-span-full">
           <p class="text-theme-status-error">表示エラーが発生しました</p>
-          <button data-action="reload" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
-            再読み込み
+          <button data-action="reload" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded"> 再読み込み
           </button>
-        </div>
-      `;
+        </div> `;
       } catch (fallbackError) {
         console.error('フォールバック表示も失敗:', fallbackError);
       }
@@ -2705,7 +2683,7 @@
           reaction: reactionType.key,
           count: newCount,
           reacted,
-          shouldDisplay: true  // ✅ リアクションボタンは常に表示（UI一貫性のため）
+          shouldDisplay: true  //  リアクションボタンは常に表示（UI一貫性のため）
         });
       });
 
@@ -2736,8 +2714,8 @@
                 svgEl.outerHTML = newIcon;
               }
 
-              const colorClass = update.reaction === 'LIKE' ? 'text-red-500' :
-                update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+              const colorClass = update.reaction === 'LIKE'? 'text-red-500' :
+                update.reaction === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
               btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
               btn.classList.add(colorClass);
               btn.classList.toggle('reacted', update.reacted);
@@ -2745,7 +2723,7 @@
 
               const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
               const reactionName = reactionNames[update.reaction] || update.reaction;
-              btn.setAttribute('aria-label', `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`);
+              btn.setAttribute('aria-label', `${reactionName}${update.reacted ? 'を取り消す': 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`);
             });
           });
 
@@ -2861,20 +2839,20 @@
 
     createCardElement(safeData) {
       const card = document.createElement('div');
-      const highlightClass = safeData.highlight ? ' highlighted' : '';
+      const highlightClass = safeData.highlight ? 'highlighted' : '';
       card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
       card.dataset.rowIndex = safeData.rowIndex;
       card.setAttribute('role', 'article');
       card.setAttribute('tabindex', '0');
-      card.setAttribute('aria-label', '回答カード: ' + safeData.opinion.substring(0, 50) + (safeData.opinion.length > 50 ? '...' : ''));
+      card.setAttribute('aria-label', '回答カード: '+ safeData.opinion.substring(0, 50) + (safeData.opinion.length > 50 ? '...': ''));
       return card;
     }
 
     createHighlightButton(safeData) {
       if (!this.state.isEditor) return '';
 
-      const cls = safeData.highlight ? 'reacted' : '';
-      const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      const cls = safeData.highlight ? 'reacted': '';
+      const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する': 'ハイライトする';
       return `<button type="button" class="highlight-btn like-btn text-theme-status-warning ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
     }
 
@@ -2883,7 +2861,7 @@
       btn.type = 'button';
       btn.className = 'highlight-badge highlight-btn';
       btn.dataset.rowIndex = safeData.rowIndex;
-      btn.setAttribute('aria-label', safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする');
+      btn.setAttribute('aria-label', safeData.highlight ? 'ハイライトを解除する': 'ハイライトする');
       btn.setAttribute('aria-pressed', String(safeData.highlight));
       btn.innerHTML = this.getIcon('star', '', safeData.highlight);
       if (safeData.highlight) btn.classList.add('active');
@@ -2928,12 +2906,12 @@
       return this.reactionTypes.map(rt => {
         try {
           const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
-          const cls = info.reacted ? 'reacted' : '';
-          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          const cls = info.reacted ? 'reacted': '';
+          const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
           const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-theme" aria-hidden="true">${info.count || 0}</span>` : '';
           const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
           const reactionName = reactionNames[rt.key] || rt.key;
-          const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+          const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す': 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
 
           return `<button type="button" class="reaction-btn like-btn flex items-center gap-1 ${colorClass} ${cls}" data-row-index="${safeData.rowIndex}" data-reaction="${rt.key}" aria-label="${ariaLabel}" aria-pressed="${info.reacted}">${this.getIcon(rt.icon, 'w-5 h-5', info.reacted)}${countSpan}</button>`;
         } catch (reactionError) {
@@ -3023,10 +3001,9 @@
         errorCard.className = 'answer-card glass-panel rounded-xl p-4 border-2 border-theme-status-error-strong bg-theme-status-error-soft';
         errorCard.innerHTML = `
         <div class="text-theme-status-error text-center">
-          <div class="mb-2">⚠️ カード表示エラー</div>
+          <div class="mb-2"> カード表示エラー</div>
           <div class="text-xs text-theme-status-error">データ処理中に問題が発生しました</div>
-        </div>
-      `;
+        </div> `;
         return errorCard;
       } catch (fallbackError) {
         console.error('createAnswerCard: Fallback card creation also failed:', fallbackError);
@@ -3046,7 +3023,7 @@
      * @returns {string} UUID-like unique identifier
      */
     generateRequestId() {
-      return 'req_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+      return 'req_'+ Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     /**
@@ -3069,7 +3046,7 @@
         await this.loadSheetData({ bypassCache: true, silent: true });
         return { success: true, level: 1, method: 'cache_clear_reload' };
       } catch (level1Error) {
-        console.warn('⚠️ Level 1 recovery failed:', level1Error.message);
+        console.warn('Level 1 recovery failed:', level1Error.message);
       }
 
       try {
@@ -3078,7 +3055,7 @@
           return { success: true, level: 2, method: 'local_restore' };
         }
       } catch (level2Error) {
-        console.error('❌ Level 2 recovery failed:', level2Error.message);
+        console.error('Level 2 recovery failed:', level2Error.message);
       }
 
       return {
@@ -3178,20 +3155,20 @@
         changed,
         reactions: predictedReactions,
         action: userCurrentReaction === reaction ? 'removed' :
-          userCurrentReaction ? 'changed' : 'added',
+          userCurrentReaction ? 'changed': 'added',
         userReaction: userCurrentReaction === reaction ? null : reaction
       };
     }
 
     /**
-     * 🚀 フェーズ2: デバウンシング方式リアクション処理（CLAUDE.md準拠最適化）
+     *  フェーズ2: デバウンシング方式リアクション処理（CLAUDE.md準拠最適化）
      */
     async addReaction(rowIndex, reaction) {
       // Option B / Phase 2 lesson review: 過去状態を閲覧中は read-only。
       //   サーバ側でも判別できないので client が gate するのが必須。
       if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
         if (typeof this.showToast === 'function') {
-          this.showToast(this.state.isReviewMode ? '振り返り中はリアクションできません' : '過去のフェーズを閲覧中はリアクションできません');
+          this.showToast(this.state.isReviewMode ? '振り返り中はリアクションできません': '過去のフェーズを閲覧中はリアクションできません');
         }
         return;
       }
@@ -3284,7 +3261,7 @@
           await this.sendReactionToServerDirect(rowIndex, reaction, reactionKey);
 
         } catch (error) {
-          console.error(`❌ デバウンス実行エラー (${reactionKey}):`, error);
+          console.error(` デバウンス実行エラー (${reactionKey}):`, error);
 
           this.ensureReactionCleanup(rowIndex, reaction, reactionKey, error);
 
@@ -3297,7 +3274,7 @@
     }
 
     /**
-     * 🚀 直接リアクション送信（デバウンシング後）
+     *  直接リアクション送信（デバウンシング後）
      */
     async sendReactionToServerDirect(rowIndex, reaction, reactionKey) {
       let success = false;
@@ -3331,7 +3308,7 @@
       } catch (error) {
         success = false;
         errorMessage = error.message;
-        console.error(`❌ デバウンス処理エラー (${reactionKey}):`, error);
+        console.error(` デバウンス処理エラー (${reactionKey}):`, error);
 
         await this.handleReactionError(error, rowIndex, reaction);
 
@@ -3350,7 +3327,7 @@
     }
 
     /**
-     * 🛡️ 共通クリーンアップ関数 - UI状態とサーバー処理の確実な同期
+     *  共通クリーンアップ関数 - UI状態とサーバー処理の確実な同期
      */
     ensureReactionCleanup(rowIndex, reaction, reactionKey, error = null) {
       try {
@@ -3388,7 +3365,7 @@
         }
 
       } catch (cleanupError) {
-        console.error(`❌ クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
+        console.error(` クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
         try {
           const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
           buttons.forEach(btn => {
@@ -3397,7 +3374,7 @@
             btn.setAttribute('aria-busy', 'false');
           });
         } catch (finalError) {
-          console.error(`❌ 最終UI復旧もエラー: ${reactionKey}`, finalError);
+          console.error(` 最終UI復旧もエラー: ${reactionKey}`, finalError);
         }
       }
     }
@@ -3409,7 +3386,7 @@
           try {
             listener(result);
           } catch (error) {
-            console.error('❌ リアクション完了リスナーエラー:', error);
+            console.error('リアクション完了リスナーエラー:', error);
           }
         });
         this.reactionEventListeners.delete(reactionKey);
@@ -3472,7 +3449,7 @@
 
         this.saveReactionState(item.rowIndex, item.reactions);
       } else {
-        console.error('❌ Invalid server response format:', response);
+        console.error('Invalid server response format:', response);
         throw new Error('Server returned invalid response format');
       }
     }
@@ -3525,7 +3502,7 @@
         try {
           this._applyReactionUIUpdate(item);
         } catch (error) {
-          console.error('❌ UI即座更新エラー:', error);
+          console.error('UI即座更新エラー:', error);
         }
         return;
       }
@@ -3575,7 +3552,7 @@
         const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
         return !hasLastSeenTimestamp && !hasDiffCards && !hasDOMCards;
       } catch (error) {
-        console.warn('⚠️ 初回判定エラー:', error);
+        console.warn('初回判定エラー:', error);
         return false;
       }
     }
@@ -3588,7 +3565,7 @@
 
         return timestamp;
       } catch (error) {
-        console.warn('⚠️ lastSeenTimestamp読み込みエラー:', error);
+        console.warn('lastSeenTimestamp読み込みエラー:', error);
         return new Date(0).toISOString();
       }
     }
@@ -3599,7 +3576,7 @@
         localStorage.setItem(key, timestamp);
 
       } catch (error) {
-        console.warn('⚠️ lastSeenTimestamp保存エラー:', error);
+        console.warn('lastSeenTimestamp保存エラー:', error);
       }
     }
 
@@ -3684,11 +3661,11 @@
       // reality again, and showing "リアクション更新エラーが発生しました" would
       // confuse them into thinking the retry didn't work.
       if (recoveryResult.success) {
-        console.log('✅ Recovery succeeded:', recoveryResult.method);
+        console.log('Recovery succeeded:', recoveryResult.method);
         return;
       }
 
-      console.error('❌ All recovery attempts failed:', recoveryResult.message);
+      console.error('All recovery attempts failed:', recoveryResult.message);
 
       let userMessage = 'リアクション更新エラーが発生しました';
       if (error.message.includes('timeout') || error.message.includes('タイムアウト')) {
@@ -3705,14 +3682,14 @@
         this.showNotification(userMessage, 'error');
       }
 
-      console.error('🔍 Reaction Error:', error.message, { rowIndex, reaction });
+      console.error('Reaction Error:', error.message, { rowIndex, reaction });
     }
 
     async handleHighlight(rowIndex) {
       // Option B / Phase 2 lesson review: 過去状態閲覧中は read-only。
       if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
         if (typeof this.showToast === 'function') {
-          this.showToast(this.state.isReviewMode ? '振り返り中は操作できません' : '過去のフェーズを閲覧中は操作できません');
+          this.showToast(this.state.isReviewMode ? '振り返り中は操作できません': '過去のフェーズを閲覧中は操作できません');
         }
         return;
       }
@@ -3733,7 +3710,7 @@
       if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
       this.lastReactionTimes.set(highlightKey, now);
 
-      const btns = document.querySelectorAll('.highlight-btn[data-row-index="' + numericRowIndex + '"]');
+      const btns = document.querySelectorAll('.highlight-btn[data-row-index="'+ numericRowIndex + '"]');
       const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
 
       if (!item) {
@@ -3765,8 +3742,7 @@
               return false;
             }
             const retryableErrors = ['network', 'timeout', 'server error', 'temporarily unavailable'];
-            return retryableErrors.some(errorType =>
-              error.message.toLowerCase().includes(errorType)
+            return retryableErrors.some(errorType => error.message.toLowerCase().includes(errorType)
             );
           }
         });
@@ -3841,8 +3817,7 @@
      */
     async confirmDeleteAnswer(rowIndex) {
       try {
-        const answerData = this.state.currentAnswers.find(answer =>
-          String(answer.rowIndex) === String(rowIndex)
+        const answerData = this.state.currentAnswers.find(answer => String(answer.rowIndex) === String(rowIndex)
         );
 
         if (!answerData) {
@@ -3886,26 +3861,21 @@
 
           <div class="bg-theme-surface rounded-lg p-4 mb-6">
             <p class="text-theme-secondary text-sm mb-2">削除対象の回答:</p>
-            <p class="text-theme-accent-cyan font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...' : ''}</p>
-            ${answerData.name ? `<p class="text-theme-muted text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
+            <p class="text-theme-accent-cyan font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...': ''}</p> ${answerData.name ? `<p class="text-theme-muted text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
           </div>
 
           <div class="bg-theme-status-error-soft border border-theme-status-error-strong rounded-lg p-3 mb-6">
-            <p class="text-theme-status-error text-sm">
-              ⚠️ この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
+            <p class="text-theme-status-error text-sm"> この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
             </p>
           </div>
 
           <div class="flex gap-3">
-            <button type="button" class="flex-1 btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-2 px-4 rounded-lg cancel-btn">
-              キャンセル
+            <button type="button" class="flex-1 btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-2 px-4 rounded-lg cancel-btn"> キャンセル
             </button>
-            <button type="button" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg confirm-btn">
-              削除実行
+            <button type="button" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg confirm-btn"> 削除実行
             </button>
           </div>
-        </div>
-      `;
+        </div> `;
 
         document.body.appendChild(modal);
 
@@ -3989,13 +3959,11 @@
         const initialCount = this.state.currentAnswers?.length || 0;
 
         if (this.state.currentAnswers) {
-          this.state.currentAnswers = this.state.currentAnswers.filter(answer =>
-            String(answer.rowIndex) !== String(deletedRowIndex)
+          this.state.currentAnswers = this.state.currentAnswers.filter(answer => String(answer.rowIndex) !== String(deletedRowIndex)
           );
         }
         if (this.state.allAnswers) {
-          this.state.allAnswers = this.state.allAnswers.filter(answer =>
-            String(answer.rowIndex) !== String(deletedRowIndex)
+          this.state.allAnswers = this.state.allAnswers.filter(answer => String(answer.rowIndex) !== String(deletedRowIndex)
           );
         }
 
@@ -4078,7 +4046,7 @@
         window.showAdminFeatures = enable;
 
         // body.admin-mode を toggle して `.admin-mode-only` 要素を CSS で出し入れ。
-        //   destructive action (公開を終了) は通常表示から外し、⚙ → 確認 → 管理モード ON
+        //   destructive action (公開を終了) は通常表示から外し、 → 確認 → 管理モード ON
         //   の二段階で開く (電子黒板で生徒視線に destructive ボタンを入れないため)。
         document.body.classList.toggle('admin-mode', enable);
 
@@ -4089,7 +4057,7 @@
           const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
 
           window.showCounts = displaySettings.showReactions || false;
-          window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
+          window.displayMode = displaySettings.showNames ? 'named': 'anonymous';
         }
 
         window.isStudentMode = !enable;
@@ -4134,21 +4102,16 @@
             </div>
           </div>
           <div class="mb-6">
-            <p class="text-sm text-theme-muted">
-              管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br>
-              画面共有時などは十分注意してください。
+            <p class="text-sm text-theme-muted"> 管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br> 画面共有時などは十分注意してください。
             </p>
           </div>
           <div class="flex justify-end space-x-3">
-            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-elevated border border-theme-normal rounded-md hover:bg-theme-elevated-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">
-              キャンセル
+            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-elevated border border-theme-normal rounded-md hover:bg-theme-elevated-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"> キャンセル
             </button>
-            <button type="button" class="confirm-btn px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-              管理モードに切り替え
+            <button type="button" class="confirm-btn px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"> 管理モードに切り替え
             </button>
           </div>
-        </div>
-      `;
+        </div> `;
 
         const cancelBtn = modal.querySelector('.cancel-btn');
         const confirmBtn = modal.querySelector('.confirm-btn');
@@ -4200,8 +4163,7 @@
         endPublicationBtn.innerHTML = `
         <svg class="w-3 h-3 animate-spin inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-        </svg>
-        公開を終了中...
+        </svg> 公開を終了中...
       `;
       }
 
@@ -4222,7 +4184,7 @@
           endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
         }
       }).catch((error) => {
-        console.error('❌ 公開を終了できませんでした:', error);
+        console.error('公開を終了できませんでした:', error);
         let errorMsg = '公開を終了できませんでした';
         if (error && error.message) errorMsg += ': ' + error.message;
         else if (typeof error === 'string') errorMsg += ': ' + error;
@@ -4241,7 +4203,7 @@
      */
     showRedirectModal(title, message, redirectUrl) {
       // Why: 実装は SharedUtilities.html の window.showRedirectModal に集約済（重複排除）。
-      //  variant='cyan' / buttonLabel='ページを更新する' でこれまでの見た目を維持。
+      //  variant='cyan'/ buttonLabel='ページを更新する' でこれまでの見た目を維持。
       if (typeof window.showRedirectModal === 'function') {
         window.showRedirectModal({
           title,
@@ -4308,7 +4270,7 @@
           svgEl.outerHTML = newIcon;
         }
 
-        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+        const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
         modalBtn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
         modalBtn.classList.add(colorClass);
         modalBtn.classList.toggle('reacted', info.reacted);
@@ -4316,7 +4278,7 @@
 
         const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
         const reactionName = reactionNames[rt.key] || rt.key;
-        const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
+        const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す': 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
         modalBtn.setAttribute('aria-label', ariaLabel);
       });
     }
@@ -4349,10 +4311,10 @@
             reaction: rt.key,
             count: reaction.count,
             reacted: reaction.reacted,
-            shouldDisplay: true  // ✅ リアクションボタンは常に表示（UI一貫性のため）
+            shouldDisplay: true  //  リアクションボタンは常に表示（UI一貫性のため）
           });
         });
-        const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
+        const card = document.querySelector('.answer-card[data-row-index="'+ item.rowIndex + '"]');
         if (card) {
           card.classList.toggle('highlighted', item.highlight);
           this.applyReactionStyles(card, item);
@@ -4361,7 +4323,7 @@
             highlightBtn.classList.toggle('reacted', item.highlight);
             highlightBtn.classList.toggle('active', item.highlight);
             highlightBtn.setAttribute('aria-pressed', String(item.highlight));
-            const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+            const label = item.highlight ? 'ハイライトを解除する': 'ハイライトする';
             highlightBtn.setAttribute('aria-label', label);
             highlightBtn.innerHTML = this.getIcon('star', '', item.highlight);
           }
@@ -4403,7 +4365,7 @@
       const defaultMax = typeof axis.defaultMax === 'number' ? axis.defaultMax : 5;
 
       const renderBar = (labels, value) => {
-        if (typeof value !== 'number' || !isFinite(value)) return '';
+        if (typeof value !== 'number'|| !isFinite(value)) return '';
         const minLabel = (labels && labels.min) ? String(labels.min) : '';
         const maxLabel = (labels && labels.max) ? String(labels.max) : '';
         // どちらのラベルも無ければ「数字だけのバー」になって意味が薄いので表示しない
@@ -4412,15 +4374,7 @@
           ((value - defaultMin) / (defaultMax - defaultMin)) * 100));
         // 数値は行の右端で独立表示。ドットの右隣にラベルが来てもはみ出さず、
         //   全行で表示位置が一定 (= 視線で 5/5 を縦に追える)。
-        return ''
-          + '<div class="modal-axis-row" role="img" aria-label="' + escape(minLabel) + ' から ' + escape(maxLabel) + ' のうち ' + value + '/' + defaultMax + '">'
-          +   '<span class="modal-axis-label-min">' + escape(minLabel) + '</span>'
-          +   '<span class="modal-axis-track">'
-          +     '<span class="modal-axis-dot" style="left:' + pct.toFixed(1) + '%"></span>'
-          +   '</span>'
-          +   '<span class="modal-axis-label-max">' + escape(maxLabel) + '</span>'
-          +   '<span class="modal-axis-value" aria-hidden="true">' + value + '/' + defaultMax + '</span>'
-          + '</div>';
+        return ''          + '<div class="modal-axis-row" role="img" aria-label="'+ escape(minLabel) + ' から '+ escape(maxLabel) + ' のうち '+ value + '/'+ defaultMax + '">'          +   '<span class="modal-axis-label-min">'+ escape(minLabel) + '</span>'          +   '<span class="modal-axis-track">'          +     '<span class="modal-axis-dot" style="left:'+ pct.toFixed(1) + '%"></span>'          +   '</span>'          +   '<span class="modal-axis-label-max">'+ escape(maxLabel) + '</span>'          +   '<span class="modal-axis-value" aria-hidden="true">'+ value + '/'+ defaultMax + '</span>'          + '</div>';
       };
 
       let html = '';
@@ -4432,19 +4386,19 @@
 
         // 象限ラベル: matrix のみ。numericX/Y が中央より上/下で象限を決定。
         const q = axis.matrixQuadrantLabels || {};
-        if (typeof data.numericX === 'number' && typeof data.numericY === 'number') {
+        if (typeof data.numericX === 'number'&& typeof data.numericY === 'number') {
           const mid = (defaultMin + defaultMax) / 2;
-          const xKey = data.numericX >= mid ? 'h' : 'l';
-          const yKey = data.numericY >= mid ? 'h' : 'l';
+          const xKey = data.numericX >= mid ? 'h': 'l';
+          const yKey = data.numericY >= mid ? 'h': 'l';
           const quadrantName = q[xKey + yKey];
           if (quadrantName) {
-            html += '<div class="modal-axis-quadrant">📍 この立場は<strong>「' + escape(quadrantName) + '」</strong></div>';
+            html += '<div class="modal-axis-quadrant"> この立場は<strong>「'+ escape(quadrantName) + '」</strong></div>';
           }
         }
       }
       // 全バー無し (= ラベル未設定) なら null を返して fallback させる
       if (!html) return null;
-      return '<div class="modal-axis-block">' + html + '</div>';
+      return '<div class="modal-axis-block">'+ html + '</div>';
     }
 
     showAnswerModal(rowIndex) {
@@ -4473,12 +4427,12 @@
           ? data.reason
           : (isNumericEcho ? '' : opinionText);
         if (detailText) {
-          modalHtml += '<p class="text-theme whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">' + window.sharedUtilities.security.escapeHtml(detailText) + '</p>';
+          modalHtml += '<p class="text-theme whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">'+ window.sharedUtilities.security.escapeHtml(detailText) + '</p>';
         }
       } else {
-        modalHtml = '<p class="text-theme-accent-cyan whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
+        modalHtml = '<p class="text-theme-accent-cyan whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">'+ window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
         if (data.reason && data.reason.trim()) {
-          modalHtml += '<p class="text-theme whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+          modalHtml += '<p class="text-theme whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">'+ window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
         }
       }
 
@@ -4496,13 +4450,13 @@
 
       this.elements.modalStudentName.textContent = modalDisplayName;
       const footerBase = 'text-xs text-theme-muted pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
-      this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
+      this.elements.modalFooter.className = footerBase + (showName ? 'justify-between items-center' : 'justify-end items-center');
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-        const cls = info.reacted ? 'reacted' : '';
-        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">' + info.count + '</span>' : '';
-        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+        const cls = info.reacted ? 'reacted': '';
+        const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
+        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">'+ info.count + '</span>': '';
+        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 '+ colorClass + ' '+ cls + '" '+ 'data-row-index="'+ rowIndex + '" data-reaction="'+ rt.key + '" aria-label="'+ rt.key + '">'+ this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
       this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
@@ -4520,10 +4474,10 @@
 
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-        const cls = info.reacted ? 'reacted' : '';
-        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">' + info.count + '</span>' : '';
-        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
+        const cls = info.reacted ? 'reacted': '';
+        const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
+        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">'+ info.count + '</span>': '';
+        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 '+ colorClass + ' '+ cls + '" '+ 'data-row-index="'+ data.rowIndex + '" data-reaction="'+ rt.key + '" aria-label="'+ rt.key + '">'+ this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
       this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
@@ -4592,14 +4546,14 @@
     }
     getIcon(name, classes = '', solid = false) {
       if (!window.ICONS) {
-        return '<svg class="' + classes + '" aria-hidden="true">⭐</svg>';
+        return '<svg class="'+ classes + '" aria-hidden="true">⭐</svg>';
       }
 
-      const key = solid ? name + '-solid' : name + '-outline';
+      const key = solid ? name + '-solid': name + '-outline';
       const icon = window.ICONS[key] || window.ICONS[name];
 
       if (!icon) {
-        return '<svg class="' + classes + '" aria-hidden="true">⭐</svg>';
+        return '<svg class="'+ classes + '" aria-hidden="true">⭐</svg>';
       }
 
       const result = icon.replace('<svg', `<svg class="${classes}" aria-hidden="true"`);
@@ -4702,7 +4656,7 @@
       // 従来の「2 以下なら low」基準だと取りこぼしていた。4 以下の AND で絞る
       // と、ただの低 RAM ラップトップは medium のまま扱える。
       const staticLowEnd =
-        (typeof memory === 'number' && memory <= 4 && typeof cores === 'number' && cores <= 4) ||
+        (typeof memory === 'number'&& memory <= 4 && typeof cores === 'number' && cores <= 4) ||
         (typeof memory === 'number' && memory <= 2) ||
         (typeof cores === 'number' && cores <= 2);
 
@@ -4718,7 +4672,7 @@
     enterLowPerformanceMode(reason) {
       if (this.isLowPerformanceMode) return;
       this.isLowPerformanceMode = true;
-      console.info('⚡ low-performance mode enabled:', reason);
+      console.info('low-performance mode enabled:', reason);
       this.optimizeForLowPerformance();
     }
 
@@ -4885,7 +4839,7 @@
 
       // Why: 'append'/'update' の HTML 文字列ブランチ (data.content / data.html → innerHTML)
       //   はリポジトリ内に呼び出しが無いまま XSS sink になっていた。安全な代替として
-      //   'append' は data.node (Node 直接) / data.text (textNode)、'update' は data.text のみを残す。
+      //   'append'は data.node (Node 直接) / data.text (textNode)、'update' は data.text のみを残す。
       //   呼び出しを追加する際は必ずこれらの安全な形を使うこと。
       switch (operation) {
         case 'append':
@@ -5050,7 +5004,7 @@
 
         return validationResults;
       } catch (error) {
-        console.error('❌ Board data integrity validation failed:', error);
+        console.error('Board data integrity validation failed:', error);
         return {
           timestamp: new Date().toISOString(),
           error: error.message,
@@ -5068,12 +5022,12 @@
         await this.loadBoardData();
 
       } catch (error) {
-        console.error('❌ Automatic reason field recovery failed:', error);
+        console.error('Automatic reason field recovery failed:', error);
       }
     }
 
     /**
-     * 🔧 API応答からdisplaySettingsを動的更新
+     *  API応答からdisplaySettingsを動的更新
      *
      * Why (profile 跨ぎ整合性): 管理モード OFF パスと loadFormLink 等が
      *   `UNIFIED_CONFIG.displaySettings` を「現在 active profile の値」として参照する。
@@ -5103,7 +5057,7 @@
       const oldDisplayMode = window.displayMode;
 
       window.showCounts = newDisplaySettings.showReactions || false;
-      window.displayMode = newDisplaySettings.showNames ? 'named' : 'anonymous';
+      window.displayMode = newDisplaySettings.showNames ? 'named': 'anonymous';
 
       this.state.showCounts = window.showCounts;
       this.state.displayMode = window.displayMode;
@@ -5122,7 +5076,7 @@
       try {
         this.renderBoard(false, false);
       } catch (error) {
-        console.error('❌ renderWithCurrentData failed:', error);
+        console.error('renderWithCurrentData failed:', error);
       }
     }
 
@@ -5154,7 +5108,7 @@
 
           const formTitleSpan = formLinkBtn.querySelector('span');
           if (formTitleSpan) {
-            formTitleSpan.textContent = `📝 ${formInfo.formTitle}`;
+            formTitleSpan.textContent = ` ${formInfo.formTitle}`;
           }
         } else {
           formLinkBtn.classList.add('hidden');
@@ -5201,7 +5155,7 @@
     const container = document.getElementById('answers');
     if (container) {
       const msg = window.sharedUtilities.security.escapeHtml(error.message || '');
-      container.innerHTML = '<div class="text-theme-status-error p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+      container.innerHTML = '<div class="text-theme-status-error p-4">アプリケーションの初期化に失敗しました: '+ msg + '</div>';
     }
   }
 

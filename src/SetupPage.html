@@ -23,7 +23,7 @@
   <div class="max-w-2xl mx-auto">
     <!-- ヘッダー -->
     <div class="text-center mb-6">
-      <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2">📚 みんなの回答ボード</h1>
+      <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2"> みんなの回答ボード</h1>
       <p class="text-xl text-theme-secondary">初回セットアップ</p>
       <p class="text-sm text-theme-muted mt-2">システムを使用開始するための設定を行います</p>
     </div>
@@ -31,28 +31,25 @@
 
     <!-- セットアップフォーム -->
     <div class="glass-panel rounded-xl p-6 mb-6">
-      <h2 class="text-xl font-semibold text-theme mb-4">🔧 システム設定</h2>
+      <h2 class="text-xl font-semibold text-theme mb-4"> システム設定</h2>
 
       <form id="setup-form" class="space-y-6">
         <!-- サービスアカウントJSON -->
         <div>
-          <label for="service-account-json" class="block text-sm font-medium text-theme-secondary mb-2">
-            🔑 サービスアカウントJSONキー
+          <label for="service-account-json" class="block text-sm font-medium text-theme-secondary mb-2"> サービスアカウントJSONキー
           </label>
           <textarea id="service-account-json" name="serviceAccountJson" rows="8"
             class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme font-mono text-xs resize-vertical focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
             required></textarea>
-          <p class="text-xs text-theme-muted mt-1">
-            Google Cloud
+          <p class="text-xs text-theme-muted mt-1"> Google Cloud
             ConsoleからダウンロードしたサービスアカウントのJSONファイルの内容を貼り付けてください
           </p>
         </div>
 
         <!-- データベーススプレッドシートID -->
         <div>
-          <label for="database-id" class="block text-sm font-medium text-theme-secondary mb-2">
-            📊 データベーススプレッドシートID
+          <label for="database-id" class="block text-sm font-medium text-theme-secondary mb-2"> データベーススプレッドシートID
           </label>
           <div class="flex gap-2">
             <input type="text" id="database-id" name="databaseId"
@@ -60,45 +57,39 @@
               placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
               required />
             <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
-              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors">
-              自動作成
+              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors"> 自動作成
             </button>
           </div>
-          <p class="text-xs text-theme-muted mt-1">
-            既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
+          <p class="text-xs text-theme-muted mt-1"> 既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
           </p>
         </div>
 
         <!-- 管理者メールアドレス -->
         <div>
-          <label for="admin-email" class="block text-sm font-medium text-theme-secondary mb-2">
-            👤 管理者メールアドレス
+          <label for="admin-email" class="block text-sm font-medium text-theme-secondary mb-2"> 管理者メールアドレス
           </label>
           <input type="email" id="admin-email" name="adminEmail"
             class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder="admin@example.com" required />
-          <p class="text-xs text-theme-muted mt-1">
-            システム管理者のメールアドレスを入力してください
+          <p class="text-xs text-theme-muted mt-1"> システム管理者のメールアドレスを入力してください
           </p>
         </div>
 
         <!-- Google Client ID（オプション） -->
         <div>
-          <label for="google-client-id" class="block text-sm font-medium text-theme-secondary mb-2">
-            🔐 Google Client ID <span class="text-theme-muted">(オプション)</span>
+          <label for="google-client-id" class="block text-sm font-medium text-theme-secondary mb-2"> Google Client ID <span class="text-theme-muted">(オプション)</span>
           </label>
           <input type="text" id="google-client-id" name="googleClientId"
             class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" />
-          <p class="text-xs text-theme-muted mt-1">
-            Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
+          <p class="text-xs text-theme-muted mt-1"> Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
           </p>
         </div>
 
         <!-- セットアップボタン -->
         <button type="submit" id="setup-btn"
           class="w-full btn bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg">
-          <span id="setup-text">🚀 セットアップを開始</span>
+          <span id="setup-text"> セットアップを開始</span>
           <div id="setup-spinner" class="spinner-xs mx-auto hidden"></div>
         </button>
       </form>
@@ -106,29 +97,25 @@
 
     <!-- テストセクション（セットアップ後に表示） -->
     <div id="test-section" class="glass-panel rounded-xl p-6 hidden">
-      <h3 class="text-lg font-semibold text-theme mb-4">✅ セットアップ完了</h3>
-      <p class="text-theme-secondary mb-4">
-        セットアップが正常に完了しました。システムの動作確認を行えます。
+      <h3 class="text-lg font-semibold text-theme mb-4"> セットアップ完了</h3>
+      <p class="text-theme-secondary mb-4"> セットアップが正常に完了しました。システムの動作確認を行えます。
       </p>
       <button type="button" id="test-btn"
-        class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg">
-        🔍 システムテスト実行
+        class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg"> システムテスト実行
       </button>
       <div class="mt-4">
         <a id="start-studyquest-btn" target="_top"
-          class="inline-block btn bg-theme-card-3 text-theme-muted font-bold py-2 px-4 rounded-lg text-center pointer-events-none">
-          読み込み中...
+          class="inline-block btn bg-theme-card-3 text-theme-muted font-bold py-2 px-4 rounded-lg text-center pointer-events-none"> 読み込み中...
         </a>
       </div>
     </div>
 
     <!-- ヘルプセクション -->
     <div class="glass-panel rounded-xl p-6">
-      <h3 class="text-lg font-semibold text-theme mb-4">❓ セットアップでお困りの場合</h3>
+      <h3 class="text-lg font-semibold text-theme mb-4"> セットアップでお困りの場合</h3>
       <div class="space-y-3 text-sm text-theme-secondary">
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover">
-            サービスアカウントJSONの取得方法
+          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover"> サービスアカウントJSONの取得方法
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
             <ol class="list-decimal list-inside space-y-1">
@@ -141,8 +128,7 @@
           </div>
         </details>
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover">
-            スプレッドシートIDの取得方法
+          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover"> スプレッドシートIDの取得方法
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
             <ol class="list-decimal list-inside space-y-1">
@@ -156,8 +142,7 @@
     </div>
   </div>
 
-  <script>
-    let setupInProgress = false;
+  <script> let setupInProgress = false;
 
     async function createDatabaseAuto() {
       const btn = document.getElementById('create-db-btn');
@@ -175,7 +160,7 @@
           showMessage((result && result.message) || 'データベース作成に失敗しました', 'error');
         }
       } catch (error) {
-        showMessage('データベース作成に失敗しました: ' + error.message, 'error');
+        showMessage('データベース作成に失敗しました: '+ error.message, 'error');
       } finally {
         btn.disabled = false;
         btn.classList.remove('btn-busy');
@@ -258,7 +243,7 @@
             showMessage((result && result.message) || 'セットアップに失敗しました', 'error');
           }
         } catch (error) {
-          showMessage('セットアップに失敗しました: ' + error.message, 'error');
+          showMessage('セットアップに失敗しました: '+ error.message, 'error');
         }
       } catch (error) {
         // validateJSON / validateSpreadsheetId など同期エラーは showMessage 未実行のためここで表示
@@ -277,12 +262,12 @@
       btn.innerHTML = '<div class="spinner-small mx-auto"></div>';
       try {
         const result = await runServer('testSystemDiagnosis');
-        showMessage(`${result.message}`, result.success ? 'success' : 'warning');
+        showMessage(`${result.message}`, result.success ? 'success': 'warning');
       } catch (_) {
         showMessage('システム診断の実行に失敗しました', 'error');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '🔍 システムテスト実行';
+        btn.innerHTML = 'システムテスト実行';
       }
     });
 
@@ -361,7 +346,7 @@
       } catch (error) {
         console.warn('Failed to get current user email:', error);
       }
-      showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
+      showMessage('ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
     });
   </script>
 

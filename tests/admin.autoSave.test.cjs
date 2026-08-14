@@ -75,17 +75,15 @@ test('AdminPanel: 個別ボード authoring に ① ② ③ のステップ番�
   assert.ok(matches.length >= 3, `step-number badge が 3 つ未満: ${matches.length}`);
 });
 
-test('AdminPanel: 「💾 設定を保存」ボタンは hidden 化されている (autosave に置換済)', () => {
-  // #save-config-changes は display:none を持っているはず
-  const match = ADMIN_HTML.match(
-    /<button[^>]*id="save-config-changes"[^>]*>/
-  );
-  assert.ok(match, '#save-config-changes ボタンが見つからない');
-  assert.match(
-    match[0],
-    /display:\s*none/,
-    '#save-config-changes が hidden 化されていない'
-  );
+test('AdminPanel: 旧「設定を保存」ボタンは互換ノード置き場に隔離されている (autosave に置換済)', () => {
+  // v2891: 各セクションに散っていた display:none の互換ノードを
+  //   #legacy-compat-nodes に集約した。#save-config-changes はその中にある。
+  assert.match(ADMIN_HTML, /id="save-config-changes"/, '#save-config-changes が見つからない');
+  const block = ADMIN_HTML.match(/<div id="legacy-compat-nodes"[^>]*hidden[\s\S]*?<\/div>/);
+  assert.ok(block, '#legacy-compat-nodes ブロックが見つからない');
+  for (const id of ['save-config-changes', 'save-draft', 'publish-now', 'template-type-select']) {
+    assert.ok(block[0].includes('id="' + id + '"'), id + ' が互換ノード置き場に無い');
+  }
 });
 
 test('AdminPanel: #autosave-status が存在する (自動保存の視覚 feedback)', () => {

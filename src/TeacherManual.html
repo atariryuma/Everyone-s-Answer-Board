@@ -12,8 +12,7 @@
   <?!= include('SharedThemeBoot'); ?>
     <?!= include('UnifiedStyles.css'); ?>
 
-    <style>
-      /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル
+    <style> /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル
          (v2807: 全 hardcoded color を theme token 経由に変更しライト/ダーク対応) */
       .manual-wrap { max-width: 56rem; margin: 0 auto; padding: 2rem 1rem 6rem; }
       .manual-h1 { font-size: 2rem; font-weight: 700; color: var(--theme-accent-cyan); margin-bottom: 0.5rem; }
@@ -107,7 +106,7 @@
     <div class="manual-wrap">
 
       <header class="text-center mb-8">
-        <h1 class="manual-h1">📚 みんなの回答ボード — 使い方ガイド</h1>
+        <h1 class="manual-h1"> みんなの回答ボード — 使い方ガイド</h1>
         <p class="manual-p">児童の回答を集めて、クラスで共有・可視化する授業支援ツール。</p>
       </header>
 
@@ -116,16 +115,16 @@
         <!-- 目次 (sticky sidebar on desktop) -->
         <aside class="md:w-56 md:flex-shrink-0">
           <nav class="toc">
-            <h4>📖 目次</h4>
-            <a href="#start">🚀 はじめての授業 (3分)</a>
-            <a href="#modes">📊 可視化モード</a>
-            <a href="#discussion-tools">🎙️ 議論支援ツール</a>
-            <a href="#columns">⚙️ 列設定とは？</a>
-            <a href="#publish">📣 公開と URL 共有</a>
+            <h4> 目次</h4>
+            <a href="#start"> はじめての授業 (3分)</a>
+            <a href="#modes"> 可視化モード</a>
+            <a href="#discussion-tools"> 議論支援ツール</a>
+            <a href="#columns"> 列設定とは？</a>
+            <a href="#publish"> 公開と URL 共有</a>
             <a href="#reactions">⭐ 反応・ハイライト</a>
-            <a href="#lessons">🎒 レッスン (複数フェーズ)</a>
-            <a href="#profiles">📋 プロファイル (複数ボード)</a>
-            <a href="#privacy">🔒 プライバシー設定</a>
+            <a href="#lessons"> レッスン (複数フェーズ)</a>
+            <a href="#profiles"> プロファイル (複数ボード)</a>
+            <a href="#privacy"> プライバシー設定</a>
             <a href="#troubleshooting">🆘 困ったとき</a>
           </nav>
         </aside>
@@ -135,9 +134,8 @@
 
           <!-- §1 はじめての授業 -->
           <section id="start">
-            <h2 class="manual-h2">🚀 はじめての授業 (3 分)</h2>
-            <p class="manual-p">
-              いちばん簡単な始め方は、<strong>🎒 新しい授業を作る</strong> ボタンからテンプレートを 1 つ選ぶことです。
+            <h2 class="manual-h2"> はじめての授業 (3 分)</h2>
+            <p class="manual-p"> いちばん簡単な始め方は、<strong> 新しい授業を作る</strong> ボタンからテンプレートを 1 つ選ぶことです。
               フォームと回答先スプレッドシートが自動で作成され、すぐに使い始められます。
             </p>
 
@@ -153,13 +151,13 @@
             <div class="step-card">
               <div class="step-num">2</div>
               <div class="step-body">
-                <h4>「🎒 新しい授業を作る」をクリック</h4>
-                <p>画面上部の <strong>🎒 レッスン</strong> セクションでボタンを押すと、授業フローのテンプレートが選べます:</p>
+                <h4>「 新しい授業を作る」をクリック</h4>
+                <p>画面上部の <strong> レッスン</strong> セクションでボタンを押すと、授業フローのテンプレートが選べます:</p>
                 <p>
                   <strong>授業の定番（3段階）</strong>・<strong>低学年向け</strong>・<strong>探究（田村モデル）</strong>・<strong>議論前後（2段階）</strong>
                 </p>
                 <p>各フェーズには適切な可視化モード (数直線/マトリクス/円グラフ等) が自動で割り当てられます。
-                  詳しくは <a href="#modes" class="text-theme-accent-cyan underline">📊 可視化モード</a> を参照。</p>
+                  詳しくは <a href="#modes" class="text-theme-accent-cyan underline"> 可視化モード</a> を参照。</p>
               </div>
             </div>
 
@@ -172,82 +170,79 @@
                   → <strong>② フェーズ設計</strong> (各フェーズの名前 / 形式 / 質問 / 1〜5 個)
                   → <strong>③ 確認</strong> の 3 ステップ。
                 </p>
-                <p>最後の確認画面で <strong>「🎬 すべて作成して開始」</strong> を押すと、各フェーズの Google フォームと回答先スプレッドシートが自動作成され、列マッピングが推定されて授業が開始されます。
-                  そのまま画面下部の <strong>「📣 公開する」</strong> を押せば、児童が回答ボードを見られるようになります。</p>
+                <p>最後の確認画面で <strong>「 すべて作成して開始」</strong> を押すと、各フェーズの Google フォームと回答先スプレッドシートが自動作成され、列マッピングが推定されて授業が開始されます。
+                  そのまま画面下部の <strong>「 公開する」</strong> を押せば、児童が回答ボードを見られるようになります。</p>
               </div>
             </div>
 
             <div class="callout tip">
-              <strong>💡 単発のボードを使いたいときは：</strong>
-              レッスン機能を使わず「フォームを連携」欄に Google フォームの URL を貼り付けるだけでも始められます。
-              新規 Form は「🔧 他の方法」を展開して「✨ テンプレートを作成」から
+              <strong> 単発のボードを使いたいときは：</strong> レッスン機能を使わず「フォームを連携」欄に Google フォームの URL を貼り付けるだけでも始められます。
+              新規 Form は「 他の方法」を展開して「 テンプレートを作成」から
               <strong>シンプル掲示板 / 数直線 / マトリクス / 円グラフ</strong> の 4 種類のいずれかを選んで作れます。
             </div>
           </section>
 
           <!-- §2 可視化モード -->
           <section id="modes">
-            <h2 class="manual-h2">📊 可視化モード</h2>
-            <p class="manual-p">
-              授業の目的に合わせて、回答の見せ方を選べます。テンプレートから作ると自動で適切なモードが設定されます。
+            <h2 class="manual-h2"> 可視化モード</h2>
+            <p class="manual-p"> 授業の目的に合わせて、回答の見せ方を選べます。テンプレートから作ると自動で適切なモードが設定されます。
               既定の「自動判定」は、データの形 (線形尺度の有無等) を見て最適なモードを選びます。
             </p>
 
             <div class="mode-grid">
               <div class="mode-card">
-                <div class="icon">📝</div>
+                <div class="icon"></div>
                 <div class="title">掲示板</div>
                 <div class="desc">回答を一覧表示。各カードに「いいね！」「なるほど！」「もっと知りたい！」のリアクションが付けられる。</div>
-                <div class="when">👉 自由記述の意見交換に</div>
+                <div class="when"> 自由記述の意見交換に</div>
               </div>
               <div class="mode-card">
-                <div class="icon">🥧</div>
+                <div class="icon"></div>
                 <div class="title">円グラフ</div>
                 <div class="desc">選択肢の集計を円グラフで表示。多数派・少数派が一目で分かる。</div>
-                <div class="when">👉 導入アンケート / 賛否を取る場面に</div>
+                <div class="when"> 導入アンケート / 賛否を取る場面に</div>
               </div>
               <div class="mode-card">
-                <div class="icon">📊</div>
+                <div class="icon"></div>
                 <div class="title">ワードランキング</div>
                 <div class="desc">自由記述から頻出語を抽出し、頻度順に棒グラフで表示。</div>
-                <div class="when">👉 振り返り / 学んだことの集約に</div>
+                <div class="when"> 振り返り / 学んだことの集約に</div>
               </div>
               <div class="mode-card">
-                <div class="icon">📏</div>
+                <div class="icon"></div>
                 <div class="title">数直線 (1 軸)</div>
                 <div class="desc">1〜5 の値で立場を可視化。同じ位置に複数人が集まる様子が見える。</div>
-                <div class="when">👉 賛成/反対 など 1 つの軸の意見分布に</div>
+                <div class="when"> 賛成/反対 など 1 つの軸の意見分布に</div>
               </div>
               <div class="mode-card">
-                <div class="icon">🎯</div>
+                <div class="icon"></div>
                 <div class="title">マトリクス (2 軸)</div>
                 <div class="desc">X・Y 2 軸の散布図。考えの背景や 2 つの価値の重み付けを比較できる。</div>
-                <div class="when">👉 道徳 / 判断の根拠を可視化したい場面に</div>
+                <div class="when"> 道徳 / 判断の根拠を可視化したい場面に</div>
               </div>
               <div class="mode-card">
-                <div class="icon">🔄</div>
+                <div class="icon"></div>
                 <div class="title">自動判定 (既定)</div>
                 <div class="desc">フォームに「線形尺度」列があれば数直線/散布図、無ければ掲示板に自動切替。</div>
-                <div class="when">👉 とりあえず始めたいときに</div>
+                <div class="when"> とりあえず始めたいときに</div>
               </div>
             </div>
 
             <div class="callout info">
-              <strong>モード切替：</strong>管理パネル ③「表示と公開」セクションの <code>📊 表示方法を細かく調整</code> を開くと、
+              <strong>モード切替：</strong>管理パネル ③「表示と公開」セクションの <code> 表示方法を細かく調整</code> を開くと、
               モードを手動で変更できます。
             </div>
           </section>
 
           <!-- §3 議論支援ツール -->
           <section id="discussion-tools">
-            <h2 class="manual-h2">🎙️ 議論支援ツール</h2>
-            <p class="manual-p">
-              児童画面の上部に出るツールバーで、議論の進行を支援できます。すべて<strong>教師が意図的に押したときだけ</strong>動くので、
+            <h2 class="manual-h2"> 議論支援ツール</h2>
+            <p class="manual-p"> 児童画面の上部に出るツールバーで、議論の進行を支援できます。すべて<strong>教師が意図的に押したときだけ</strong>動くので、
               児童に「いつ何を見せるか」は先生が制御できます。
             </p>
 
             <div class="step-card">
-              <div class="step-num">📌</div>
+              <div class="step-num"></div>
               <div class="step-body">
                 <h4>議論前</h4>
                 <p>議論を始める前に押すと、その時点の分布をスナップショットとして保存します。
@@ -268,8 +263,7 @@
                 <h4>動き <span class="text-sm text-theme-muted">(マトリクス専用)</span></h4>
                 <p>議論前 → 現在 の動きを軌跡 (細い線) で重ね描きします。1.5 秒のアニメーションで「動きが起きた」を直感的に伝えます。
                   <strong>クリック</strong>で再生、<strong>Shift+クリック</strong>で OFF。</p>
-                <p class="text-sm text-theme-muted mt-2">
-                  💡 動きが小さい児童・動かなかった児童は軌跡が無いだけで、「考えを保持した」も等価な学びとして扱う設計です。
+                <p class="text-sm text-theme-muted mt-2"> 動きが小さい児童・動かなかった児童は軌跡が無いだけで、「考えを保持した」も等価な学びとして扱う設計です。
                   「大きく動いた = 正解」という見方にならないよう、強調色は使っていません。
                 </p>
               </div>
@@ -284,49 +278,44 @@
             </div>
 
             <div class="callout info">
-              <strong>使う順番の目安：</strong>
-              授業冒頭で <code>📌 議論前</code> を押す → 議論 → <code>→ 動き</code> または <code>⇄ 比較</code> で振り返り。
+              <strong>使う順番の目安：</strong> 授業冒頭で <code> 議論前</code> を押す → 議論 → <code>→ 動き</code> または <code>⇄ 比較</code> で振り返り。
               プロファイル切替や軸ラベル変更で議論前スナップは自動でリセットされます (違うフォーム間の座標を結ばない安全弁)。
             </div>
           </section>
 
           <!-- §4 列設定 -->
           <section id="columns">
-            <h2 class="manual-h2">⚙️ 列設定とは？</h2>
-            <p class="manual-p">
-              スプレッドシートの「どの列」に「どんなデータ」が入っているかをアプリに教える設定です。
+            <h2 class="manual-h2"> 列設定とは？</h2>
+            <p class="manual-p"> スプレッドシートの「どの列」に「どんなデータ」が入っているかをアプリに教える設定です。
               フォームから自動作成した場合は、ほぼすべて自動推定されます。
             </p>
 
             <h3 class="manual-h3">必須の列 (モードによって 1〜2 つ)</h3>
-            <p class="manual-p">
-              赤い <strong>【必須】</strong> ラベルが付いている列は必ず設定が必要です。ラベル自体もモードで変わります:
+            <p class="manual-p"> 赤い <strong>【必須】</strong> ラベルが付いている列は必ず設定が必要です。ラベル自体もモードで変わります:
             </p>
             <ul class="manual-p list-disc list-inside">
-              <li><strong>掲示板:</strong> 💬 メイン質問列 (回答が入る列)</li>
-              <li><strong>円グラフ:</strong> 🥧 集計する選択肢列 (選択肢が入る列)</li>
-              <li><strong>ワードランキング:</strong> 💭 自由記述列 (自由記述が入る列)</li>
-              <li><strong>数直線:</strong> 📏 X軸の数値列 (1〜5 等の整数列)</li>
-              <li><strong>マトリクス:</strong> 📏 X軸 + 📐 Y軸 の 2 つの数値列</li>
+              <li><strong>掲示板:</strong> メイン質問列 (回答が入る列)</li>
+              <li><strong>円グラフ:</strong> 集計する選択肢列 (選択肢が入る列)</li>
+              <li><strong>ワードランキング:</strong> 自由記述列 (自由記述が入る列)</li>
+              <li><strong>数直線:</strong> X軸の数値列 (1〜5 等の整数列)</li>
+              <li><strong>マトリクス:</strong> X軸 +  Y軸 の 2 つの数値列</li>
             </ul>
 
             <h3 class="manual-h3">任意の列</h3>
             <p class="manual-p">
-              <strong>📋 補助/理由列・🏫 クラス列・👤 名前列</strong> は任意です。
+              <strong> 補助/理由列・ クラス列・ 名前列</strong> は任意です。
               設定するとホバー時の補助表示やクラス別フィルタが使えます。
               不要なら空のままで OK。
             </p>
 
             <div class="callout tip">
-              <strong>🎯 自動推定とは:</strong>
-              列のヘッダー (質問文) と実データの形 (数値か文字か、長さ等) から、アプリが最適な役割を提案します。
-              各列の下に <code>🎯 自動推定 95%</code> のようにバッジが表示され、信頼度が高ければそのまま使えます。
-              間違っていれば dropdown から手動で選び直してください (バッジは「✋ 手動設定」に変わります)。
+              <strong> 自動推定とは:</strong> 列のヘッダー (質問文) と実データの形 (数値か文字か、長さ等) から、アプリが最適な役割を提案します。
+              各列の下に <code> 自動推定 95%</code> のようにバッジが表示され、信頼度が高ければそのまま使えます。
+              間違っていれば dropdown から手動で選び直してください (バッジは「 手動設定」に変わります)。
             </div>
 
             <div class="callout info">
-              <strong>🧭 軸ラベル自動取得:</strong>
-              数直線/マトリクスモードで使う X軸・Y軸の両端ラベル (例:「効率優先 ↔ 倫理優先」) は、
+              <strong> 軸ラベル自動取得:</strong> 数直線/マトリクスモードで使う X軸・Y軸の両端ラベル (例:「効率優先 ↔ 倫理優先」) は、
               Google フォームの「線形尺度」項目に書かれているラベルから<strong>自動で取得</strong>されます。
               空欄なら自動で埋まり、placeholder にもフォームの値が出るので、教師が手入力する手間はほぼゼロです。
               自分の言葉に書き換えたいときは普通に上書き入力すれば、その値が優先されます。
@@ -335,10 +324,9 @@
 
           <!-- §4 公開 -->
           <section id="publish">
-            <h2 class="manual-h2">📣 公開と URL 共有</h2>
-            <p class="manual-p">
-              すべての必須列が緑色 (🟢) になったら、画面下部の <strong>📣 公開する</strong> を押します。
-              児童に共有する URL は <strong>📋 URLコピー</strong> ボタンで取得できます。
+            <h2 class="manual-h2"> 公開と URL 共有</h2>
+            <p class="manual-p"> すべての必須列が緑色 () になったら、画面下部の <strong> 公開する</strong> を押します。
+              児童に共有する URL は <strong> URLコピー</strong> ボタンで取得できます。
             </p>
 
             <h3 class="manual-h3">児童への URL 共有方法</h3>
@@ -349,8 +337,7 @@
             </ul>
 
             <div class="callout warn">
-              <strong>⚠ ドメイン制限:</strong>
-              児童は学校ドメインの Google アカウントでログインする必要があります。
+              <strong> ドメイン制限:</strong> 児童は学校ドメインの Google アカウントでログインする必要があります。
               個人 Gmail からはアクセスできません (心理的安全性のため)。
             </div>
           </section>
@@ -358,23 +345,20 @@
           <!-- §5 反応 -->
           <section id="reactions">
             <h2 class="manual-h2">⭐ 反応・ハイライト</h2>
-            <p class="manual-p">
-              児童は他の児童の回答に <strong>👍 いいね！</strong>・<strong>💡 なるほど！</strong>・<strong>🔍 もっと知りたい！</strong> の 3 種類のリアクションを付けられます。
+            <p class="manual-p"> 児童は他の児童の回答に <strong> いいね！</strong>・<strong> なるほど！</strong>・<strong> もっと知りたい！</strong> の 3 種類のリアクションを付けられます。
               先生は ⭐ ボタンで重要な回答をハイライトできます (児童画面では枠が光ります)。
             </p>
 
             <div class="callout info">
-              <strong>初期設定はリアクション数 非表示:</strong>
-              心理的安全性のため、リアクション数は既定で児童には見えません。
+              <strong>初期設定はリアクション数 非表示:</strong> 心理的安全性のため、リアクション数は既定で児童には見えません。
               授業の場面に応じて「リアクション数を表示」をオンにできます (管理パネル ③ セクション)。
             </div>
           </section>
 
           <!-- §6 レッスン -->
           <section id="lessons">
-            <h2 class="manual-h2">🎒 レッスン (複数フェーズ授業)</h2>
-            <p class="manual-p">
-              1 つの授業を「導入 → 本時 → 振り返り」のように複数フェーズに分けて記録できます。
+            <h2 class="manual-h2"> レッスン (複数フェーズ授業)</h2>
+            <p class="manual-p"> 1 つの授業を「導入 → 本時 → 振り返り」のように複数フェーズに分けて記録できます。
               フェーズを切り替えると、児童画面の質問も自動で切り替わります。
               授業終了後、各フェーズの回答が時系列で保存され、後日「振り返り画面」で再生できます。
             </p>
@@ -383,14 +367,14 @@
               <div class="step-num">1</div>
               <div class="step-body">
                 <h4>授業を作成</h4>
-                <p>「🎒 新しい授業を作る」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
+                <p>「 新しい授業を作る」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
               </div>
             </div>
             <div class="step-card">
               <div class="step-num">2</div>
               <div class="step-body">
                 <h4>授業を実行</h4>
-                <p>「🎬 すべて作成して開始」を押すと、フェーズ 1 のフォームが自動公開されます。
+                <p>「 すべて作成して開始」を押すと、フェーズ 1 のフォームが自動公開されます。
                   授業の進行に合わせて <strong>「▶ 次のフェーズへ」</strong> を押し、児童画面の質問を切り替えていきます。</p>
               </div>
             </div>
@@ -406,51 +390,46 @@
 
           <!-- §7 プロファイル -->
           <section id="profiles">
-            <h2 class="manual-h2">📋 プロファイル (複数ボード)</h2>
-            <p class="manual-p">
-              1 つのユーザーアカウントで複数の回答ボードを切り替えて使えます。
+            <h2 class="manual-h2"> プロファイル (複数ボード)</h2>
+            <p class="manual-p"> 1 つのユーザーアカウントで複数の回答ボードを切り替えて使えます。
               例: 「5年1組 国語」「5年1組 道徳」「6年2組 算数」を別々のプロファイルとして保存。
             </p>
 
-            <h3 class="manual-h3">右パネル「📚 保存済みボード」の見方</h3>
-            <p class="manual-p">
-              現在編集中の行には水色の枠と次のバッジが表示されます:
+            <h3 class="manual-h3">右パネル「 保存済みボード」の見方</h3>
+            <p class="manual-p"> 現在編集中の行には水色の枠と次のバッジが表示されます:
             </p>
             <ul class="manual-p list-disc list-inside">
-              <li><strong>🟢 公開中</strong> — このボードが児童に公開されている</li>
+              <li><strong> 公開中</strong> — このボードが児童に公開されている</li>
               <li><strong>「現在」</strong> — 編集中だが未公開</li>
             </ul>
 
             <h3 class="manual-h3">プロファイルの操作</h3>
             <ul class="manual-p list-disc list-inside">
-              <li><strong>保存:</strong> 管理パネル下部の「💾 [プロファイル名] に保存」(現在のプロファイルに上書き)</li>
-              <li><strong>切替:</strong> 一覧の <strong>📥</strong> アイコン (非アクティブ行のみ)</li>
+              <li><strong>保存:</strong> 管理パネル下部の「 [プロファイル名] に保存」(現在のプロファイルに上書き)</li>
+              <li><strong>切替:</strong> 一覧の <strong></strong> アイコン (非アクティブ行のみ)</li>
               <li><strong>名前変更:</strong> 一覧の名前部分をダブルクリック</li>
-              <li><strong>削除:</strong> 一覧の <strong>🗑</strong> アイコン</li>
-              <li><strong>別名で保存:</strong> 「📋 別名で保存」を展開してプロファイル名を入力 → 新規保存</li>
+              <li><strong>削除:</strong> 一覧の <strong></strong> アイコン</li>
+              <li><strong>別名で保存:</strong> 「 別名で保存」を展開してプロファイル名を入力 → 新規保存</li>
             </ul>
 
             <div class="callout tip">
-              <strong>💡 入力は自動保存:</strong>
-              設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です (プロファイルへの保存は別操作)。
+              <strong> 入力は自動保存:</strong> 設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です (プロファイルへの保存は別操作)。
             </div>
           </section>
 
           <!-- §8 プライバシー -->
           <section id="privacy">
-            <h2 class="manual-h2">🔒 プライバシー設定</h2>
-            <p class="manual-p">
-              既定では児童のプライバシーを最大限保護する設定になっています:
+            <h2 class="manual-h2"> プライバシー設定</h2>
+            <p class="manual-p"> 既定では児童のプライバシーを最大限保護する設定になっています:
             </p>
             <ul class="manual-p list-disc list-inside">
-              <li><strong>👤 回答者名を表示:</strong> OFF (匿名表示)</li>
-              <li><strong>📊 リアクション数を表示:</strong> OFF</li>
-              <li><strong>🔒 ドメイン制限:</strong> 学校アカウントのみアクセス可</li>
+              <li><strong> 回答者名を表示:</strong> OFF (匿名表示)</li>
+              <li><strong> リアクション数を表示:</strong> OFF</li>
+              <li><strong> ドメイン制限:</strong> 学校アカウントのみアクセス可</li>
             </ul>
 
             <div class="callout warn">
-              <strong>⚠ 公開後に名前を ON にした場合:</strong>
-              既に投稿された匿名の回答も実名で表示されます。事前に児童と合意した方針で運用してください。
+              <strong> 公開後に名前を ON にした場合:</strong> 既に投稿された匿名の回答も実名で表示されます。事前に児童と合意した方針で運用してください。
             </div>
           </section>
 
@@ -460,16 +439,14 @@
             <div class="faq">
               <details>
                 <summary>フォーム URL を貼ったが「接続できません」と出る</summary>
-                <p class="answer">
-                  Google フォームの<strong>編集用 URL</strong> (末尾が <code>/edit</code>) を使ってください。
+                <p class="answer"> Google フォームの<strong>編集用 URL</strong> (末尾が <code>/edit</code>) を使ってください。
                   回答用 URL (末尾が <code>/viewform</code>) は接続できません。
                 </p>
               </details>
 
               <details>
                 <summary>列設定で「必須: 0/2」のままで公開できない</summary>
-                <p class="answer">
-                  選んだ表示モードが必要とする列が設定されていません。
+                <p class="answer"> 選んだ表示モードが必要とする列が設定されていません。
                   例: マトリクスモードなら X軸・Y軸の数値列が両方必要。
                   ラベルの【必須】を確認してください。
                 </p>
@@ -477,71 +454,62 @@
 
               <details>
                 <summary>児童が「公開されていません」と表示される</summary>
-                <p class="answer">
-                  管理パネル下部の <strong>📣 公開する</strong> を押し、ボタンが「🟢 公開中」に変わっていることを確認してください。
+                <p class="answer"> 管理パネル下部の <strong> 公開する</strong> を押し、ボタンが「 公開中」に変わっていることを確認してください。
                   また、児童が学校ドメインの Google アカウントでログインしているか確認してください。
                 </p>
               </details>
 
               <details>
                 <summary>自動推定の信頼度が低い (50% 以下)</summary>
-                <p class="answer">
-                  ヘッダー (質問文) に「回答」「理由」「クラス」などのキーワードが含まれていないと低く出ます。
+                <p class="answer"> ヘッダー (質問文) に「回答」「理由」「クラス」などのキーワードが含まれていないと低く出ます。
                   低くても保存マッピングが優先されますが、手動で正しい列を選んでください。
                 </p>
               </details>
 
               <details>
                 <summary>授業を再公開したい (一度終了した後)</summary>
-                <p class="answer">
-                  右パネル「保存済みボード」の対象プロファイルを 📥 で開き、「📣 公開する」を再度押してください。
+                <p class="answer"> 右パネル「保存済みボード」の対象プロファイルを  で開き、「 公開する」を再度押してください。
                   公開状態は明示操作でのみ変わります。
                 </p>
               </details>
 
               <details>
                 <summary>意図しない列が dropdown に表示される</summary>
-                <p class="answer">
-                  タイムスタンプ、UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT などのシステム列は自動的に除外されます。
+                <p class="answer"> タイムスタンプ、UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT などのシステム列は自動的に除外されます。
                   それ以外の余計な列が出る場合はスプレッドシートのヘッダーを確認してください。
                 </p>
               </details>
 
               <details>
                 <summary>1 ヶ月以上前の授業データを見たい</summary>
-                <p class="answer">
-                  終了済みのレッスンは画面上部「🎒 レッスン」一覧の <strong>「振り返り」</strong> ボタンから時系列再生できます。
+                <p class="answer"> 終了済みのレッスンは画面上部「 レッスン」一覧の <strong>「振り返り」</strong> ボタンから時系列再生できます。
                   回答データはスプレッドシートに保存され続けるため、Drive から直接開くこともできます。
                 </p>
               </details>
 
               <details>
                 <summary>児童に見せる前に自分で表示を確認したい</summary>
-                <p class="answer">
-                  公開すると画面下部に「現在の回答ボード」のフッターが現れ、<strong>「📊 ボードを開く」</strong> ボタンで自分のブラウザで実画面を確認できます。
+                <p class="answer"> 公開すると画面下部に「現在の回答ボード」のフッターが現れ、<strong>「 ボードを開く」</strong> ボタンで自分のブラウザで実画面を確認できます。
                   リアクションやハイライトも実際に操作して試せます。
                 </p>
               </details>
 
               <details>
                 <summary>スプレッドシートはどこに保存されている？</summary>
-                <p class="answer">
-                  右パネル「📚 リソース」の <strong>「📊 スプレッドシートを開く」</strong> ボタンから直接開けます。
+                <p class="answer"> 右パネル「 リソース」の <strong>「 スプレッドシートを開く」</strong> ボタンから直接開けます。
                   Google Drive の「マイドライブ」配下に「みんなの回答ボード」フォルダが自動作成され、フォーム本体と回答先スプレッドシートが一緒に整理されます。
                 </p>
               </details>
 
               <details>
                 <summary>複数クラスで同じフォームを使い分けたい</summary>
-                <p class="answer">
-                  レッスン作成時に <strong>対象クラス</strong> を複数選ぶと、1 つのフォームを全クラスで共有できます (児童が回答時にクラスを選択)。
+                <p class="answer"> レッスン作成時に <strong>対象クラス</strong> を複数選ぶと、1 つのフォームを全クラスで共有できます (児童が回答時にクラスを選択)。
                   クラス別に集計したいときは、ボード画面のクラスフィルタで切り替えられます。
                 </p>
               </details>
             </div>
 
-            <p class="manual-p mt-6">
-              他の質問は学校 IT 担当者または管理者へお問い合わせください。
+            <p class="manual-p mt-6"> 他の質問は学校 IT 担当者または管理者へお問い合わせください。
             </p>
           </section>
 

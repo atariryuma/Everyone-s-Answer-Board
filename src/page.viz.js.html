@@ -48,7 +48,7 @@
       if (window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
         window.ClientErrorReporter.report({
           level: 'log',
-          message: '[viz/heartbeat] ' + mode + ' rendered',
+          message: '[viz/heartbeat] '+ mode + ' rendered',
           context: 'viz/' + mode,
           url: window.location.href,
           userAgent: navigator.userAgent.substring(0, 100),
@@ -290,9 +290,9 @@
     const defaultMax = typeof axisCfg.defaultMax === 'number' ? axisCfg.defaultMax : 5;
     const quadrantMid = (defaultMin + defaultMax) / 2;
     const quadrantOf = (r) => {
-      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') return '';
-      const xKey = r.numericX >= quadrantMid ? 'h' : 'l';
-      const yKey = r.numericY >= quadrantMid ? 'h' : 'l';
+      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') return '';
+      const xKey = r.numericX >= quadrantMid ? 'h': 'l';
+      const yKey = r.numericY >= quadrantMid ? 'h': 'l';
       return quadrantLabels[xKey + yKey] || '';
     };
 
@@ -310,28 +310,25 @@
       const text = escapeForTooltip(r.reason || r.answer || '(本文なし)');
       const quadrantName = quadrantOf(r);
       const chipHtml = quadrantName
-        ? '<span class="viz-rows-popup-chip">📍 ' + escapeForTooltip(quadrantName) + '</span>'
-        : '';
+        ? '<span class="viz-rows-popup-chip"> '+ escapeForTooltip(quadrantName) + '</span>'        : '';
       const safeData = { rowIndex: r.rowIndex, reactions: r.reactions || {} };
       const reactionBtns = canMakeBtns ? app.createReactionButtons(safeData) : '';
       return [
-        '<div class="viz-rows-popup-row" data-row-index="' + r.rowIndex + '" tabindex="0" role="button" aria-label="意見の詳細を表示">',
-        '  <div class="viz-rows-popup-name">', displayName, chipHtml, '</div>',
-        '  <div class="viz-rows-popup-reason">', text, '</div>',
-        '  <div class="viz-rows-popup-actions reaction-container">', reactionBtns, '</div>',
-        '</div>'
-      ].join('');
+        '<div class="viz-rows-popup-row" data-row-index="'+ r.rowIndex + '" tabindex="0" role="button" aria-label="意見の詳細を表示">',
+        ' <div class="viz-rows-popup-name">', displayName, chipHtml, '</div>',
+        ' <div class="viz-rows-popup-reason">', text, '</div>',
+        ' <div class="viz-rows-popup-actions reaction-container">', reactionBtns, '</div>',
+        '</div>'      ].join('');
     }).join('');
 
     popup.innerHTML = [
       '<div class="viz-rows-popup-card">',
-      '  <div class="viz-rows-popup-header">',
-      '    <h4>', safeTitle, '</h4>',
-      '    <button type="button" class="viz-rows-popup-close" aria-label="閉じる">×</button>',
-      '  </div>',
-      '  <div class="viz-rows-popup-body">', cards || '<p class="viz-rows-popup-empty">該当する回答がありません</p>', '</div>',
-      '</div>'
-    ].join('');
+      ' <div class="viz-rows-popup-header">',
+      '   <h4>', safeTitle, '</h4>',
+      '   <button type="button" class="viz-rows-popup-close" aria-label="閉じる">×</button>',
+      ' </div>',
+      ' <div class="viz-rows-popup-body">', cards || '<p class="viz-rows-popup-empty">該当する回答がありません</p>', '</div>',
+      '</div>'    ].join('');
     document.body.appendChild(popup);
 
     const close = () => { popup.remove(); document.removeEventListener('keydown', onKey); };
@@ -384,7 +381,7 @@
 
     // キーボード操作: 行に focus 時 Enter / Space で詳細モーダルを開く
     popup.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.key !== 'Enter'&& e.key !== ' ') return;
       const row = e.target.closest('.viz-rows-popup-row');
       if (!row) return;
       e.preventDefault();
@@ -576,7 +573,7 @@
       : '';
 
     tip.innerHTML =
-      `<div class="tooltip-meta">${headerText}${item.class ? ' / ' + escapeForTooltip(item.class) : ''}</div>` +
+      `<div class="tooltip-meta">${headerText}${item.class ? '/ ' + escapeForTooltip(item.class) : ''}</div>` +
       `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em class="tooltip-empty">（コメントなし）</em>'}</div>` +
       sameCoordText;
     tip.classList.add('visible');
@@ -687,16 +684,7 @@
     teacherPanel.className = 'viz-teacher-panel';
     teacherPanel.id = 'vizTeacherPanel';
     teacherPanel.innerHTML =
-        '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'
-      + '<div class="viz-panel-section" id="vizReasonSeedsSection" style="display:none">'
-      +   '<h3>議論のたねになる声<span class="viz-panel-sub">（各立場から・教師用）</span></h3>'
-      +   '<p class="viz-panel-hint">人気順ではありません。立場ごとに「理由を述べている声」を手がかりとして1つずつ。読み上げる声は先生が選びます。</p>'
-      +   '<ul id="vizReasonSeeds"></ul>'
-      + '</div>'
-      + '<div class="viz-panel-section" id="vizSwingSection" style="display:none">'
-      +   '<h3>気になる児童<span class="viz-panel-sub">（意見が動いた順）</span></h3>'
-      +   '<ul id="vizSwingList"></ul>'
-      + '</div>';
+        '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'      + '<div class="viz-panel-section" id="vizReasonSeedsSection" style="display:none">'      +   '<h3>議論のたねになる声<span class="viz-panel-sub">（各立場から・教師用）</span></h3>'      +   '<p class="viz-panel-hint">人気順ではありません。立場ごとに「理由を述べている声」を手がかりとして1つずつ。読み上げる声は先生が選びます。</p>'      +   '<ul id="vizReasonSeeds"></ul>'      + '</div>'      + '<div class="viz-panel-section" id="vizSwingSection" style="display:none">'      +   '<h3>気になる児童<span class="viz-panel-sub">（意見が動いた順）</span></h3>'      +   '<ul id="vizSwingList"></ul>'      + '</div>';
     answers.appendChild(teacherPanel);
 
     return { svg, teacherPanel };
@@ -709,7 +697,7 @@
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
-    updatedEl.textContent = '最終更新 ' + hh + ':' + mm;
+    updatedEl.textContent = '最終更新 '+ hh + ':' + mm;
   }
 
   function maybeRenderTeacherPanel(app, swings, rows, mode) {
@@ -758,13 +746,12 @@
       if (seeds.length) {
         seedsEl.innerHTML = seeds.map((s) => {
           const who = (showName && s.name) ? escapeForTooltip(s.name)
-                    : (s.emailHash ? '匿名(' + s.emailHash + ')' : '匿名');
+                    : (s.emailHash ? '匿名('+ s.emailHash + ')': '匿名');
           // raw を先に切ってから escape する（entity 途中切り防止）。
           const stance = s.label
-            ? '<span class="viz-seed-stance">' + escapeForTooltip(String(s.label).substring(0, 24)) + '</span>'
-            : '';
+            ? '<span class="viz-seed-stance">'+ escapeForTooltip(String(s.label).substring(0, 24)) + '</span>'            : '';
           const reason = escapeForTooltip(String(s.reason).substring(0, 120));
-          return '<li>' + stance + '<span class="viz-seed-who">' + who + '</span>「' + reason + '」</li>';
+          return '<li>'+ stance + '<span class="viz-seed-who">'+ who + '</span>「'+ reason + '」</li>';
         }).join('');
         if (section) section.style.display = '';
       } else {
@@ -784,9 +771,9 @@
           const fromTo = (s.from.y !== null && s.to.y !== null)
             ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
             : `${s.from.x} → ${s.to.x}`;
-          const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名(' + s.emailHash + ')';
+          const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名('+ s.emailHash + ')';
           // raw を先に切ってから escape する（"&amp;" を entity 途中で切らないため）。
-          const comment = s.comment ? '：' + escapeForTooltip(String(s.comment).substring(0, 60)) : '';
+          const comment = s.comment ? '：'+ escapeForTooltip(String(s.comment).substring(0, 60)) : '';
           return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
         }).join('');
         if (swingSection) swingSection.style.display = '';
@@ -971,7 +958,7 @@
       // 件数バッジ（既存のヘッダ表示）も更新（updateAnswerCount は board モード前提）
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =
-          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ current.length + '件</span>';
       }
       vizHeartbeat('numberline', { rowCount: rows.length, current: current.length, ghost: ghost.length });
     } catch (e) {
@@ -987,8 +974,7 @@
   StudyQuestApp.prototype.renderMatrix = async function (isInitialLoad, oldRows) {
     try {
       const d3 = await this.ensureD3Loaded();
-      const rows = (this.state.currentAnswers || []).filter((r) =>
-        typeof r.numericX === 'number' && typeof r.numericY === 'number');
+      const rows = (this.state.currentAnswers || []).filter((r) => typeof r.numericX === 'number'&& typeof r.numericY === 'number');
       const containerRefs = getOrCreateVizContainer(this);
       if (!containerRefs) return;
 
@@ -1034,14 +1020,14 @@
         .attr('x', 0).attr('y', midY).attr('width', midX).attr('height', innerH - midY);
 
       // 象限ラベル + 理由キーワードを SVG 内に配置 (「ドット位置 + 言葉の意味」を視線移動なしで把握)。
-      //   anchor='top' → ラベルの下に配置 (hh/lh) / anchor='bottom' → ラベルの上に配置 (hl/ll)。
+      //   anchor='top'→ ラベルの下に配置 (hh/lh) / anchor='bottom' → ラベルの上に配置 (hl/ll)。
       const q = __resolveQuadrantLabels(axis);
       // バケット分け (renderQuadrantSummary と同じロジック)
       const buckets = { hh: [], lh: [], hl: [], ll: [] };
       for (const r of rows) {
-        if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
-        const xKey = r.numericX >= (minX + maxX) / 2 ? 'h' : 'l';
-        const yKey = r.numericY >= (minY + maxY) / 2 ? 'h' : 'l';
+        if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
+        const xKey = r.numericX >= (minX + maxX) / 2 ? 'h': 'l';
+        const yKey = r.numericY >= (minY + maxY) / 2 ? 'h': 'l';
         buckets[xKey + yKey].push(r);
       }
       // 各象限の reason を 1 回ずつトークン化してキャッシュ。
@@ -1073,7 +1059,7 @@
           const reason = String(r.reason || '');
           return reason.indexOf(keyword) >= 0;
         });
-        showRowsPopup(selfM, '「' + keyword + '」を含む回答 (' + matched.length + '件)', matched);
+        showRowsPopup(selfM, '「'+ keyword + '」を含む回答 ('+ matched.length + '件)', matched);
       };
       const placeLabel = (text, x, y, key, anchor) => {
         if (!text) return;
@@ -1105,16 +1091,16 @@
               });
             // 視覚区切り
             if (idx < kws.length - 1) {
-              kwLine.append('tspan').text('  ');
+              kwLine.append('tspan').text(' ');
             }
             // a11y: keyboard 操作のため tabindex / role
             const node = tspan.node();
             if (node) {
               node.setAttribute('role', 'button');
               node.setAttribute('tabindex', '0');
-              node.setAttribute('aria-label', k + ' を含む回答を一覧表示');
+              node.setAttribute('aria-label', k + 'を含む回答を一覧表示');
               node.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+                if (e.key === 'Enter'|| e.key === ' ') {
                   e.preventDefault();
                   openKeywordPopup(k);
                 }
@@ -1186,12 +1172,12 @@
       const xExclude = xPair ? new Set([xPair.leftKey, xPair.rightKey]) : new Set();
       const yPair = contrastingPair(lowerMap, upperMap, 'reason', xExclude);
       const summaryParts = [];
-      if (xPair) summaryParts.push('#' + xPair.left + ' ↔ #' + xPair.right);
-      if (yPair) summaryParts.push('#' + yPair.left + ' ↔ #' + yPair.right);
+      if (xPair) summaryParts.push('#'+ xPair.left + ' ↔ #' + xPair.right);
+      if (yPair) summaryParts.push('#'+ yPair.left + ' ↔ #' + yPair.right);
       if (summaryParts.length > 0) {
         g.append('text').attr('class', 'viz-contrast-summary')
           .attr('x', innerW / 2).attr('y', innerH + 44).attr('text-anchor', 'middle')
-          .text('議論の対立軸:  ' + summaryParts.join('   |   '));
+          .text('議論の対立軸:  '+ summaryParts.join('   |   '));
       }
 
       // 共通の足場（consensus / bridging）— 対立軸の「補集合」を 1 行で示す。
@@ -1208,7 +1194,7 @@
       if (consensus.length > 0) {
         g.append('text').attr('class', 'viz-consensus-summary')
           .attr('x', innerW / 2).attr('y', innerH + 62).attr('text-anchor', 'middle')
-          .text('立場を越えた共通の言葉:  ' + consensus.map((c) => '#' + c.word).join('   '));
+          .text('立場を越えた共通の言葉:  '+ consensus.map((c) => '#'+ c.word).join('   '));
       }
 
       // ghost 配列は groupByStudent が常に空 ([]) を返すので no-op。
@@ -1287,14 +1273,14 @@
       const sameCoordCounts = (function () {
         const m = new Map();
         for (const r of current) {
-          if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+          if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
           const key = Math.round(r.numericX) + ',' + Math.round(r.numericY);
           m.set(key, (m.get(key) || 0) + 1);
         }
         return m;
       })();
       const sameCoordOf = (item) => {
-        if (!item || typeof item.numericX !== 'number' || typeof item.numericY !== 'number') return 0;
+        if (!item || typeof item.numericX !== 'number'|| typeof item.numericY !== 'number') return 0;
         const key = Math.round(item.numericX) + ',' + Math.round(item.numericY);
         return sameCoordCounts.get(key) || 0;
       };
@@ -1354,7 +1340,7 @@
 
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =
-          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ current.length + '件</span>';
       }
       vizHeartbeat('matrix', { rowCount: rows.length, current: current.length, ghost: ghost.length });
     } catch (e) {
@@ -1403,9 +1389,9 @@
 
     const buckets = { hh: [], lh: [], hl: [], ll: [] };
     for (const r of rows) {
-      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
-      const xKey = r.numericX >= midX ? 'h' : 'l';
-      const yKey = r.numericY >= midY ? 'h' : 'l';
+      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
+      const xKey = r.numericX >= midX ? 'h': 'l';
+      const yKey = r.numericY >= midY ? 'h': 'l';
       buckets[xKey + yKey].push(r);
     }
 
@@ -1424,7 +1410,7 @@
       cell.className = 'qs-cell ' + cls;
 
       const h4 = document.createElement('h4');
-      h4.textContent = '📍 ' + label;
+      h4.textContent = ' ' + label;
       cell.appendChild(h4);
 
       if (cellRows.length === 0) {
@@ -1568,7 +1554,7 @@
    *   日本語語には影響なし（lower/upper の概念がないため key === word.toLowerCase()）。
    *
    * @param {Array} rows - currentAnswers
-   * @param {string} field - 集計対象列名（'reason' or 'answer'）
+   * @param {string} field - 集計対象列名（'reason'or 'answer'）
    * @returns {Array<{word, count}>} desc sorted, max 25 件
    */
   /**
@@ -1671,7 +1657,7 @@
    *
    * @param {Array} thisCellRows  対象象限の rows
    * @param {Array<Array>} otherCellsRows  他 3 象限それぞれの rows 配列
-   * @param {string} field  集計対象列名（'reason' or 'answer'）
+   * @param {string} field  集計対象列名（'reason'or 'answer'）
    * @param {number} topN  返す語数（既定 3）
    * @returns {Array<{word: string, score: number, count: number}>}
    */
@@ -1895,7 +1881,7 @@
     const dMin = typeof cfg.defaultMin === 'number' ? cfg.defaultMin : 1;
     const dMax = typeof cfg.defaultMax === 'number' ? cfg.defaultMax : 5;
     if (mode === 'matrix') {
-      const valid = (rows || []).filter((r) => typeof r.numericX === 'number' && typeof r.numericY === 'number');
+      const valid = (rows || []).filter((r) => typeof r.numericX === 'number'&& typeof r.numericY === 'number');
       const xs = valid.map((r) => r.numericX);
       const ys = valid.map((r) => r.numericY);
       const minX = xs.length ? Math.min(...xs, dMin) : dMin;
@@ -1907,8 +1893,8 @@
       const q = __resolveQuadrantLabels(cfg);
       const buckets = { hh: [], lh: [], hl: [], ll: [] };
       for (const r of valid) {
-        const xk = r.numericX >= midX ? 'h' : 'l';
-        const yk = r.numericY >= midY ? 'h' : 'l';
+        const xk = r.numericX >= midX ? 'h': 'l';
+        const yk = r.numericY >= midY ? 'h': 'l';
         buckets[xk + yk].push(r);
       }
       return ['hh', 'lh', 'hl', 'll'].map((k) => ({ key: k, label: q[k] || '', rows: buckets[k] }));
@@ -2019,7 +2005,7 @@
     const beforeByHash = new Map();
     for (const r of beforeRows) {
       if (!r || !r.emailHash) continue;
-      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
       // 同 hash で複数 row があれば最後（=最新）のものを採用
       beforeByHash.set(r.emailHash, r);
     }
@@ -2027,7 +2013,7 @@
     const seen = new Set();
     for (const r of currentRows) {
       if (!r || !r.emailHash) continue;
-      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
       if (seen.has(r.emailHash)) continue;  // current 側でも 1 hash = 1 entry に正規化
       seen.add(r.emailHash);
       const before = beforeByHash.get(r.emailHash);
@@ -2055,7 +2041,7 @@
       removeQuadrantSummary(this.elements.answersContainer);
 
       // Why: reason 列がメインの自由記述。空なら answer にフォールバック。
-      const useField = rows.some(r => r.reason) ? 'reason' : 'answer';
+      const useField = rows.some(r => r.reason) ? 'reason': 'answer';
       const words = aggregateWords(rows, useField);
 
       const svgEl = containerRefs.svg;
@@ -2109,7 +2095,7 @@
             const text = String((r[useField] || ''));
             return text.indexOf(d.word) >= 0;
           });
-          showRowsPopup(selfW, '「' + d.word + '」を含む回答 (' + matched.length + '件)', matched);
+          showRowsPopup(selfW, '「'+ d.word + '」を含む回答 ('+ matched.length + '件)', matched);
         });
 
       // 単語ラベル（左）
@@ -2138,7 +2124,7 @@
       updateStatsPills(this, rows.length);
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =
-          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ rows.length + '件</span>';
       }
       vizHeartbeat('wordcloud', { rowCount: rows.length, words: words.length });
     } catch (e) {
@@ -2192,7 +2178,7 @@
       removeQuadrantSummary(this.elements.answersContainer);
 
       // 'answer' 列を優先（Forms の選択肢設問はここに入る）
-      const useField = rows.some(r => r.answer) ? 'answer' : 'reason';
+      const useField = rows.some(r => r.answer) ? 'answer': 'reason';
       const cats = aggregateCategories(rows, useField);
       const total = cats.reduce((s, c) => s + c.count, 0);
 
@@ -2250,7 +2236,7 @@
         .on('click', (event, d) => {
           hideTooltip();
           const matched = (selfP.state.currentAnswers || []).filter(r => String(r[useField] || '').trim() === d.data.label);
-          showRowsPopup(selfP, '「' + d.data.label + '」 の回答 (' + matched.length + '件)', matched);
+          showRowsPopup(selfP, '「'+ d.data.label + '」 の回答 ('+ matched.length + '件)', matched);
         });
 
       // ラベル
@@ -2276,7 +2262,7 @@
       updateStatsPills(this, rows.length);
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =
-          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ rows.length + '件</span>';
       }
       vizHeartbeat('pie', { rowCount: rows.length, categories: cats.length });
     } catch (e) {
@@ -2297,7 +2283,7 @@
     if (app.state.isEditor || app.state.isAdminUser || app.state.showAdminFeatures) return true;
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('teacher') === '1' || params.get('admin') === '1') return true;
+      if (params.get('teacher') === '1'|| params.get('admin') === '1') return true;
     } catch (_) {}
     // profiles 自体は誰でも見える（buildSafePublishedDataResult が全員に送る）ため、
     // それを根拠に teacher 判定すると student にも UI が出てしまう。
@@ -2422,7 +2408,7 @@
     // viz モードではカードがないので意味不明なのと、viewport の下部を占有して
     // SVG レイアウトとぶつかるので非表示にする。
     const footer = document.getElementById('controlsFooter');
-    if (footer) footer.style.display = (cur === 'board') ? '' : 'none';
+    if (footer) footer.style.display = (cur === 'board') ? '': 'none';
   }
 
   // mode 切替は profile 切替 (boardMode を server-resolved で決定) に統一済み。
@@ -2454,10 +2440,10 @@
     // 生徒: app.state.studentProfileNav.history (過去 + 現在のみ)
     let pillEntries;
     let activeName;
-    let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には ✓ 付ける）
+    let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には  付ける）
     if (teacher) {
       // Why: teacher は state.profiles を root として表示。pastSet は state.profileHistory
-      //   (server の profileSummary.history) から構築し、過去 active 経験を ✓ で示す。
+      //   (server の profileSummary.history) から構築し、過去 active 経験を  で示す。
       //   pill click は v2771 で「常に switch (active 切替)」に統一済 (詳細は下の action 行参照)。
       const profiles = (app.state && app.state.profiles) || [];
       const navHist = (app.state && Array.isArray(app.state.profileHistory))
@@ -2552,16 +2538,14 @@
         if (e.isCurrent) classes.push('current');
         if (e.isPast) classes.push('past');
         if (e.isViewing) classes.push('viewing');
-        const icon = e.isCurrent ? '<span class="viz-profile-pill__dot" aria-hidden="true">●</span> '
-                   : e.isPast ? '<span class="viz-profile-pill__check" aria-hidden="true">✓</span> '
-                   : '';
-        const ariaSel = e.isViewing ? 'true' : 'false';
-        const dataAction = e.action ? ' data-action="' + e.action + '"' : '';
+        const icon = e.isCurrent ? '<span class="viz-profile-pill__dot" aria-hidden="true">●</span> '                   : e.isPast ? '<span class="viz-profile-pill__check" aria-hidden="true"></span> '                   : '';
+        const ariaSel = e.isViewing ? 'true': 'false';
+        const dataAction = e.action ? 'data-action="' + e.action + '"': '';
         html.push(
-          '<button type="button" class="' + classes.join(' ') +
+          '<button type="button" class="'+ classes.join(' ') +
           '" role="tab" aria-selected="' + ariaSel +
-          '" data-profile="' + safe + '"' + dataAction +
-          ' title="' + safeTitle + '">' +
+          '" data-profile="'+ safe + '"' + dataAction +
+          'title="' + safeTitle + '">' +
           icon + safe + '</button>'
         );
       }
@@ -2576,10 +2560,10 @@
       container.innerHTML = html.join('');
     } else {
       // select fallback (teacher only)
-      const opts = ['<option value="">📚 ボード...</option>'];
+      const opts = ['<option value=""> ボード...</option>'];
       for (const e of pillEntries) {
-        const sel = e.isCurrent ? ' selected' : '';
-        opts.push('<option value="' + escapeForTooltip(e.name) + '"' + sel + '>' + escapeForTooltip(e.name) + '</option>');
+        const sel = e.isCurrent ? 'selected' : '';
+        opts.push('<option value="'+ escapeForTooltip(e.name) + '"'+ sel + '>'+ escapeForTooltip(e.name) + '</option>');
       }
       container.innerHTML =
         '<select id="vizProfileSelect" class="viz-profile-select" aria-label="ボード切替" title="ボード（profile）切替">' +
@@ -2605,7 +2589,7 @@
     // pill click → 数秒の沈黙、 を防ぐ (生徒の「効いてる?」 不安を解消)。
     const select = document.getElementById('vizProfileSelect');
     if (select) select.disabled = true;
-    if (typeof this.showToast === 'function') this.showToast('「' + name + '」 に切替中…');
+    if (typeof this.showToast === 'function') this.showToast('「'+ name + '」 に切替中…');
 
     let res;
     try {
@@ -2625,7 +2609,7 @@
     if (select) select.disabled = false;
     if (!(res && res.success)) {
       console.error('Profile load failed:', res && res.message);
-      const msg = 'プロファイルの読み込みに失敗しました: ' + ((res && res.message) || '不明なエラー');
+      const msg = 'プロファイルの読み込みに失敗しました: '+ ((res && res.message) || '不明なエラー');
       if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
       else if (typeof this.showToast === 'function') this.showToast(msg);
       return;
@@ -2651,7 +2635,7 @@
     }
     // 成功通知も右上トーストに統一 (エラーと同位置で操作-結果のペアが明示される)。
     if (typeof this.showNotification === 'function') {
-      this.showNotification('「' + name + '」 に切替えました', 'success');
+      this.showNotification('「'+ name + '」 に切替えました', 'success');
     }
   };
 
@@ -2689,7 +2673,7 @@
     // UI 即時反映 (loading フィードバック + 描画ペインに loading 文字)。
     this.state.viewingPastProfile = name;
     if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
-    if (typeof this.showToast === 'function') this.showToast('「' + name + '」 を読み込み中…');
+    if (typeof this.showToast === 'function') this.showToast('「'+ name + '」 を読み込み中…');
 
     let res;
     try {
@@ -2738,7 +2722,7 @@
     if (typeof this.renderBoard === 'function') this.renderBoard(false, false, []);
     // トースト「過去のフェーズを表示中（読み取り専用）」
     if (typeof this.showToast === 'function') {
-      this.showToast('「' + name + '」を表示中（読み取り専用）');
+      this.showToast('「'+ name + '」を表示中（読み取り専用）');
     }
   };
 

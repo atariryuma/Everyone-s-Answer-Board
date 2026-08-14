@@ -346,7 +346,7 @@
           <svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg>
           使い方
         </button>
-        <!-- アカウント: 旧「👤 ユーザー情報」カード + 「⚙️ アプリ設定」を集約。
+        <!-- アカウント: 旧「ユーザー情報」カード + 「アプリ設定」を集約。
              常時 4 カードを右カラムに置く必要が無くなる。 -->
         <details class="account-menu">
           <summary title="アカウント">
@@ -515,13 +515,13 @@
                 <div id="form-info" class="form-info hidden">
                   <div class="bg-theme-status-detection-soft border border-theme-status-detection-strong rounded-lg p-3">
                     <div class="text-sm text-theme-status-detection">
-                      <div class="mb-1">📝 <span id="form-title" class="font-medium">-</span></div>
-                      <div class="mb-1">📊 <span id="form-spreadsheet-status" class="font-medium">-</span></div>
+                      <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg> <span id="form-title" class="font-medium">-</span></div>
+                      <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-table"></use></svg> <span id="form-spreadsheet-status" class="font-medium">-</span></div>
                       <div><a id="form-url" href="#" target="_blank" class="text-theme-status-info hover:underline text-xs">フォームを開く</a></div>
                     </div>
                   </div>
                 </div>
-                <button id="refresh-data" class="btn btn-secondary text-sm" type="button">🔄 一覧を更新</button>
+                <button id="refresh-data" class="btn btn-secondary text-sm" type="button"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> 一覧を更新</button>
               </div>
             </div>
 
@@ -530,12 +530,10 @@
       </section>
 
       <!-- ② 列設定: フォーム接続時に自動推定が走るので、UI は controlled disclosure -->
-      <section class="card">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold text-theme">
-            <span class="step-number">②</span> 列設定
-          </h2>
-        </div>
+      <section class="subsection">
+        <h3 class="subsection-title">
+          <span class="step-number">②</span> 列設定
+        </h3>
 
         <!-- 列設定 dropdowns. label は JS の applyColumnModeLabels が一元的に上書きするので
              ここでは <label> を空にし、初期ハイドレ前のチラ見えを防止。
@@ -558,7 +556,7 @@
           <div id="numeric-mapping-container" class="hidden space-y-4">
             <div id="numeric-candidates-info" class="hidden p-3 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-theme-status-info-text-on-soft">🔢</span>
+                <span class="text-theme-status-info-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-number-line"></use></svg></span>
                 <span class="text-sm font-medium text-theme-status-info-text-on-soft">検出された数値列</span>
               </div>
               <div id="numeric-candidates-list" class="text-xs text-theme-status-info-text-on-soft opacity-90 space-y-1"></div>
@@ -618,7 +616,7 @@
         <!-- 設定完了状況表示 + 再推定 (inline) -->
         <div class="text-sm text-theme-muted mb-4 flex items-center justify-between">
           <!-- updateCompletionStatus が mode 別に上書きする (matrix=2必須, pie=1必須 等) -->
-          <span id="completion-status">⚪ 設定状況: 読み込み中...</span>
+          <span id="completion-status">設定状況: 読み込み中...</span>
           <button id="ai-analyze-btn" type="button"
             class="text-xs text-theme-accent-cyan hover:text-theme-accent-cyan-hover underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
             title="列マッピングを再推定する（フォーム接続後に有効）">
@@ -628,7 +626,7 @@
 
         <!-- 手動変更通知 + 自動推定に戻すボタン (見出しだけの装飾は廃止 / 動作するボタンを併設) -->
         <div id="manual-override-info" class="hidden mb-4 p-2 bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg flex items-center justify-between gap-2">
-          <span class="text-xs text-theme-status-warning-text-on-soft">✋ 手動で変更されました。</span>
+          <span class="text-xs text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-hand"></use></svg> 手動で変更されました。</span>
           <button id="reset-to-ai" class="text-xs text-theme-status-info hover:text-theme-status-info underline-offset-2 hover:underline transition-colors flex-shrink-0" type="button">
             ↩ 自動推定に戻す
           </button>
@@ -637,16 +635,16 @@
       </section>
 
       <!-- ③ 表示設定 + 公開ボタン: 個別ボード authoring の最終ステップ -->
-      <section class="card">
-        <h2 class="text-xl font-semibold text-theme mb-4">
+      <section class="subsection">
+        <h3 class="subsection-title">
           <span class="step-number">③</span> 表示と公開
-        </h2>
+        </h3>
         <div class="space-y-4">
           <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
           <div class="mb-4">
             <div class="bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg p-3 mb-4">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-theme-status-warning-text-on-soft">🔒</span>
+                <span class="text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-lock"></use></svg></span>
                 <span class="text-sm font-medium text-theme-status-warning-text-on-soft">心理的安全性への配慮</span>
               </div>
               <p class="text-xs text-theme-status-warning-text-on-soft">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
@@ -667,7 +665,7 @@
                  view ヘッダーにも sun/moon ボタンを置いているが、 ここでは
                  「明示的な 3 択 (Dark/Light/Auto)」 で詳細制御可能。 -->
             <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <label for="theme-select" class="text-theme-secondary whitespace-nowrap">🎨 テーマ:</label>
+              <label for="theme-select" class="text-theme-secondary whitespace-nowrap"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-palette"></use></svg> テーマ:</label>
               <select id="theme-select" class="modern-select" style="flex: 0 0 auto; min-width: 140px;">
                 <option value="auto">自動 (OS追従)</option>
                 <option value="dark">ダーク</option>
@@ -680,7 +678,7 @@
           <!-- 可視化モード設定（M1 数直線 / M2 マトリクス散布図）。既定 'auto' でサーバ自動判定。 -->
           <details id="visualization-section" class="mb-4 pt-4 border-t border-theme-subtle admin-collapsible">
             <summary class="cursor-pointer text-sm text-theme-secondary hover:text-white select-none py-1">
-              📊 表示方法を細かく調整（通常は不要）
+              <svg class="icon icon-sm" aria-hidden="true"><use href="#i-bar-chart"></use></svg> 表示方法を細かく調整（通常は不要）
             </summary>
             <div class="mt-3 pl-4 border-l-2 border-theme-normal">
               <p class="text-xs text-theme-muted mb-3">通常は「自動判定」のままで OK。Forms に「線形尺度」が含まれていれば数直線/散布図に自動で切り替わります。</p>
@@ -692,10 +690,10 @@
                 <select id="board-mode-select" class="modern-select" data-autosave>
                   <option value="auto">自動判定（推奨）</option>
                   <option value="board">掲示板</option>
-                  <option value="numberline">数直線（M1）</option>
-                  <option value="matrix">マトリクス（M2）</option>
-                  <option value="wordcloud">ワードランキング（M3・終末用）</option>
-                  <option value="pie">円グラフ（M4・導入用）</option>
+                  <option value="numberline">数直線</option>
+                  <option value="matrix">マトリクス（散布図）</option>
+                  <option value="wordcloud">ワードランキング</option>
+                  <option value="pie">円グラフ</option>
                 </select>
                 <div class="text-xs text-theme-muted mt-1" id="board-mode-hint">
                   線形尺度列がなければ掲示板表示になります。
@@ -711,7 +709,7 @@
                    ここの "例:" 表記はフォーム未連携時のみ見える汎用 fallback。 -->
               <div id="axis-labels-container" class="hidden space-y-3 mt-3">
                 <p class="text-xs text-theme-muted mb-2">
-                  💡 フォームの「線形尺度」項目に書いたラベルが自動で入ります。空欄なら自動補完、書き換えれば優先されます。
+                  <svg class="icon icon-sm" aria-hidden="true"><use href="#i-lightbulb"></use></svg> フォームの「線形尺度」項目に書いたラベルが自動で入ります。空欄なら自動補完、書き換えれば優先されます。
                 </p>
                 <div class="form-group">
                   <label class="block text-sm font-medium text-theme-secondary mb-2">X軸ラベル（両端）</label>
@@ -754,55 +752,42 @@
           </details>
         </div>
 
-        <!-- 公開トグル + プロファイル保存。設定は autosave (#autosave-status で進行表示)。 -->
-        <div class="action-buttons items-center" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-          <span id="autosave-status" class="text-xs text-theme-muted" aria-live="polite" title="入力すると自動保存されます"></span>
-          <button id="save-config-changes" type="button"
-            style="display:none;"
-            aria-hidden="true"
-            title="現在の設定を保存（公開状態は変更しません）">
-            💾 設定を保存
-          </button>
-          <!-- プロファイル保存: 左パネル末尾に配置することで「編集 → 保存」のフローを自然にする。
-               label と data-profile-name は applyConfig で activeProfile から毎回再生成 (drift 防止)。
-               activeProfile が無いときは hidden。 -->
-          <button id="save-to-profile-btn" type="button" class="btn btn-secondary" hidden
-            title="現在の編集内容をこのプロファイルのスナップショットに上書き保存">
-            💾 <span id="save-to-profile-name">プロファイル</span>に保存
-          </button>
+        <!-- 公開操作 + 保存状態。設定値そのものは autosave (#autosave-status で進行表示)。 -->
+        <div class="flex flex-wrap items-center gap-3 mt-5">
           <button id="primary-publish-toggle" class="btn btn-primary" type="button"
             title="ボードの公開状態を切り替える">
-            <span class="primary-publish-toggle-label">📣 公開する</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-megaphone"></use></svg>
+            <span class="primary-publish-toggle-label">公開する</span>
           </button>
-        </div>
-
-        <!-- legacy buttons (handler 互換のため hidden 残置) -->
-        <div style="display:none;" aria-hidden="true">
-          <button id="save-draft" type="button">下書き保存</button>
-          <button id="publish-now" type="button">今すぐ公開</button>
+          <!-- プロファイル保存: 「編集 → 保存」の flow を自然にするため公開ボタンの隣。
+               label と data-profile-name は applyConfig で activeProfile から毎回再生成。
+               activeProfile が無いときは hidden。 -->
+          <button id="save-to-profile-btn" type="button" class="btn btn-secondary" hidden
+            title="現在の編集内容をこのボードのスナップショットに上書き保存">
+            <svg class="icon" aria-hidden="true"><use href="#i-save"></use></svg>
+            <span id="save-to-profile-name">ボード</span>に保存
+          </button>
+          <span id="autosave-status" class="text-xs text-theme-muted" aria-live="polite"
+            title="入力すると自動保存されます"></span>
         </div>
       </section>
-    </div>
 
-    <!-- 右パネル: 情報表示 -->
-    <div class="info-panel">
-      <!-- 現在の設定 + プロファイル管理（統合パネル）
-           Why: 「現在の設定（active）」と「保存済みプロファイル一覧」は表裏一体の情報。
-                別パネルで分けると認知負荷が高いので、1 つの info-card に集約する。 -->
-      <section class="card card-compact">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-lg font-semibold text-theme">📋 現在の設定</h3>
+      <!-- ④ 現在の状態 + 保存済みボード。旧「右カラム」の情報パネルをここへ集約した。 -->
+      <section class="subsection">
+        <div class="section-head">
+          <h3 class="subsection-title" style="margin-bottom:0;">
+            <svg class="icon" aria-hidden="true"><use href="#i-circle-dot"></use></svg>
+            現在の状態
+          </h3>
           <span class="text-xs text-theme-muted" id="profile-count-badge">--</span>
         </div>
-        <!-- 表示モード/回答者名/リアクション数/シート名は左パネル「表示設定」と重複のため非表示。
-             legacy ID は hidden span として残置 (updateConfigSummary 等の JS 互換維持)。 -->
         <div class="config-summary">
           <div class="box box-row">
             <span class="label">公開状態:</span>
             <span id="app-publish-status" class="status-badge unpublished">未公開</span>
           </div>
           <div class="box box-row">
-            <span class="label">アクティブ:</span>
+            <span class="label">編集中のボード:</span>
             <span id="current-active-profile" class="text-sm text-theme-muted">単一ボード</span>
           </div>
           <div class="box box-row">
@@ -811,120 +796,81 @@
           </div>
         </div>
 
-        <!-- legacy 重複項目 (JS handler 互換のため hidden 残置) -->
-        <div style="display:none;" aria-hidden="true">
-          <span id="current-board-mode">auto</span>
-          <span id="current-show-names">匿名</span>
-          <span id="current-show-reactions">非表示</span>
-          <span id="current-sheetname">未設定</span>
-        </div>
-
-        <!-- 保存済みプロファイル一覧（切替・削除可） -->
         <div class="mt-4 pt-3 border-t border-theme-subtle">
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-semibold text-theme">📚 保存済みボード</h4>
-          </div>
-          <!-- 編集中の active row には直接 💾 ボタンが表示される (旧 editBar 廃止)。
-               視覚マーカー (cyan border + 現在/公開中 badge) + 💾 button が「今編集している
-               プロファイル」を自明にする。詳細: AdminPanel.js.html renderProfileList コメント。 -->
-
+          <h4 class="text-sm font-semibold text-theme mb-2">保存済みボード</h4>
           <div id="profile-list" class="space-y-1.5">
             <div class="text-xs text-theme-muted italic">読み込み中...</div>
           </div>
-
-          <!-- 状態フィードバック: collapsible の外に置いて、どんな操作 (切替/削除/更新/rename/新規保存)
-               でもユーザーが結果を見えるようにする。空文字なら高さ 0 (min-h で flicker 防止)。 -->
+          <!-- 状態フィードバックは collapsible の外。空文字なら高さ 0 (min-h で flicker 防止)。 -->
           <div id="profile-action-status" class="text-xs text-theme-muted mt-2 min-h-[1rem]"></div>
-        </div>
 
-        <details class="mt-3 pt-3 border-t border-theme-subtle admin-collapsible">
-          <summary class="cursor-pointer text-xs text-theme-muted hover:text-theme select-none py-1">
-            📋 別名で保存（新しいプロファイルを作る）
-          </summary>
-          <div class="flex items-center gap-1.5 mt-2">
-            <input type="text" id="new-profile-name" placeholder="例: 振り返り用"
-              class="flex-1 min-w-0 px-2 py-1.5 bg-theme-surface border border-theme-normal rounded text-theme text-xs focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
-              maxlength="50" />
-            <button id="save-current-as-profile-btn" type="button"
-              class="px-2 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-semibold transition-all focus:ring-2 focus:ring-cyan-400/50 focus:outline-none whitespace-nowrap">
-              新規保存
-            </button>
-          </div>
-          <p class="text-xs text-theme-muted mt-1">既存プロファイルとは別の名前で保存できます。</p>
-        </details>
-      </section>
-
-      <!-- ユーザー情報 -->
-      <div class="card card-compact">
-        <h3 class="text-lg font-semibold text-theme mb-3">👤 ユーザー情報</h3>
-        <div class="space-y-3">
-          <div class="flex items-center justify-between p-3 box">
-            <span class="text-theme-secondary">メールアドレス:</span>
-            <span id="current-user-email" class="text-theme">読み込み中...</span>
-          </div>
-          <div class="flex items-center justify-between p-3 box">
-            <span class="text-theme-secondary">アクション:</span>
-            <button onclick="window.sharedUtilities.auth.logout()" type="button"
-              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
-              ログアウト
-            </button>
-          </div>
-        </div>
-        <!-- legacy: ユーザーID 表示要素は JS handler 互換のため hidden 残置 -->
-        <span id="current-user-id" style="display:none;" aria-hidden="true">--</span>
-      </div>
-
-      <!-- リソース -->
-      <section class="card card-compact">
-        <h3 class="text-lg font-semibold text-theme mb-3">📚 リソース</h3>
-        <div class="resource-buttons space-y-2">
-          <button id="open-spreadsheet-btn"
-            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled type="button">
-            <span>📊</span>
-            <span>スプレッドシートを開く</span>
-          </button>
-
-          <button id="open-form-btn"
-            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled type="button">
-            <span>📝</span>
-            <span>フォームを開く</span>
-          </button>
-
-
-          <div id="resource-status" class="text-xs text-theme-muted mt-2 text-center">
-            設定を読み込み中...
-          </div>
+          <details class="mt-3 admin-collapsible">
+            <summary class="cursor-pointer text-xs text-theme-muted hover:text-theme select-none py-1">
+              別名で保存（新しいボードを作る）
+            </summary>
+            <div class="flex items-center gap-2 mt-2">
+              <input type="text" id="new-profile-name" placeholder="例: 振り返り用"
+                class="modern-input flex-1 min-w-0" maxlength="50" />
+              <button id="save-current-as-profile-btn" type="button" class="btn btn-secondary text-sm">
+                新規保存
+              </button>
+            </div>
+            <p class="text-xs text-theme-muted mt-1">既存のボードとは別の名前で保存できます。</p>
+          </details>
         </div>
       </section>
 
-      <!-- クイックアクション -->
-      <section class="card card-compact">
-        <h3 class="text-lg font-semibold text-theme mb-3">⚡ クイックアクション</h3>
-        <div class="space-y-3">
-          <button class="link-btn w-full text-center" type="button"
-            onclick="window.open('https://drive.google.com', '_blank')">
-            📁 Googleドライブを開く
+      <!-- ⑤ 連携先を開く -->
+      <section class="subsection">
+        <h3 class="subsection-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>
+          連携先を開く
+        </h3>
+        <div class="resource-buttons flex flex-wrap gap-2">
+          <button id="open-spreadsheet-btn" class="btn btn-secondary" disabled type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-table"></use></svg>
+            スプレッドシート
           </button>
-          <button class="link-btn w-full text-center" type="button"
-            onclick="window.open('https://docs.google.com/forms/', '_blank')">
-            📝 Googleフォームを開く
+          <button id="open-form-btn" class="btn btn-secondary" disabled type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-form"></use></svg>
+            フォーム
           </button>
-          <button class="link-btn w-full text-center" type="button"
-            onclick="window.open('https://classroom.google.com', '_blank')">
-            🎓 Googleクラスルームを開く
-          </button>
-          <!-- システム管理者用ボタン (アプリ設定で SA pool 管理 / システム診断等が可能) -->
-          <a id="app-setup-btn" target="_top" class="link-btn w-full text-center block" style="display: none;">
-            ⚙️ アプリ設定
-          </a>
         </div>
+        <div id="resource-status" class="text-xs text-theme-muted mt-2">設定を読み込み中...</div>
       </section>
-    </div>
+
+        </div>
+      </details>
+  </main>
+
+  <!-- =====================================================================
+    互換用の非表示ノード。
+    AdminPanel.js から ID で参照されるが、UI としては表に出さない要素をここへ集約する。
+    以前は各セクションに散らばって「display:none の隣に本物のボタン」が並び、
+    マークアップを読む側が本物を判別できない状態だった。1 か所に集めて明示する。
+  ===================================================================== -->
+  <div id="legacy-compat-nodes" hidden aria-hidden="true">
+    <!-- 旧テンプレート select: createTemplateForm が value を読む -->
+    <select id="template-type-select" tabindex="-1">
+      <option value="board" selected>board</option>
+      <option value="numberline">numberline</option>
+      <option value="matrix">matrix</option>
+      <option value="pie">pie</option>
+    </select>
+    <button id="create-template-form" type="button" tabindex="-1"></button>
+    <!-- 旧「設定を保存 / 下書き保存 / 今すぐ公開」ボタン: autosave + 公開トグルに統合済 -->
+    <button id="save-config-changes" type="button" tabindex="-1"></button>
+    <button id="save-draft" type="button" tabindex="-1"></button>
+    <button id="publish-now" type="button" tabindex="-1"></button>
+    <!-- 旧サマリー表示: 現在の状態セクションと重複するため非表示 -->
+    <span id="current-board-mode">auto</span>
+    <span id="current-show-names">匿名</span>
+    <span id="current-show-reactions">非表示</span>
+    <span id="current-sheetname">未設定</span>
+    <span id="current-user-id">--</span>
   </div>
 
-  <!-- Lesson Workspace: 作成 wizard + Runner (admin-container 外に置いて全画面 takeover)。
+  <!-- Lesson Workspace: 作成 wizard + Runner (main の外に置いて全画面 takeover)。
        Hero list は main-editor 内にインライン配置済。 -->
   <?!= include('LessonWorkspace'); ?>
 
@@ -936,7 +882,7 @@
         <!-- 左側：問題文表示 -->
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <span class="text-theme-status-warning-text-on-soft">📝</span>
+            <span class="text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg></span>
             <span class="text-xs text-theme-muted">現在の回答ボード</span>
           </div>
           <div id="currentQuestionText" class="text-theme font-medium truncate">
@@ -947,13 +893,13 @@
         <!-- 右側：アクションボタン -->
         <div class="flex items-center gap-2 flex-shrink-0">
           <button id="copyViewUrlBtn" class="btn btn-secondary text-sm px-3 py-2" title="閲覧用URLをコピー（共有用）" type="button">
-            📋 URLコピー
+            <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
           </button>
           <button id="openBoardBtn" class="btn btn-primary text-sm px-3 py-2" title="回答ボードを開く" type="button">
-            📊 ボードを開く
+            <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
           </button>
           <button id="unpublishBoardBtn" class="btn btn-danger text-sm px-3 py-2" title="ボードの公開を終了する" type="button">
-            🔒 公開を終了
+            <svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg> 公開を終了
           </button>
         </div>
       </div>

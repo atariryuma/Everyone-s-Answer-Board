@@ -1,5 +1,4 @@
-<style>
-  /* =============================================================================
+<style> /* =============================================================================
    みんなの回答ボード - Unified CSS Styles
    Based on AdminPanel.html with additional styles from all HTML files
    ============================================================================= */
@@ -408,7 +407,7 @@
 
     /* インジケーター / アクセント (light 上で WCAG AA 確保: cyan は 3 段下げ) */
     --theme-spinner: #0891b2;                          /* cyan-600 (dark の cyan-300 から 3 段下) */
-    --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50 ✓ AA */
+    --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50  AA */
     --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
 
     /* Card tier (light v2828): 白カード内の inner box が見える step elevation
@@ -996,8 +995,7 @@
 
   /* ============================================================
    * Modal Primitives (v2839+)
-   * 旧パターン: <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-   *   = 6 utility 重複 (modal 9 箇所で repeat)。
+   * 旧パターン: <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4"> *   = 6 utility 重複 (modal 9 箇所で repeat)。
    * 新パターン: <div class="modal-card"> または <div class="modal-card modal-card-lg">。
    *   .modal-card 単体で modal の全レイアウト (bg/border/radius/padding/max-width/margin) を提供。
    * 用途別: modal-card-sm (確認 dialog) / modal-card-md (form modal) / modal-card-lg (content modal)。
@@ -1380,7 +1378,7 @@
     -moz-appearance: none;
     background: var(--theme-bg-elevated);
     /* chevron: theme-aware SVG (currentColor 風)、 light/dark で自動切替 */
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg'width='12'height='12'viewBox='0 0 12 12'fill='none'stroke='%2394a3b8'stroke-width='2'stroke-linecap='round'stroke-linejoin='round'%3E%3Cpolyline points='3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 12px 12px;
@@ -2050,7 +2048,7 @@
     margin-bottom: 0.35rem;
   }
 
-  /* プレビュー上のラベル「📺 生徒に見える形:」: 「ここが結果」を明示 */
+  /* プレビュー上のラベル「 生徒に見える形:」: 「ここが結果」を明示 */
   .phase-preview-label {
     font-size: 0.75rem;
     color: var(--theme-accent-cyan);
@@ -2137,7 +2135,7 @@
     box-shadow: 0 0 0 1px var(--theme-card-2);
   }
 
-  /* Lesson template picker (dropdown menu on 🎒 新しい授業を作る ▾) */
+  /* Lesson template picker (dropdown menu on  新しい授業を作る ▾) */
   .lesson-template-picker {
     position: relative;
   }
@@ -2200,7 +2198,7 @@
   /* ===== Profile row: アイコンボタン + 状態バッジ + 編集中バー ===== */
   .profile-badge {
     padding: 0.15rem 0.45rem;
-    /* 「🟢 公開中」等の機能的な状態テキスト。 旧 0.65rem(10.4px) は design system 下限
+    /* 「 公開中」等の機能的な状態テキスト。 旧 0.65rem(10.4px) は design system 下限
        (--font-size-xs 12px) を割っていたため、 教師が公開状態を読み取る文字として小さすぎた。 */
     font-size: var(--font-size-xs);
     border-radius: 0.25rem;
@@ -2265,7 +2263,7 @@
     outline: none;
   }
 
-  /* 💾 更新ボタン (active row のみ表示) */
+  /*  更新ボタン (active row のみ表示) */
   .profile-icon-update {
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 18%, transparent);
     border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 45%, transparent);

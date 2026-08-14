@@ -15,8 +15,7 @@
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles.css'); ?>
-  <style>
-    body {
+  <style> body {
       margin: 0;
     }
 
@@ -53,12 +52,11 @@
       <div class="mb-6 p-4 bg-theme-elevated rounded-lg">
         <p class="text-sm text-theme-muted mb-2">生徒用URL:</p>
         <div class="flex gap-2">
-          <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
+          <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined'? boardUrl : '' ?>"
             class="flex-1 p-2 bg-theme-elevated border border-theme-strong rounded text-sm cursor-pointer hover:bg-theme-elevated-hover focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
             onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
           <button type="button" onclick="copyBoardUrl()"
-            class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm">
-            コピー
+            class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm"> コピー
           </button>
         </div>
       </div>
@@ -66,13 +64,12 @@
       <!-- 再公開ボタン -->
       <button type="button" id="republish-btn" onclick="republishBoard()"
         class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-theme-base">
-        <span role="img" aria-label="公開">🌟</span> 回答ボードを再び公開する
+        <span role="img" aria-label="公開"></span> 回答ボードを再び公開する
       </button>
 
       <!-- 管理パネル遷移ボタン -->
       <a id="admin-panel-btn" target="_top"
-        class="block w-full mt-3 px-6 py-3 bg-theme-elevated text-theme-muted rounded-lg font-medium text-base text-center pointer-events-none">
-        読み込み中...
+        class="block w-full mt-3 px-6 py-3 bg-theme-elevated text-theme-muted rounded-lg font-medium text-base text-center pointer-events-none"> 読み込み中...
       </a>
 
     </div>
@@ -90,8 +87,7 @@
 
       <div class="mt-6">
         <a id="refresh-btn" target="_top"
-          class="inline-block px-6 py-2 bg-theme-elevated text-theme-muted rounded-lg font-semibold text-center pointer-events-none">
-          読み込み中...
+          class="inline-block px-6 py-2 bg-theme-elevated text-theme-muted rounded-lg font-semibold text-center pointer-events-none"> 読み込み中...
         </a>
       </div>
     </div>
@@ -102,8 +98,7 @@
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedErrorHandling'); ?>
 
-  <script>
-    function copyBoardUrl() {
+  <script> function copyBoardUrl() {
       const urlInput = document.getElementById('board-url');
       if (urlInput) {
         try {
@@ -148,7 +143,7 @@
           button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
         }
       } catch (error) {
-        showMessage('再び公開する処理でエラーが発生しました: ' + (error.message || error), 'error');
+        showMessage('再び公開する処理でエラーが発生しました: '+ (error.message || error), 'error');
         button.disabled = false;
         button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
       }
@@ -179,7 +174,7 @@
 
       if (adminBtn) {
         adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
-        adminBtn.textContent = '⚙️ 管理パネルを開く';
+        adminBtn.textContent = '管理パネルを開く';
         adminBtn.classList.remove('pointer-events-none', 'text-theme-muted');
         adminBtn.classList.add('hover:bg-theme-elevated-hover', 'text-theme');
       }

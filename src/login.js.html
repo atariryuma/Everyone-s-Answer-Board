@@ -1,5 +1,4 @@
-<script>
-  /* =====================================================================
+<script> /* =====================================================================
    * login.js — ログイン画面 (mode=login)
    *
    * 責任範囲:
@@ -37,11 +36,11 @@
       const userEmailDisplay = document.getElementById('user-email-display');
 
       if (!loginBtn) {
-        console.error('❌ Critical: login-btn element not found');
+        console.error('Critical: login-btn element not found');
         return;
       }
       if (!userEmailDisplay) {
-        console.error('❌ Critical: user-email-display element not found');
+        console.error('Critical: user-email-display element not found');
         return;
       }
 
@@ -51,7 +50,7 @@
         try {
           handleLogin();
         } catch (error) {
-          console.error('❌ Login handler failed:', error);
+          console.error('Login handler failed:', error);
           userEmailDisplay.textContent = 'ログイン処理でエラーが発生しました。ページを更新してください。';
           userEmailDisplay.classList.add('text-red-400');
         }
@@ -71,7 +70,7 @@
       }
 
     } catch (error) {
-      console.error('❌ Initialization failed:', error);
+      console.error('Initialization failed:', error);
 
       if (window.notifications) {
         window.notifications.error('初期化に失敗しました。ページを再読み込みしてください。', 10000);
@@ -114,13 +113,13 @@
         }
 
         if (isLogoutRedirect && userEmailDisplay) {
-          let statusMessage = '✅ ログアウトが完了しました。新しくログインしてください。';
+          let statusMessage = 'ログアウトが完了しました。新しくログインしてください。';
 
           if (fallbackReason) {
             if (fallbackReason.includes('server_error')) {
-              statusMessage = '⚠️ サーバーエラーが発生しましたが、ログアウトは完了しました。';
+              statusMessage = 'サーバーエラーが発生しましたが、ログアウトは完了しました。';
             } else if (fallbackReason.includes('critical_error')) {
-              statusMessage = '🔧 システムエラーが発生しましたが、セッションはクリアされました。';
+              statusMessage = 'システムエラーが発生しましたが、セッションはクリアされました。';
             }
           }
 
@@ -159,7 +158,7 @@
         }
 
       } catch (error) {
-        console.warn('⚠️ Fresh login experience initialization failed:', error);
+        console.warn('Fresh login experience initialization failed:', error);
       }
 
   }
@@ -221,10 +220,10 @@
     const displayCurrentUserEmail = async () => {
       const userEmailDisplay = document.getElementById('user-email-display');
       if (!userEmailDisplay) {
-        console.error('❌ userEmailDisplay element not found');
+        console.error('userEmailDisplay element not found');
         return;
       }
-      userEmailDisplay.textContent = '🔄 アカウント情報を確認中...';
+      userEmailDisplay.textContent = 'アカウント情報を確認中...';
 
       let email;
       try {
@@ -242,7 +241,7 @@
         return;
       }
 
-      const emailText = `📧 ${email}`;
+      const emailText = ` ${email}`;
       userEmailDisplay.textContent = emailText;
       userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400');
       userEmailDisplay.classList.add('text-blue-400');
@@ -266,7 +265,7 @@
       console.error('Login error:', err);
 
       const displayMessage = err?.message ||
-                            (typeof err === 'string' ? err : 'ログイン処理エラーが発生しました');
+                            (typeof err === 'string'? err : 'ログイン処理エラーが発生しました');
 
       const userEmailDisplay = document.getElementById('user-email-display');
       if (userEmailDisplay && !userEmailDisplay.dataset.emailSet) {
@@ -440,8 +439,7 @@
           <title>${safeMessage}</title>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { 
+          <style> body { 
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               background: #1a1b26;
               min-height: 100vh;
@@ -615,33 +613,31 @@
         </head>
         <body>
           <div class="container">
-            <div class="icon">✅</div>
+            <div class="icon"></div>
             <h1 class="title">${safeMessage}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
 
             <a href="${safeAdminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
-              <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
+              <span id="admin-panel-btn-text"> 管理パネルを開く</span>
             </a>
 
             <div class="url-info">
-              <div class="url-label">📱 管理パネルURL:</div>
+              <div class="url-label"> 管理パネルURL:</div>
               <div class="url-text">${safeAdminUrl}</div>
-              <button data-copy-url class="copy-btn">
-                📋 URLをコピー
+              <button data-copy-url class="copy-btn"> URLをコピー
               </button>
             </div>
             
             <div class="note">
-              <div class="mb-1">✓ このリンクは安全です</div>
-              <div class="mb-1">✓ Google Apps Script公式のセキュリティガイドラインに準拠</div>
-              <div class="mb-1">🖱️ ボタンをクリックして管理パネルに移動してください</div>
-              <div class="mb-1">💡 このURLをブックマークすると、次回から直接アクセスできます</div>
-              <div>🔒 セキュリティのため、URLは他人と共有しないでください</div>
+              <div class="mb-1"> このリンクは安全です</div>
+              <div class="mb-1"> Google Apps Script公式のセキュリティガイドラインに準拠</div>
+              <div class="mb-1"> ボタンをクリックして管理パネルに移動してください</div>
+              <div class="mb-1"> このURLをブックマークすると、次回から直接アクセスできます</div>
+              <div> セキュリティのため、URLは他人と共有しないでください</div>
             </div>
           </div>
         </body>
-        </html>
-      `;
+        </html> `;
       // theme:exempt-block-end
 
       document.body.innerHTML = successHtml; // lint-disable-line no-inner-html-assignment-with-variable -- safeMessage と safeAdminUrl は escapeHtml 済 + adminUrl は /^https:\/\//i.test() でガード
@@ -665,7 +661,7 @@
 
         const btnText = buttonElement.querySelector('#admin-panel-btn-text');
         if (btnText) {
-          btnText.textContent = '🔄 管理パネルに移動中...';
+          btnText.textContent = '管理パネルに移動中...';
         }
         buttonElement.style.opacity = '0.7';
         buttonElement.style.pointerEvents = 'none';
@@ -708,7 +704,7 @@
           .writeText(url)
           .then(() => {
             const originalText = buttonElement.textContent;
-            buttonElement.textContent = '✅ コピー完了!';
+            buttonElement.textContent = 'コピー完了!';
             buttonElement.disabled = true;
   
 
@@ -720,7 +716,7 @@
           .catch((error) => {
             console.error('Clipboard API failed:', error);
             const messageElement = document.createElement('span');
-            messageElement.textContent = ' (手動でコピーしてください)';
+            messageElement.textContent = '(手動でコピーしてください)';
             messageElement.style.color = 'var(--status-warning)';
             buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
   
@@ -731,7 +727,7 @@
         console.warn('Clipboard API not supported. Manual copy required.');
         const messageElement = document.createElement('span');
         messageElement.textContent =
-          ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
+          '(ブラウザがコピーをサポートしていません。手動でコピーしてください)';
         messageElement.style.color = 'var(--status-warning)';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
         createPromiseDelay(5000).then(() => messageElement.remove());
@@ -739,7 +735,7 @@
     } catch (error) {
       console.error('copyUrlToClipboard error:', error);
       const messageElement = document.createElement('span');
-      messageElement.textContent = ' (コピー中にエラーが発生しました)';
+      messageElement.textContent = '(コピー中にエラーが発生しました)';
       messageElement.style.color = 'var(--status-error)';
       buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
       createPromiseDelay(5000).then(() => messageElement.remove());

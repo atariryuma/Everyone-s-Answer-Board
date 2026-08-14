@@ -1,5 +1,4 @@
-<script>
-  /* =============================================================================
+<script> /* =============================================================================
      みんなの回答ボード - Shared JavaScript Utilities
      GAS Compatible utility functions for all HTML files
      ============================================================================= */
@@ -309,7 +308,7 @@
         return result;
 
       } catch (error) {
-        console.error(`❌ [UnifiedDataLoader] ${funcName} エラー:`, error);
+        console.error(` [UnifiedDataLoader] ${funcName} エラー:`, error);
 
         if (retryOnError && this.shouldRetry(requestId)) {
           return this.loadData(functionName, { ...options, retryOnError: false }, ...args);
@@ -337,7 +336,7 @@
           ...options,
           showLoading: false, // バッチでは個別ローディングを無効化
         }, ...args).catch(error => {
-          console.error(`❌ [UnifiedDataLoader] バッチ${index || 0}: ${functionName || 'unknown'} エラー:`, error);
+          console.error(` [UnifiedDataLoader] バッチ${index || 0}: ${functionName || 'unknown'} エラー:`, error);
           return { error: error.message, functionName };
         });
       });
@@ -381,7 +380,7 @@
             if (!completed) {
               completed = true;
               clearTimeout(timeoutId);
-              console.error(`❌ [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
+              console.error(` [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
               reject(new Error(error.message || error.toString()));
             }
           })
@@ -480,7 +479,7 @@
           this.errors.shift();
         }
 
-        console.group('🚨 Error Logged');
+        console.group('Error Logged');
         console.groupEnd();
       } catch (loggingError) {
         console.error('Error in error logging:', loggingError);
@@ -550,7 +549,7 @@
     escapeHtml(text) {
       if (!text) return '';
       // Why: div.innerHTML から得る出力は <, >, &, " はエスケープするが、ブラウザ実装に
-      //      よっては ' を素通しする。HTML 属性値を build するときに `id='${escapeHtml(x)}'`
+      //      よっては 'を素通しする。HTML 属性値を build するときに `id='${escapeHtml(x)}'`
       //      のようなテンプレートが他箇所にあるため、' を明示的に &#39; に置換して XSS を防ぐ。
       const div = document.createElement('div');
       div.textContent = text;
@@ -635,15 +634,13 @@
    *   公開ライフサイクル（公開を終了 / 再び公開）の後の遷移で共通利用。
    *
    * @param {Object} opts - { title, message, redirectUrl, buttonLabel?, variant? }
-   *   variant: 'cyan' (default) | 'green'  ボタンの色
+   *   variant: 'cyan'(default) | 'green'  ボタンの色
    */
   window.showRedirectModal = function (opts) {
     const { title, message, redirectUrl } = opts || {};
     const buttonLabel = (opts && opts.buttonLabel) || '回答ボードを開く';
     const variant = (opts && opts.variant) || 'cyan';
-    const colorClasses = variant === 'green'
-      ? 'from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-      : 'from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700';
+    const colorClasses = variant === 'green'      ? 'from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'      : 'from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700';
 
     const existing = document.getElementById('redirect-modal');
     if (existing) existing.remove();
@@ -664,11 +661,9 @@
         </div>
         <h3 class="text-xl font-bold text-theme mb-2">${esc(title)}</h3>
         <p class="text-theme-secondary mb-6">${esc(message)}</p>
-        <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r ${colorClasses} text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
-          ${esc(buttonLabel)}
+        <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r ${colorClasses} text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg"> ${esc(buttonLabel)}
         </button>
-      </div>
-    `;
+      </div> `;
     document.body.appendChild(modal);
 
     const redirectBtn = document.getElementById('redirect-btn');
@@ -693,7 +688,7 @@
    *
    * @param {string} message
    * @param {Object} [opts] - { title?, okLabel?, cancelLabel?, variant? }
-   *   variant: 'default' (cyan) | 'danger' (red) | 'success' (green)
+   *   variant: 'default'(cyan) | 'danger'(red) | 'success' (green)
    * @returns {Promise<boolean>}  confirm: OK で true / cancel または backdrop click で false。
    *                              alert: 常に true。
    */
@@ -717,17 +712,14 @@
       const cancelBtn = (opts && opts.kind === 'confirm')
         ? `<button type="button" id="app-modal-cancel" class="flex-1 px-4 py-2.5 bg-theme-elevated hover:bg-theme-elevated-hover text-theme rounded-lg font-semibold transition-colors">${esc((opts && opts.cancelLabel) || 'キャンセル')}</button>`
         : '';
-      const okLabel = (opts && opts.okLabel) || (opts && opts.kind === 'confirm' ? 'OK' : 'わかった');
+      const okLabel = (opts && opts.okLabel) || (opts && opts.kind === 'confirm'? 'OK': 'わかった');
       modal.innerHTML = `
-        <div class="modal-card">
-          ${title}
+        <div class="modal-card"> ${title}
           <p class="text-theme mb-5 whitespace-pre-wrap">${esc(opts && opts.message)}</p>
-          <div class="flex gap-3">
-            ${cancelBtn}
+          <div class="flex gap-3"> ${cancelBtn}
             <button type="button" id="app-modal-ok" class="flex-1 px-4 py-2.5 bg-gradient-to-r ${okClasses} text-white rounded-lg font-semibold transition-all">${esc(okLabel)}</button>
           </div>
-        </div>
-      `;
+        </div> `;
       document.body.appendChild(modal);
       return modal;
     },
@@ -840,14 +832,13 @@
    * 実際の light mode 採用は別フェーズで CSS の light placeholder を本番値に書き換えてから。
    *
    * 設計:
-   *   - 値は localStorage('app-theme') に保存 ('dark' | 'light' | 'auto')。
+   *   - 値は localStorage('app-theme') に保存 ('dark'| 'light'| 'auto')。
    *   - 'auto' = OS の prefers-color-scheme に追従。
-   *   - 適用は body に 'theme-dark' / 'theme-light' クラスを付与。
+   *   - 適用は body に 'theme-dark'/ 'theme-light' クラスを付与。
    *   - 初期化は init() を SharedUtilities ロード時に自動呼出 (FOUC 防止のため早期実行)。
    *
    * 使い方:
-   *   themeManager.get()          // 'dark' | 'light' | 'auto'
-   *   themeManager.resolved()     // 'dark' | 'light' (auto なら OS 反映)
+   *   themeManager.get()          // 'dark'| 'light'| 'auto'   *   themeManager.resolved()     // 'dark'| 'light' (auto なら OS 反映)
    *   themeManager.set('light')   // 切替 + 永続化
    *   themeManager.toggle()       // dark ↔ light トグル
    *   themeManager.subscribe(fn)  // 切替時コールバック
@@ -880,7 +871,7 @@
     }
 
     function resolve(value) {
-      if (value === 'auto') return osPrefersDark() ? 'dark' : 'light';
+      if (value === 'auto') return osPrefersDark() ? 'dark': 'light';
       return value;
     }
 
@@ -941,7 +932,7 @@
       },
       toggle() {
         const cur = resolve(readStorage());
-        return this.set(cur === 'dark' ? 'light' : 'dark');
+        return this.set(cur === 'dark'? 'light': 'dark');
       },
       subscribe(fn) {
         if (typeof fn === 'function') subscribers.add(fn);
@@ -1087,8 +1078,7 @@
 
       // ユーザーのクリックイベント内なので window.open が確実に動く
       const loginUrl = _cachedWebAppUrl
-        ? _cachedWebAppUrl + '?mode=login&logout=true'
-        : '';
+        ? _cachedWebAppUrl + '?mode=login&logout=true'        : '';
       if (loginUrl) {
         window.open(loginUrl, '_top');
       } else {
@@ -1169,12 +1159,10 @@
         <div class="bg-theme-surface rounded-lg p-4 mb-4">
           <p class="text-sm text-theme-muted mb-1">認証済みアカウント:</p>
           <p class="text-theme font-semibold">${safeEmail}</p>
-        </div>
-        ${showSwitchOption
+        </div> ${showSwitchOption
           ? `
         <div class="text-right">
-          <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-theme-accent-cyan hover:text-theme-accent-cyan-hover hover:underline text-sm">
-            別のアカウントでログイン
+          <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-theme-accent-cyan hover:text-theme-accent-cyan-hover hover:underline text-sm"> 別のアカウントでログイン
           </button>
         </div>`
           : ''
@@ -1289,7 +1277,7 @@
             const safeReadyState = (document && document.readyState) || 'unknown';
             const safeDelay = delay || 0;
             const safeRetries = retries || 0;
-            return `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${safeReadyState}. Retrying in ${safeDelay}ms (${safeRetries} retries left)...`;
+            return ` UnifiedLoadingManager: loading-overlay element not found. DOM state: ${safeReadyState}. Retrying in ${safeDelay}ms (${safeRetries} retries left)...`;
           })()
         );
         const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1297,7 +1285,7 @@
         createPromiseDelay(delay).then(() => this.init(retries - 1, delay * 1.5, onSuccess));
       } else {
         console.error(
-          '❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.'
+          'UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.'
         );
         this.createFallbackOverlay();
       }
@@ -1311,7 +1299,7 @@
         return true;
       }
 
-      console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
+      console.warn('UnifiedLoadingManager: Creating fallback loading-overlay element');
       const fallbackOverlay = document.createElement('div');
       fallbackOverlay.id = 'loading-overlay';
       fallbackOverlay.className = 'loading-overlay page-specific hidden';
@@ -1414,8 +1402,7 @@
           <div class="loading-content">
             <div class="loading-spinner"></div>
             <div class="loading-message">${safeOverlayMessage}</div>
-          </div>
-        `;
+          </div> `;
         messageElement = this.overlay.querySelector('.loading-message');
       } else {
         messageElement.textContent = config.message;
@@ -1540,7 +1527,7 @@
 
       const el = document.createElement('div');
       el.style.cssText =
-        'background:' + this._color(type) + ';color:white;' +
+        'background:'+ this._color(type) + ';color:white;' +
         'padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);' +
         'margin-bottom:var(--space-2);box-shadow:var(--shadow-md);' +
         'pointer-events:auto;cursor:pointer;font-size:14px;max-width:350px;' +
@@ -1600,12 +1587,11 @@
         success: 'var(--status-success)',
         error: 'var(--status-error)',
         warning: 'var(--status-warning)',
-        info: 'var(--status-info)'
-      })[type] || 'var(--status-info)';
+        info: 'var(--status-info)'      })[type] || 'var(--status-info)';
     }
 
     _icon(type) {
-      return ({ success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' })[type] || 'ℹ️';
+      return ({ success: '', error: '', warning: '', info: 'ℹ️'})[type] || 'ℹ️';
     }
 
     _defaultDuration(type) {
@@ -1638,8 +1624,8 @@
 
     if (connection) {
       const { effectiveType, downlink } = connection;
-      if (effectiveType === '2g' || (downlink && downlink < 1)) return 'low';
-      if (effectiveType === '4g' && downlink && downlink > 10) return 'high';
+      if (effectiveType === '2g'|| (downlink && downlink < 1)) return 'low';
+      if (effectiveType === '4g'&& downlink && downlink > 10) return 'high';
     }
 
     return 'medium';
@@ -1659,12 +1645,12 @@
     const isLowEnd = window.isLowEndDevice();
 
     return {
-      BASE_RENDER_BATCH_SIZE: perfLevel === 'high' ? 15 : perfLevel === 'low' ? 5 : 10,
+      BASE_RENDER_BATCH_SIZE: perfLevel === 'high'? 15 : perfLevel === 'low' ? 5 : 10,
       LOW_PERF_BATCH_SIZE: isLowEnd ? 3 : 5,
       HIGH_PERF_BATCH_SIZE: perfLevel === 'high' ? 25 : 15,
-      VIEWPORT_BUFFER: perfLevel === 'high' ? 300 : perfLevel === 'low' ? 100 : 200,
-      PERFORMANCE_BUDGET: perfLevel === 'high' ? 12 : perfLevel === 'low' ? 24 : 16,
-      CHUNK_SIZE: perfLevel === 'high' ? 8 : perfLevel === 'low' ? 3 : 5,
+      VIEWPORT_BUFFER: perfLevel === 'high'? 300 : perfLevel === 'low' ? 100 : 200,
+      PERFORMANCE_BUDGET: perfLevel === 'high'? 12 : perfLevel === 'low' ? 24 : 16,
+      CHUNK_SIZE: perfLevel === 'high'? 8 : perfLevel === 'low' ? 3 : 5,
       IDLE_TIMEOUT: isLowEnd ? 8000 : 5000
     };
   };
@@ -1692,7 +1678,7 @@
    */
   window.sharedUtilities.createUnifiedConfig = function (CONFIG, legacyVars = {}, pageDefaults = {}) {
     const safeUserId = (value) => {
-      return (typeof value === 'string' && !value.startsWith('<')) ? value : '';
+      return (typeof value === 'string'&& !value.startsWith('<')) ? value : '';
     };
 
     return {
