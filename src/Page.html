@@ -259,7 +259,7 @@
 
     </header>
     <!-- 新着通知バナー -->
-    <div id="newContentBanner" class="fixed top-20 left-1/2 z-[60] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-sm hidden transition-all duration-300 ease-out hover:shadow-2xl focus-within:ring-2 focus-within:ring-blue-300/50 notification-banner-base" role="alert" aria-live="polite" aria-label="新着通知バナー">
+    <div id="newContentBanner" class="notification-banner-base hidden" role="alert" aria-live="polite" aria-label="新着通知バナー">
       <div class="flex items-center gap-3">
         <span id="newContentIcon" class="w-5 h-5 animate-pulse text-theme-status-warning" aria-hidden="true"></span>
         <span id="newContentText" class="font-medium text-theme">新しい意見が投稿されました</span>
@@ -291,9 +291,9 @@
     <div id="infoModalCard" class="modal-card modal-card-md modal-card-prominent p-8 max-h-[85vh] overflow-y-auto relative transition-all duration-300 ease-out" role="document">
       <div class="space-y-5 text-theme text-lg leading-relaxed">
         <!-- Digital Citizenship Education Section -->
-        <div class="bg-gradient-to-r from-green-800/40 to-emerald-800/40 border border-green-400/50 rounded-lg p-4 mb-4 hover:from-green-800/50 hover:to-emerald-800/50 transition-all duration-300">
+        <div class="box box-success mb-4">
           <div class="flex items-start gap-3">
-            <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow-lg">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style="background: var(--status-success); color: var(--theme-text-inverse);">
               <span class="text-lg" role="img" aria-label="教育アイコン"></span>
             </div>
             <div>

@@ -431,10 +431,24 @@ html, body {
   background-color: color-mix(in srgb, var(--brand-accent-light) 10%, transparent);
 }
 
-/* Notification Banner Base and Animation Classes */
+/* Notification Banner Base and Animation Classes
+   v2892: 旧実装は Tailwind の inline chain (bg-gradient / rounded-full / shadow-xl …) を
+   markup 側に 15 個並べていた。見た目の定義をここへ集約し、markup は class 1 つで済ませる。 */
 .notification-banner-base {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
   transform: translate(-50%, 0);
+  z-index: 60;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--theme-bg-elevated, var(--theme-bg-surface));
+  color: var(--theme-text-primary);
+  border: var(--border-primary);
+  box-shadow: var(--shadow-lg);
+  transition: box-shadow var(--transition-normal) var(--transition-easing);
 }
+.notification-banner-base.hidden { display: none; }
 
 .notification-banner-enter {
   animation: fadeInFromTop var(--animation-normal) cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;

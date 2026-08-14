@@ -26,12 +26,6 @@
     return;
   }
 
-  // SharedIcons の icon() への薄いラッパ。SharedIcons が未 include のページ
-  // (テスト / 旧テンプレート) でも文字列連結が壊れないよう空文字を返す。
-  function iconSvg(name, extraClass) {
-    return (typeof window.icon === 'function') ? window.icon(name, extraClass) : '';
-  }
-
   /**
    * Viz レンダラの成功テレメトリ。各モードを初回描画したとき 1 回だけ Cloud Logging に
    * 送る。CLI から `npm run logs:cloud --severity INFO` で全機能が動いていることを確認可能。
@@ -230,23 +224,6 @@
       .attr('x', (d) => d.x)
       .attr('y', (d) => d.y + 3.5)
       .text((d) => totalReactions(d.data));
-  }
-
-  // 行を snapshot (before/after 比較・timeline 再生) 用の正規化 shape に変換。
-  //   vizCaptureBefore と snapshots map で同一コピペだったのを single source 化。
-  //   snapshot に field を足すとき片側を直し忘れる drift を防ぐ。
-  function snapshotRowShape(r) {
-    return {
-      rowIndex: r.rowIndex,
-      emailHash: r.emailHash || null,
-      class: r.class || '',
-      name: r.name || '',
-      answer: r.answer || '',
-      reason: r.reason || '',
-      numericX: typeof r.numericX === 'number' ? r.numericX : null,
-      numericY: typeof r.numericY === 'number' ? r.numericY : null,
-      timestamp: r.timestamp || null
-    };
   }
 
   // ---------------------------------------------------------------------
