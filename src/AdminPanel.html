@@ -21,39 +21,160 @@
   <style>
     /* AdminPanel専用スタイル */
 
-    /* ステータスヘッダーは admin-container の外に置く full-width banner。
-       padding は admin-container と揃えて視覚的に統合感を出す。 */
-    .status-header {
-      margin: var(--space-4) var(--space-4) 0;
-      padding: 1rem 1.5rem;
+    /* ── レイアウト (v2890) ────────────────────────────────────────
+       旧構成は 2fr / 1fr の 2 カラムで、右カラムに「現在の設定 / ユーザー情報 /
+       リソース / クイックアクション」の 4 カードが常時並んでいた。教師が最初に
+       見るべきものが画面上に 6 個あり、視線の出発点が定まらない状態だった。
+       新構成は単一カラム。主導線 (授業) を最上段に 1 つだけ置き、それ以外は
+       すべて折りたたみの中に降ろす。 */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: var(--z-elevated);
+      background: var(--theme-bg-surface);
+      border-bottom: var(--border-primary);
+    }
+
+    .app-header-inner {
+      max-width: 56rem;
+      margin: 0 auto;
+      padding: var(--space-3) var(--space-4);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: var(--space-3);
     }
 
-    .status-header h1 {
+    .app-header h1 {
       margin: 0;
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.01em;
     }
 
-    .admin-container {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: var(--space-4);
-      min-height: calc(100vh - 4rem);  /* status-header 分を引いた残り高さ */
-      padding: var(--space-4);
-      align-items: start;  /* 左右列が異なる高さでも top で揃える */
+    .app-main {
+      max-width: 56rem;
+      margin: 0 auto;
+      padding: var(--space-6) var(--space-4) var(--space-16);
     }
 
-    /* 左右列で padding を揃えて、最初のカードが同じ y 座標から始まる */
-    .main-editor,
-    .info-panel {
-      padding: 0;  /* admin-container の padding と各 card の margin-bottom で十分 */
+    /* 折りたたみセクション: 「詳細設定」の外枠。card と同じ見た目で、
+       summary 行だけが常時見える。 */
+    .disclosure {
+      padding: 0;
     }
 
-    .info-panel {
-      overflow-y: auto;
+    .disclosure > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      border-radius: var(--radius-xl);
+      color: var(--theme-text-secondary);
+    }
+
+    .disclosure > summary::-webkit-details-marker { display: none; }
+    .disclosure > summary:hover { color: var(--theme-text-primary); }
+
+    .disclosure > summary .disclosure-chevron {
+      margin-left: auto;
+      transition: transform var(--transition-normal) var(--transition-easing);
+    }
+
+    .disclosure[open] > summary .disclosure-chevron { transform: rotate(180deg); }
+
+    .disclosure-body {
+      padding: 0 var(--space-6) var(--space-6);
+      border-top: var(--border-primary);
+      padding-top: var(--space-5);
+    }
+
+    /* セクション見出し: アイコン + テキストを 1 行で揃える共通形。 */
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .section-title {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--theme-text-primary);
+      margin: 0;
+    }
+
+    .section-title .icon { color: var(--theme-text-muted); }
+
+    /* サブ見出し (詳細設定の中の ① ② ③) */
+    .subsection {
+      padding-top: var(--space-5);
+      margin-top: var(--space-5);
+      border-top: 1px solid var(--theme-border-subtle);
+    }
+
+    .subsection:first-child {
+      padding-top: 0;
+      margin-top: 0;
+      border-top: none;
+    }
+
+    .subsection-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--theme-text-primary);
+      margin: 0 0 var(--space-3);
+    }
+
+    /* ヘッダー内のアカウントメニュー */
+    .account-menu { position: relative; }
+
+    .account-menu > summary {
+      list-style: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-md);
+      border: var(--border-primary);
+      color: var(--theme-text-secondary);
+      font-size: var(--font-size-sm);
+    }
+
+    .account-menu > summary::-webkit-details-marker { display: none; }
+    .account-menu > summary:hover { color: var(--theme-text-primary); }
+
+    .account-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + var(--space-2));
+      min-width: 16rem;
+      background: var(--theme-bg-elevated, var(--theme-bg-surface));
+      border: var(--border-primary);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: var(--space-3);
+      z-index: var(--z-modal);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    @media (max-width: 640px) {
+      .app-header-inner { flex-wrap: wrap; }
+      .app-main { padding: var(--space-4) var(--space-3) var(--space-16); }
+      .disclosure > summary { padding: var(--space-4); }
+      .disclosure-body { padding: var(--space-4) var(--space-4) var(--space-5); }
     }
 
     /* card / info-card / lesson-hero-card 旧 alias マーカー は UnifiedStyles の
@@ -117,17 +238,7 @@
 
     /* レスポンシブデザイン */
     @media (max-width: 768px) {
-      .admin-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
-        padding: var(--space-4);
-      }
-
-      .status-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-      }
+      .column-dropdowns { gap: var(--space-3); }
     }
 
     /* SharedUtilitiesのローディングシステムを使用 */
@@ -224,48 +335,72 @@
   </div>
 
 
-  <!-- ステータスヘッダー: page-level banner として全幅で配置。
-       grid 内に閉じ込めると左右列の top alignment が崩れるため、admin-container の外に出す。
-       wizard / Runner takeover 時も visible に残し、ユーザーが AdminPanel コンテキストを
-       見失わないようにする (data-normal-mode を付けない)。 -->
-  <header class="status-header glass-panel rounded-xl">
-    <h1 class="text-theme-accent-cyan font-bold">みんなの回答ボード 設定</h1>
-    <div class="flex items-center gap-3">
-      <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
-        title="使い方ガイド (はじめての方は 3 分で始められる手順を確認できます)">
-        📚 使い方ガイド
-      </button>
+  <!-- アプリヘッダー: 全ページ共通の top bar。wizard / Runner takeover 中も
+       残して現在地を失わせない (data-normal-mode を付けない)。 -->
+  <header class="app-header">
+    <div class="app-header-inner">
+      <h1>みんなの回答ボード</h1>
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
+          title="はじめての方向けの手順を開きます">
+          <svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg>
+          使い方
+        </button>
+        <!-- アカウント: 旧「👤 ユーザー情報」カード + 「⚙️ アプリ設定」を集約。
+             常時 4 カードを右カラムに置く必要が無くなる。 -->
+        <details class="account-menu">
+          <summary title="アカウント">
+            <svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg>
+            <span class="hidden sm:inline">アカウント</span>
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+          </summary>
+          <div class="account-panel">
+            <div class="text-xs text-theme-muted">ログイン中</div>
+            <div id="current-user-email" class="text-sm text-theme break-all">読み込み中...</div>
+            <!-- システム管理者のみ表示 (updateResourceButtons が display を制御) -->
+            <a id="app-setup-btn" target="_top" class="link-btn w-full text-center block" style="display: none;">
+              <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+              アプリ設定
+            </a>
+            <button type="button" class="btn btn-secondary w-full"
+              onclick="window.sharedUtilities.auth.logout()">
+              <svg class="icon" aria-hidden="true"><use href="#i-log-out"></use></svg>
+              ログアウト
+            </button>
+          </div>
+        </details>
+      </div>
     </div>
   </header>
 
   <!-- data-normal-mode: body.mode-create-lesson / body.mode-run-lesson 時に CSS で非表示。
        これで wizard / Runner が main workspace を takeover する。 -->
-  <div class="admin-container" data-normal-mode>
-    <!-- 左パネル: メインエディタ -->
-    <div class="main-editor">
+  <main class="app-main" data-normal-mode>
       <!-- =========================================================
-        🎒 レッスン Hero (primary entry point)
-        Why: 複数フェーズの授業を一括管理する新しい主導線。情報設計上
-        「授業 = 設定+データ+履歴の単位」で、下の個別ボード設定より
-        上位概念。ヘッダー直下に大きく置いて発見性を確保する。
+        授業 — この画面で唯一の主導線。
+        Why: 旧構成は「レッスン」「個別ボード」「保存済みボード(プロファイル)」の
+        3 概念が同一画面に並列で存在し、初見の教師が「新しく授業をやるとき何を
+        作ればいいか」を判断できなかった。3 つは実体としてほぼ同じものなので、
+        授業 = 設定 + データ + 履歴 の 1 単位に統一し、残り 2 つは下の
+        「詳細設定」の中に降ろす (機能は削除せず露出だけ落とす)。
       ========================================================= -->
-      <section class="card card-hero">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xl font-semibold text-theme inline-flex items-center gap-2">
-            🎒 レッスン
+      <section class="card">
+        <div class="section-head">
+          <h2 class="section-title">
+            <svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>
+            授業
             <span id="lesson-list-count" class="text-xs text-theme-muted font-normal">(0)</span>
           </h2>
           <details class="lesson-template-picker">
-            <summary class="btn btn-primary">🎒 新しい授業を作る ▾</summary>
+            <summary class="btn btn-primary">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              新しい授業をつくる
+            </summary>
             <div class="lesson-template-menu" id="lesson-template-menu">
               <p class="lesson-template-loading">テンプレートを読み込み中…</p>
             </div>
           </details>
         </div>
-        <p class="text-xs text-theme-muted mb-3">
-          複数フェーズ (導入 → 本時 → 振り返り) を 1 つの授業として作成・記録できます。
-          終了時に自動保存され、後日振り返り画面で時系列再生が可能です。
-        </p>
         <ul id="lesson-list" class="space-y-2 text-sm">
           <li class="text-theme-muted italic">読み込み中…</li>
         </ul>
@@ -273,39 +408,39 @@
         <!-- 初回ユーザー向け empty-state hint
              AdminPanel.js.html: loadLessonList が lessons.length === 0 のとき
              #first-time-hint の hidden を外す。1 度でも授業を作ったら出ない。 -->
-        <div id="first-time-hint" class="hidden mt-4 p-3 rounded-lg first-time-hint-box">
-          <p class="text-sm text-theme-accent-cyan mb-1">
-            <strong>👋 初めての方へ:</strong> 上の <span class="font-semibold">「🎒 新しい授業を作る」</span> を押すと、テンプレートから 3 分で始められます。
+        <div id="first-time-hint" class="hidden mt-4 p-4 rounded-lg first-time-hint-box">
+          <p class="text-sm text-theme mb-1">
+            <strong>はじめての方へ。</strong>
+            「新しい授業をつくる」を押すと、導入 → 議論 → 振り返りの Google フォームが
+            まとめて用意されます。3 分で始められます。
           </p>
           <p class="text-xs text-theme-muted">
-            すでに Google フォームがある場合は、下の「フォームを連携」に URL を貼り付けるだけでも OK。
-            詳しい使い方は右上の <strong>📚 使い方ガイド</strong> から。
+            すでに Google フォームをお持ちなら、下の「詳細設定」で URL を貼るだけでも使えます。
           </p>
         </div>
       </section>
 
       <!-- ========================================================
-        Zone B: 個別ボード (単発の Form 単位で運用する従来パス)。
-        レッスン (Zone A) との二者択一を divider で明示。さらに ① ② ③ で
-        セットアップ順序を視覚化し、教師が「何を順に決めるか」を迷わない。
-
-        将来拡張時の置き場ガイドライン:
-          - 新 lesson テンプレート → Zone A wizard step 1 (LessonWorkspace.html)
-          - PDF/Slides export → lesson review 画面に統合
-          - クロスレッスン分析 → 別 mode (?mode=analytics) で全画面
-          - Zone B には個別ボード固有の項目しか追加しない
+        詳細設定 — 個別ボード (単発 Form) と 保存済みボード。
+        既存ユーザーの運用経路をそのまま残すため機能は一切削らず、
+        既定で折りたたむことで初見の教師の視界からだけ外す。
       ======================================================== -->
-      <div class="section-group-divider">
-        <span class="section-group-label">— または個別ボードを設定 —</span>
-      </div>
+      <details class="card disclosure">
+        <summary>
+          <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
+          <span>
+            <span class="text-theme font-medium">詳細設定</span>
+            <span class="text-xs text-theme-muted block">Google フォームを直接つないで 1 枚のボードを作る</span>
+          </span>
+          <svg class="icon disclosure-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        </summary>
+        <div class="disclosure-body">
 
       <!-- ① フォーム連携: URL paste を primary、新規作成/一覧は代替経路として 1 details に集約 -->
-      <section class="card">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold text-theme">
-            <span class="step-number">①</span> フォームを連携
-          </h2>
-        </div>
+      <section class="subsection">
+        <h3 class="subsection-title">
+          <span class="step-number">①</span> フォームを連携
+        </h3>
 
         <!-- Primary: URL paste — 最も頻度の高い経路を visible に -->
         <div class="form-group">
@@ -315,14 +450,14 @@
             placeholder="https://docs.google.com/forms/d/.../edit"
             oninput="autoAnalyzeFormUrl(this.value)" />
           <div class="text-xs text-theme-muted mt-1" id="url-validation-message">
-            💡 URL を貼り付けると自動で接続します
+            URL を貼り付けると自動で接続します
           </div>
 
           <!-- 検出情報の inline 表示 -->
           <div id="form-detection-info" class="hidden mt-3 p-3 bg-theme-status-detection-soft border border-theme-status-detection-strong rounded-lg">
             <div class="text-sm text-theme-status-detection">
-              <div class="mb-1">📝 フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
-              <div>📊 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
+              <div class="mb-1"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg> フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
+              <div><svg class="icon icon-sm" aria-hidden="true"><use href="#i-table"></use></svg> 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-theme-status-detection hover:text-white underline">-</a></div>
             </div>
           </div>
         </div>
@@ -330,31 +465,31 @@
         <!-- 代替経路: 新規作成 / 一覧から選ぶ を 1 つの details に集約 (二択であることを明示) -->
         <details class="mt-4 admin-collapsible">
           <summary class="cursor-pointer text-sm text-theme-muted hover:text-theme select-none py-1">
-            🔧 他の方法 (フォームが手元にない / 一覧から選ぶ)
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-wrench"></use></svg> 他の方法（フォームが手元にない / 一覧から選ぶ）
           </summary>
           <div class="mt-3 pl-4 border-l-2 border-theme-normal space-y-5">
 
             <!-- 代替 a: テンプレートから新規作成 -->
             <div class="form-alternative-block">
-              <h3 class="text-sm font-semibold text-theme-accent-cyan mb-2">✨ 新しく作る</h3>
+              <h4 class="text-sm font-semibold text-theme mb-2">新しく作る</h4>
               <p class="text-xs text-theme-muted mb-3">種別に合った Google フォーム + 回答先スプレッドシートを自動生成します。</p>
               <details class="template-form-picker">
-                <summary class="btn btn-secondary text-sm">✨ テンプレートを作成 ▾</summary>
+                <summary class="btn btn-secondary text-sm"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg> テンプレートを作成</summary>
                 <div class="template-form-menu" id="template-form-menu">
                   <button type="button" class="template-form-item" data-template-create="board">
-                    <span class="template-form-label">📝 シンプル掲示板</span>
+                    <span class="template-form-label"><svg class="icon" aria-hidden="true"><use href="#i-message-square"></use></svg> シンプル掲示板</span>
                     <span class="template-form-desc">回答を一覧表示</span>
                   </button>
                   <button type="button" class="template-form-item" data-template-create="numberline">
-                    <span class="template-form-label">📊 数直線</span>
+                    <span class="template-form-label"><svg class="icon" aria-hidden="true"><use href="#i-number-line"></use></svg> 数直線</span>
                     <span class="template-form-desc">1〜5 で立場を可視化</span>
                   </button>
                   <button type="button" class="template-form-item" data-template-create="matrix">
-                    <span class="template-form-label">🎯 マトリクス</span>
+                    <span class="template-form-label"><svg class="icon" aria-hidden="true"><use href="#i-scatter-chart"></use></svg> マトリクス</span>
                     <span class="template-form-desc">2 軸の散布図</span>
                   </button>
                   <button type="button" class="template-form-item" data-template-create="pie">
-                    <span class="template-form-label">🥧 円グラフ</span>
+                    <span class="template-form-label"><svg class="icon" aria-hidden="true"><use href="#i-pie-chart"></use></svg> 円グラフ</span>
                     <span class="template-form-desc">選択肢 + 理由</span>
                   </button>
                 </div>
@@ -371,7 +506,7 @@
 
             <!-- 代替 b: 既存フォーム一覧から選択 -->
             <div class="form-alternative-block">
-              <h3 class="text-sm font-semibold text-theme-secondary mb-2">📋 既存のフォーム一覧から選ぶ</h3>
+              <h4 class="text-sm font-semibold text-theme mb-2">既存のフォーム一覧から選ぶ</h4>
               <div id="dropdown-method" class="space-y-3">
                 <select id="form-select" class="modern-select"
                   aria-label="既存の Google フォーム一覧から選択">

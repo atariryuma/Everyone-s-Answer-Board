@@ -9,7 +9,6 @@
  * Header: Bento Grid 2-3 row layout
  *   - Row 1: identity + phase pills + filters + admin actions
  *   - Row 2: 設問テキスト (中央配置で focus)
- *   - Row 3: 編集者ツール (editor only, 空なら display:none)
  *   - body.is-editor / .is-viewer で editor-only 要素を CSS で表示制御
  * ============================================================================= */
 .eab-header {
@@ -211,15 +210,6 @@
 @media (min-width: 640px) { .eab-question { font-size: 1.5rem; } }
 @media (min-width: 768px) { .eab-question { font-size: 1.875rem; } }
 @media (min-width: 1024px) { .eab-question { font-size: 2.1rem; } }
-
-/* Row 3: editor tools — viz toolbar が ensureViewToolbar で注入。空なら非表示 */
-.eab-row-tools:empty {
-  display: none;
-}
-.eab-row-tools {
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--theme-overlay-white-10);
-}
 
 /* Editor-only visibility via body class:
  *   設計: setupEditorState() で body.classList.toggle('is-editor', isEditor)。

@@ -186,7 +186,6 @@
     <!-- ヘッダー: Bento Grid 構造
          Row 1: identity + phase pills + filters + admin actions
          Row 2: 設問テキスト (中央配置で focus)
-         Row 3: 編集者ツール (viz layer が vizToolbarSlot に注入、編集者のみ表示)
          body.is-editor / .is-viewer クラスで editor-only 要素を CSS 制御。 -->
     <header id="main-header" class="eab-header glass-panel rounded-xl shadow-lg fade-in">
       <!-- Row 1: identity + phase + filters + admin actions -->
@@ -261,9 +260,6 @@
         <h1 id="headingLabel" class="eab-question text-theme-accent-pink">読み込み中...</h1>
       </div>
 
-      <!-- Row 3: 編集者専用ツール (vizToolbarSlot, ensureViewToolbar が議論支援ツールを注入)
-           空の時は CSS で display:none。閲覧者では body:not(.is-editor) で全体非表示。 -->
-      <div id="vizToolbarSlot" class="eab-row eab-row-tools editor-only-row"></div>
     </header>
     <!-- 新着通知バナー -->
     <div id="newContentBanner" class="fixed top-20 left-1/2 z-[60] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-sm hidden transition-all duration-300 ease-out hover:shadow-2xl focus-within:ring-2 focus-within:ring-blue-300/50 notification-banner-base" role="alert" aria-live="polite" aria-label="新着通知バナー">

@@ -107,10 +107,6 @@
     stroke: rgba(255, 255, 255, 0.9);  /* theme:exempt - colored dot 上の白ハロー (badge separator) */
     stroke-width: 2.5;
   }
-  /* v2889: compare-disabled は廃止 (anchor 未保存でも「くらべる」は押せる)。
-     旧マークアップが残った場合でも見た目が壊れないよう no-op として残す。 */
-  .viz-btn.compare-disabled { opacity: 1; cursor: pointer; }
-
   /* 行リストポップアップ (pie のカテゴリ / wordcloud の単語クリック時) */
   .viz-rows-popup {
     position: fixed;
@@ -589,36 +585,9 @@
   /* .board-switched-toast の定義は UnifiedStyles.css.html に集約 (NotificationSystem.banner)。 */
 
   /* =====================================================================
-   * B: 統合ツールバー（教師限定）— profile + mode + ⚙️ を main-header に集約
-   * Why: 旧 .viz-profile-selector / .viz-mode-bar は別行で 2 段になっていた。
-   *      新しい .viz-toolbar は 1 行（モバイルでは折り返し）に統合する。
+   * B: フェーズ切替 (profile pills) — 教師・生徒が「いまどの時点を見ているか」を
+   *    選ぶ唯一の導線。v2890 で議論支援ツール bar を撤去し、時間軸をこの 1 本に統一。
    * ===================================================================== */
-  /* 議論支援ツール bar (Row 3) — section label + 操作ボタン群を 1 行に
-     親 .glass-panel が背景＋blur を持つので、ここは透明＋上端 border のみ。 */
-  .viz-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.25rem 0;
-    flex-wrap: wrap;
-  }
-  .viz-toolbar-section-label {
-    color: var(--theme-text-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .viz-toolbar-left { flex: 0 0 auto; }
-  .viz-toolbar-center {
-    flex: 1 1 auto;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-  }
   .viz-profile-select {
     max-width: 200px;
     padding: 0.3rem 0.55rem;
@@ -713,170 +682,19 @@
     transform: translateY(-1px);
   }
 
-  /* 生徒向け toolbar — 議論ツール / timeline は非表示（pills だけ） */
-  .viz-toolbar--student .viz-toolbar-center { display: none !important; }
-
   body.projector-mode .viz-profile-pill { font-size: 1.125rem; padding: 0.45rem 1rem; }
   @media (max-width: 640px) {
     .viz-profile-pill { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
     .viz-profile-return { font-size: 0.75rem; padding: 0.22rem 0.45rem; }
   }
 
-  body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); /* theme:exempt - projector-mode 強制 dark */ }
-  /* 電子黒板 (projector-mode): 議論支援ツールを教室後ろからも視認可能なサイズに拡大。 */
-  body.projector-mode .viz-btn { font-size: 1rem; padding: 0.5rem 0.9rem; }
-  body.projector-mode .viz-btn-small { font-size: 1rem; padding: 0.4rem 0.7rem; }
-  body.projector-mode .viz-timeline-label,
-  body.projector-mode .viz-timeline-time { font-size: 1rem; }
-  body.projector-mode .viz-timeline { min-width: 280px; }
-  body.projector-mode .viz-toolbar-section-label { font-size: 1rem; }
   /* ドット内のリアクション数。 投影時は教室後方から読めるよう拡大 (他の viz 要素は
      projector で全て拡大済だが、 この数字だけ 10px 据え置きで読めなかった抜けを補う)。
      dot 径に収まる範囲で 10px → 13px。 */
   body.projector-mode .viz-dot-label { font-size: 13px; }
 
   @media (max-width: 640px) {
-    .viz-toolbar { padding: 0.3rem 0.4rem; gap: 0.3rem; }
     .viz-profile-select { max-width: 140px; font-size: 0.875rem; }
-  }
-
-  /* 議論ツール（議論前 / 比較 / タイムライン）は toolbar 中央に inline 配置。
-     ⚙️ 折り畳みは撤廃 — 常時表示で discoverability を優先。 */
-  .viz-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    /* 中央寄せ — toolbar-center の親が flex 1 で広がるので、要素は中央に並ぶ */
-    justify-content: center;
-  }
-  .viz-btn, .viz-btn-small {
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--theme-border-subtle);
-    background: var(--theme-card-1);
-    color: var(--theme-text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    white-space: nowrap;
-    transition: background var(--transition-quick), border-color var(--transition-quick);
-  }
-  /* Light mode: slate-800 60% → 白カード (theme-bg-elevated) で議論ツール button を明るく */
-  body.theme-light .viz-btn,
-  body.theme-light .viz-btn-small {
-    background: var(--theme-bg-elevated);
-    border-color: var(--theme-border-normal);
-  }
-  .viz-btn:hover, .viz-btn-small:hover {
-    background: color-mix(in srgb, var(--theme-accent-cyan) 18%, transparent);
-    border-color: color-mix(in srgb, var(--theme-accent-cyan) 50%, transparent);
-  }
-  .viz-btn.active {
-    background: color-mix(in srgb, var(--theme-accent-cyan) 30%, transparent);
-    border-color: var(--theme-accent-cyan);
-    /* 背景は半透明 cyan tint。 light mode では淡くなるので固定 #fff だと「比較」「動き」を
-       押したとき文字が背景に同化して消える。 theme-text-primary 継承で両モード可読に。 */
-    color: var(--theme-text-primary);
-  }
-  /* 基準保存済みマーカー。旧実装は ::before で '✓ ' を差し込んでいたが、
-     フォント依存の記号なのでアイコン系と揃わない。左端のドットで表す。 */
-  .viz-btn.has-before {
-    border-color: color-mix(in srgb, var(--status-success) 55%, transparent);
-  }
-  .viz-btn.has-before::before {
-    content: '';
-    width: 0.4rem;
-    height: 0.4rem;
-    margin-right: 0.35rem;
-    border-radius: var(--radius-full);
-    background: var(--theme-text-confirm);
-    flex: none;
-  }
-
-  /* 「くらべる」= この bar の主操作。他より一段強く見せる。 */
-  .viz-btn-primary {
-    font-weight: 600;
-    border-color: color-mix(in srgb, var(--theme-accent-cyan) 45%, transparent);
-  }
-
-  /* 比較 ON のときだけ現れる副操作群。OFF 時は [hidden] で完全に畳む。 */
-  .viz-compare-tools {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex: 1 1 auto;
-    flex-wrap: wrap;
-    padding-left: 0.6rem;
-    border-left: 1px solid var(--theme-border-subtle);
-  }
-  .viz-compare-tools[hidden] { display: none; }
-
-  /* icon + ラベルを縦中央で揃える (SharedIcons の .icon は inline-block) */
-  .viz-btn, .viz-btn-small {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .viz-btn[hidden], .viz-btn-small[hidden] { display: none; }
-  .viz-btn.saved {
-    background: color-mix(in srgb, var(--status-success) 30%, transparent);
-    border-color: var(--theme-text-confirm);
-  }
-  .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
-  /* Timeline は toolbar の主役なので、横を広く取って軌跡を読み取りやすく。 */
-  .viz-timeline {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex: 1 1 auto;
-    min-width: 360px;
-  }
-  .viz-timeline-label {
-    color: var(--theme-text-muted);
-    font-size: 0.875rem;
-    white-space: nowrap;
-  }
-  .viz-timeline-time {
-    min-width: 4.5rem;
-    text-align: center;
-    color: var(--theme-text-emphasis);  /* light では amber-700。 比較/動き 時の時刻表示が消えないように */
-    font-size: 0.875rem;
-    font-variant-numeric: tabular-nums;
-  }
-  #vizTimelineSlider {
-    flex: 1 1 auto;
-    min-width: 240px;
-    width: 100%;
-  }
-  /* toolbar 中央 group も timeline に幅を譲るため自身が flex 伸縮可 */
-  .viz-toolbar-center { flex: 1 1 auto; }
-
-  /* Before/After 比較表示時のレイアウト */
-  .viz-compare-wrap {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    min-height: 50vh;
-  }
-  .viz-compare-pane {
-    border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
-    padding: 0.5rem;
-    background: color-mix(in srgb, var(--theme-bg-base) 30%, transparent);
-  }
-  /* Light mode: theme-bg-base 60% で 2 ペイン区切りを保つ (dark/light 自動追従) */
-  body.theme-light .viz-compare-pane {
-    background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
-    border-color: var(--theme-border-subtle);
-  }
-  .viz-compare-pane h4 {
-    margin: 0 0 0.5rem;
-    color: var(--theme-text-muted);
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-  @media (max-width: 768px) {
-    .viz-compare-wrap { grid-template-columns: 1fr; }
   }
 
   /* 象限キーワードパネル (matrix 専用)。「個・群・意味」三層の「意味」レイヤー。

@@ -273,22 +273,13 @@
         this.state.isReviewMode = Boolean(window.UNIFIED_CONFIG?.isReviewMode);
         this.state.reviewLesson = window.UNIFIED_CONFIG?.reviewLesson || null;
 
-        // Phase 2 lesson review: snapshots を delta-encoded 形式に hydrate して sessionStorage に書く。
-        //   これで既存の viz timeline スライダー / 比較モードが live polling 無しで動く。
-        if (this.state.isReviewMode && this.state.reviewLesson && typeof this.__vizHydrateReview === 'function') {
-          try {
-            const hydratedCount = this.__vizHydrateReview(this.state.reviewLesson);
-            console.info(`[lesson/review] hydrated ${hydratedCount} snapshot entries`);
-          } catch (hydrateErr) {
-            console.warn('[lesson/review] hydration failed:', hydrateErr && hydrateErr.message);
-          }
-          // 振り返り banner を表示。lesson name は server side の reviewLesson.name から。
+        // 振り返りモード: banner を出して read-only であることを明示する。
+        //   過去フェーズの表示はフェーズ pill の切替で行う (時間軸は 1 本だけ)。
+        if (this.state.isReviewMode && this.state.reviewLesson) {
           const banner = document.getElementById('lesson-review-banner');
           const nameEl = document.getElementById('lesson-review-name');
           if (banner) banner.classList.remove('hidden');
           if (nameEl) nameEl.textContent = (this.state.reviewLesson.name || '無題');
-          // Heading は最終 phase の question を初期値に (banner=固定文脈 / heading=動的内容 の役割分離)。
-          if (typeof this.__updateReviewHeading === 'function') this.__updateReviewHeading(null);
         }
 
         this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
@@ -2224,14 +2215,6 @@
 
         await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
 
-        // Why: viz モードのとき変化の軌跡用 snapshot を採取（60秒間隔で sampling）。
-        //      board モードでは不要。F#2 タイムライン / F#4 ビフォー・アフター の基盤。
-        if (this.state.boardMode && this.state.boardMode !== 'board' &&
-            typeof this.vizMaybeCaptureSnapshot === 'function') {
-          this.vizMaybeCaptureSnapshot();
-          if (typeof this.__vizRefreshControls === 'function') this.__vizRefreshControls();
-        }
-
         // Why: 毎回 classFilter を再構築する。refreshContent 経由でデータ更新されたとき、
         //      新しく現れたクラス（生徒が初めて投稿した）を選択肢に加えるため。
         //      populateClassFilter は現在選択中のクラスを保持するので UX は壊れない。
@@ -2387,16 +2370,6 @@
     async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
       const mode = this.state && this.state.boardMode ? this.state.boardMode : 'board';
 
-      // Why: タイムラインで過去 snapshot を選んでいるとき、currentAnswers を一時的に
-      //      過去の値に差し替えて renderer を呼び、終了後に元に戻す。各 renderer の
-      //      コードを変更せずに「時間旅行」を実現する低結合な実装。
-      const runWithTimeline = (fn) => {
-        if (typeof this.__vizWithTimelineSwap === 'function') {
-          return this.__vizWithTimelineSwap(fn);
-        }
-        return fn();
-      };
-
       const renderOne = async () => {
         if (mode === 'numberline' && typeof this.renderNumberLine === 'function') {
           return await this.renderNumberLine(isInitialLoad, oldRows);
@@ -2414,31 +2387,12 @@
       };
 
       try {
-        // Compare モード（左=過去 ↔ 右=現在）: viz mode のときのみ 2 ペイン描画。
-        // 入る条件 (どちらか満たせば左ペインに何かを出せる):
-        //   - 議論前 anchor が保存されている (loadBeforeSnapshot)、または
-        //   - timestamp 履歴 snapshot が 1 件以上ある (vizGetSnapshots)
-        // → __vizRenderCompare 内部で leftSource を 4 段階フォールバックで決定。
-        if (this.state && this.state.vizCompareMode && mode !== 'board' &&
-            typeof this.__vizRenderCompare === 'function') {
-          const hasBefore = typeof this.__vizGetBeforeSnapshot === 'function' && this.__vizGetBeforeSnapshot();
-          const hasSnaps = typeof this.vizGetSnapshots === 'function' && this.vizGetSnapshots().length > 0;
-          if (hasBefore || hasSnaps) {
-            return await this.__vizRenderCompare(renderOne, mode);
-          }
-        }
+        const result = await renderOne();
 
-        // タイムライン位置が指定されていれば、その snapshot で描画
-        const result = await runWithTimeline(renderOne);
-
-        // toolbar (profile pills + 議論ツール) は冪等に再注入。inject → refresh の順で OK。
+        // toolbar (profile pills) は冪等に再注入。inject → refresh の順で OK。
         if (typeof this.__vizInjectModeBar === 'function') this.__vizInjectModeBar();
         if (typeof this.__vizRefreshModeBar === 'function') this.__vizRefreshModeBar();
         if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
-        // viz モード時のみ議論ツール (議論前 / 比較 / タイムライン) の state を再計算
-        if (mode !== 'board' && typeof this.__vizRefreshControls === 'function') {
-          this.__vizRefreshControls();
-        }
 
         // Why: 初回描画成功を Cloud Logging に通知（mode/profile ごと 1 回のみ）。
         //      CLI から「全機能が動いた」を確認するための telemetry。
