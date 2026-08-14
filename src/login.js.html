@@ -298,27 +298,18 @@
      * ローカルドメイン情報表示 - ログインページ専用
      */
     function displayDomainInfo(info) {
-      const match = document.getElementById('header-domain-match');
+      // v2903: 「一致」「確認中」のパネルは撤去した。ログインできること自体が
+      //   ドメイン一致の証明なので、わざわざ緑のパネルで知らせる必要がない。
+      //   組織外アカウントのときだけ、なぜ先に進めないのかを示す。
       const mismatch = document.getElementById('header-domain-mismatch');
-      const initial = document.getElementById('header-domain-initial');
-
-      [match, mismatch, initial].forEach(element => {
-        if (element) element.style.display = 'none';
-      });
-
-      if (info.error) return;
-
-      if (info.isValidDomain) {
-        if (match) {
-          document.getElementById('header-domain-match-text').textContent = info.domain || 'ドメイン確認済み';
-          match.style.display = 'block';
-        }
-      } else {
-        if (mismatch) {
-          document.getElementById('header-domain-mismatch-text').textContent = info.domain ? `外部: ${info.domain}` : '外部アクセス';
-          mismatch.style.display = 'block';
-        }
+      if (!mismatch) return;
+      if (info.error || info.isValidDomain) {
+        mismatch.classList.add('hidden');
+        return;
       }
+      const label = document.getElementById('header-domain-mismatch-text');
+      if (label) label.textContent = info.domain ? `組織外のアカウントです (${info.domain})` : '組織外のアカウントです';
+      mismatch.classList.remove('hidden');
     }
 
     /**
@@ -358,34 +349,7 @@
 
 
 
-  function showSecurityModal() {
-    const modal = document.getElementById('security-modal');
-    if (modal) {
-      modal.style.animation = 'modalFade 0.3s ease-out';
-      modal.classList.remove('hidden');
 
-      const modalContent = modal.querySelector('.glass-panel');
-      if (modalContent) {
-        modalContent.style.animation = 'modalScale 0.3s ease-out';
-      }
-    }
-  }
-
-  function closeSecurityModal() {
-    const modal = document.getElementById('security-modal');
-    if (modal) {
-      modal.style.animation = 'fadeOut 0.2s ease-out';
-
-      modal.addEventListener('animationend', () => {
-        modal.classList.add('hidden');
-        modal.style.animation = '';
-        const modalContent = modal.querySelector('.glass-panel');
-        if (modalContent) {
-          modalContent.style.animation = '';
-        }
-      }, { once: true });
-    }
-  }
 
 
   /** @see window.sharedUtilities.security.escapeHtml */

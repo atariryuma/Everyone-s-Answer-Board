@@ -13,10 +13,10 @@
 </head>
   <body class="app-body min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full fade-in">
-      <div class="glass-panel rounded-2xl p-8 shadow-2xl text-center">
+      <div class="card text-center">
 
         <!-- タイトル -->
-        <h1 class="text-3xl font-bold text-theme-accent-cyan mb-2">みんなの回答ボード</h1>
+        <h1 class="text-xl font-semibold text-theme mb-2">みんなの回答ボード</h1>
 
         <? if (typeof userEmail !== 'undefined' && userEmail) { ?>
         <p class="text-sm text-theme-muted mb-6">
@@ -26,20 +26,20 @@
 
         <? if (typeof isAppDisabled !== 'undefined' && isAppDisabled) { ?>
         <!-- ========== アプリ無効化中 ========== -->
-        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 mb-6">
+        <div class="box box-warning mb-6">
           <p class="text-theme-status-warning font-semibold mb-1">現在メンテナンス中です</p>
           <p class="text-theme-muted text-sm">管理者がシステムの設定を行っています。しばらくお待ちください。</p>
         </div>
 
         <? } else if (typeof message !== 'undefined' && message) { ?>
         <!-- ========== ドメイン不一致等のメッセージ ========== -->
-        <div class="bg-red-500/10 border border-theme-status-error-strong rounded-lg p-4 mb-6">
+        <div class="box box-error mb-6">
           <p class="text-theme-status-error text-sm"><?= message ?></p>
         </div>
 
         <? } else { ?>
         <!-- ========== 通常のアクセス制限（トップページ直アクセス等） ========== -->
-        <div class="bg-theme-card-1 rounded-lg p-4 mb-6">
+        <div class="box mb-6">
           <p class="text-theme-secondary text-sm">このページは管理者・登録ユーザー向けです。</p>
           <p class="text-theme-muted text-xs mt-2">回答ボードの閲覧は、先生から共有されたURLからアクセスしてください。</p>
         </div>

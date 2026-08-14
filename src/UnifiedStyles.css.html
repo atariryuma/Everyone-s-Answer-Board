@@ -1146,7 +1146,6 @@
     flex: none;
   }
   .admin-dot-ok { background: var(--status-success); }
-  .admin-dot-warn { background: var(--status-warning); }
   .admin-dot-error { background: var(--status-error); }
 
   /* 状態バッジ (admin 一覧表内)。色は 2 値だけに絞り、面ではなく文字色で表す。 */
@@ -1826,9 +1825,9 @@
     background: color-mix(in srgb, var(--status-warning) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
   }
-  .box-info {
-    background: color-mix(in srgb, var(--status-info) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--status-info) 45%, transparent);
+  .box-error {
+    background: color-mix(in srgb, var(--status-error) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
   }
 
   .config-summary {
@@ -2674,27 +2673,15 @@
    *   のような Tailwind class をそのまま使い続ける (semantic で読みやすい)。
    *   token を変更したいときは `--theme-status-*` の値を 1 箇所変えるだけで全箇所に反映。
    * ============================================================================= */
-  .bg-theme-status-success-soft     { background: var(--theme-status-success-soft); }
   .bg-theme-status-error-soft       { background: var(--theme-status-error-soft); }
   .bg-theme-status-warning-soft     { background: var(--theme-status-warning-soft); }
-  .bg-theme-status-info-soft        { background: var(--theme-status-info-soft); }
-  .bg-theme-status-accent-soft      { background: var(--theme-status-accent-soft); }
-  .bg-theme-status-detection-soft   { background: var(--theme-status-detection-soft); }
-  .bg-theme-status-highlight-soft   { background: var(--theme-status-highlight-soft); }
 
-  .border-theme-status-success-strong   { border-color: var(--theme-status-success-strong); }
   .border-theme-status-error-strong     { border-color: var(--theme-status-error-strong); }
   .border-theme-status-warning-strong   { border-color: var(--theme-status-warning-strong); }
-  .border-theme-status-info-strong      { border-color: var(--theme-status-info-strong); }
-  .border-theme-status-accent-strong    { border-color: var(--theme-status-accent-strong); }
-  .border-theme-status-detection-strong { border-color: var(--theme-status-detection-strong); }
-  .border-theme-status-highlight-strong { border-color: var(--theme-status-highlight-strong); }
 
-  .text-theme-status-success-text-on-soft { color: var(--theme-status-success-text-on-soft); }
   .text-theme-status-error-text-on-soft   { color: var(--theme-status-error-text-on-soft); }
   .text-theme-status-warning-text-on-soft { color: var(--theme-status-warning-text-on-soft); }
   .text-theme-status-info-text-on-soft    { color: var(--theme-status-info-text-on-soft); }
-  .text-theme-status-accent-text-on-soft  { color: var(--theme-status-accent-text-on-soft); }
 
   .text-theme-status-success     { color: var(--theme-status-success-text); }
   .text-theme-status-error       { color: var(--theme-status-error-text); }

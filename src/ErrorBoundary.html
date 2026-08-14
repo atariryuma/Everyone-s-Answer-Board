@@ -26,17 +26,17 @@
 </head>
   <body class="app-body min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full text-center space-y-6">
-      <div class="text-5xl" role="img" aria-label="警告">&#x26A0;&#xFE0F;</div>
+      <div class="text-theme-status-warning" role="img" aria-label="警告"><svg class="icon icon-xl" aria-hidden="true"><use href="#i-alert-triangle"></use></svg></div>
       <h1 class="text-2xl font-bold text-theme"><?= title || 'エラーが発生しました' ?></h1>
       <p class="text-theme-secondary leading-relaxed">
         <?= message || 'システムエラーが発生しました。管理者にお問い合わせください。' ?>
       </p>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-        <button type="button" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="safeReload()">
+        <button type="button" class="btn btn-primary" onclick="safeReload()">
           再読み込み
         </button>
-        <button type="button" class="px-5 py-2.5 bg-theme-elevated hover:bg-theme-elevated-hover text-theme rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="goToTop()">
+        <button type="button" class="btn btn-secondary" onclick="goToTop()">
           トップページに戻る
         </button>
       </div>
