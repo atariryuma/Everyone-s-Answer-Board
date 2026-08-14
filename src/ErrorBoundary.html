@@ -40,7 +40,7 @@
           トップページに戻る
         </button>
       </div>
-      <? if (!webAppUrl) { ?>
+      <? if (typeof webAppUrl === 'undefined' || !webAppUrl) { ?>
       <p class="text-xs text-theme-status-warning">URLの取得に失敗しました。ブラウザの戻るボタンまたはリロードをお試しください。</p>
       <? } ?>
 

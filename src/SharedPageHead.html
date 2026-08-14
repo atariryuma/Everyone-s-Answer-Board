@@ -16,8 +16,13 @@
 
   使い方 (各ページの <head> 内):
     <title>ページ固有のタイトル</title>
-    <?!= include('SharedPageHead'); ?>
+    include('SharedPageHead') をスクリプトレットで囲んで書く
     <style> /* ページ固有のスタイルだけをここに */ </style>
+
+  注意: この用例をスクリプトレット記法そのままで書いてはいけない。 include() は
+    createTemplateFromFile().evaluate() (main.js) なので、 HTML コメント内であっても
+    スクリプトレットは評価される。 ここに書くと自分自身を無限 include して全ページが落ちる。
+    SharedThemeBoot も同じ理由で用例から記法を外している。
 
   含めないもの:
     - <title> : ページごとに異なるため各ページで書く

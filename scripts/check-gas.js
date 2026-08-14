@@ -233,6 +233,58 @@ for (const s of jsSrc.values()) {
   check('8. *.css.html が <style> の中に収まっている', bad.length === 0, bad.join(', '));
 }
 
+// ── 9. HTML コメント内に生きた scriptlet が残っていないか ────────────
+// Why: include() は createTemplateFromFile().evaluate() (main.js) なので、
+//   テンプレートエンジンは HTML より先に走る。つまり <!-- --> の中に書いた
+//   <? ... ?> も「コメントだから無害」ではなく、そのまま評価される。
+//   使い方の説明をファイル冒頭のコメントに書く運用と相性が最悪で、用例のつもりで
+//   <?!= include('SelfName'); ?> と書くと自分自身を無限 include して全ページが落ちる。
+//   SharedThemeBoot はこれを知っていて用例から記法を外しているが、規約が人の記憶に
+//   依存していたため SharedPageHead (v2899) で再発した。構造で止める。
+{
+  const bad = [];
+  for (const [f, src] of htmlSrc) {
+    for (const c of src.matchAll(/<!--[\s\S]*?-->/g)) {
+      for (const s of c[0].matchAll(/<\?[\s\S]*?\?>/g)) {
+        const at = c.index + s.index;
+        bad.push(`${f}:${lineOf(src, at)} ${s[0].trim().slice(0, 60)}`);
+      }
+    }
+  }
+  check('9. HTML コメント内に生きた scriptlet がない', bad.length === 0, bad.join(', '));
+}
+
+// ── 10. include() が循環していないか ────────────────────────────────
+// Why: 9 で塞ぐのはコメント経由の自己 include だけ。通常のコードで A→B→A と
+//   組んでも同じく無限再帰になり、症状は「全ページが落ちる」で同じ。
+//   9 とは独立した経路なので別項目として持つ。
+{
+  const graph = new Map();
+  for (const [f, src] of htmlSrc) {
+    const deps = [];
+    // コメント内は 9 が担当するので、ここでは実コードのみ見る。
+    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+    for (const m of code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)) {
+      deps.push(m[1].replace(/\.html$/, ''));
+    }
+    graph.set(f.replace(/\.html$/, ''), deps);
+  }
+  const cycles = [];
+  const seen = new Set();
+  const walk = (node, stack) => {
+    for (const next of graph.get(node) || []) {
+      if (stack.includes(next)) {
+        const cycle = [...stack.slice(stack.indexOf(next)), next].join(' → ');
+        if (!seen.has(cycle)) { seen.add(cycle); cycles.push(cycle); }
+        continue;
+      }
+      walk(next, [...stack, next]);
+    }
+  };
+  for (const node of graph.keys()) walk(node, [node]);
+  check('10. include() が循環していない', cycles.length === 0, cycles.join(', '));
+}
+
 // ── 出力 ──────────────────────────────────────────────────────────
 console.log('\nGAS 参照整合性チェック\n');
 for (const r of results) {
