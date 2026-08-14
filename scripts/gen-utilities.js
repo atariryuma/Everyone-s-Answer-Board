@@ -78,9 +78,21 @@ for (const f of htmlFiles) {
 const ownClasses = new Set();
 {
   const noComment = ownCss.replace(/\/\*[\s\S]*?\*\//g, ' ');
-  // `セレクタ {` の形だけを拾う。宣言の中身 (プロパティ: 値;) は見ない。
+  // 「自前で定義している」とみなすのは、そのクラス単独が主体のセレクタだけ
+  //   (.card / .card:hover / .card::before)。
+  //
+  // Why: 以前は複合セレクタに出てくる名前も「定義済み」として除外していた。
+  //   すると `#boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 { … }` のような
+  //   「utility を狙い撃ちする」ルールを 1 本書いただけで、.flex / .items-center /
+  //   .gap-2 / .flex-shrink-0 がアプリ全体から生成されなくなる。
+  //   実際 .hidden が `body .loading-overlay:not(.hidden)` のせいで生成されず、
+  //   hidden 指定の 19 要素中 18 個が画面に出たままになっていた。
+  //   複合セレクタは「既存 utility に上乗せする」意図であって定義ではない。
   for (const m of noComment.matchAll(/(^|[};])([^{};]+)\{/g)) {
-    for (const c of m[2].matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)) ownClasses.add(c[1]);
+    for (const part of m[2].split(',')) {
+      const solo = part.trim().match(/^\.([A-Za-z][A-Za-z0-9_-]*)(?:::?[a-zA-Z-]+(?:\([^)]*\))?)*$/);
+      if (solo) ownClasses.add(solo[1]);
+    }
   }
 }
 
