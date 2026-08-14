@@ -15,7 +15,7 @@
  *   - ensureD3Loaded()       : d3 を遅延 CDN ロード
  *   - renderNumberLine()     : M1 ビーズワーム
  *   - renderMatrix()         : M2 散布図
- *   - vizComputeSwings()     : 揺らぎ計算（教師ダッシュボード用）
+ *   - vizComputeSwings()     : 揺らぎ計算（再投稿した児童の点を大きく描くため）
  *   - vizApplyProjectorMode(): URL クエリ ?display=projector のクラス付与
  * ===================================================================== */
 (function () {
@@ -394,7 +394,7 @@
    */
   /**
    * 児童(emailHash)ごとの回答イベントを ts 昇順の配列で返す共有集計。
-   *   vizComputeSwings（揺らぎ）と vizComputeOpinionShift（収束/分散）が共有する。
+   *   vizComputeSwings（揺らぎ）が使う。
    *   emailHash が無い行（メアド収集 OFF）と numericX が無い行はスキップ。
    * @returns {Map<string, Array<{ts:number,x:number,y:(number|null),name:string,comment:string}>>}
    */
@@ -444,66 +444,6 @@
     swings.sort((a, b) => b.distance - a.distance);
     return swings;
   };
-
-  /**
-   * 意見変容サマリ（熟議型世論調査 Deliberative Polling, Fishkin）。
-   *   児童ごとの「最初の位置」と「最新の位置」のコホート全体のばらつき(標準偏差)を比較し、
-   *   議論を経て意見が **収束(ばらつき減)** したか **分散(ばらつき増)** したかを測る。
-   *
-   * 重要な設計判断（多数派バイアス回避）:
-   *   - これは **教師端末のみ** に出す分析であり、 児童には見せない（「クラスは収束した」を
-   *     児童に示すと同調圧力 = conformity を生む。 IEEE VIS 2023 / 同調研究）。
-   *   - 文言は **記述的**（ばらつきが小さく/大きくなった）であり評価的（良い/悪い）にしない。
-   *     収束も分散もどちらも正当な熟議の帰結（道理ある不一致 reasonable disagreement）。
-   *
-   * @returns {{before:number, after:number, delta:number, trend:string, movedCount:number, total:number}|null}
-   */
-  StudyQuestApp.prototype.vizComputeOpinionShift = function (rows, mode) {
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    const has2D = mode === 'matrix';
-    const byHash = groupStudentEvents(rows);
-
-    const firsts = [];
-    const lasts = [];
-    let movedCount = 0;
-    byHash.forEach((list) => {
-      const first = list[0];
-      const last = list[list.length - 1];
-      firsts.push(first);
-      lasts.push(last);
-      if (list.length >= 2) {
-        const fy = has2D && first.y !== null ? first.y : 0;
-        const ly = has2D && last.y !== null ? last.y : 0;
-        if (euclidean(first.x, fy, last.x, ly) > 0.001) movedCount += 1;
-      }
-    });
-    if (firsts.length < 2) return null; // 2 名未満では「ばらつき」を語れない
-
-    const stdev = (vals) => {
-      const n = vals.length;
-      const mean = vals.reduce((s, v) => s + v, 0) / n;
-      const variance = vals.reduce((s, v) => s + (v - mean) * (v - mean), 0) / n;
-      return Math.sqrt(variance);
-    };
-    const spreadOf = (arr) => {
-      const sx = stdev(arr.map((p) => p.x));
-      if (!has2D) return sx;
-      const sy = stdev(arr.map((p) => (p.y === null ? 0 : p.y)));
-      return Math.sqrt(sx * sx + sy * sy);
-    };
-    const before = spreadOf(firsts);
-    const after = spreadOf(lasts);
-    const delta = after - before;
-    // 閾値 0.15 (Likert 1-5 で約 3-4%) 未満は「ほぼ変化なし」とする
-    let trend = 'stable';
-    if (delta < -0.15) trend = 'converged';
-    else if (delta > 0.15) trend = 'diverged';
-    return { before, after, delta, trend, movedCount, total: firsts.length };
-  };
-
-  // ---------------------------------------------------------------------
-  // ツールチップ管理（M1/M2 共通）
-  // ---------------------------------------------------------------------
 
   function ensureTooltip() {
     let tip = document.getElementById('vizTooltip');
@@ -626,16 +566,9 @@
     //   SVG の中身は renderMatrix/numberline 側で `svg.selectAll('*').remove()`
     //   して再描画するため、ここでは触らない。
     //
-    //   ただし比較モード描画後 (`.viz-compare-wrap` が子要素として残る) は強制再構築。
-    //   そうしないと比較解除後も 2 ペイン構造の中で querySelector が「最初の svg」を
-    //   返して左ペインだけが再描画され、教師は「解除されない」と感じる。
-    if (answers.classList.contains('viz-container') &&
-        !answers.querySelector('.viz-compare-wrap')) {
+    if (answers.classList.contains('viz-container')) {
       const existingSvg = answers.querySelector('svg#vizSvg');
-      const existingPanel = answers.querySelector('#vizTeacherPanel');
-      if (existingSvg && existingPanel) {
-        return { svg: existingSvg, teacherPanel: existingPanel };
-      }
+      if (existingSvg) return { svg: existingSvg };
     }
 
     // 初回 or board mode → viz mode 切替時のみ DOM を再構築
@@ -643,10 +576,9 @@
     answers.className = 'viz-container';
     answers.innerHTML = '';
 
-    // SVG
-    // Why role="img" + aria-label: ビーズワーム/散布図は児童の位置プロットなのでスクリーン
-    // リーダーには静的画像として扱わせ、回答件数を要約として読み上げる。本文の児童名・
-    // コメントは vizTeacherPanel (下) の <ul> 経由で AT に届くので、SVG 自体は要約のみ。
+    // Why role="img" + aria-label: ビーズワーム/散布図は児童の位置プロットなので、
+    // スクリーンリーダーには静的画像として扱わせ、図の要約だけを読み上げる。
+    // 個々の回答は dot クリックで開くモーダル (通常の DOM) から AT に届く。
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('id', 'vizSvg');
@@ -656,15 +588,7 @@
     svg.setAttribute('aria-label', '児童の回答分布をプロットした図');
     answers.appendChild(svg);
 
-    // 教師パネル
-    const teacherPanel = document.createElement('div');
-    teacherPanel.className = 'viz-teacher-panel';
-    teacherPanel.id = 'vizTeacherPanel';
-    teacherPanel.innerHTML =
-        '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'      + '<div class="viz-panel-section" id="vizReasonSeedsSection" style="display:none">'      +   '<h3>議論のたねになる声<span class="viz-panel-sub">（各立場から・教師用）</span></h3>'      +   '<p class="viz-panel-hint">人気順ではありません。立場ごとに「理由を述べている声」を手がかりとして1つずつ。読み上げる声は先生が選びます。</p>'      +   '<ul id="vizReasonSeeds"></ul>'      + '</div>'      + '<div class="viz-panel-section" id="vizSwingSection" style="display:none">'      +   '<h3>気になる児童<span class="viz-panel-sub">（意見が動いた順）</span></h3>'      +   '<ul id="vizSwingList"></ul>'      + '</div>';
-    answers.appendChild(teacherPanel);
-
-    return { svg, teacherPanel };
+    return { svg };
   }
 
   // 「最終更新 HH:MM」をヘッダー右の #lastUpdatedText に表示。
@@ -677,92 +601,6 @@
     updatedEl.textContent = '最終更新 '+ hh + ':' + mm;
   }
 
-  function maybeRenderTeacherPanel(app, swings, rows, mode) {
-    const panel = document.getElementById('vizTeacherPanel');
-    if (!panel) return;
-
-    // Why: パネルは教師端末のみ。表示する name は displayMode に合わせる
-    //   （管理モード OFF のときは匿名 + emailHash で識別）。 カード実装と同じ振舞い。
-    const showAdmin = Boolean(app.state.showAdminFeatures);
-    const showName = app.state.displayMode === 'named';
-
-    // (1) 意見変容サマリ（教師のみ・記述的）。 swings が空でも shift は出し得る。
-    const shiftEl = document.getElementById('vizOpinionShift');
-    const shift = showAdmin ? app.vizComputeOpinionShift(rows || [], mode) : null;
-    if (shiftEl) {
-      if (shift) {
-        const b = shift.before.toFixed(1);
-        const a = shift.after.toFixed(1);
-        let msg;
-        if (shift.trend === 'converged') {
-          msg = `議論を経て、意見のばらつきは小さくなりました（${b} → ${a}）。`;
-        } else if (shift.trend === 'diverged') {
-          msg = `議論を経て、意見のばらつきは大きくなりました（${b} → ${a}）。`;
-        } else {
-          msg = `意見のばらつきはほぼ変わりませんでした（${b} → ${a}）。`;
-        }
-        shiftEl.textContent = `${msg} ${shift.movedCount}名が立場を動かしました。`;
-        shiftEl.style.display = '';
-      } else {
-        shiftEl.textContent = '';
-        shiftEl.style.display = 'none';
-      }
-    }
-
-    // (2) 議論のたねになる声（教師のみ・各立場から1件・記述的）。
-    //   人気順ではなく position coverage で選ぶ（多数派バイアス回避）。 swing と違い
-    //   再投稿不要なので単一投稿のボードでも機能する = 最も広く使える教師ヒント。
-    const seedsEl = document.getElementById('vizReasonSeeds');
-    let seeds = [];
-    if (showAdmin) {
-      const groups = buildPositionGroups(rows || [], mode, app.state.axisConfig);
-      seeds = representativeReasons(groups, { perBucket: 1, field: 'reason', minLen: 6 });
-    }
-    if (seedsEl) {
-      const section = document.getElementById('vizReasonSeedsSection');
-      if (seeds.length) {
-        seedsEl.innerHTML = seeds.map((s) => {
-          const who = (showName && s.name) ? escapeForTooltip(s.name)
-                    : (s.emailHash ? '匿名('+ s.emailHash + ')': '匿名');
-          // raw を先に切ってから escape する（entity 途中切り防止）。
-          const stance = s.label
-            ? '<span class="viz-seed-stance">'+ escapeForTooltip(String(s.label).substring(0, 24)) + '</span>'            : '';
-          const reason = escapeForTooltip(String(s.reason).substring(0, 120));
-          return '<li>'+ stance + '<span class="viz-seed-who">'+ who + '</span>「'+ reason + '」</li>';
-        }).join('');
-        if (section) section.style.display = '';
-      } else {
-        seedsEl.innerHTML = '';
-        if (section) section.style.display = 'none';
-      }
-    }
-
-    // (3) 気になる児童（意見が動いた順）。 swing は再投稿許可 + 複数投稿が前提。
-    const list = document.getElementById('vizSwingList');
-    const swingSection = document.getElementById('vizSwingSection');
-    const hasSwings = showAdmin && swings.length > 0;
-    if (list) {
-      if (hasSwings) {
-        const top = swings.slice(0, 5);
-        list.innerHTML = top.map((s) => {
-          const fromTo = (s.from.y !== null && s.to.y !== null)
-            ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
-            : `${s.from.x} → ${s.to.x}`;
-          const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名('+ s.emailHash + ')';
-          // raw を先に切ってから escape する（"&amp;" を entity 途中で切らないため）。
-          const comment = s.comment ? '：'+ escapeForTooltip(String(s.comment).substring(0, 60)) : '';
-          return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
-        }).join('');
-        if (swingSection) swingSection.style.display = '';
-      } else {
-        list.innerHTML = '';
-        if (swingSection) swingSection.style.display = 'none';
-      }
-    }
-
-    // パネルは shift / seeds / swing のいずれかがあれば表示。
-    panel.classList.toggle('active', Boolean(shift) || seeds.length > 0 || hasSwings);
-  }
 
   // ---------------------------------------------------------------------
   // M1: 数直線ビーズワーム
@@ -930,7 +768,6 @@
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
-      maybeRenderTeacherPanel(this, swings, rows, 'numberline');
 
       // 件数バッジ（既存のヘッダ表示）も更新（updateAnswerCount は board モード前提）
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
@@ -1311,7 +1148,6 @@
       renderDotLabels(g, nodes, this.state);
 
       updateStatsPills(this, current.length);
-      maybeRenderTeacherPanel(this, swings, rows, 'matrix');
       // 象限キーワードは SVG 内に統合済 (旧 HTML パネルは廃止)。mode 切替で残存する panel は除去。
       removeQuadrantSummary(this.elements.answersContainer);
 
@@ -1344,10 +1180,7 @@
       panel = document.createElement('div');
       panel.id = 'vizQuadrantSummary';
       panel.className = 'viz-quadrant-summary';
-      // teacherPanel の直前に挿入（順序: stats → svg → quadrant-summary → teacher-panel）
-      const tp = answers.querySelector('#vizTeacherPanel');
-      if (tp) answers.insertBefore(panel, tp);
-      else answers.appendChild(panel);
+      answers.appendChild(panel);
     }
     panel.innerHTML = '';
 
@@ -1596,7 +1429,7 @@
   // 4 象限 + その派生集合 (X 軸左右 / Y 軸上下) を文字列キーで指す唯一の場所。
   const QUADRANT_KEYS = ['hh', 'lh', 'hl', 'll'];
 
-  // 2D ユークリッド距離。vizComputeSwings / computeMatrixDeltas / 矢印 trim で共有。
+  // 2D ユークリッド距離。vizComputeSwings が使う。
   function euclidean(ax, ay, bx, by) {
     const dx = bx - ax, dy = by - ay;
     return Math.sqrt(dx * dx + dy * dy);
@@ -1795,219 +1628,6 @@
     return scored.slice(0, N);
   }
 
-  // ---------------------------------------------------------------------
-  // 議論のたねになる声 (representative reasons) — 教師が熟議で読み上げる候補を
-  //   「各立場から 1 件ずつ」拾う。 [[viz-major-update-research-grounded]] の延長。
-  //
-  // 設計ガードレール（多数派バイアス回避・研究根拠・変更時は必ず読むこと）:
-  //   - 選定は **立場(group)ごとに 1 件ずつ** = position coverage。 人気(reaction)・
-  //     頻度・多数派では絶対に選ばない。 少数の立場も等しく 1 席を得る（少数意見の保全）。
-  //     consensusKeywords が coverage で選ぶのと同じ原理（人数で選ばない）。
-  //   - group 内の優先は「**理由を述べているか(hasJustification)**」という *記述的* な観察。
-  //     良い/悪いの評価ではなく「理由づけの言語が含まれるか」だけを見る。 これは道徳科が
-  //     重視する「理由を挙げて多面的・多角的に考える」過程そのもの (MEXT 2016 報告 p.10)。
-  //   - **教師端末のみ**に出す。 児童に「模範回答」として示すと同調圧力になる
-  //     (opinion-shift と同じ teacher-only 原則)。 読み上げる声は最終的に教師が選ぶ。
-  //
-  // 学術根拠:
-  //   - Stanford HCOMP 2024 (arXiv:2408.11936 "Estimating Contribution Quality…"):
-  //     集団の意見変容は「理由づけのある主張の selective uptake」で起きる
-  //     (justification quality が効き、 novelty 単独では効かない)。 教師が理由づけのある
-  //     声を拾って議論にかけることが熟議の駆動力になる、という知見を反映。
-  //   - Pol.is: クラスタごとの代表的発言を surface（人気ではなく代表性）。
-  // ---------------------------------------------------------------------
-
-  // 「考えの筋道(理由づけ)が文に表れているか」の *記述的* 検出（良し悪しの評価ではない）。
-  //   実データ検証 (2026-05-30, 沖縄県の道徳 matrix ボード 実回答 120 件) で校正した:
-  //   児童の道徳的理由は「だから/から」等の因果接続を **明示しない** ことが多く、 因果語だけ
-  //   では発火 3% で discrimination しなかった。 一方で「〜つつ / だけど / でも / 両方」のような
-  //   **両面を weigh する譲歩・対比表現** が 22% に現れ、 これは MEXT「多面的・多角的な見方」
-  //   そのもの（= 反対の考えにも触れた高い理由づけ。 Toulmin の rebuttal / 熟議研究で重視される）。
-  //   因果 + 譲歩/対比 + 両面衡量 を合わせると発火 33% で、 素朴な言い切り（「確信した」等）と
-  //   うまく分離できた。
-  //
-  //   検出は形態素解析に依らない部分一致。 過検出は許容（弱い tiebreak にすぎず、 外れても
-  //   fallback で最も実質的な理由が選ばれるだけ）。 ただし時間的な「から」(明日から/これから等)
-  //   は理由ではないので除去してから判定し、 誤検出を抑える。
-  const REASONING_MARKERS = [
-    // 因果・理由・例示
-    'なぜなら', '理由は', 'というのも', 'だって', 'だから', 'ので', 'から', 'ため', 'ゆえ',
-    'したがって', 'よって', 'そのため', 'それで', 'たとえば', '例えば', '具体的に', 'おかげ', 'せいで',
-    // 譲歩・対比（両面を weigh する = 多面的・多角的な reasoning）
-    'けど', 'けれど', 'でも', 'しかし', 'つつ', 'ながら', 'ものの', 'とはいえ', '一方', '反面',
-    // 両面の衡量
-    '両立', '両方', 'どちらも'
-  ];
-  const TEMPORAL_KARA = /(明日|今日|これ|それ|あれ|今|昔|前|普段|最初|途中|ここ|そこ|どこ)から/g;
-  function hasJustification(text) {
-    if (!text) return false;
-    const s = String(text).replace(TEMPORAL_KARA, '');
-    return REASONING_MARKERS.some((m) => s.indexOf(m) >= 0);
-  }
-
-  /**
-   * rows を「立場(position) のグループ」に分割する。
-   *   matrix: 4 象限 (hh/lh/hl/ll)。 ラベルは __resolveQuadrantLabels。
-   *   numberline: 2 極 (low/high)。 中点で二分し、 ラベルは xAxisLabels.min/max（= 軸の両端の名前）。
-   *     1D で「対立軸」を表す最も自然な構造は両極なので、 ここを立場グループとする。
-   *   バケット境界は renderMatrix / renderNumberLine と整合（>= mid を high 側）。
-   * @returns {Array<{key:string, label:string, rows:Array}>}
-   */
-  function buildPositionGroups(rows, mode, axisCfg) {
-    const cfg = axisCfg || {};
-    const dMin = typeof cfg.defaultMin === 'number' ? cfg.defaultMin : 1;
-    const dMax = typeof cfg.defaultMax === 'number' ? cfg.defaultMax : 5;
-    if (mode === 'matrix') {
-      const valid = (rows || []).filter((r) => typeof r.numericX === 'number'&& typeof r.numericY === 'number');
-      const xs = valid.map((r) => r.numericX);
-      const ys = valid.map((r) => r.numericY);
-      const minX = xs.length ? Math.min(...xs, dMin) : dMin;
-      const maxX = xs.length ? Math.max(...xs, dMax) : dMax;
-      const minY = ys.length ? Math.min(...ys, dMin) : dMin;
-      const maxY = ys.length ? Math.max(...ys, dMax) : dMax;
-      const midX = (minX + maxX) / 2;
-      const midY = (minY + maxY) / 2;
-      const q = __resolveQuadrantLabels(cfg);
-      const buckets = { hh: [], lh: [], hl: [], ll: [] };
-      for (const r of valid) {
-        const xk = r.numericX >= midX ? 'h': 'l';
-        const yk = r.numericY >= midY ? 'h': 'l';
-        buckets[xk + yk].push(r);
-      }
-      return ['hh', 'lh', 'hl', 'll'].map((k) => ({ key: k, label: q[k] || '', rows: buckets[k] }));
-    }
-    // numberline: low / high の 2 極
-    const valid = (rows || []).filter((r) => typeof r.numericX === 'number');
-    const xs = valid.map((r) => r.numericX);
-    const minX = xs.length ? Math.min(...xs, dMin) : dMin;
-    const maxX = xs.length ? Math.max(...xs, dMax) : dMax;
-    const mid = (minX + maxX) / 2;
-    const xL = cfg.xAxisLabels || {};
-    const lowRows = [];
-    const highRows = [];
-    for (const r of valid) {
-      (r.numericX >= mid ? highRows : lowRows).push(r);
-    }
-    return [
-      { key: 'low', label: xL.min || '', rows: lowRows },
-      { key: 'high', label: xL.max || '', rows: highRows }
-    ];
-  }
-
-  /**
-   * 各立場グループから「議論のたねになる声」を選ぶ（上のガードレール参照）。
-   * @param {Array<{key,label,rows}>} groups buildPositionGroups の戻り値
-   * @param {Object} [opts] { perBucket=1, field='reason', minLen=6 }
-   * @returns {Array<{key,label,reason,name,emailHash,numericX,numericY,hasJustification}>}
-   */
-  function representativeReasons(groups, opts) {
-    const perBucket = (opts && opts.perBucket) || 1;
-    const field = (opts && opts.field) || 'reason';
-    const minLen = (opts && typeof opts.minLen === 'number') ? opts.minLen : 6;
-    const out = [];
-    for (const grp of (groups || [])) {
-      const cands = (grp.rows || [])
-        .map((r) => ({ row: r, text: String((r && r[field]) || '').trim() }))
-        .filter((c) => c.text.length >= minLen);
-      if (!cands.length) continue;
-      // justification 有(1) > 無(0) を最優先 → 同点は理由の情報量(長さ)を弱い tiebreak →
-      //   最後に rowIndex で決定的に（毎 render 同じ声が選ばれ、 教師の認知が安定する）。
-      cands.sort((a, b) => {
-        const ja = hasJustification(a.text) ? 1 : 0;
-        const jb = hasJustification(b.text) ? 1 : 0;
-        if (ja !== jb) return jb - ja;
-        if (a.text.length !== b.text.length) return b.text.length - a.text.length;
-        return (a.row.rowIndex || 0) - (b.row.rowIndex || 0);
-      });
-      for (const c of cands.slice(0, perBucket)) {
-        out.push({
-          key: grp.key,
-          label: grp.label,
-          reason: c.text,
-          name: c.row.name || '',
-          emailHash: c.row.emailHash || '',
-          numericX: typeof c.row.numericX === 'number' ? c.row.numericX : null,
-          numericY: typeof c.row.numericY === 'number' ? c.row.numericY : null,
-          hasJustification: hasJustification(c.text)
-        });
-      }
-    }
-    return out;
-  }
-
-  /**
-   * 2 つの axis 設定が「同じ座標系を表すか」を判定する。
-   *
-   * 「議論前 → 現在」矢印を描くには (numericX, numericY) が **同じ意味の座標** を
-   *   指している必要がある。具体的には Likert 軸の min/max ラベルが完全一致していること。
-   *   違うフォーム（導入アンケート pie ↔ 本時 matrix）や軸ラベル変更があった場合に
-   *   座標を結んでしまうと誤った可視化になる。
-   *
-   *   profile 切替 / 軸ラベル編集 / boardMode 変更を跨いで矢印を抑止するためのガード。
-   *
-   * @param {Object|null} a axisConfig 1
-   * @param {Object|null} b axisConfig 2
-   * @returns {boolean}
-   */
-  function arePhasesAxisCompatible(a, b) {
-    if (!a || !b) return false;
-    const ax = a.xAxisLabels || {};
-    const bx = b.xAxisLabels || {};
-    const ay = a.yAxisLabels || {};
-    const by = b.yAxisLabels || {};
-    return (ax.min || '') === (bx.min || '')
-        && (ax.max || '') === (bx.max || '')
-        && (ay.min || '') === (by.min || '')
-        && (ay.max || '') === (by.max || '');
-  }
-
-  /**
-   * 「議論前」rows と「現在」rows を emailHash で照合し、移動した児童の delta を返す。
-   *
-   *   each entry: { emailHash, fromX, fromY, toX, toY, distance, fromRow, toRow }
-   *   - 同じ emailHash が両方にある児童だけ対象
-   *   - 動かなかった児童 (distance < epsilon) は除外（矢印が点になる無意味なケース）
-   *   - epsilon = 0.1 は「Likert スケール 1-5 で 0.1 = 2% 未満」= 実質同じ位置
-   *
-   * 道徳教育観点（MEXT 2016 報告 p.10）：
-   *   「自らの生活や考えを見直している」評価観点の証拠データ。
-   *   「議論を経て立場が動いた児童」を教師が即座に発見できる。
-   *
-   * @param {Array} beforeRows
-   * @param {Array} currentRows
-   * @returns {Array<Object>} 距離降順
-   */
-  function computeMatrixDeltas(beforeRows, currentRows) {
-    if (!Array.isArray(beforeRows) || !Array.isArray(currentRows)) return [];
-    const beforeByHash = new Map();
-    for (const r of beforeRows) {
-      if (!r || !r.emailHash) continue;
-      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
-      // 同 hash で複数 row があれば最後（=最新）のものを採用
-      beforeByHash.set(r.emailHash, r);
-    }
-    const out = [];
-    const seen = new Set();
-    for (const r of currentRows) {
-      if (!r || !r.emailHash) continue;
-      if (typeof r.numericX !== 'number'|| typeof r.numericY !== 'number') continue;
-      if (seen.has(r.emailHash)) continue;  // current 側でも 1 hash = 1 entry に正規化
-      seen.add(r.emailHash);
-      const before = beforeByHash.get(r.emailHash);
-      if (!before) continue;
-      const distance = euclidean(before.numericX, before.numericY, r.numericX, r.numericY);
-      if (distance < 0.1) continue;  // 動いていない
-      out.push({
-        emailHash: r.emailHash,
-        fromX: before.numericX, fromY: before.numericY,
-        toX: r.numericX,         toY: r.numericY,
-        distance,
-        fromRow: before, toRow: r
-      });
-    }
-    out.sort((a, b) => b.distance - a.distance);
-    return out;
-  }
 
   StudyQuestApp.prototype.renderWordRanking = async function (isInitialLoad, oldRows) {
     try {
@@ -2116,13 +1736,7 @@
   StudyQuestApp.prototype.__distinctiveKeywords = distinctiveKeywords;
   StudyQuestApp.prototype.__contrastingPair = contrastingPair;
   StudyQuestApp.prototype.__consensusKeywords = consensusKeywords;
-  StudyQuestApp.prototype.__hasJustification = hasJustification;
-  StudyQuestApp.prototype.__buildPositionGroups = buildPositionGroups;
-  StudyQuestApp.prototype.__representativeReasons = representativeReasons;
   StudyQuestApp.prototype.__reactionDash = reactionDash;
-  StudyQuestApp.prototype.__arePhasesAxisCompatible = arePhasesAxisCompatible;
-  StudyQuestApp.prototype.__computeMatrixDeltas = computeMatrixDeltas;
-  // vizComputeOpinionShift は prototype method として既に定義済 (test から直接呼べる)。
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）

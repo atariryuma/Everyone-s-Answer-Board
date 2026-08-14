@@ -605,48 +605,6 @@ test('vizComputeSwings: M2 Euclidean distance', () => {
   assert.equal(swings[0].distance, 5);
 });
 
-// =====================================================================
-// vizComputeOpinionShift (意見変容: 収束/分散, Deliberative Polling)
-// =====================================================================
-
-test('vizComputeOpinionShift: detects convergence (spread shrinks first→last)', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
-  // h1 は 1→3, h2 は 5→3: 最初は両端(spread 大)、最後は中央に集合(spread 0) = 収束
-  const rows = [
-    { emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 1 },
-    { emailHash: 'h1', timestamp: '2026-05-12T02:00:00Z', numericX: 3 },
-    { emailHash: 'h2', timestamp: '2026-05-12T01:00:00Z', numericX: 5 },
-    { emailHash: 'h2', timestamp: '2026-05-12T02:00:00Z', numericX: 3 }
-  ];
-  const shift = fn.call({}, rows, 'numberline');
-  assert.ok(shift, 'shift should be computed');
-  assert.equal(shift.trend, 'converged', `expected converged, got ${shift.trend}`);
-  assert.ok(shift.after < shift.before, 'after spread < before spread');
-  assert.equal(shift.movedCount, 2);
-});
-
-test('vizComputeOpinionShift: detects divergence (spread grows first→last)', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
-  // h1 は 3→1, h2 は 3→5: 最初は中央(spread 0)、最後は両端(spread 大) = 分散
-  const rows = [
-    { emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 3 },
-    { emailHash: 'h1', timestamp: '2026-05-12T02:00:00Z', numericX: 1 },
-    { emailHash: 'h2', timestamp: '2026-05-12T01:00:00Z', numericX: 3 },
-    { emailHash: 'h2', timestamp: '2026-05-12T02:00:00Z', numericX: 5 }
-  ];
-  const shift = fn.call({}, rows, 'numberline');
-  assert.equal(shift.trend, 'diverged', `expected diverged, got ${shift.trend}`);
-  assert.ok(shift.after > shift.before, 'after spread > before spread');
-});
-
-test('vizComputeOpinionShift: returns null with fewer than 2 students', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
-  assert.equal(fn.call({}, [{ emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 1 }], 'numberline'), null);
-  assert.equal(fn.call({}, [], 'numberline'), null);
-});
 
 // =====================================================================
 // 議論のたねになる声 (hasJustification / buildPositionGroups / representativeReasons)
@@ -667,117 +625,7 @@ test('reactionDash: CVD redundant encoding — distinct dash pattern per reactio
   assert.equal(dash('UNKNOWN'), null);
 });
 
-test('projector mode hides the teacher panel (privacy: no private analysis on the projected board)', () => {
-  // 教師パネル（議論のたね / 気になる児童 / 意見変容）は教師の手元端末用。 電子黒板に
-  //   投影されると児童全員に「模範回答」や収束情報が見え同調圧力になる → projector で必ず隠す。
-  const css = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.css.html'), 'utf8');
-  assert.match(css, /body\.projector-mode\s+\.viz-teacher-panel[^{]*\{[^}]*display:\s*none/);
-});
 
-test('hasJustification: detects reasoning forms; ignores temporal から (real-data calibrated 2026-05-30)', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const h = StudyQuestApp.prototype.__hasJustification;
-  // 因果・理由
-  assert.equal(h('みんなが使うから、そのままでいい'), true);   // 因果の から
-  assert.equal(h('なぜなら時間がないのだ'), true);              // なぜなら
-  assert.equal(h('急いでいるので直さない'), true);               // ので
-  assert.equal(h('相手のためを思って直す'), true);               // ため
-  // 譲歩・対比（両面を weigh する = 多面的・多角的な reasoning。 実データで主に効く層）
-  assert.equal(h('夢を追いつつ、約束も忘れない'), true);         // つつ
-  assert.equal(h('夢は大事だけど、約束も意識する'), true);       // だけど
-  assert.equal(h('両方大切。でも今は約束を選ぶ'), true);         // でも / 両方
-  assert.equal(h('どちらも捨てがたい思いがある'), true);         // どちらも
-  // 素朴な言い切り = reasoning が文に見えない
-  assert.equal(h('そのまま使う'), false);
-  assert.equal(h('最初の感覚は正しかったと確信'), false);
-  // 時間的な「から」は理由ではない（誤検出回帰防止）
-  assert.equal(h('明日からの自分に生かしたい'), false);
-  assert.equal(h('これから考えていきたい'), false);
-  assert.equal(h(''), false);
-  assert.equal(h(null), false);
-});
-
-test('buildPositionGroups: numberline splits into two poles labeled by axis ends', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const build = StudyQuestApp.prototype.__buildPositionGroups;
-  const rows = [
-    { rowIndex: 1, numericX: 1, reason: 'a' },
-    { rowIndex: 2, numericX: 2, reason: 'b' },
-    { rowIndex: 3, numericX: 5, reason: 'c' }
-  ];
-  const axis = { defaultMin: 1, defaultMax: 5, xAxisLabels: { min: 'そのまま', max: '直す' } };
-  const groups = build(rows, 'numberline', axis);
-  assert.equal(groups.length, 2);
-  assert.equal(groups[0].key, 'low');
-  assert.equal(groups[0].label, 'そのまま');
-  assert.equal(groups[1].key, 'high');
-  assert.equal(groups[1].label, '直す');
-  assert.equal(groups[0].rows.length, 2); // x=1,2 (< mid 3)
-  assert.equal(groups[1].rows.length, 1); // x=5 (>= mid 3)
-});
-
-test('buildPositionGroups: matrix splits into four quadrants, skips rows missing numericY', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const build = StudyQuestApp.prototype.__buildPositionGroups;
-  const rows = [
-    { rowIndex: 1, numericX: 5, numericY: 5, reason: 'hh' },
-    { rowIndex: 2, numericX: 1, numericY: 5, reason: 'lh' },
-    { rowIndex: 3, numericX: 5, numericY: 1, reason: 'hl' },
-    { rowIndex: 4, numericX: 1, numericY: 1, reason: 'll' },
-    { rowIndex: 5, numericX: 3, reason: 'no-y' } // numericY 無し → 除外
-  ];
-  const groups = build(rows, 'matrix', { defaultMin: 1, defaultMax: 5 });
-  assert.equal(groups.length, 4);
-  const byKey = Object.fromEntries(groups.map((g) => [g.key, g.rows.length]));
-  assert.deepEqual(byKey, { hh: 1, lh: 1, hl: 1, ll: 1 });
-});
-
-test('representativeReasons: prefers a reason that states a reason, one per stance', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const rep = StudyQuestApp.prototype.__representativeReasons;
-  const groups = [
-    { key: 'low', label: 'そのまま', rows: [
-      { rowIndex: 1, numericX: 1, reason: 'そのままがいいです' },             // marker なし
-      { rowIndex: 2, numericX: 2, reason: '時間がないからそのままにする' }     // から → justification
-    ] },
-    { key: 'high', label: '直す', rows: [
-      { rowIndex: 3, numericX: 5, reason: '自分で直したいです' }              // marker なし
-    ] }
-  ];
-  const out = rep(groups, { perBucket: 1, field: 'reason', minLen: 4 });
-  assert.equal(out.length, 2);                                  // 占有された立場ごとに 1 件
-  assert.equal(out[0].key, 'low');
-  assert.equal(out[0].reason, '時間がないからそのままにする');   // 理由づけのある声が選ばれる
-  assert.equal(out[0].hasJustification, true);
-  assert.equal(out[1].key, 'high');
-});
-
-test('representativeReasons: never selects by popularity — minority stance gets equal seat', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const rep = StudyQuestApp.prototype.__representativeReasons;
-  // low 立場は 5 人、 high 立場は 1 人。 それでも各立場 1 席ずつ（人数で重み付けしない）。
-  const groups = [
-    { key: 'low', label: 'A', rows: Array.from({ length: 5 }, (_, i) => ({ rowIndex: i + 1, reason: 'みんなと同じでいい' + i })) },
-    { key: 'high', label: 'B', rows: [{ rowIndex: 9, reason: '少数だけど直したい立場です' }] }
-  ];
-  const out = rep(groups, { perBucket: 1, minLen: 4 });
-  assert.equal(out.length, 2);
-  assert.equal(out.filter((s) => s.key === 'low').length, 1);
-  assert.equal(out.filter((s) => s.key === 'high').length, 1);
-});
-
-test('representativeReasons: skips empty/too-short reasons and handles empty input', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const rep = StudyQuestApp.prototype.__representativeReasons;
-  const groups = [
-    { key: 'low', label: 'A', rows: [{ rowIndex: 1, reason: '' }, { rowIndex: 2, reason: 'うん' }] }, // 空 / 短すぎ
-    { key: 'high', label: 'B', rows: [] }
-  ];
-  assert.equal(rep(groups, { perBucket: 1, minLen: 6 }).length, 0);
-  // cross-realm（vm context）配列なので length で検証（deepStrictEqual は prototype 同一性を見る）
-  assert.equal(rep([], {}).length, 0);
-  assert.equal(rep(null, {}).length, 0);
-});
 
 // =====================================================================
 // __vizRenderCompare: dual-modal 対応のための左側ペイン情報保存 + side マーカー
@@ -856,19 +704,6 @@ function loadVizContextForCompare(beforeSnapshot) {
   return { context, StudyQuestApp, makeElement };
 }
 
-
-test('getOrCreateVizContainer: 比較解除時に viz-compare-wrap が残っていれば強制再構築 (regression)', () => {
-  // Why: 比較モードが answers コンテナを 2 ペイン構造にしたあと、比較を解除して通常レンダラー
-  //   が走っても、'viz-container' クラスは残るので reuse 経路に入ってしまっていた。
-  //   querySelector('svg#vizSvg') は左ペイン内の svg を返すため、画面は 2 ペインのまま
-  //   左だけ再描画される ("解除できない"症状)。.viz-compare-wrap の存在チェックで強制再構築。
-  const src = VIZ_HTML;
-  const fnStart = src.indexOf('function getOrCreateVizContainer');
-  assert.ok(fnStart > 0);
-  // function 本体内に .viz-compare-wrap への参照があり、条件分岐に使われていること。
-  const fnSrc = src.slice(fnStart, fnStart + 3000);
-  assert.match(fnSrc, /viz-compare-wrap/, '.viz-compare-wrap の guard が必要');
-});
 
 
 // =====================================================================
