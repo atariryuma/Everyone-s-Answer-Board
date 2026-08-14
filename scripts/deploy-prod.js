@@ -12,7 +12,7 @@
  *   npm run deploy:prod -- --env open  # 別環境
  *   npm run deploy:prod -- --force     # 未コミット変更を許容してデプロイ
  */
-const { execSync, execFileSync } = require('child_process');
+const { execSync, execFileSync, spawnSync } = require('child_process');
 const { parseEnvFromArgs, requestJSON, loadScriptContext } = require('./lib/gas-auth');
 
 const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
@@ -63,8 +63,40 @@ function preflightGitClean() {
   process.exit(1);
 }
 
+// 生成物が入力とズレたまま本番へ出るのを止める。
+// Why: src/UtilityStyles.css.html と src/SharedPageHead.html は生成物で、元ファイル
+//   (HTML の class / UnifiedStyles.css 等) を編集して再生成を忘れると、その変更だけが
+//   本番に出ないまま古い CSS / head が配信され続ける。症状は「直したはずのスタイルが
+//   本番でだけ効かない」で、原因追跡が難しい。
+//   CI にも同じチェックはあるが、このリポジトリの手順は deploy:prod → commit → push で
+//   CI が回るのはデプロイの後。本番を守るゲートはここにしかないので preflight で見る。
+function preflightGeneratedFresh() {
+  const gens = [
+    ['gen-utilities.js', 'src/UtilityStyles.css.html', 'npm run gen:utilities'],
+    ['gen-pagehead.js', 'src/SharedPageHead.html', 'npm run gen:pagehead'],
+  ];
+  const stale = [];
+  for (const [script, out, cmd] of gens) {
+    const r = spawnSync(process.execPath, [`${__dirname}/${script}`, '--check'], { encoding: 'utf8' });
+    if (r.status !== 0) stale.push(`   ${out} → ${cmd}`);
+  }
+  if (!stale.length) return;
+
+  if (force) {
+    console.warn('⚠️  生成物が古いままデプロイします (--force):');
+    console.warn(stale.join('\n'));
+    return;
+  }
+  console.error('❌ 生成物が古くなっています。再生成してからデプロイしてください:');
+  console.error(stale.join('\n'));
+  console.error('');
+  console.error('   bypass するなら: npm run deploy:prod -- --force');
+  process.exit(1);
+}
+
 try {
   preflightGitClean();
+  preflightGeneratedFresh();
 
   const { config, scriptId, token } = loadScriptContext(env);
 

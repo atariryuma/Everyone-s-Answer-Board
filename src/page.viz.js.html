@@ -12,7 +12,8 @@
  * Top-level side effects forbidden (CLAUDE.md): すべて関数定義のみ。
  *
  * Public methods added to StudyQuestApp.prototype:
- *   - ensureD3Loaded()       : d3 を遅延 CDN ロード
+ *   - ensureD3Loaded()       : 後方互換の薄いラッパ。d3 は src/d3.min.html で同梱済みなので
+ *                              即座に解決する (v2901 で CDN ロードを廃止)
  *   - renderNumberLine()     : M1 ビーズワーム
  *   - renderMatrix()         : M2 散布図
  *   - vizComputeSwings()     : 揺らぎ計算（再投稿した児童の点を大きく描くため）

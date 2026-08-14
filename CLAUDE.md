@@ -173,7 +173,8 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 - `SharedUtilities.html`: Common JS utilities including `escapeHtml()`
 - `page.js.html` / `AdminPanel.js.html`: Single-file JS (no physical splitting - intentional)
 - Top-level side effects forbidden - `google.script.run`, DOM manipulation, and auto-timers must be inside `init()` only
-- Include order is fixed; changes require a standalone commit
+- **include 対象に scriptlet を書かない** - `include()` は `createHtmlOutputFromFile().getContent()` (単なるファイル連結) であり、テンプレート評価をしない。`<? ?>` を書いても実行されず生テキストとして出る。`check:gas` 項目 11 が機械検証する
+- Include order は `scripts/gen-pagehead.js` の `ORDER` が唯一の定義。変更は独立コミットで
 
 ### Canonical Frontend APIs (Use these, don't reinvent)
 
@@ -240,7 +241,8 @@ Google Sheets as database via service account. `users` sheet stores user records
 
 - `publishApp` accepts only allowlisted fields with `etag` conflict detection - maintain both
 - `doPost` actions are allowlist-managed; adding an action requires adding its input validation simultaneously
-- Include order in HTML templates is fixed; changes to it require a standalone commit
+- Include order は `scripts/gen-pagehead.js` の `ORDER` で定義。変更は独立コミットで
+- **生成物を手で編集しない** - `src/UtilityStyles.css.html` (`gen:utilities`) と `src/SharedPageHead.html` (`gen:pagehead`) は生成物。元ファイルを直したら再生成する。`deploy:prod` の preflight と CI が鮮度を検証する
 
 ### Board Publish Lifecycle (single source of truth)
 

@@ -73,9 +73,9 @@
   //   head パース時に theme class を <html> に当てないと、 light モード保存ユーザに
   //   一瞬 dark 背景がフラッシュして見える。 paint 前に同期で実行する必要がある。
   //
-  // 使い方: 各ページ <head> 内 SharedTailwindConfig include の直後に
-  //   include('SharedThemeBoot') する。 GAS template engine 競合回避のため
-  //   サンプル include タグは ここに書かない (コメント内でも engine が parse する)。
+  // 使い方: scripts/gen-pagehead.js の ORDER が読み込み順序を決める。 このファイルは
+  //   SharedPageHead へ展開済みとして配信されるので、 各ページから直接 include しない。
+  //   サンプル include タグを ここに書かないこと (コメント内でも engine が parse する)。
   //
   // 仕様:
   //   - localStorage 'app-theme' を読む (dark / light / auto)。 invalid なら auto。

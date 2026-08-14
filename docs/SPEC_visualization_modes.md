@@ -166,7 +166,7 @@
 
 - **既存 API は変えない**。`getPublishedSheetData` のレスポンスにフィールド追加するだけ（後方互換）。
 - **フロントの分岐は 1 箇所**。`renderBoard()` のエントリで `boardMode` を見て dispatcher に渡す。
-- **d3 は CDN ロード**。GAS のファイル増を最小化、必要なモードでのみロード（dynamic import パターン）。
+- **d3 は同梱**（`src/d3.min.html`）。当初は CDN ロードだったが v2901 で外部ネットワーク依存をゼロにするため同梱に変更。学校ネットワークが CDN を遮断しても動く。
 
 ---
 
@@ -420,7 +420,7 @@ async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
 
 ```javascript
 renderNumberLine(isInitialLoad, oldRows) {
-  this.ensureD3Loaded();                     // CDN から動的ロード
+  this.ensureD3Loaded();                     // 同梱済み。後方互換のため呼び出しは残す
   const container = document.getElementById('answers');
   container.innerHTML = '<svg id="vizSvg"></svg>';
   // d3 で beeswarm レンダリング
@@ -460,7 +460,7 @@ renderNumberLine(isInitialLoad, oldRows) {
 
 ### 9.3 新規ファイル: `src/page.viz.js.html`
 
-- d3 CDN ロード（`https://d3js.org/d3.v7.min.js` + `https://unpkg.com/d3-beeswarm@1`）
+- d3 は `src/d3.min.html` で同梱（v2901 で CDN ロードを廃止）。beeswarm は自前実装
 - `StudyQuestApp.prototype.renderNumberLine = function(...) { ... }`
 - `StudyQuestApp.prototype.renderMatrix = function(...) { ... }`
 - ホバー時のツールチップ DOM 生成

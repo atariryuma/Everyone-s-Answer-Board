@@ -2,19 +2,25 @@
 /**
  * theme-verify.js — ダーク/ライト切替の完成度を end-to-end で機械的に検証。
  *
- * チェック項目 (10 軸):
- *   1. Token Coverage          (--theme-* token が dark + light で全定義済)
- *   2. CSS Hardcoded           (CSS 内ハードコード hex/rgba ゼロ)
- *   3. Tailwind Unpaired       (gray-family class が light+dark:dark でペア化)
- *   4. Inline Style Hex        (HTML inline style に hex ハードコードなし)
- *   5. WCAG AA (dark mode)     (主要 11 ペア全部 ≥4.5/3.0:1)
- *   6. WCAG AA (light mode)    (同上)
- *   7. Tailwind darkMode 設定  (SharedTailwindConfig に darkMode:'class')
- *   8. themeManager API        (mount + apply + persist 完備)
- *   9. UI mount 点             (mode=view ヘッダー + mode=admin 設定)
- *  10. Unit tests              (themeManager 11 件 + 全 957 件 PASS)
+ * チェック項目 (12 軸):
+ *   1.  Token Coverage          (--theme-* token が dark + light で全定義済)
+ *   2.  CSS Hardcoded           (CSS 内ハードコード hex/rgba ゼロ)
+ *   3.  Tailwind Unpaired       (gray-family class が theme token 化済み)
+ *   4.  Inline Style Hex        (HTML inline style に hex ハードコードなし)
+ *   5.  WCAG AA (dark mode)     (主要 11 ペア全部 ≥4.5/3.0:1)
+ *   6.  WCAG AA (light mode)    (同上)
+ *   7.  utility CSS 静的同梱    (UtilityStyles.css.html に同梱 / 外部読込ゼロ)
+ *   8.  themeManager API        (mount + apply + persist 完備)
+ *   8b. class 同期              (themeManager の付与 class と CSS セレクタが一致)
+ *   8c. brand alias 不在        (--theme-* 直参照に統一)
+ *   9.  UI mount 点             (mode=view ヘッダー + mode=admin 設定)
+ *   10. Unit tests              (themeManager + 全テスト PASS)
  *
- * スコア: 各 10 点満点 → 合計 100 点。 0 違反かつ 100/100 で「完成」。
+ * スコア: 各 10 点満点 → 合計 120 点。 0 違反かつ 120/120 で「完成」。
+ *
+ * 注: 7 は v2901 で「Tailwind darkMode 設定」から差し替わった。Tailwind CDN と
+ *   SharedTailwindConfig.html は廃止済みで、dark/light の判定は themeManager が付ける
+ *   class と UnifiedStyles.css の body.theme-light セレクタの整合 (8b) で見る。
  *
  * 使い方:
  *   npm run theme:verify             # ヒューマンリーダブル出力
