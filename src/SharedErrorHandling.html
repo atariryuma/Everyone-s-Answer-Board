@@ -46,34 +46,6 @@ window.ErrorHandler = {
   },
 
   /**
-   * ユーザー向けエラーメッセージの生成
-   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
-   * @param {string} [context] - コンテキスト
-   * @returns {string} ユーザー向けメッセージ
-   */
-  getUserMessage(error, context = '') {
-    const errorType = this.classifyError(error);
-
-    const messages = {
-      [this.ErrorTypes.AUTHENTICATION]: 'ログインが必要です。再度ログインしてください。',
-      [this.ErrorTypes.AUTHORIZATION]: 'この操作を実行する権限がありません。',
-      [this.ErrorTypes.VALIDATION]: '入力内容に問題があります。正しい形式で入力してください。',
-      [this.ErrorTypes.NOT_FOUND]: '指定されたリソースが見つかりません。',
-      [this.ErrorTypes.NETWORK]: 'ネットワークエラーが発生しました。時間をおいて再試行してください。',
-      [this.ErrorTypes.EXTERNAL_API]: '外部サービスとの通信に失敗しました。',
-      [this.ErrorTypes.SYSTEM]: 'システムエラーが発生しました。管理者に連絡してください。'
-    };
-
-    let baseMessage = messages[errorType] || messages[this.ErrorTypes.SYSTEM];
-
-    if (context) {
-      baseMessage = `${context}: ${baseMessage}`;
-    }
-
-    return baseMessage;
-  },
-
-  /**
    * エラーログの出力
    * @param {Error|string} error - エラーオブジェクトまたはメッセージ
    * @param {string} [context] - コンテキスト

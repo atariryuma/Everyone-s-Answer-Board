@@ -1593,36 +1593,6 @@
       </div> `;
     }
 
-    /**
-     * Display data loading error to user
-     * @param {string} message - Error message to display
-     */
-    displayDataLoadError(message, result = null) {
-      const container = this.elements.answersContainer;
-      if (!container) return;
-
-      container.innerHTML = `
-      <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-        <svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-        <h3 class="mt-2 text-lg font-medium text-theme-status-warning">データ読み込みエラー</h3>
-        <p class="mt-1 text-sm text-theme-secondary">${window.sharedUtilities.security.escapeHtml(message)}</p>
-        <div class="mt-6 space-x-3">
-          <button 
-            data-action="reload" 
-            class="inline-flex items-center px-4 py-2 border border-theme-normal text-sm font-medium rounded-md text-theme-secondary bg-theme-elevated hover:bg-theme-elevated-hover"
-          > ページを再読み込み
-          </button>
-          <button 
-            data-action="retry-load" 
-            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-theme-status-info bg-blue-700 hover:bg-blue-600"
-          > 再試行
-          </button>
-        </div>
-      </div> `;
-    }
-
     showMinimalSkeleton() {
       const count = 2;
       const frag = document.createDocumentFragment();
@@ -1770,84 +1740,6 @@
       }
     }
 
-    async forceDataRefresh() {
-
-      const preservedLastSeenTimestamp = this.state.lastSeenTimestamp;
-
-      if (this.cache) {
-        this.cache.clear();
-      }
-
-      try {
-      } catch (error) {
-        console.warn('サーバーキャッシュクリアでエラー:', error);
-      }
-
-      await this.loadSheetData({ bypassCache: true });
-
-      this.updateLastSeenTimestamp();
-    }
-
-    /**
-     * データ取得結果の有効性を判定
-     * @param {object} result - サーバーからの応答
-     * @returns {boolean} 有効なデータかどうか
-     */
-    isValidDataResult(result) {
-      try {
-        if (!result || typeof result !== 'object') {
-          return false;
-        }
-
-        if (!Array.isArray(result.data)) {
-          return false;
-        }
-
-        if (result.header && typeof result.header !== 'string') {
-          return false;
-        }
-
-        if (result.sheetName && typeof result.sheetName !== 'string') {
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.warn('データ判定エラー:', error);
-        return false;
-      }
-    }
-
-    /**
-     * データ検証失敗の理由を取得
-     * @param {object} result - 検証対象のレスポンス
-     * @returns {string} 失敗理由
-     */
-    getFailureReason(result) {
-      if (!result) {
-        return 'レスポンスがnull/undefined';
-      }
-      if (typeof result !== 'object') {
-        return `レスポンスがオブジェクトではない (${typeof result})`;
-      }
-
-      if (!('data' in result)) {
-        return 'dataフィールドが存在しない';
-      }
-      if (!Array.isArray(result.data)) {
-        return `dataが配列ではない (${typeof result.data})`;
-      }
-
-      if (result.header && typeof result.header !== 'string') {
-        return `ヘッダーの型が不正 (${typeof result.header})`;
-      }
-      if (result.sheetName && typeof result.sheetName !== 'string') {
-        return `シート名の型が不正 (${typeof result.sheetName})`;
-      }
-
-      return '不明な検証失敗';
-    }
-
     /**
      * シンプルなデータ取得（複雑なリトライロジック削除）
      * @param {object} fetchParams - データ取得パラメータ
@@ -1933,67 +1825,6 @@
           header: 'ネットワークエラー'
         };
       }
-    }
-
-    /**
-     * ユーザー情報が見つからない場合のエラー画面を表示
-     * @param {string} errorMessage - エラーメッセージ
-     */
-    displayUserNotFoundError(errorMessage) {
-      const container = this.elements.answersContainer;
-      if (!container) return;
-
-      const isUserNotFoundError = errorMessage && (
-        errorMessage.includes('ユーザー情報が見つかりません') ||
-        errorMessage.includes('が見つかりません')
-      );
-
-      container.innerHTML = `
-      <div class="text-center py-16 px-6 col-span-full">
-        <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-        <h3 class="mt-2 text-lg font-medium text-theme-status-error">${isUserNotFoundError ? 'ユーザー情報が見つかりません': 'アクセスエラー'}</h3>
-        <p class="mt-1 text-sm text-theme-secondary">${isUserNotFoundError ?
-          'この回答ボードは存在しないか、アクセス権限が不正です' :
-          'この回答ボードにアクセスする権限がありません'}</p> ${isUserNotFoundError ? `
-        <div class="mt-4 p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-info-text-on-soft mb-2"> 考えられる原因：</h4>
-          <ul class="text-xs text-theme-status-info-text-on-soft opacity-90 space-y-1">
-            <li>• URLのユーザーIDが無効または期限切れ</li>
-            <li>• ボードが削除されたか非アクティブ化された</li>
-            <li>• データベース接続に一時的な問題</li>
-            <li>• サーバー側の権限設定に問題</li>
-            <li>• ブラウザのセッション情報が破損</li>
-          </ul>
-        </div>
-        <div class="mt-4 p-4 bg-theme-status-success-soft border border-theme-status-success-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-success-text-on-soft mb-2"> 解決方法：</h4>
-          <ul class="text-xs text-theme-status-success-text-on-soft opacity-90 space-y-1">
-            <li>• まずページを再読み込みしてみる</li>
-            <li>• 正しいボードURLを管理者に確認</li>
-            <li>• 5-10分待ってから再度アクセス</li>
-            <li>• 別のブラウザで試してみる</li>
-            <li>• 新しい回答ボードを作成する</li>
-          </ul>
-        </div>
-        <div class="mt-4 p-3 bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-warning-text-on-soft mb-2"> 自動修復：</h4>
-          <p class="text-xs text-theme-status-warning-text-on-soft opacity-90">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
-        </div>` : ''}
-        <p class="mt-2 text-xs text-theme-muted">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
-        <div class="mt-6 space-x-3">
-          <button 
-            data-action="reload" 
-            class="inline-flex items-center px-4 py-2 border border-theme-normal text-sm font-medium rounded-md text-theme-secondary bg-theme-elevated hover:bg-theme-elevated-hover focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-theme-base"
-          >
-            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg> ページを再読み込み
-          </button>
-        </div>
-      </div> `;
-
     }
 
     showLoadingOverlay(message = '') {
@@ -3494,19 +3325,6 @@
     getScopedKey(base) {
       const userId = this.state?.userId || window.USER_ID;
       return `${base}_${userId}_${window.SHEET_NAME}`;
-    }
-
-    isFirstTimeBoardAccess() {
-      try {
-        const hasLastSeenTimestamp = localStorage.getItem(this.getScopedKey('lastSeenTimestamp')) !== null;
-        const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
-        const container = this.elements?.answersContainer;
-        const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
-        return !hasLastSeenTimestamp && !hasDiffCards && !hasDOMCards;
-      } catch (error) {
-        console.warn('初回判定エラー:', error);
-        return false;
-      }
     }
 
     loadLastSeenTimestamp() {

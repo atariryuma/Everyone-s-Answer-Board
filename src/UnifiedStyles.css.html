@@ -1019,9 +1019,6 @@
   }
 
   /* Reset optimization when interaction ends */
-  .render-optimized:not(:hover):not(:focus):not(:active):not(.animating) {
-    will-change: auto;
-  }
 
   /* Disable render optimization when global loading is active to prevent stacking context issues */
   body.gas-loading .render-optimized,

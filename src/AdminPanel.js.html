@@ -3320,8 +3320,8 @@
             <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
-            <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="このレッスンをテンプレとして複製"> 複製</button>
-            <button class="btn btn-secondary text-xs" data-lesson-delete="${safeId}" title="削除"></button>
+            <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="この授業をテンプレートとして複製"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製</button>
+            <button class="btn btn-danger text-xs" data-lesson-delete="${safeId}" title="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg>削除</button>
           </li>`;
         }).join('');
       }).catch((err) => {
@@ -3910,11 +3910,11 @@
             'aria-label="画像をドラッグ&ドロップ、ペースト、またはクリックして選択">' +
             (hasImage
               ? ('<div class="phase-image-preview">' +
-                  (previewSrc ? '<img src="'+ esc(previewSrc) + '" alt="教材プレビュー" />': '<span> 画像登録済</span>') +
-                  '<button type="button" class="phase-image-clear" data-phase-action="image-clear" data-phase-index="'+ i + '">× 削除</button>' +
+                  (previewSrc ? '<img src="'+ esc(previewSrc) + '" alt="教材プレビュー" />': '<span>画像登録済</span>') +
+                  '<button type="button" class="phase-image-clear" data-phase-action="image-clear" data-phase-index="'+ i + '"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg>削除</button>' +
                 '</div>')
               : ('<div class="phase-image-hint">' +
-                  '<span class="phase-image-hint-icon"></span>' +
+                  '<span class="phase-image-hint-icon"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-download"></use></svg></span>' +
                   '<span class="phase-image-hint-text">画像をここにドロップ / クリックして選択 / Cmd+V でペースト</span>' +
                 '</div>')
             ) +

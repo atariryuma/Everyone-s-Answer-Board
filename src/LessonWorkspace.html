@@ -9,7 +9,7 @@
   <header class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-semibold text-theme"> 新しい授業を作る</h2>
     <button type="button" class="btn btn-secondary text-sm"
-      onclick="exitLessonCreateMode()" title="作成途中の内容は draft として保存されます"> ← 設定に戻る
+      onclick="exitLessonCreateMode()" title="作成途中の内容は draft として保存されます"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg> 設定に戻る
     </button>
   </header>
 
@@ -80,7 +80,7 @@
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
-      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(2)"> 次へ →
+      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(2)">次へ <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
       </button>
     </div>
   </div>
@@ -95,8 +95,8 @@
     </div>
 
     <div class="flex justify-between gap-2 mt-4">
-      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(1)">← 戻る</button>
-      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(3)">次へ →</button>
+      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(1)"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg> 戻る</button>
+      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(3)">次へ <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
   </div>
 
@@ -118,9 +118,9 @@
     <div id="lesson-start-error" class="lesson-start-error" hidden></div>
 
     <div class="flex justify-between gap-2 mt-4">
-      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(2)">← 戻る</button>
+      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(2)"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg> 戻る</button>
       <button type="button" id="lesson-start-btn" class="btn btn-primary"
-        onclick="lessonStartNow()"> すべて作成して開始
+        onclick="lessonStartNow()"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> すべて作成して開始
       </button>
     </div>
   </div>
@@ -141,14 +141,14 @@
 
   <div class="flex items-center gap-2">
     <button type="button" id="lesson-prev-btn" class="btn btn-secondary"
-      onclick="lessonAdvance('previous')">⏪ 戻す</button>
+      onclick="lessonAdvance('previous')"><svg class="icon" aria-hidden="true"><use href="#i-skip-back"></use></svg> 戻す</button>
     <button type="button" id="lesson-next-btn" class="btn btn-primary"
-      onclick="lessonAdvance('next')">▶ 次のフェーズへ</button>
+      onclick="lessonAdvance('next')"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> 次のフェーズへ</button>
     <span class="ml-auto"></span>
     <button type="button" class="btn btn-danger"
-      onclick="lessonEnd()">⏹ 授業終了</button>
+      onclick="lessonEnd()"><svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg> 授業終了</button>
   </div>
 
-  <p class="text-xs text-theme-muted mt-3"> 「⏹ 授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。
+  <p class="text-xs text-theme-muted mt-3">「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。
   </p>
 </section>
