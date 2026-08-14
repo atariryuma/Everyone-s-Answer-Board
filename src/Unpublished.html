@@ -18,6 +18,8 @@
 </head>
 
 <body class="app-body flex items-center justify-center min-h-screen overflow-auto p-4">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
   <!-- Loading Overlay for UnifiedLoadingManager -->
   <div id="loading-overlay" class="loading-overlay page-specific hidden">
     <div class="global-spinner"></div>

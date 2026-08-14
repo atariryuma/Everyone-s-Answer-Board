@@ -308,6 +308,64 @@ for (const s of jsSrc.values()) {
   check('11. include 対象が scriptlet を持たない', bad.length === 0, bad.join(', '));
 }
 
+// ── 12. SVG sprite の参照先が実在するか ─────────────────────────
+// Why: <use href="#i-xxx"> は参照先が無くても例外を出さず、ただ「何も描画されない」。
+//   コンソールにも出ないので、アイコンだけが消えた画面が本番に出ても気付けない。
+//   実際 i-alert-triangle (ログイン画面とエラー画面の警告)、i-grid-2x2 (列設定)、
+//   i-link (アプリ設定) の 3 つが参照だけ残って欠落していた。
+//   getIcon(name) は PAIRED な名前だけ -outline/-solid に展開するため、その規則も再現する。
+{
+  const sprite = htmlSrc.get('SharedIcons.html') || '';
+  const defined = new Set([...sprite.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].map((m) => m[1]));
+  // page.js の getIcon() が持つ PAIRED 集合と一致させる
+  const PAIRED = new Set(['hand-thumb-up', 'lightbulb', 'magnifying-glass-plus', 'star']);
+  const missing = [];
+  const want = (id, f, s, idx) => {
+    if (!defined.has(id)) missing.push(`${f}:${lineOf(s, idx)} #${id}`);
+  };
+  for (const [f, s] of [...jsSrc, ...htmlSrc]) {
+    for (const m of s.matchAll(/getIcon\(\s*'([a-zA-Z0-9_-]+)'/g)) {
+      const n = m.group ? m.group(1) : m[1];
+      if (PAIRED.has(n)) { want(`i-${n}-outline`, f, s, m.index); want(`i-${n}-solid`, f, s, m.index); }
+      else want(`i-${n}`, f, s, m.index);
+    }
+    if (f === 'SharedIcons.html') continue; // sprite 自身の内部参照は対象外
+    for (const m of s.matchAll(/href="#(i-[a-zA-Z0-9_-]+)"/g)) want(m[1], f, s, m.index);
+  }
+  check('12. SVG sprite の参照先が実在する', missing.length === 0, missing.join(', '));
+}
+
+// ── 13. アイコンを使うページが sprite を読み込んでいるか ─────────
+// Why: symbol が定義されていても、そのページが SharedIcons を include していなければ
+//   <use> は解決先を見つけられず、やはり無言で何も描画されない。12 とは別の失敗経路。
+//   実際 ErrorBoundary と Unpublished が参照だけ持っていて sprite を読んでいなかった。
+{
+  const PAGES = ['LoginPage', 'AdminPanel', 'Page', 'TeacherManual', 'ErrorBoundary',
+    'Unpublished', 'SetupPage', 'AppSetupPage', 'AccessRestricted'];
+  const depsOf = (name) => {
+    const src = htmlSrc.get(`${name}.html`) || '';
+    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+    return [...code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)].map((m) => m[1].replace(/\.html$/, ''));
+  };
+  const treeOf = (name, seen = new Set()) => {
+    if (seen.has(name)) return seen;
+    seen.add(name);
+    for (const d of depsOf(name)) treeOf(d, seen);
+    return seen;
+  };
+  const bad = [];
+  for (const page of PAGES) {
+    const tree = treeOf(page);
+    const usesIcon = [...tree].some((n) => {
+      if (n === 'SharedIcons') return false;
+      const s = htmlSrc.get(`${n}.html`) || '';
+      return /href="#i-/.test(s) || /getIcon\(/.test(s);
+    });
+    if (usesIcon && !tree.has('SharedIcons')) bad.push(`${page}.html が SharedIcons を include していない`);
+  }
+  check('13. アイコン使用ページが sprite を読み込む', bad.length === 0, bad.join(', '));
+}
+
 // ── 出力 ──────────────────────────────────────────────────────────
 console.log('\nGAS 参照整合性チェック\n');
 for (const r of results) {

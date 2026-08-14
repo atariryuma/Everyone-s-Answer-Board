@@ -25,6 +25,8 @@
     </script>
 </head>
   <body class="app-body min-h-screen flex items-center justify-center p-4">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
     <div class="max-w-lg w-full text-center space-y-6">
       <div class="text-theme-status-warning" role="img" aria-label="警告"><svg class="icon icon-xl" aria-hidden="true"><use href="#i-alert-triangle"></use></svg></div>
       <h1 class="text-2xl font-bold text-theme"><?= title || 'エラーが発生しました' ?></h1>
