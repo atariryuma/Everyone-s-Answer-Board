@@ -209,18 +209,18 @@ test('AdminPanel.js: autoAnalyzeFormUrl が debounce 経由で validateCompleteU
   );
 });
 
-test('AdminPanel.js: validateCompleteUrl は validateBtn 参照を nil-safe で扱う', () => {
-  const fnMatch = ADMIN_JS.match(
-    /function\s+validateCompleteUrl\s*\([\s\S]*?\n\s{2}\}/
+test('AdminPanel.js: 削除済み #url-validate への参照が残っていない', () => {
+  // v2900: 要素 #url-validate は v2757 で完全削除されたのに、validateCompleteUrl が
+  //   getElementById('url-validate') を呼び続けていた。常に null を返すため
+  //   `if (validateBtn)` を毎回すり抜ける死にコードで、旧テストはその null-check の
+  //   存在を検査していた (= 参照が残っていることを固定してしまっていた)。
+  //   参照ごと削除したので、検査対象を「参照が無いこと」に反転させる。
+  //   同種の参照切れは npm run check:gas の項目 6 が全ファイルで機械検出する。
+  assert.ok(
+    !/getElementById\(\s*['"]url-validate['"]\s*\)/.test(ADMIN_JS),
+    '削除済み要素 #url-validate への参照が残っている'
   );
-  assert.ok(fnMatch, 'validateCompleteUrl 関数本体が見つからない');
-  const body = fnMatch[0];
-  // hidden 化された legacy ボタンが無いとき (null) にも安全に動くこと
-  assert.match(
-    body,
-    /if\s*\(\s*validateBtn\s*\)/,
-    'validateBtn の nil-check が無い (button hidden 化後の安全策が必要)'
-  );
+  assert.ok(!/validateBtn/.test(ADMIN_JS), 'validateBtn の残骸が残っている');
 });
 
 test('AdminPanel.js: getCurrentDataSourceField が URL→dropdown の順で参照する', () => {

@@ -32,6 +32,7 @@
     "loadtest:open": "node scripts/load-test-concurrent.js --env open",
     "test": "node --test tests/*.test.cjs",
     "test:coverage": "node scripts/test-coverage.js",
+    "check:gas": "node scripts/check-gas.js",
     "lint": "node scripts/lint.js",
     "lint:errors": "node scripts/lint.js --severity error",
     "lint:eslint": "eslint src/*.js",

@@ -1601,7 +1601,6 @@
    */
   function validateCompleteUrl() {
     const urlInput = document.getElementById('form-url-input');
-    const validateBtn = document.getElementById('url-validate');
 
     if (!urlInput) {
       console.error('form-url-input element not found');
@@ -1623,16 +1622,7 @@
       return;
     }
 
-    if (validateBtn) {
-      validateBtn.disabled = true;
-      validateBtn.classList.add('btn-busy');
-    }
-
     runServer('processFormUrlInput', formUrl).then((result) => {
-      if (validateBtn) {
-        validateBtn.disabled = false;
-        validateBtn.classList.remove('btn-busy');
-      }
 
       if (!(result && result.success)) {
         hideFormDetectionInfo();
@@ -1659,10 +1649,6 @@
       // 検証完了表示を読ませる短い遅延の後に自動接続
       setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
     }, (error) => {
-      if (validateBtn) {
-        validateBtn.disabled = false;
-        validateBtn.classList.remove('btn-busy');
-      }
       console.error('processFormUrlInput error:', error);
       updateUrlValidationMessage(' '+ ((error && error.message) || 'エラーが発生しました'), 'error');
     });

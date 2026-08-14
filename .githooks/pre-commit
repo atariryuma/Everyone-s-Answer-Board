@@ -7,7 +7,8 @@
 #   1. node --check で構文エラー検出（fast, 1s 未満）
 #   2. ESLint で no-redeclare/no-undef 等のバグパターン検出
 #   3. CLAUDE.md カスタム lint で error severity 違反検出
-#   4. npm test で全ユニットテスト
+#   4. GAS 参照整合性チェック（ファイル間の参照切れ検出）
+#   5. npm test で全ユニットテスト
 #
 # 全部失敗なしで進む。1 つでも error なら commit 中止。
 
@@ -39,6 +40,14 @@ if ! npx eslint --quiet src/*.js; then
   exit 1
 fi
 echo "  ✓ ESLint OK (no errors)"
+
+echo "▶ pre-commit: GAS 参照整合性..."
+if ! node scripts/check-gas.js > /tmp/pre-commit-gas.log 2>&1; then
+  cat /tmp/pre-commit-gas.log
+  echo "✗ pre-commit aborted: GAS 参照切れ"
+  exit 1
+fi
+echo "  ✓ GAS 参照整合性 OK"
 
 echo "▶ pre-commit: unit tests..."
 if ! npm test --silent > /tmp/pre-commit-tests.log 2>&1; then
