@@ -59,8 +59,8 @@ test('AdminPanel: 表示モード/軸ラベルは <details> で畳まれてい�
   // 代替経路 details の中にテンプレート作成と既存一覧の両方が含まれている
   assert.match(
     ADMIN_HTML,
-    /id="template-type-select"/,
-    'テンプレート作成 select が見当たらない'
+    /data-template-create="board"/,
+    'テンプレート作成メニューが見当たらない'
   );
   assert.match(
     ADMIN_HTML,
@@ -81,7 +81,7 @@ test('AdminPanel: 旧「設定を保存」ボタンは互換ノード置き場�
   assert.match(ADMIN_HTML, /id="save-config-changes"/, '#save-config-changes が見つからない');
   const block = ADMIN_HTML.match(/<div id="legacy-compat-nodes"[^>]*hidden[\s\S]*?<\/div>/);
   assert.ok(block, '#legacy-compat-nodes ブロックが見つからない');
-  for (const id of ['save-config-changes', 'save-draft', 'publish-now', 'template-type-select']) {
+  for (const id of ['save-config-changes', 'save-draft', 'publish-now']) {
     assert.ok(block[0].includes('id="' + id + '"'), id + ' が互換ノード置き場に無い');
   }
 });
@@ -102,22 +102,32 @@ test('AdminPanel: #autosave-status が存在する (自動保存の視覚 feedba
 // JS 側: ハンドラと behavior の不変条件
 // ─────────────────────────────────────────────────────────────────────────
 
-test('AdminPanel.js.html: applyVisualizationConfig の boardMode allowlist が HTML の <option> と全件一致 (silent downgrade 防止)', () => {
-  // Why: allowlist が HTML より狭いと、profile を「読み込んで編集」した時に UI が
-  //   silently 'auto' に downgrade し、続く autosave で profile.boardMode が破壊される。
-  // HTML 側の option value を抽出
+test('表示モードの一覧は validators.js の BOARD_MODES 1 箇所だけで定義される', () => {
+  // v2899: 以前はモード一覧が HTML の <option> / AdminPanel.js の allowlist /
+  //   ラベル表 / page.js の正規表現に分散し、追加のたびに手で同期していた。
+  //   そのズレを検出するためだけにこのテストが存在していた。
+  //   いまは <option> を server-side 生成し、client は DOM から読むので
+  //   「一覧が 1 箇所にしかない」ことを直接検査する。
+  const VALIDATORS = fs.readFileSync(path.resolve(__dirname, '../src/validators.js'), 'utf8');
+
+  // 唯一の定義が存在する
+  assert.match(VALIDATORS, /const BOARD_MODES = Object\.freeze\(\[/,
+    'validators.js に BOARD_MODES の定義が無い');
+  for (const key of ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie']) {
+    assert.ok(VALIDATORS.includes(`key: '${key}'`), `BOARD_MODES に ${key} が無い`);
+  }
+
+  // HTML は一覧を手書きせず、生成関数を呼ぶだけ
+  assert.match(ADMIN_HTML, /<\?!= boardModeOptionsHtml\(\) \?>/,
+    'board-mode-select が boardModeOptionsHtml() から生成されていない');
   const selectBlock = ADMIN_HTML.match(/<select[^>]*id="board-mode-select"[\s\S]*?<\/select>/);
   assert.ok(selectBlock, '#board-mode-select が見つからない');
-  const htmlValues = (selectBlock[0].match(/value="([a-z]+)"/g) || []).map(s => s.replace(/value="|"/g, ''));
-  // JS 側の allowlist を抽出
-  const jsAllowed = ADMIN_JS.match(/const allowed = \[([^\]]+)\];/);
-  assert.ok(jsAllowed, 'applyVisualizationConfig 内の allowlist が見つからない');
-  const jsValues = jsAllowed[1].match(/'([a-z]+)'/g).map(s => s.replace(/'/g, ''));
-  // HTML の各 value が JS allowlist に含まれていること
-  htmlValues.forEach((v) => {
-    assert.ok(jsValues.includes(v),
-      `HTML option value="${v}" が JS allowlist に無い → 読み込んで編集で silent downgrade`);
-  });
+  assert.ok(!/<option/.test(selectBlock[0]),
+    'board-mode-select に <option> が手書きされている (BOARD_MODES とズレる)');
+
+  // client 側も配列をコピーせず select の options を読む
+  assert.match(ADMIN_JS, /Array\.from\(modeSelect\.options\)\.map\(o => o\.value\)/,
+    'client の allowlist が select の options から導出されていない');
 });
 
 test('AdminPanel.html: 必須フィールドが data-autosave 属性でマーキングされている', () => {

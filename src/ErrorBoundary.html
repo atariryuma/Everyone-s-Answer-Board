@@ -2,14 +2,8 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base target="_top" />
-    <title><?= title || 'エラー' ?> - みんなの回答ボード</title>
-    <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-    <?!= include('UnifiedStyles.css'); ?>
+  <title><?= title || 'エラー' ?> - みんなの回答ボード</title>
+  <?!= include('SharedPageHead'); ?>
     <script>
       var WEB_APP_URL = '<?= typeof webAppUrl !== "undefined" ? webAppUrl : "" ?>';
 
@@ -29,8 +23,8 @@
         }
       }
     </script>
-  </head>
-  <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);" class="min-h-screen flex items-center justify-center p-4">
+</head>
+  <body class="app-body min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full text-center space-y-6">
       <div class="text-5xl" role="img" aria-label="警告">&#x26A0;&#xFE0F;</div>
       <h1 class="text-2xl font-bold text-theme"><?= title || 'エラーが発生しました' ?></h1>

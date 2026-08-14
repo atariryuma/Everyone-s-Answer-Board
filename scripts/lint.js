@@ -79,6 +79,22 @@ const RULES = [
       && !filepath.endsWith('/helpers.js'),
   },
   {
+    id: 'page-head-must-use-shared',
+    severity: 'error',
+    message: 'ページの <head> は include(\'SharedPageHead\') 経由で組み立てる。個別 include は読み込み順序が崩れ、CSP や FOUC の不具合を生む。',
+    // SharedPageHead が束ねている 4 つを直接 include しているページを検出。
+    patterns: [
+      /<\?!=\s*include\('SharedSecurityHeaders'\)/g,
+      /<\?!=\s*include\('SharedTailwindConfig'\)/g,
+      /<\?!=\s*include\('SharedThemeBoot'\)/g,
+      /<\?!=\s*include\('UnifiedStyles\.css'\)/g,
+    ],
+    // SharedPageHead 自身だけが直接 include してよい。
+    filter: (filepath) => /\.html$/.test(filepath)
+      && !filepath.includes('/tests/')
+      && !filepath.endsWith('/SharedPageHead.html'),
+  },
+  {
     id: 'no-emoji-as-ui-icon',
     severity: 'warn',
     message: '絵文字を UI アイコンに使わない。OS でレンダリングが変わり投影で潰れ、テーマ色に追従しない。SharedIcons の <use href="#i-*"> / icon(\'name\') を使用。',

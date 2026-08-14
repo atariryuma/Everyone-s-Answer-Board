@@ -310,12 +310,12 @@ function validateAndSanitizeConfig(config, userId) {
  * @param {Object} displaySettings - 表示設定
  * @returns {Object} サニタイズ済み表示設定
  */
-// Why: boardMode の正規 enum 定義は validators.js の VALIDATOR_BOARD_MODES (single source of truth)。
-//   ここでは GAS の単一グローバルスコープでミラー参照する。値が divergent にならないよう
-//   validators.js が定義済の場合はそちらを尊重し、未定義のときだけ fallback で定義。
+// boardMode の正規定義は validators.js の BOARD_MODES (単一定義)。GAS の単一グローバル
+//   スコープでそのまま参照する。ユニットテストが ConfigService.js を単独ロードする場合に
+//   備えて未定義時の fallback だけ残す (値のコピーは持たない)。
 const VALID_BOARD_MODES = (typeof VALIDATOR_BOARD_MODES !== 'undefined' && Array.isArray(VALIDATOR_BOARD_MODES))
   ? VALIDATOR_BOARD_MODES
-  : ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
+  : ['auto'];
 
 // Why __strictBool: Boolean("false") は truthy 評価で true を返すため、文字列で
 //   永続化された display setting (旧クライアント or migration 経由) が読込時に privacy

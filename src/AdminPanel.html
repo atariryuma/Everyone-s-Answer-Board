@@ -2,18 +2,8 @@
 <html lang="ja">
 
 <head>
-  <meta charset="UTF-8" />
-  <base target="_top" />
   <title>みんなの回答ボード 設定</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- GAS推奨: セキュリティヘッダー最優先 -->
-  <?!= include('SharedSecurityHeaders'); ?>
-
-  <!-- GAS推奨: CSS読み込みはhead内に集約 -->
-  <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-  <?!= include('UnifiedStyles.css'); ?>
+  <?!= include('SharedPageHead'); ?>
 
   <!-- Safe template variable injection using HTML data attributes -->
   <div id="app-data" data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId : '' ?>"
@@ -323,7 +313,7 @@
   </style>
 </head>
 
-<body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+<body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
   <div id="loading-overlay" class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
@@ -494,14 +484,6 @@
                   </button>
                 </div>
               </details>
-              <!-- legacy: 既存ハンドラ互換のため hidden で残す (select の value を読む箇所がある) -->
-              <select id="template-type-select" style="display:none;" aria-hidden="true" tabindex="-1">
-                <option value="board" selected>board</option>
-                <option value="numberline">numberline</option>
-                <option value="matrix">matrix</option>
-                <option value="pie">pie</option>
-              </select>
-              <button id="create-template-form" type="button" style="display:none;" aria-hidden="true" tabindex="-1"></button>
             </div>
 
             <!-- 代替 b: 既存フォーム一覧から選択 -->
@@ -687,13 +669,10 @@
                 <label class="block text-sm font-medium text-theme-secondary mb-2" for="board-mode-select">
                   表示モード
                 </label>
+                <!-- <option> は validators.js の BOARD_MODES から生成する。
+                     HTML に一覧を手書きしないので JS の allowlist とズレようがない。 -->
                 <select id="board-mode-select" class="modern-select" data-autosave>
-                  <option value="auto">自動判定（推奨）</option>
-                  <option value="board">掲示板</option>
-                  <option value="numberline">数直線</option>
-                  <option value="matrix">マトリクス（散布図）</option>
-                  <option value="wordcloud">ワードランキング</option>
-                  <option value="pie">円グラフ</option>
+                  <?!= boardModeOptionsHtml() ?>
                 </select>
                 <div class="text-xs text-theme-muted mt-1" id="board-mode-hint">
                   線形尺度列がなければ掲示板表示になります。
@@ -815,14 +794,6 @@
     マークアップを読む側が本物を判別できない状態だった。1 か所に集めて明示する。
   ===================================================================== -->
   <div id="legacy-compat-nodes" hidden aria-hidden="true">
-    <!-- 旧テンプレート select: createTemplateForm が value を読む -->
-    <select id="template-type-select" tabindex="-1">
-      <option value="board" selected>board</option>
-      <option value="numberline">numberline</option>
-      <option value="matrix">matrix</option>
-      <option value="pie">pie</option>
-    </select>
-    <button id="create-template-form" type="button" tabindex="-1"></button>
     <!-- 旧「設定を保存 / 下書き保存 / 今すぐ公開」ボタン: autosave + 公開トグルに統合済 -->
     <button id="save-config-changes" type="button" tabindex="-1"></button>
     <button id="save-draft" type="button" tabindex="-1"></button>

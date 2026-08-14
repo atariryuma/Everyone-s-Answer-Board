@@ -1,16 +1,8 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="UTF-8" />
-    <base target="_top" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <?!= include('SharedSecurityHeaders'); ?>
-    <title>みんなの回答ボード - 使い方ガイド</title>
-
-    <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-    <?!= include('UnifiedStyles.css'); ?>
+  <title>みんなの回答ボード - 使い方ガイド</title>
+  <?!= include('SharedPageHead'); ?>
 
     <style> /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル
          (v2807: 全 hardcoded color を theme token 経由に変更しライト/ダーク対応) */
@@ -99,8 +91,8 @@
       .faq .answer { color: var(--theme-text-secondary); margin-top: 0.5rem;
                      line-height: 1.6; font-size: 0.875rem; }
     </style>
-  </head>
-  <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+</head>
+  <body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
     <div class="manual-wrap">

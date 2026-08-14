@@ -250,17 +250,25 @@ const hasCsRoot = /:root\s*\{[\s\S]*?color-scheme:\s*dark/.test(us);
 const hasCsLight = /body\.theme-light[\s\S]{0,2000}?color-scheme:\s*light/.test(us);
 check('21. color-scheme CSS property (dark+light)', hasCsRoot && hasCsLight, `root=${hasCsRoot}, light=${hasCsLight}`);
 
-// 22. FOUC 防止: SharedThemeBoot.html 存在 + 全 theme-aware ページに include
+// 22. FOUC 防止: SharedThemeBoot が全 theme-aware ページに届いているか
+//   v2899 で各ページの <head> 定型を SharedPageHead に集約したため、ページは
+//   SharedThemeBoot を直接ではなく SharedPageHead 経由で読む。どちらの経路でも
+//   「paint 前に theme class が付く」という目的は満たされるので両方を許容する。
 const bootExists = FILE_SET.has('SharedThemeBoot.html');
+const headBundlesBoot = FILE_SET.has('SharedPageHead.html')
+  && /SharedThemeBoot/.test(readSrc('SharedPageHead.html'));
 const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'LoginPage', 'AppSetupPage', 'SetupPage',
                             'TeacherManual', 'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
 let bootMissing = 0;
 for (const p of PAGES_NEEDING_BOOT) {
   const name = `${p}.html`;
   if (!FILE_SET.has(name)) continue;
-  if (!/SharedThemeBoot/.test(readSrc(name))) bootMissing++;
+  const src = readSrc(name);
+  const reachesBoot = /SharedThemeBoot/.test(src)
+    || (headBundlesBoot && /SharedPageHead/.test(src));
+  if (!reachesBoot) bootMissing++;
 }
-check('22. FOUC 防止 SharedThemeBoot 全ページ include', bootExists && bootMissing === 0, `boot=${bootExists}, missing=${bootMissing}`);
+check('22. FOUC 防止 SharedThemeBoot 全ページ include', bootExists && bootMissing === 0, `boot=${bootExists}, via SharedPageHead=${headBundlesBoot}, missing=${bootMissing}`);
 
 // 23. Theme 切替 smooth transition (body に transition: background-color color)
 const hasTransition = /body\s*\{[\s\S]*?transition:[\s\S]*?background-color[\s\S]*?color/.test(us);

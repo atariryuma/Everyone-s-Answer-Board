@@ -1,20 +1,10 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="UTF-8" />
-    <base target="_top" />
-    <title>みんなの回答ボード - ログイン</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>みんなの回答ボード - ログイン</title>
+  <?!= include('SharedPageHead'); ?>
     <meta name="theme-color" content="#1a1b26" /> <!-- theme:exempt - mobile browser chrome dark default -->
     <meta name="description" content="みんなの回答ボードシステム - ログイン" />
-    <!-- Shared Security Headers -->
-    <?!= include('SharedSecurityHeaders'); ?>
-
-    <!-- GAS推奨: CSS読み込みはhead内に集約 -->
-    <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-    <?!= include('UnifiedStyles.css'); ?>
 
     <style> /* Login Page Specific Styles - Unified with Admin Panel */
       .login-background {
@@ -153,7 +143,7 @@
         }
       }
     </style>
-  </head>
+</head>
   <body class="login-background">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>

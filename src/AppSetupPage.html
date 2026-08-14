@@ -1,20 +1,8 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="UTF-8" />
-    <base target="_top" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Shared Security Headers -->
-    <?!= include('SharedSecurityHeaders'); ?>
-    <title>みんなの回答ボード - システム設定</title>
-    
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-    
-    <!-- Shared Styles -->
-    <?!= include('UnifiedStyles.css'); ?>
+  <title>みんなの回答ボード - システム設定</title>
+  <?!= include('SharedPageHead'); ?>
     <script> function getUrlParameterUserId() {
         try {
           const urlParams = new URLSearchParams(window.location.search);
@@ -28,8 +16,8 @@
       const templateUserId = '<?= typeof userIdParam !== "undefined" ? userIdParam : "" ?>';
       let __USER_ID__ = getUrlParameterUserId() || templateUserId;
     </script>
-  </head>
-  <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+</head>
+  <body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
     <div
@@ -447,11 +435,9 @@
     </div>
 
 
-    <script> function showMessage(message, type = 'info', duration = 5000) {
-        if (window.notifications) {
-          window.notifications.showMessage(message, type, { duration });
-        }
-      }
+    <script>
+      // showMessage / showSuccess / showError / showWarning / showInfo は
+      // SharedUtilities が window に公開する共通 API。ここでは再定義しない。
 
 
 

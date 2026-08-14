@@ -1929,10 +1929,16 @@
 
         // boardMode は server が決める。teacher の手動 override 機構は撤去済。
         //   ?boardMode=X URL パラメータだけは検証 / プレビュー用途で残す。
+        //   許可値は server が displaySettings.boardMode に返しうる値と同じ集合。
+        //   一覧をここに書き写すと validators.js の BOARD_MODES とズレるため、
+        //   「server が返した mode」か「auto」だけを override として受け付ける。
         let overrideMode = null;
         try {
           const urlMode = new URLSearchParams(window.location.search).get('boardMode');
-          if (urlMode && /^(auto|board|numberline|matrix|wordcloud|pie)$/.test(urlMode)) {
+          const allowed = Array.isArray(window.UNIFIED_CONFIG?.boardModes)
+            ? window.UNIFIED_CONFIG.boardModes
+            : [];
+          if (urlMode && allowed.includes(urlMode)) {
             overrideMode = urlMode;
           }
         } catch (_) { /* URL parse 失敗時は server mode をそのまま使用 */ }

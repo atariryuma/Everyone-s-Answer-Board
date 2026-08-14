@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -909,8 +909,8 @@ function dispatchAdminOperation(operation, params) {
     }
 
     case 'createForm': {
-      // templateType: 'board' | 'numberline' | 'matrix' | 'pie' (default: 'board')
-      const templateType = ['board', 'numberline', 'matrix', 'pie'].includes(params.templateType)
+      // templateType の許可値は validators.js の BOARD_MODES から導出 (templateable な key)。
+      const templateType = TEMPLATE_BOARD_MODES.includes(params.templateType)
         ? params.templateType : 'board';
       const user = resolveTargetUser_(params);
       if (!user) return createErrorResponse('User not found');

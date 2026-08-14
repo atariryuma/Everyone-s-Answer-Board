@@ -4,13 +4,54 @@
 
 /* global SYSTEM_LIMITS */
 
-// Why module-level: validateConfig が boardMode を sanitize する際に使う enum。
-//   ConfigService.js:285 の VALID_BOARD_MODES とミラー。GAS single-global-scope で
-//   実行時には ConfigService 側の定義と統合されるが、ユニットテストでは
-//   validators.js を単独で vm.runInContext するため、こちらにも宣言が必要。
-//   ⚠️ 値を変える際は ConfigService.js:285 も同時更新すること。
-//   詳細は docs/SPEC_visualization_modes.md §F-1 参照。
-const VALIDATOR_BOARD_MODES = Object.freeze(['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie']);
+/**
+ * 表示モードの単一定義 (v2899)。
+ *
+ * Why: 以前はモード一覧が 7 箇所 (validators / ConfigService / AdminApis /
+ *   AdminPanel.html の <option> / AdminPanel.js の allowlist / AdminPanel.js の
+ *   ラベル表 / page.js の正規表現) に散っており、「値を変えるときは
+ *   ConfigService.js:285 も同時更新すること」という注意書きで人手同期していた。
+ *   さらに HTML と JS のズレを検出するためだけのテストまで存在した。
+ *   ここを唯一の定義とし、他は全てこの表から導出する。
+ *
+ * フィールド:
+ *   key          : config.displaySettings.boardMode に入る値
+ *   label        : 教師に見せる日本語名 (管理画面の select / 状態サマリで共用)
+ *   templateable : Google フォームのテンプレート自動生成に対応しているか
+ *   requires     : 描画に必須の列マッピング。'auto' は空 (サーバが解決する)
+ *
+ * 追加するときは、この配列に 1 行足すだけでよい。select の <option>、
+ * クライアントの allowlist、ラベル表はすべて自動で追従する。
+ */
+const BOARD_MODES = Object.freeze([
+  Object.freeze({ key: 'auto',       label: '自動判定（推奨）',       templateable: false, requires: Object.freeze([]) }),
+  Object.freeze({ key: 'board',      label: '掲示板',                 templateable: true,  requires: Object.freeze(['answer']) }),
+  Object.freeze({ key: 'numberline', label: '数直線',                 templateable: true,  requires: Object.freeze(['numericX']) }),
+  Object.freeze({ key: 'matrix',     label: 'マトリクス（散布図）',   templateable: true,  requires: Object.freeze(['numericX', 'numericY']) }),
+  Object.freeze({ key: 'wordcloud',  label: 'ワードランキング',       templateable: false, requires: Object.freeze(['answer']) }),
+  Object.freeze({ key: 'pie',        label: '円グラフ',               templateable: true,  requires: Object.freeze(['answer']) })
+]);
+
+// boardMode の許可値。BOARD_MODES から導出するので単独で編集しない。
+const VALIDATOR_BOARD_MODES = Object.freeze(BOARD_MODES.map(m => m.key));
+
+// フォームテンプレートを自動生成できるモード (createTemplateForm の許可値)。
+const TEMPLATE_BOARD_MODES = Object.freeze(BOARD_MODES.filter(m => m.templateable).map(m => m.key));
+
+/**
+ * 管理画面の表示モード select 用 <option> を生成する。
+ *   AdminPanel.html から `<?!= boardModeOptionsHtml() ?>` で呼ぶ。
+ *   HTML に一覧を手書きしないことで、BOARD_MODES とのズレが構造的に起こらない。
+ * @param {string} [selected='auto'] - selected 属性を付ける key
+ * @returns {string} <option> 要素の連結
+ */
+function boardModeOptionsHtml(selected) {
+  const sel = typeof selected === 'string' ? selected : 'auto';
+  return BOARD_MODES.map((m) => {
+    const isSel = m.key === sel ? ' selected' : '';
+    return `<option value="${m.key}"${isSel}>${m.label}</option>`;
+  }).join('');
+}
 
 
 /**

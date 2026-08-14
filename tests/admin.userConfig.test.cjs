@@ -152,6 +152,10 @@ function loadAdminContext(overrides = {}) {
     ...overrides
   };
   vm.createContext(context);
+  // AdminApis は validators.js の BOARD_MODES / TEMPLATE_BOARD_MODES を参照する
+  //   (GAS は単一グローバルスコープなので実行時には両方読み込まれている)。
+  const validators = fs.readFileSync(path.resolve(__dirname, '../src/validators.js'), 'utf8');
+  vm.runInContext(validators, context, { filename: 'validators.js' });
   const source = fs.readFileSync(path.resolve(__dirname, '../src/AdminApis.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'AdminApis.js' });
   return context;

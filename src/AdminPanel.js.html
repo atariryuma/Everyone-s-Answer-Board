@@ -525,24 +525,15 @@
       });
     }
 
-    const createTemplateBtn = document.getElementById('create-template-form');
-    if (createTemplateBtn) {
-      createTemplateBtn.addEventListener('click', function () {
-        createTemplateForm();
-      });
-    }
-
-    // 新 UI: dropdown メニューから種別をクリック → 既存の createTemplateForm() に流す。
-    //   select#template-type-select は hidden で残してあるので value を書き換えてから createTemplateForm() を呼ぶ。
+    // dropdown メニューから種別をクリック → createTemplateForm(種別) を直接呼ぶ。
+    //   旧実装は hidden の select#template-type-select に value を書いてから引数なしで
+    //   呼び出しており、値の受け渡しのためだけに DOM を経由していた。
     document.addEventListener('click', function (e) {
       const item = e.target && e.target.closest && e.target.closest('[data-template-create]');
       if (!item) return;
-      const tpl = item.dataset.templateCreate;
       const picker = item.closest('.template-form-picker');
       if (picker) picker.open = false;
-      const select = document.getElementById('template-type-select');
-      if (select) select.value = tpl;
-      createTemplateForm();
+      createTemplateForm(item.dataset.templateCreate);
     });
 
     const saveDraftBtn = document.getElementById('save-draft');
@@ -762,13 +753,13 @@
     if (!config) return;
 
     // 1) boardMode セレクト
-    //   Why: allowlist は validators.js / ConfigService.js の VALIDATOR_BOARD_MODES と整合させる。
-    //   `wordcloud` / `pie` が漏れていると、保存済み設定を読み込んだ際に UI が
-    //   silently `auto` に downgrade し、続く autosave で boardMode が破壊される
-    //   (silent data loss)。
+    //   allowlist は select の <option> そのもの。<option> は validators.js の
+    //   BOARD_MODES から server-side で生成されるので、手書きの一覧とズレようがない。
+    //   (旧実装はここに配列をコピーしており、モード追加時に更新漏れが起きると
+    //    保存済み設定が silently `auto` に落ちて autosave で失われる罠があった。)
     const modeSelect = document.getElementById('board-mode-select');
     if (modeSelect) {
-      const allowed = ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
+      const allowed = Array.from(modeSelect.options).map(o => o.value);
       const value = (config.displaySettings && allowed.includes(config.displaySettings.boardMode))
         ? config.displaySettings.boardMode
         : 'auto';
@@ -1287,10 +1278,10 @@
    * Why: 可視化モードに合った Forms 構造（線形尺度フィールド）をテンプレート時点で
    *      用意することで、教師が手動で項目を追加する手間を省く。
    */
-  function createTemplateForm() {
-    const btn = document.getElementById('create-template-form');
-    const typeSelect = document.getElementById('template-type-select');
-    const templateType = (typeSelect && typeSelect.value) || 'board';
+  function createTemplateForm(requestedType) {
+    // busy 表示は dropdown の summary ボタンに出す (旧 hidden ボタンは撤去済)。
+    const btn = document.querySelector('.template-form-picker > summary');
+    const templateType = requestedType || 'board';
     // テンプレート種別ごとの表示テキスト集約。ローディング画面の文言が散らからないよう
     // 1 か所にまとめる。backend の TEMPLATE_LABELS とは別 runtime なので意図的に重複。
     const TEMPLATE_VIEW = {
@@ -1317,8 +1308,8 @@
     const typeLabel = view.label;
 
     if (btn) {
-      btn.disabled = true;
       btn.classList.add('btn-busy');  // 統一: スピナー表示で「処理中」明示
+      btn.dataset.prevHtml = btn.innerHTML;
       btn.textContent = '作成中...';
     }
 
@@ -1395,9 +1386,8 @@
 
     runServer('createTemplateForm', templateType).then((result) => {
       if (btn) {
-        btn.disabled = false;
         btn.classList.remove('btn-busy');
-        btn.textContent = 'テンプレート作成';
+        if (btn.dataset.prevHtml) { btn.innerHTML = btn.dataset.prevHtml; delete btn.dataset.prevHtml; }
       }
 
       if (!(result && result.success)) {
@@ -3130,7 +3120,7 @@
     const boardModeEl = document.getElementById('current-board-mode');
     if (boardModeEl) {
       const mode = ds.boardMode || 'auto';
-      boardModeEl.textContent = BOARD_MODE_LABELS[mode] || mode;
+      boardModeEl.textContent = boardModeLabel(mode);
       boardModeEl.className = 'text-sm text-theme';
     }
 
@@ -3148,11 +3138,13 @@
 
   }
 
-  // 表示モードの日本語ラベル (「現在の状態」サマリー用)。
-  const BOARD_MODE_LABELS = {
-    auto: '自動判定', board: '掲示板', numberline: '数直線',
-    matrix: '散布図', wordcloud: 'ワードランキング', pie: '円グラフ'
-  };
+  // 表示モードの日本語ラベル。select の <option> (= validators.js の BOARD_MODES から
+  //   生成) をそのまま読むので、ラベル表を二重に持たない。
+  function boardModeLabel(mode) {
+    const sel = document.getElementById('board-mode-select');
+    const opt = sel && Array.from(sel.options).find(o => o.value === mode);
+    return opt ? opt.textContent.trim() : mode;
+  }
 
   let currentBoardInfo = null;
 

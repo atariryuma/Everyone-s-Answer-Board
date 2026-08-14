@@ -1,0 +1,31 @@
+<!-- =====================================================================
+  SharedPageHead — 全ページ共通の <head> 定型 (v2899)
+
+  Why: 従来は 9 つの HTML テンプレートが同じ meta / base / viewport と
+    4 つの include を各自で書いており、しかも順序がページごとに揺れていた。
+    CLAUDE.md は「include order は固定。変更には独立コミットが必要」と
+    規定しているが、その順序が 9 箇所に散っていては規約を守りようがない。
+    順序をこのファイル 1 つに閉じ込め、規約を構造で強制する。
+
+  読み込み順序 (この順序に意味がある。動かすときは独立コミットで):
+    1. SharedSecurityHeaders — CSP。他の何よりも先に効かせる
+    2. SharedTailwindConfig  — Tailwind の設定。CSS より先に必要
+    3. SharedThemeBoot       — paint 前に <html> へ theme class を付け FOUC を防ぐ
+    4. UnifiedStyles.css     — semantic token とプリミティブの本体
+
+  使い方 (各ページの <head> 内):
+    <title>ページ固有のタイトル</title>
+    <?!= include('SharedPageHead'); ?>
+    <style> /* ページ固有のスタイルだけをここに */ </style>
+
+  含めないもの:
+    - <title> : ページごとに異なるため各ページで書く
+    - SharedIcons : SVG sprite は <use> 解決のため <body> 先頭に置く必要がある
+===================================================================== -->
+<meta charset="UTF-8" />
+<base target="_top" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<?!= include('SharedSecurityHeaders'); ?>
+<?!= include('SharedTailwindConfig'); ?>
+<?!= include('SharedThemeBoot'); ?>
+<?!= include('UnifiedStyles.css'); ?>

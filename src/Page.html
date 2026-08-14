@@ -1,12 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <base target="_top" />
   <title>みんなの回答ボード</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Shared Security Headers -->
-  <?!= include('SharedSecurityHeaders'); ?>
+  <?!= include('SharedPageHead'); ?>
   
   <!-- Preload Google Fonts for better performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -67,11 +63,6 @@
     });
 
   </script>
-  
-  <!-- Shared TailwindCSS Configuration -->
-  <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
   <script>
   </script>
 
@@ -150,13 +141,10 @@
       MAPPING = {};
     }
   </script>
-
-  <?!= include('UnifiedStyles.css'); ?>
   <?!= include('page.css'); ?>
   <?!= include('page.viz.css'); ?>
-
 </head>
-<body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+<body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
   <!-- Loading Overlay for UnifiedLoadingManager -->

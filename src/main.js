@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator */
+/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -210,7 +210,10 @@ function handleAdminMode_(params, currentEmail) {
     setupStatus: config.setupStatus || 'pending',
     displaySettings: config.displaySettings || {},
     columnMapping: config.columnMapping || {},
-    dynamicUrls: enhancedConfig.dynamicUrls || {}
+    dynamicUrls: enhancedConfig.dynamicUrls || {},
+    // 表示モードの許可値。validators.js の BOARD_MODES を唯一の定義とし、
+    //   client 側に一覧をコピーしないための注入。
+    boardModes: VALIDATOR_BOARD_MODES
   });
   return template.evaluate().setTitle('管理');
 }
@@ -319,7 +322,10 @@ function handleViewMode_(params, currentEmail) {
     isCollaborator,
     formUrl: config.formUrl || '',
     showDetails: config.showDetails !== false,
-    displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS
+    displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS,
+    // 表示モードの許可値。validators.js の BOARD_MODES を唯一の定義とし、
+    //   client 側に一覧をコピーしないための注入。
+    boardModes: VALIDATOR_BOARD_MODES
   });
   return template.evaluate().setTitle('回答ボード');
 }
@@ -362,7 +368,10 @@ function handleReviewMode_(params, currentEmail) {
     isAdminUser: template.isAdminUser,
     isOwnBoard: true,
     isReviewMode: true,
-    reviewLesson: lesson
+    reviewLesson: lesson,
+    // 表示モードの許可値。validators.js の BOARD_MODES を唯一の定義とし、
+    //   client 側に一覧をコピーしないための注入。
+    boardModes: VALIDATOR_BOARD_MODES
   });
   return template.evaluate().setTitle('振り返り: ' + (lesson.name || ''));
 }

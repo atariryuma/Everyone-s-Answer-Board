@@ -963,6 +963,14 @@
    * .modal-card-prominent: 答え modal 等の primary content modal 用 cyan accent。 */
   /* modal-overlay: モーダルの背面。旧実装は fixed inset-0 bg-black/80 backdrop-blur-sm
      … の utility 連結を 5 箇所で重複させていた。1 クラスに集約する。 */
+  /* app-body: 全ページ共通の body 基本色。
+     旧実装は 8 ページが同じ inline style="background: var(--theme-bg-base); …" を
+     書いており、テーマ変更のたびに 8 箇所を直す必要があった。1 クラスに集約する。 */
+  .app-body {
+    background: var(--theme-bg-base);
+    color: var(--theme-text-primary);
+  }
+
   .modal-overlay {
     position: fixed;
     inset: 0;

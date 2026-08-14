@@ -2,22 +2,11 @@
 <html lang="ja">
 
 <head>
-  <meta charset="UTF-8" />
-  <base target="_top" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Shared Security Headers -->
-  <?!= include('SharedSecurityHeaders'); ?>
   <title>みんなの回答ボード - セットアップ</title>
-
-  <?!= include('SharedTailwindConfig'); ?>
-  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
-  <?!= include('SharedThemeBoot'); ?>
-
-  <!-- Shared Styles and Utilities -->
-  <?!= include('UnifiedStyles.css'); ?>
+  <?!= include('SharedPageHead'); ?>
 </head>
 
-<body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+<body class="app-body">
   <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
   <?!= include('SharedIcons'); ?>
   <div class="max-w-2xl mx-auto">
@@ -166,10 +155,6 @@
         btn.classList.remove('btn-busy');
         btn.textContent = '自動作成';
       }
-    }
-
-    function showMessage(message, type = 'info') {
-      if (window.notifications) window.notifications.showMessage(message, type);
     }
 
     function validateJSON(jsonString) {
