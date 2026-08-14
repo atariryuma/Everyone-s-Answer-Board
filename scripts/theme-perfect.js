@@ -524,6 +524,51 @@ check('31. Status + Accent rgba hardcoded = 0 (color-mix 統一)',
     ? '✓ 0 件 (color-mix 経由に統一)'
     : `${primaryRgba.length} 件 残存 (例: ${primaryRgba.slice(0,3).join(', ')})`);
 
+// 32. mobile chrome bar 色が --theme-bg-base と一致しているか
+// Why: theme-color meta は mobile browser の上部バーの色。値は --theme-bg-base と揃っていないと
+//   ページ背景とバーだけ色が違う状態になる。SharedThemeBoot は CSS 読み込みより前に走るため
+//   computed style を読めず、literal を持つしかない (LoginPage の静的 meta も同じ理由)。
+//   両方とも theme:exempt 指定で他の hardcoded 検査を素通りするので、ここが唯一の砦になる。
+//   themeManager 側 (SharedUtilities) は CSS 読み込み後なので --theme-bg-base を直接読んでおり、
+//   ここでは検査対象外。
+function checkThemeBarSync() {
+  const css = fs.readFileSync(path.join(SRC, 'UnifiedStyles.css.html'), 'utf8');
+  const grab = (startRe) => {
+    const body = extractBlockBody(css, startRe) || '';
+    const m = body.match(/--theme-bg-base:\s*([^;]+);/);
+    return m ? m[1].trim().toLowerCase() : null;
+  };
+  const dark = grab(/:root\s*\{/);
+  const light = grab(/body\.theme-light[^{]*\{/);
+  if (!dark || !light) return { ok: false, detail: '--theme-bg-base を UnifiedStyles から読めない' };
+
+  const bad = [];
+
+  // SharedThemeBoot の literal
+  const boot = fs.readFileSync(path.join(SRC, 'SharedThemeBoot.html'), 'utf8');
+  const bm = boot.match(/THEME_BAR_COLORS\s*=\s*\{\s*dark:\s*'([^']+)'\s*,\s*light:\s*'([^']+)'/);
+  if (!bm) bad.push('SharedThemeBoot: THEME_BAR_COLORS を読めない');
+  else {
+    if (bm[1].toLowerCase() !== dark) bad.push(`SharedThemeBoot dark ${bm[1]} ≠ --theme-bg-base ${dark}`);
+    if (bm[2].toLowerCase() !== light) bad.push(`SharedThemeBoot light ${bm[2]} ≠ body.theme-light ${light}`);
+  }
+
+  // 静的 meta[name=theme-color] を持つページ (初期表示用。dark 既定)
+  for (const f of fs.readdirSync(SRC).filter((x) => x.endsWith('.html'))) {
+    if (f === 'SharedPageHead.html') continue; // 生成物。元ファイル側で検査済み
+    const s = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const m = s.match(/<meta\s+name="theme-color"\s+content="([^"]+)"/i);
+    if (m && m[1].toLowerCase() !== dark) bad.push(`${f} meta ${m[1]} ≠ --theme-bg-base ${dark}`);
+  }
+
+  return {
+    ok: bad.length === 0,
+    detail: bad.length === 0 ? `✓ --theme-bg-base (dark ${dark} / light ${light}) と一致` : bad.join(', '),
+  };
+}
+const barSync = checkThemeBarSync();
+check('32. mobile chrome bar 色 = --theme-bg-base', barSync.ok, barSync.detail);
+
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');
 console.log(`  Theme Perfect — ${checks.length} 軸 完璧度ゲート`);

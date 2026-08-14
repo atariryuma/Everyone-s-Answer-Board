@@ -307,7 +307,39 @@ npm run test:coverage                 # 既存カバレッジを記録
 `.github/workflows/ci.yml` が PR で自動実行：
 
 - node 構文チェック
+- `npm run lint:errors`
+- `npm run check:utilities`（utility CSS 生成物の鮮度）
+- `npm run check:pagehead`（共通 head 生成物の鮮度）
+- `npm run check:gas`（GAS 参照整合性）
 - `npm test`
-- （将来）`npm run lint:errors` と `npm run lint:eslint` も組み込み可能
+- `npm run theme:perfect`
 
 デプロイは CI からは**行わない**（ローカル `deploy:prod` のみ）。
+
+**注意: CI は本番のゲートではない。** 手順が `deploy:prod` → commit → push である以上、CI が回るのは
+デプロイの後になる。本番を守るのは pre-commit と `deploy:prod` の preflight（git クリーン + 生成物の
+鮮度）の 2 つだけ。CI にしかないチェックを増やしても本番事故は止められない。
+
+---
+
+## 7. 一回限り / 移行専用ツールの棚卸し
+
+移行が終わったツールを放置すると「使うべき現役ツール」と見分けがつかなくなる。残作業の有無を
+定期的に確認し、ゼロなら削除候補として下表に記録する（**削除自体はユーザー判断**）。
+
+確認日: 2026-08-14
+
+| スクリプト | 残作業 | 判定 |
+| ---------- | ------ | ---- |
+| `theme-tokenize.js` | 1 件 | **現役**。`npm run theme:tokenize:dry` で確認 |
+| `theme-pair-tailwind.js` | 0 件 | 削除候補（移行完了） |
+| `theme-normalize-typography.js` | 0 件 | 削除候補（移行完了）。npm scripts 未登録 |
+| `export-board-data.js` | — | 削除候補。道徳 5/14 の 3 スプレッドシートを ID 直書きした一回限りの書き出し（v2727）。npm scripts 未登録 |
+
+残作業の確認方法：
+
+```bash
+node scripts/theme-tokenize.js --dry-run
+node scripts/theme-pair-tailwind.js --dry-run
+node scripts/theme-normalize-typography.js --dry-run
+```

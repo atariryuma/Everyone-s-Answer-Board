@@ -652,15 +652,23 @@
       }
 
       // mobile browser chrome bar 色を theme 連動更新 (OS auto-switching に依存しない)
+      // 値は --theme-bg-base から読む。ここは CSS 読み込み後なので computed style が取れる。
+      //   Why: 以前は dark/light の色を直書きしており、UnifiedStyles の --theme-bg-base を
+      //   変えても追従せず静かにズレた。定義を CSS 側 1 箇所に寄せる。
+      //   light は body.theme-light で上書きされるため、documentElement ではなく body から読む。
+      //   body 未生成のタイミングでは SharedThemeBoot が既に設定済みなので何もしない。
       try {
-        const THEME_BAR_COLORS = { dark: '#1a1b26', light: '#f1f5f9' };  // theme:exempt - mobile chrome bar 用 brand color
-        let metaTC = document.querySelector('meta[name="theme-color"]');
-        if (!metaTC) {
-          metaTC = document.createElement('meta');
-          metaTC.setAttribute('name', 'theme-color');
-          document.head && document.head.appendChild(metaTC);
+        const barColor = document.body
+          && getComputedStyle(document.body).getPropertyValue('--theme-bg-base').trim();
+        if (barColor) {
+          let metaTC = document.querySelector('meta[name="theme-color"]');
+          if (!metaTC) {
+            metaTC = document.createElement('meta');
+            metaTC.setAttribute('name', 'theme-color');
+            document.head && document.head.appendChild(metaTC);
+          }
+          metaTC.setAttribute('content', barColor);
         }
-        metaTC.setAttribute('content', THEME_BAR_COLORS[resolved]);
       } catch (_) {}
 
       subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
