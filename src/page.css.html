@@ -36,6 +36,15 @@
   gap: 0.6rem;
   min-height: 2.25rem;
 }
+/* 各要素を明示的に列へ割り当てる (v2921)。
+   Why: grid は「置かれた順」に列を埋めるため、identity pill や phase host が
+   非表示のときフィルタが 1 列目、操作が伸縮列 (1fr) に落ちる。実測で
+   フィルタと操作アイコンの間に 879px の空白ができていた。列を固定すれば
+   どれが欠けても「左: 識別 / 中: フェーズ / 右: フィルタ + 操作」が保たれる。 */
+.eab-row-meta > .eab-identity-pill { grid-column: 1; }
+.eab-row-meta > .eab-phase-host    { grid-column: 2; }
+.eab-row-meta > .eab-filters       { grid-column: 3; }
+.eab-row-meta > .eab-actions       { grid-column: 4; }
 
 /* Identity (form link) */
 .eab-identity-pill {
@@ -241,6 +250,12 @@ body:not(.admin-mode) .admin-mode-only {
     grid-auto-rows: auto;
     gap: 0.4rem;
   }
+  /* 縦積みに戻すので列の固定 (desktop 用) を解除する。
+     残すと grid が暗黙の 3・4 列目を作り、1fr の指定が効かなくなる。 */
+  .eab-row-meta > .eab-identity-pill,
+  .eab-row-meta > .eab-phase-host,
+  .eab-row-meta > .eab-filters,
+  .eab-row-meta > .eab-actions { grid-column: auto; }
   .eab-actions { justify-content: flex-end; }
   .eab-filters { flex-wrap: wrap; }
 }
@@ -370,11 +385,13 @@ html, body {
   padding-left: 1.25rem;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
 }
-/* 左端のアクセントバー = リアクション符号の置き場。既定は不可視 (幅 0)。 */
+/* 左端のアクセントバー = リアクション符号の置き場。既定は不可視 (幅 0)。
+   inset を -1px にして 1px の枠線に重ねる (v2921)。重ねないと
+   「subtle な枠線」と「色バー」の 2 本が隣接して見え、線が団子になる。 */
 .answer-card::before {
   content: "";
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: -1px auto -1px -1px;
   width: 0;
   background: var(--theme-border-subtle);
   transition: width var(--animation-normal) var(--transition-easing);
@@ -639,9 +656,9 @@ button.highlight-badge:hover {
 /* lint-disable-next-line no-gradient-background -- 装飾ではなくリアクション種別の符号 */
 .answer-card.reaction-bg-like-understand-curious::before { background: linear-gradient(180deg, var(--brand-like) 0 33.33%, var(--brand-understand) 33.33% 66.66%, var(--brand-curious) 66.66% 100%); }
 
-.answer-card.reaction-border-1::before { width: 3px; }
-.answer-card.reaction-border-2::before { width: 5px; }
-.answer-card.reaction-border-3::before { width: 7px; }
+.answer-card.reaction-border-1::before { width: 4px; }
+.answer-card.reaction-border-2::before { width: 6px; }
+.answer-card.reaction-border-3::before { width: 8px; }
 
 .answer-card {
   /* v2920: 組版を締めた分だけ高さも詰める。232px では本文の下に余白が残り、
