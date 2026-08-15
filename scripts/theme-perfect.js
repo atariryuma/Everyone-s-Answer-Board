@@ -310,6 +310,11 @@ function countFontSizes() {
   for (const f of files) {
     const text = readSrc(f);
     const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    // token 経由 (var(--font-size-*)) はスケールそのものなので準拠として数える。
+    //   Why: 以前は生値だけを数えており、token 化を進めるほど分母から外れて
+    //   準拠率が下がるという逆立ちした指標になっていた (実際 288 箇所を token に
+    //   寄せた直後に 0% へ落ちた)。測りたいのは「スケールに乗っているか」。
+    for (const _ of cleaned.matchAll(/font-size:\s*var\(--font-size-[a-z0-9]+\)/g)) { total++; std++; }
     const matches = cleaned.matchAll(/font-size:\s*([0-9.]+(?:rem|px|em))/g);
     for (const m of matches) {
       total++;
@@ -448,6 +453,8 @@ function countRadii() {
   for (const f of files) {
     const text = readSrc(f);
     const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    // token 経由 (var(--radius-*)) はスケールそのものなので準拠として数える (25 と同じ理由)。
+    for (const _ of cleaned.matchAll(/border-radius:\s*var\(--radius-[a-z]+\)/g)) { total++; std++; }
     const matches = cleaned.matchAll(/border-radius:\s*([0-9.]+(?:rem|px|%))/g);
     for (const m of matches) {
       total++;

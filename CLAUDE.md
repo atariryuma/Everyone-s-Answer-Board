@@ -146,7 +146,11 @@ main.js (doGet/doPost routing, auth)
 
 **色を変更したいとき**: [UnifiedStyles.css.html](src/UnifiedStyles.css.html) の `:root` (dark) と `body.theme-light` (light) の token を書き換えるだけで全体反映。
 
-**検証**: `npm run theme:contrast` (WCAG AA) / `theme:matrix` (全 token + contrast) / `theme:perfect` (統合ゲート)。
+**寸法も token 経由で書く**: 角丸・文字サイズ・余白は生値を書かず `var(--radius-md)` /
+`var(--font-size-sm)` / `var(--space-4)` を使う。スケールと同値の生値は `check:tokens` が検出する
+(`npm run tokenize:dim` で一括変換)。値を散らすとスケールを一括で変えられなくなる。
+
+**検証**: `npm run theme:contrast` (WCAG AA) / `theme:matrix` (全 token + contrast) / `theme:perfect` (統合ゲート) / `check:tokens` (寸法 token)。
 
 **パレット設計哲学・token 一覧・primitives 表・status box token・themeManager API・保守 CLI 詳細**: [docs/THEME.md](docs/THEME.md)。
 

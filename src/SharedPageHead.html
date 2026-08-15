@@ -705,7 +705,7 @@
     padding: 0;
     background: transparent;
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-text-secondary);
     cursor: pointer;
     transition: background var(--transition-quick) ease, color var(--transition-quick) ease, border-color var(--transition-quick) ease;
@@ -728,7 +728,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
     border: var(--border-primary);
     transition: all var(--transition-normal) var(--transition-easing);
-    border-radius: 1rem;
+    border-radius: var(--radius-xl);
   }
 
   .glass-panel:hover {
@@ -919,7 +919,7 @@
 
   /* Admin Toggle - Subtle button for administrators only */
   .admin-toggle {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     transition: all var(--transition-normal) ease;
   }
 
@@ -942,7 +942,7 @@
     );
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s infinite;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
 
   /* =============================================================================
@@ -998,22 +998,22 @@
   .loading-content {
     color: var(--theme-text-primary);
     text-align: center;
-    padding: 2rem;
+    padding: var(--space-8);
     max-width: 400px;
     background: var(--theme-overlay-surface-glass);
-    border-radius: 1rem;
+    border-radius: var(--radius-xl);
     border: 1px solid var(--theme-accent-cyan-soft);  /* brand-accent-light の薄め (loading 専用) */
     box-shadow: 0 12px 40px var(--theme-overlay-black-60);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .loading-message {
-    font-size: 1.125rem;
-    margin-top: 1rem;
+    font-size: var(--font-size-lg);
+    margin-top: var(--space-4);
     font-weight: 600;
     opacity: 0.95;
     animation: fadeInOut 1.5s ease-in-out infinite;
@@ -1039,7 +1039,7 @@
     border-top: 6px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-6);
   }
 
 
@@ -1107,7 +1107,7 @@
     background: var(--theme-overlay-black-90);
     color: white;
     padding: 6px 10px;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     font-size: var(--font-size-xs);  /* 12px — token に統一 */
     white-space: nowrap;
     opacity: 0;
@@ -1437,9 +1437,9 @@
 
   /* Message System */
   .message {
-    padding: 1rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1rem;
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
     transform: translateY(20px);
     opacity: 0;
     transition: all var(--animation-normal) var(--transition-easing);
@@ -1493,7 +1493,7 @@
   :focus-visible {
     outline: 3px solid var(--brand-primary);
     outline-offset: 2px;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
   }
 
   /* Animation Classes (only used ones) */
@@ -1551,10 +1551,10 @@
     left: 50%;
     transform: translateX(-50%) translateY(-20px);
     z-index: var(--z-notification);
-    padding: 0.75rem 1.25rem;
+    padding: var(--space-3) var(--space-5);
     background: var(--theme-accent-cyan-soft);
     border: 1px solid var(--theme-accent-cyan);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     color: var(--theme-text-primary);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
     opacity: 0;
@@ -1562,11 +1562,11 @@
     transition: opacity var(--transition-slow) ease, transform var(--transition-slow) ease;
     max-width: 90vw;
     text-align: center;
-    font-size: 1rem;
+    font-size: var(--font-size-base);
     line-height: 1.4;
   }
   .board-switched-toast strong { color: var(--theme-accent-cyan); }
-  .board-switched-toast span { color: var(--theme-text-secondary); font-size: 0.875rem; }
+  .board-switched-toast span { color: var(--theme-text-secondary); font-size: var(--font-size-sm); }
   .board-switched-toast.visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -1722,25 +1722,25 @@
   @media (max-width: 768px) /* md breakpoint */ {
     .btn {
       min-height: 48px;
-      padding: 1rem 1.5rem;
+      padding: var(--space-4) var(--space-6);
       font-size: 16px;
     }
 
 
     .glass-panel {
       margin: 0.5rem;
-      padding: 1rem;
+      padding: var(--space-4);
       /* Performance optimization for low-end devices */
       background: var(--theme-bg-elevated);
     }
 
     .answer-card {
-      padding: 1rem;
+      padding: var(--space-4);
     }
 
     .reaction-btn {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.875rem;
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--font-size-sm);
     }
   }
 
@@ -1771,7 +1771,7 @@
 
   /* Form Groups */
   .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   /* Modern Select Styling — admin form 共通の select 要素
@@ -1791,9 +1791,9 @@
     background-position: right 0.75rem center;
     background-size: 12px 12px;
     border: 1px solid var(--theme-border-normal);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-text-primary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     transition: all var(--transition-normal);
     cursor: pointer;
   }
@@ -1823,7 +1823,7 @@
     padding: 0.875rem 1rem;
     background: var(--theme-overlay-white-05);
     border: var(--border-primary);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     color: var(--theme-text-primary);
     transition: all var(--transition-normal) var(--transition-easing);
     /* 16px は意図的（token 化しない）: iOS Safari は font-size < 16px の input に
@@ -1851,13 +1851,13 @@
   .toggle-group {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .toggle-switch {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     cursor: pointer;
     color: var(--theme-text-secondary);
   }
@@ -1870,7 +1870,7 @@
     width: 44px;
     height: 24px;
     background: var(--theme-border-strong);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     position: relative;
     transition: all var(--transition-slow);
   }
@@ -1899,9 +1899,9 @@
 
   /* Status Badges */
   .status-badge {
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
     font-weight: 500;
   }
 
@@ -1930,11 +1930,11 @@
   .confidence-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
     font-weight: 500;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .confidence-badge.high {
@@ -1967,10 +1967,10 @@
   .link-btn {
     background: color-mix(in srgb, var(--brand-primary) 20%, transparent);
     color: var(--brand-primary);
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     transition: all var(--transition-normal);
     display: inline-block;
@@ -1990,8 +1990,8 @@
   .box {
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
   }
   /* .box-row: flex 横並び の inner box (label + value) */
   .box-row {
@@ -2020,13 +2020,13 @@
   .config-summary {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .label {
     font-weight: 500;
     color: var(--theme-text-muted);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
   }
 
   /* `<details>` summary の default triangle を消し、回転式の小さな三角で代替する。 */
@@ -2065,17 +2065,17 @@
   .class-chip-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--space-3);
   }
   .class-chip-row-inline { margin-bottom: 0; }
   .class-chip-row-selected {
     min-height: 2.5rem;
-    padding: 0.5rem;
+    padding: var(--space-2);
     background: var(--theme-overlay-white-05);
     border: 1px dashed var(--theme-border-normal);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
   .class-chip-row-known {
     flex-direction: column;
@@ -2083,7 +2083,7 @@
   }
   .class-chip-empty {
     color: var(--theme-text-muted);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     font-style: italic;
   }
   .class-chip {
@@ -2091,11 +2091,11 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.3rem 0.7rem;
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     background: color-mix(in srgb, var(--brand-primary) 18%, transparent);  /* brand-primary 薄背景 */
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
     color: var(--theme-text-primary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     cursor: default;
   }
   .class-chip-known {
@@ -2114,7 +2114,7 @@
     border: none;
     color: var(--theme-text-muted);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: var(--font-size-base);
     line-height: 1;
     padding: 0 0.15rem;
   }
@@ -2124,19 +2124,19 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-2);
   }
   .class-preset-label {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--theme-text-muted);
   }
   .btn-class-preset {
     padding: 0.25rem 0.65rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-normal);
     color: var(--theme-text-secondary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     transition: all var(--transition-quick) ease;
   }
@@ -2153,7 +2153,7 @@
   .class-custom-add summary {
     cursor: pointer;
     color: var(--theme-text-muted);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     padding: 0.3rem 0;
   }
   .class-custom-add[open] summary { color: var(--theme-text-secondary); }
@@ -2163,9 +2163,9 @@
     display: inline-block;
     width: 1.5rem; height: 1.5rem;
     text-align: center; line-height: 1.5rem;
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     color: var(--theme-border-strong);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
   }
   .lesson-step-dot.active {
     color: color-mix(in srgb, var(--theme-accent-cyan-strong) 95%, transparent);
@@ -2177,7 +2177,7 @@
   .lesson-phase-card {
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     padding: 0.85rem 1rem;
     min-width: 180px;
     transition: border-color var(--transition-quick) ease, background var(--transition-quick) ease;
@@ -2191,27 +2191,27 @@
     border-color: color-mix(in srgb, var(--status-success) 45%, transparent);
   }
   .lesson-phase-card .phase-number {
-    font-size: 0.75rem; color: var(--theme-text-muted); font-weight: bold;
+    font-size: var(--font-size-xs); color: var(--theme-text-muted); font-weight: bold;
   }
-  .lesson-phase-card .phase-name { font-size: 1rem; color: var(--theme-text-primary); margin: 0.2rem 0; }
-  .lesson-phase-card .phase-meta { font-size: 0.75rem; color: var(--theme-text-muted); }
+  .lesson-phase-card .phase-name { font-size: var(--font-size-base); color: var(--theme-text-primary); margin: 0.2rem 0; }
+  .lesson-phase-card .phase-meta { font-size: var(--font-size-xs); color: var(--theme-text-muted); }
 
   /* Phase card 編集モード (Wizard Step 2) */
   .phase-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-2);
   }
   .phase-delete-btn {
     background: none;
     border: none;
     color: var(--theme-text-muted);
-    font-size: 1.25rem;
+    font-size: var(--font-size-xl);
     line-height: 1;
     cursor: pointer;
     padding: 0 0.3rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     transition: color var(--transition-quick) ease, background var(--transition-quick) ease;
   }
   .phase-delete-btn:hover {
@@ -2224,22 +2224,22 @@
   .phase-field:last-child { margin-bottom: 0; }
   .phase-label {
     display: block;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-text-muted);
     margin-bottom: 0.2rem;
   }
   .phase-add-wrap {
     grid-column: 1 / -1;
     text-align: center;
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
   }
   .phase-add-btn {
     padding: 0.6rem 1.4rem;
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
     border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-accent-cyan);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     transition: all var(--transition-quick) ease;
   }
@@ -2256,8 +2256,8 @@
     padding: 0.5rem 0.6rem;
     background: color-mix(in srgb, var(--theme-accent-cyan-deep) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 25%, transparent);
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
     color: var(--theme-text-primary);
   }
   .phase-preview-numberline {
@@ -2276,7 +2276,7 @@
     grid-template-rows: auto auto auto;
     gap: 0.2rem 0.4rem;
     align-items: center;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
   .matrix-y-high { grid-column: 2; color: var(--theme-accent-cyan); }
   .matrix-grid {
@@ -2287,7 +2287,7 @@
     width: 100%; aspect-ratio: 1;
     max-height: 50px;
     background: var(--theme-card-2);
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     overflow: hidden;
   }
   .matrix-quad {
@@ -2297,20 +2297,20 @@
   .matrix-y-low { grid-column: 2; color: var(--theme-accent-cyan); }
   .phase-preview-pie,
   .phase-preview-board {
-    display: flex; align-items: center; gap: 0.5rem;
+    display: flex; align-items: center; gap: var(--space-2);
   }
 
   .phase-detail {
-    margin-top: 0.5rem;
+    margin-top: var(--space-2);
     background: var(--theme-card-2);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.4rem 0.6rem;
   }
   .phase-detail summary {
     cursor: pointer;
     color: var(--theme-accent-cyan);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     padding: 0.15rem 0;
     list-style: none;
   }
@@ -2320,14 +2320,14 @@
     display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;
   }
   .phase-detail-tag {
-    font-size: 0.75rem; color: var(--theme-text-muted);
+    font-size: var(--font-size-xs); color: var(--theme-text-muted);
     min-width: 1.5rem;
   }
   .phase-detail-sep {
-    color: var(--theme-text-muted); font-size: 0.875rem;
+    color: var(--theme-text-muted); font-size: var(--font-size-sm);
   }
   .phase-detail-row input {
-    flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: 0.875rem;
+    flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: var(--font-size-sm);
   }
   .phase-choice-list {
     margin-top: 0.4rem;
@@ -2337,12 +2337,12 @@
     display: flex; gap: 0.3rem; align-items: center;
   }
   .phase-choice-row input {
-    flex: 1; padding: 0.3rem 0.5rem; font-size: 0.875rem;
+    flex: 1; padding: 0.3rem 0.5rem; font-size: var(--font-size-sm);
   }
   .phase-choice-del {
     background: none; border: none;
     color: var(--theme-text-muted);
-    font-size: 1rem; cursor: pointer; padding: 0 0.3rem;
+    font-size: var(--font-size-base); cursor: pointer; padding: 0 0.3rem;
   }
   .phase-choice-del:hover { color: var(--status-error); }
   .phase-choice-add {
@@ -2350,9 +2350,9 @@
     padding: 0.25rem 0.7rem;
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 10%, transparent);
     border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-accent-cyan);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     cursor: pointer;
   }
   .phase-choice-add:hover {
@@ -2369,8 +2369,8 @@
     padding: 0.25rem 0.55rem;
     background: var(--theme-card-2);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
     color: var(--theme-text-primary);
     cursor: pointer;
   }
@@ -2379,7 +2379,7 @@
   }
   .phase-scale-opt input[type="radio"] { margin: 0; cursor: pointer; }
   .phase-scale-hint {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-text-muted);
   }
 
@@ -2390,7 +2390,7 @@
     padding: 0.7rem;
     background: var(--theme-card-2);
     border: 1.5px dashed color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-quick) ease;
     min-height: 80px;
@@ -2406,19 +2406,19 @@
     display: none;
   }
   .phase-image-hint {
-    display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+    display: flex; align-items: center; gap: var(--space-2); justify-content: center;
     color: var(--theme-accent-cyan);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     text-align: center;
     padding: 0.4rem;
   }
-  .phase-image-hint-icon { font-size: 1.25rem; }
+  .phase-image-hint-icon { font-size: var(--font-size-xl); }
   .phase-image-preview {
     display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
   }
   .phase-image-preview img {
     max-width: 100%; max-height: 160px;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     border: 1px solid var(--theme-border-subtle);
     background: var(--theme-bg-base);  /* 画像背景 (透過 PNG 用) */
   }
@@ -2426,9 +2426,9 @@
     background: color-mix(in srgb, var(--status-error) 18%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
     color: var(--theme-status-error-text);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.2rem 0.6rem;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     cursor: pointer;
   }
   .phase-image-clear:hover {
@@ -2442,46 +2442,46 @@
   /* 「+ もっと細かく」 で集約する任意拡張ブロック */
   .phase-extra-details > summary {
     color: var(--theme-accent-cyan);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
   .phase-extra-badges {
     margin-left: 0.4rem;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: color-mix(in srgb, var(--theme-accent-cyan-strong) 90%, transparent);
     padding: 0.05rem 0.4rem;
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
   .phase-extra-list {
-    display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.5rem;
+    display: flex; flex-direction: column; gap: 0.7rem; margin-top: var(--space-2);
   }
   .phase-extra-section {
     background: var(--theme-card-2);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.5rem 0.6rem;
   }
   .phase-extra-label {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-accent-cyan);
     margin-bottom: 0.35rem;
   }
 
   /* プレビュー上のラベル「 生徒に見える形:」: 「ここが結果」を明示 */
   .phase-preview-label {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-accent-cyan);
     font-weight: 600;
     margin: 0.85rem 0 0.35rem;
-    padding-top: 0.5rem;
+    padding-top: var(--space-2);
     border-top: 1px dashed var(--theme-border-subtle);
   }
 
   /* 「その他」 toggle */
   .phase-choice-other {
     display: flex; align-items: center; gap: 0.4rem;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
+    margin-top: var(--space-2);
+    font-size: var(--font-size-xs);
     color: var(--theme-text-primary);
     cursor: pointer;
   }
@@ -2491,9 +2491,9 @@
   .phase-preview-sample-card {
     background: var(--theme-card-1);
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 35%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.45rem 0.55rem;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
   .sample-card-name {
     font-size: 0.65rem;
@@ -2507,7 +2507,7 @@
   }
   .sample-card-reason {
     color: var(--theme-text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     line-height: 1.3;
   }
   .phase-preview-board-hint {
@@ -2526,7 +2526,7 @@
   }
   .phase-preview-pie-list {
     display: flex; flex-direction: column; gap: 0.15rem;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-text-primary);
   }
   .phase-preview-pie-item {
@@ -2570,7 +2570,7 @@
     width: 280px;
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.4rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     z-index: 100;
@@ -2583,10 +2583,10 @@
     padding: 0.55rem 0.7rem;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-text-primary);
     cursor: pointer;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-1);
     transition: all var(--transition-quick) ease;
   }
   .lesson-template-item:hover {
@@ -2594,11 +2594,11 @@
     border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
   }
   .lesson-template-label {
-    font-size: 0.875rem; font-weight: 600;
+    font-size: var(--font-size-sm); font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .lesson-template-desc {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-text-muted);
     margin-top: 0.15rem;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2609,7 +2609,7 @@
   }
   .lesson-template-loading {
     padding: 0.4rem 0.7rem;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--theme-text-muted);
     font-style: italic;
   }
@@ -2632,7 +2632,7 @@
     min-width: 220px;
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.35rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
     z-index: 50;
@@ -2644,9 +2644,9 @@
     padding: 0.5rem 0.7rem;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-text-primary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     transition: all var(--transition-fast) ease;
   }
@@ -2672,7 +2672,7 @@
     min-width: 280px;
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.4rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     z-index: 50;
@@ -2685,7 +2685,7 @@
     padding: 0.5rem 0.7rem;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-text-primary);
     cursor: pointer;
     margin-bottom: 0.2rem;
@@ -2695,9 +2695,9 @@
     background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
     border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
   }
-  .template-form-label { font-size: 0.875rem; font-weight: 600; }
+  .template-form-label { font-size: var(--font-size-sm); font-weight: 600; }
   .template-form-desc {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--theme-text-muted);
     margin-top: 0.1rem;
   }
@@ -2718,31 +2718,31 @@
     padding: 0.5rem 0.7rem;
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
   }
   .confirm-phase-idx {
     color: var(--theme-accent-cyan);
     font-weight: 600;
     min-width: 5.5rem;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
   .confirm-phase-body {
     flex: 1;
     color: var(--theme-text-primary);
     line-height: 1.5;
   }
-  .confirm-phase-q { color: var(--theme-text-muted); font-size: 0.875rem; }
-  .confirm-phase-detail { color: var(--theme-accent-cyan); font-size: 0.75rem; }
+  .confirm-phase-q { color: var(--theme-text-muted); font-size: var(--font-size-sm); }
+  .confirm-phase-detail { color: var(--theme-accent-cyan); font-size: var(--font-size-xs); }
 
   .confirm-warnings-wrap { margin-top: 0.7rem; }
   .confirm-warnings {
     margin: 0; padding-left: 0; list-style: none;
     background: color-mix(in srgb, var(--status-warning) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-warning) 40%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.5rem 0.7rem;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--theme-status-warning-text);
   }
   .confirm-warnings li { margin: 0.15rem 0; }
@@ -2751,9 +2751,9 @@
     padding: 0.5rem 0.7rem;
     background: color-mix(in srgb, var(--status-success) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-success) 30%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     color: var(--theme-status-success-text);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
   }
 
   /* lesson.start エラー時の retry box */
@@ -2762,19 +2762,19 @@
     padding: 0.7rem 1rem;
     background: color-mix(in srgb, var(--status-error) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
   .lesson-start-error-title {
     font-weight: 600; color: var(--theme-status-error-text);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
   }
   .lesson-start-error-detail {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--theme-status-error-text);
-    margin-top: 0.25rem;
+    margin-top: var(--space-1);
   }
   .lesson-start-error-progress {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--theme-status-success-text);
     margin-top: 0.35rem;
   }
@@ -2792,16 +2792,16 @@
     line-height: 1.5rem; text-align: center;
     background: var(--theme-overlay-white-10);
     border-radius: 50%;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     margin-right: 0.4rem;
     color: var(--theme-accent-cyan);
   }
 
   /* フォーム連携の代替経路ブロック (details 内、2 つを区切る薄い背景) */
   .form-alternative-block {
-    padding: 0.75rem;
+    padding: var(--space-3);
     background: var(--theme-card-2);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
 
   /* Lesson review banner (Phase 2): Page.html 上部に固定表示 */
@@ -2809,26 +2809,26 @@
   #lesson-review-banner {
     position: sticky; top: 0; z-index: 9999;
     background: color-mix(in srgb, var(--theme-accent-cyan-deep) 90%, transparent);
-    color: var(--theme-text-primary); padding: 0.5rem 1rem;
+    color: var(--theme-text-primary); padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 60%, transparent);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
   }
   #lesson-review-banner .lesson-review-banner-inner {
     max-width: 1200px; margin: 0 auto;
-    display: flex; align-items: center; gap: 0.5rem;
+    display: flex; align-items: center; gap: var(--space-2);
   }
   #lesson-review-banner .lesson-review-readonly {
     margin-left: auto;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     background: var(--theme-overlay-white-20);
-    padding: 0.15rem 0.6rem; border-radius: 9999px;
+    padding: 0.15rem 0.6rem; border-radius: var(--radius-full);
   }
 
   /* Lesson list (過去レッスン一覧) */
   #lesson-list li {
     padding: 0.6rem 0.8rem;
     background: var(--theme-card-2);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -2841,7 +2841,7 @@
   #lesson-list li > .flex-1 { min-width: 8rem; }
   #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
-    font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
+    font-size: var(--font-size-xs); padding: 0.1rem 0.5rem; border-radius: var(--radius-full);
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
   }
   #lesson-list .lesson-state-badge.state-active {

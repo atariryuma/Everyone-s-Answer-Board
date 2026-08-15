@@ -66,6 +66,12 @@ jobs:
         #   本番に出ないまま古い head が配信され続ける。生成物と入力のズレを CI で止める。
         run: npm run check:pagehead
 
+      - name: 寸法が設計スケール token 経由か
+        # Why: --radius-* / --font-size-* / --space-* は整備済みなのに、CSS の 85-89% が
+        #   生値で書かれていた (border-radius 91/106 が生値等)。同じ値を各所で書くと
+        #   スケールを変えたくても一括で変えられない。token と同値の生値を検出して止める。
+        run: npm run check:tokens
+
       - name: GAS 参照整合性チェック
         # Why: GAS は単一グローバルスコープでモジュール解決が無いため、関数や要素 ID を
         #   1 つ消すと呼び出し側は無言で本番落ちする。node --test は各ファイルを個別に

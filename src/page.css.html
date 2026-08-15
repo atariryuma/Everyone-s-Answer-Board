@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .eab-row {
@@ -54,9 +54,9 @@
   padding: 0.35rem 0.65rem;
   background: color-mix(in srgb, var(--theme-accent-cyan) 10%, transparent);  /* accent-cyan 透明、 inline で OK */
   border: 1px solid color-mix(in srgb, var(--theme-accent-cyan) 30%, transparent);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   color: var(--theme-accent-cyan);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   transition: background-color var(--transition-quick), color var(--transition-quick), transform var(--transition-quick);
   white-space: nowrap;
@@ -94,9 +94,9 @@
   padding: 0.35rem 0.65rem;
   background: var(--theme-bg-surface);
   border: 1px solid var(--theme-border-subtle);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   color: var(--theme-text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 .eab-select-wrap {
@@ -106,9 +106,9 @@
 .eab-select {
   background: var(--theme-bg-elevated);
   border: 1px solid var(--theme-border-normal);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.35rem 1.7rem 0.35rem 0.7rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--theme-text-secondary);
   appearance: none;
   -webkit-appearance: none;
@@ -133,13 +133,13 @@
 .eab-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-shrink: 0;
   justify-content: flex-end;
 }
 .eab-status {
   color: var(--theme-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   opacity: 0.72;
   white-space: nowrap;
 }
@@ -149,7 +149,7 @@
 .eab-icon-btn {
   background: transparent;
   border: 1px solid var(--theme-border-subtle);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.3rem 0.4rem;
   color: var(--theme-text-muted);
   transition: background-color var(--transition-quick), color var(--transition-quick), transform var(--transition-quick);
@@ -174,9 +174,9 @@
   padding: 0.3rem 0.55rem;
   background: color-mix(in srgb, var(--theme-accent-destructive) 18%, transparent);
   border: 1px solid color-mix(in srgb, var(--theme-accent-destructive) 55%, transparent);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   color: #fdba74;
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   transition: background-color var(--transition-quick), color var(--transition-quick), border-color var(--transition-quick);
 }
@@ -199,7 +199,7 @@
 .eab-question {
   font-weight: 700;
   line-height: 1.25;
-  font-size: 1.5rem;
+  font-size: var(--font-size-2xl);
   text-align: center;
   max-width: min(100%, 60rem);
   margin: 0;
@@ -210,7 +210,7 @@
      「問い = pink」という意味付けは下のアクセントラインで保つ。 */
   color: var(--theme-text-primary);
   position: relative;
-  padding-bottom: 0.5rem;
+  padding-bottom: var(--space-2);
 }
 /* 「問い」であることを示す小さな pink のしるし。文字を塗らずに意味だけ残す。 */
 .eab-question::after {
@@ -224,8 +224,8 @@
   border-radius: var(--radius-full);
   background: var(--theme-accent-pink);
 }
-@media (min-width: 640px) { .eab-question { font-size: 1.5rem; } }
-@media (min-width: 768px) { .eab-question { font-size: 1.875rem; } }
+@media (min-width: 640px) { .eab-question { font-size: var(--font-size-2xl); } }
+@media (min-width: 768px) { .eab-question { font-size: var(--font-size-3xl); } }
 @media (min-width: 1024px) { .eab-question { font-size: 2.1rem; } }
 
 /* Editor-only visibility via body class:
@@ -314,9 +314,9 @@ header.header-hidden {
   background: var(--theme-bg-elevated, var(--theme-bg-surface));
   color: var(--theme-text-primary);
   border: var(--border-primary);
-  border-radius: 9999px;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   box-shadow: var(--shadow-lg);
   pointer-events: none;
@@ -325,7 +325,7 @@ header.header-hidden {
   opacity: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 #pull-to-refresh-indicator.active {
   opacity: 1;
@@ -382,7 +382,7 @@ html, body {
   contain: layout style;
   position: relative;
   overflow: hidden;
-  padding-left: 1.25rem;
+  padding-left: var(--space-5);
   box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
 }
 /* 左端のアクセントバー = リアクション符号の置き場。既定は不可視 (幅 0)。
@@ -498,7 +498,7 @@ html, body {
   left: 50%;
   transform: translate(-50%, 0);
   z-index: 60;
-  padding: 0.75rem 1.5rem;
+  padding: var(--space-3) var(--space-6);
   border-radius: var(--radius-full);
   background: var(--theme-bg-elevated, var(--theme-bg-surface));
   color: var(--theme-text-primary);
@@ -540,11 +540,11 @@ html, body {
   }
 
   .answer-card {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
   }
 
   header {
-    padding: 1rem;
+    padding: var(--space-4);
   }
 }
 
@@ -712,12 +712,12 @@ button.highlight-badge:hover {
   color: var(--theme-text-primary);
 }
 @media (min-width: 768px) {
-  .opinion-text { font-size: 1.125rem; }
+  .opinion-text { font-size: var(--font-size-lg); }
 }
 .answer-preview p {
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--theme-text-secondary);
@@ -761,7 +761,7 @@ button.highlight-badge:hover {
 .highlight-btn { 
   transition: background var(--transition-normal) var(--transition-easing),
               transform var(--transition-normal) var(--transition-easing);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 .highlight-btn:hover {
@@ -858,7 +858,7 @@ button.highlight-badge:hover {
      クラス名を組み立てないので、どの値でも確実に効く。 */
   --answers-cols: 4;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 1rem;
+  gap: var(--space-4);
   transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (min-width: 640px)  { .answers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -879,7 +879,7 @@ button.highlight-badge:hover {
 
 #infoModalCard {
   position: relative;
-  padding: 2rem;
+  padding: var(--space-8);
   max-height: 85vh;
   overflow-y: auto;
 }
@@ -889,8 +889,8 @@ button.highlight-badge:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 1rem;
-  font-size: 0.75rem;
+  padding-top: var(--space-4);
+  font-size: var(--font-size-xs);
   line-height: 1rem;
   color: var(--theme-text-muted);
   border-top: 1px solid var(--theme-border-subtle);
@@ -908,11 +908,11 @@ button.highlight-badge:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   max-width: 28rem;
   margin: 0 auto;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
   background: var(--theme-bg-surface);
   border: var(--border-primary);
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -924,7 +924,7 @@ button.highlight-badge:hover {
 }
 .column-slider {
   width: 50%;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   appearance: none;
   cursor: pointer;
 }
