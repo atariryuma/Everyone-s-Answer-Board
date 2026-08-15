@@ -467,6 +467,16 @@ const header = `<!-- ===========================================================
   img, video { max-width: 100%; height: auto; }
   /* 押せるものはカーソルで分かるようにする */
   button, [role="button"] { cursor: pointer; }
+  /* ボタンの既定外観を消す。
+     Why: 背景を明示していないボタンは UA 既定の灰色 (rgb(107,107,107)) と
+     outset の立体枠になる。実際 回答カードの削除ボタンが「灰色の丸」として
+     本文の上に乗り、90 年代のフォーム部品のように見えていた。
+     色や枠は各 primitive (.btn / .reaction-btn 等) が与える。 */
+  button, input[type="button"], input[type="submit"], input[type="reset"] {
+    background-color: transparent;
+    background-image: none;
+    border-style: solid;
+  }
   table { border-collapse: collapse; }
   /* hidden 属性はブラウザ既定の [hidden]{display:none} がクラス指定に負ける。
      .class-chip-row{display:flex} の要素に hidden を付けても消えず、JS の

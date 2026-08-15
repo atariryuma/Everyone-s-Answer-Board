@@ -685,6 +685,9 @@ button.highlight-badge:hover {
    一切見えず、隣のカードと情報量が揃わなかった。意見 3 行 / 理由 2 行に配分し、
    どのカードでも「意見 → 理由」の 2 段が必ず読める状態にする。 */
 .opinion-text,
+.has-admin-actions .opinion-text {
+  padding-right: 3.25rem;
+}
 .answer-preview p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -694,6 +697,9 @@ button.highlight-badge:hover {
 .opinion-text {
   /* 右上の ★ (highlight-badge, 1.5rem) と重ならないよう逃げを作る */
   padding-right: 1.75rem;
+  /* 管理機能 ON のときは削除ボタン (32px, right:8px) も乗るので更に広げる。
+     以前は逃げが無く、見出しがボタンの下に潜って読めなくなっていた
+     (「自分の考え」「ルールが必要」等が隠れる)。 */
   -webkit-line-clamp: 3;
   line-clamp: 3;
   font-size: 1.0625rem;

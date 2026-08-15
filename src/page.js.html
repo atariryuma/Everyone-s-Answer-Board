@@ -2736,7 +2736,9 @@
       const fragment = document.createDocumentFragment();
 
       const contentDiv = document.createElement('div');
-      contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+      // has-admin-actions: 右上に削除ボタンが乗るので、見出しに逃げを作るための目印。
+      contentDiv.className = 'relative flex-grow mb-3 answer-preview'
+        + (this.state.showAdminFeatures ? ' has-admin-actions' : '');
 
       if (this.state.showAdminFeatures) {
         const deleteBtn = document.createElement('button');
