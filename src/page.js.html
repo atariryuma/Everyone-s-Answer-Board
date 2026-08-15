@@ -1581,7 +1581,7 @@
         <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-theme-status-error">初期化エラー</h3>
+        <h2 class="mt-2 text-lg font-medium text-theme-status-error">初期化エラー</h2>
         <p class="mt-1 text-sm text-theme-secondary">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
@@ -1664,7 +1664,7 @@
           <svg class="mx-auto h-12 w-12 text-theme-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <h3 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h3>
+          <h2 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h2>
           <p class="mt-1 text-sm text-theme-secondary">あなたが最初の回答者になってディスカッションを始めましょう！</p> ${formLinkHtml}
         </div> `;
       } catch (error) {
@@ -1674,7 +1674,7 @@
           <svg class="mx-auto h-12 w-12 text-theme-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <h3 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h3>
+          <h2 class="mt-2 text-lg font-medium text-theme">まだ回答がありません</h2>
           <p class="mt-1 text-sm text-theme-secondary">あなたが最初の回答者になってディスカッションを始めましょう！</p>
         </div> `;
       }
@@ -2747,7 +2747,9 @@
         contentDiv.appendChild(deleteBtn);
       }
 
-      const opinionTitle = document.createElement('h3');
+      // h2: ボードの問い (h1 #headingLabel) の直下にあたる。サイズは .opinion-text と
+      //   明示クラスで決まるため、タグを変えても見え方は変わらない。
+      const opinionTitle = document.createElement('h2');
       // text-cyan-200 は light mode の白背景で 1.25:1 しか出ず、ボードの主役である
       //   意見テキストがほぼ読めなかった。theme token 経由にして両モードで AA を満たす。
       opinionTitle.className = 'opinion-text text-theme-accent-cyan whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';

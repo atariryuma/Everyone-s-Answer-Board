@@ -34,7 +34,10 @@
         font-weight: 700;
       }
       .step-body { flex: 1; }
-      .step-body h4 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.25rem; }
+      .step-body h3 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.25rem;
+                      /* h4 から h3 へ変更 (見出し階層の飛び解消)。既定サイズが 1.17em に
+                         上がってしまうので、従来の見え方を保つため 1rem に固定する。 */
+                      font-size: 1rem; }
       .step-body p { color: var(--theme-text-secondary); font-size: 0.875rem; margin: 0; line-height: 1.6; }
       .step-body p + p { margin-top: 0.4rem; }
 
@@ -69,7 +72,7 @@
              border: 1px solid var(--theme-border-subtle);
              border-radius: 0.75rem;
              padding: 1rem; }
-      .toc h4 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
+      .toc h2 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
       .toc a {
         display: block; color: var(--theme-accent-cyan); text-decoration: none;
         padding: 0.3rem 0; font-size: 0.875rem;
@@ -107,7 +110,7 @@
         <!-- 目次 (sticky sidebar on desktop) -->
         <aside class="md:w-56 md:flex-shrink-0">
           <nav class="toc">
-            <h4> 目次</h4>
+            <h2> 目次</h2>
             <a href="#start">はじめての授業 (3分)</a>
             <a href="#lessons">授業を進める</a>
             <a href="#modes">表示モード</a>
@@ -132,7 +135,7 @@
             <div class="step-card">
               <div class="step-num">1</div>
               <div class="step-body">
-                <h4>管理パネルを開く</h4>
+                <h3>管理パネルを開く</h3>
                 <p>学校から共有された URL にアクセスし、Google アカウントでログインしてください。
                   初回は「Google スプレッドシートへのアクセスを許可」と表示されるので「許可」を押します。</p>
               </div>
@@ -141,7 +144,7 @@
             <div class="step-card">
               <div class="step-num">2</div>
               <div class="step-body">
-                <h4>「 新しい授業を作る」をクリック</h4>
+                <h3>「 新しい授業を作る」をクリック</h3>
                 <p>画面上部の <strong>授業</strong> セクションで「新しい授業をつくる」を押すと、授業フローのテンプレートが選べます:</p>
                 <p>
                   <strong>授業の定番（3段階）</strong>・<strong>低学年向け</strong>・<strong>探究（田村モデル）</strong>・<strong>議論前後（2段階）</strong>
@@ -154,7 +157,7 @@
             <div class="step-card">
               <div class="step-num">3</div>
               <div class="step-body">
-                <h4>3 ステップのウィザードで授業を作成</h4>
+                <h3>3 ステップのウィザードで授業を作成</h3>
                 <p>
                   <strong>① 基本情報</strong> (授業名・対象クラス)
                   → <strong>② フェーズ設計</strong> (各フェーズの名前 / 形式 / 質問 / 1〜5 個)
@@ -183,14 +186,14 @@
             <div class="step-card">
               <div class="step-num">1</div>
               <div class="step-body">
-                <h4>授業をつくる</h4>
+                <h3>授業をつくる</h3>
                 <p>「新しい授業をつくる」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
               </div>
             </div>
             <div class="step-card">
               <div class="step-num">2</div>
               <div class="step-body">
-                <h4>授業を実行</h4>
+                <h3>授業を実行</h3>
                 <p>「すべて作成して開始」を押すと、フェーズ 1 のフォームが自動公開されます。
                   授業の進行に合わせて <strong>「次のフェーズへ」</strong> を押し、児童画面の質問を切り替えていきます。</p>
               </div>
@@ -198,7 +201,7 @@
             <div class="step-card">
               <div class="step-num">3</div>
               <div class="step-body">
-                <h4>授業を終了 → 振り返り</h4>
+                <h3>授業を終了 → 振り返り</h3>
                 <p><strong>「授業終了」</strong> を押すと全フォームの受付が締め切られ、各フェーズの回答が保存されます。
                   授業一覧の <strong>「振り返り」</strong> ボタンから後日いつでも開けます。</p>
               </div>
