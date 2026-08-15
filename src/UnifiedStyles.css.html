@@ -317,6 +317,28 @@
     --shadow-lg: 0 var(--space-8) var(--space-20) var(--shadow-color-medium);
 
     /* =============================================================================
+     * Elevation — 「面がどれだけ浮いているか」の唯一の定義 (v2924)
+     *
+     * Why: box-shadow は 39 箇所で 31 通りに分裂しており、ほぼ一点物だった。
+     *   実態を並べると値は 3 つの役割に収束していたので、その 3 段だけを token 化する。
+     *   ここを変えれば全ての面の浮き方が揃って変わる。
+     *
+     *   1 = 置いてある面   (card / panel / modal-card。既定)
+     *   2 = 持ち上がった面 (hover、ドラッグ中、固定パネル)
+     *   3 = 浮いている面   (ドロップダウン、ポップアップ、読み込みオーバーレイ)
+     *
+     * 影ではないもの (別 token):
+     *   - focus ring は「深さ」ではなく状態表示なので --ring-focus
+     *   - status の glow (警告の光彩等) は意味を持つ演出なので個別のまま
+     * ============================================================================= */
+    --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --elevation-2: 0 4px 6px rgba(0, 0, 0, 0.07), 0 10px 20px rgba(0, 0, 0, 0.08);
+    --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+    /* focus ring: 太さと色を 1 箇所で持つ。色は用途側で上書きできるよう変数に逃がす */
+    --ring-width: 2px;
+    --ring-focus: 0 0 0 var(--ring-width) color-mix(in srgb, var(--theme-accent-cyan) 45%, transparent);
+
+    /* =============================================================================
      * Performance Optimized Computed Values
      * ============================================================================= */
     --glass-backdrop: blur(var(--backdrop-blur));
@@ -597,11 +619,8 @@
    * dark: bg-surface slate-800 で page bg slate-900 から浮く
    * light: 純白カード on slate-100 page bg、 さらに shadow で elevation 確立 */
   .glass-panel {
-    background: var(--theme-bg-surface);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-    border: var(--border-primary);
-    transition: all var(--transition-normal) var(--transition-easing);
-    border-radius: var(--radius-xl);
+    /* 面としての差分なし (共通定義のみ)。旧 glassmorphism 由来の名前を
+       互換のため残している。新規 UI では .card を使うこと。 */
   }
 
   .glass-panel:hover {
@@ -876,7 +895,7 @@
     background: var(--theme-overlay-surface-glass);
     border-radius: var(--radius-xl);
     border: 1px solid var(--theme-accent-cyan-soft);  /* brand-accent-light の薄め (loading 専用) */
-    box-shadow: 0 12px 40px var(--theme-overlay-black-60);
+    box-shadow: var(--elevation-3);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1005,14 +1024,30 @@
    *   文脈依存のところでも使うので、 「コンテンツカード」 とは semantic を分離する。
    *   .card は 「上下に積まれるコンテンツの 1 単位」 を表す。
    * 既存の .glass-panel 単体使用 (modal 等) は影響を受けない。 */
-  .card {
+  /* =============================================================================
+   * Surface — 「ページの上に置く面」の唯一の定義 (v2924)
+   *
+   * Why: .card / .glass-panel / .modal-card / .answer-card はいずれも
+   *   「bg-surface + 1px の subtle 枠 + xl 角丸 + elevation-1」という同じ面だったが、
+   *   4 箇所でそれぞれ書き写していた。面の見え方を変えたいとき 4 箇所を直す必要があり、
+   *   実際 v2913 でカードだけ変えて他が取り残された。ここ 1 箇所で全ての面が変わる。
+   *
+   *   各クラスは「面としての差分」(padding / 幅 / margin) だけを持つ。
+   * ============================================================================= */
+  .card,
+  .glass-panel,
+  .modal-card,
+  .answer-card {
     background: var(--theme-bg-surface);
     border: var(--border-primary);
     border-radius: var(--radius-xl);
+    box-shadow: var(--elevation-1);
+    transition: all var(--transition-normal) var(--transition-easing);
+  }
+
+  .card {
     padding: var(--space-6);
     margin-bottom: var(--space-4);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-    transition: all var(--transition-normal) var(--transition-easing);
   }
 
   /* compact: padding を縮めた card (情報密度の高い設定パネル等)。 旧 .info-card 相当。 */
@@ -1290,22 +1325,17 @@
     pointer-events: none;
     cursor: not-allowed;
   }
-
   .modal-card {
-    background: var(--theme-bg-surface);
-    border: var(--border-primary);
-    border-radius: var(--radius-xl);
     padding: var(--space-6);
     width: 100%;
     max-width: 28rem;  /* デフォルト = max-w-md (確認 dialog 想定) */
     margin: 0 var(--space-4);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   }
   .modal-card-md { max-width: 42rem; }   /* max-w-2xl */
   .modal-card-lg { max-width: 64rem; }   /* max-w-5xl */
   .modal-card-prominent {
     border: 2px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--elevation-3);
   }
 
   /* Message System */
@@ -1429,7 +1459,7 @@
     border: 1px solid var(--theme-accent-cyan);
     border-radius: var(--radius-lg);
     color: var(--theme-text-primary);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--elevation-2);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-slow) ease, transform var(--transition-slow) ease;
@@ -1674,17 +1704,17 @@
   .modern-select:focus {
     outline: none;
     border-color: color-mix(in srgb, var(--brand-primary) 80%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    box-shadow: var(--ring-focus);
   }
 
   .modern-select.has-ai-selection {
     border-color: color-mix(in srgb, var(--brand-primary) 60%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    box-shadow: 0 0 0 var(--ring-width) color-mix(in srgb, var(--brand-primary) 20%, transparent);
   }
 
   .modern-select.has-manual-selection {
     border-color: color-mix(in srgb, var(--brand-highlight) 60%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-highlight) 20%, transparent);
+    box-shadow: 0 0 0 var(--ring-width) color-mix(in srgb, var(--brand-highlight) 20%, transparent);
   }
 
   /* .modern-select-sm / -md は v2840 で削除 — 実 migration 無く YAGNI 違反だった。
@@ -1708,7 +1738,7 @@
   .modern-input:focus {
     outline: none;
     border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);  /* primary halo (brand identity) */
+    box-shadow: var(--ring-focus);  /* primary halo (brand identity) */
     background: var(--theme-overlay-white-10);
   }
 
@@ -2445,7 +2475,7 @@
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: var(--radius-md);
     padding: 0.4rem;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--elevation-3);
     z-index: 100;
   }
   .lesson-template-item {
@@ -2507,7 +2537,7 @@
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
     border-radius: var(--radius-md);
     padding: 0.35rem;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--elevation-3);
     z-index: 50;
   }
   .phase-add-menu-item {
@@ -2547,7 +2577,7 @@
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: var(--radius-md);
     padding: 0.4rem;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--elevation-3);
     z-index: 50;
   }
   .template-form-item {

@@ -118,7 +118,7 @@
 .eab-select:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--theme-accent-cyan) 60%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-cyan) 25%, transparent);
+  box-shadow: var(--ring-focus);
 }
 .eab-select-caret {
   position: absolute;
@@ -277,7 +277,7 @@ body:not(.admin-mode) .admin-mode-only {
 }
 #classFilter:focus, #sortOrder:focus {
   border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  box-shadow: var(--ring-focus);
 }
 :focus-visible { 
   outline: 3px solid var(--brand-primary); 
@@ -374,16 +374,15 @@ html, body {
    符号は左端のアクセントバー (::before) に集約し、カード面は 1px の subtle border と
    段階的な影で「浮いている紙」として表現する。色も情報量も変えず、密度だけを下げる。 */
 .answer-card {
+  /* 面 (背景/枠/角丸/影) は UnifiedStyles の共通定義が与える。
+     ここには回答カード固有の差分だけを書く。 */
   transition: transform var(--animation-normal) var(--transition-easing),
               box-shadow var(--animation-normal) var(--transition-easing),
               border-color var(--animation-normal) var(--transition-easing);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--theme-border-subtle);
   contain: layout style;
   position: relative;
   overflow: hidden;
   padding-left: var(--space-5);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
 }
 /* 左端のアクセントバー = リアクション符号の置き場。既定は不可視 (幅 0)。
    inset を -1px にして 1px の枠線に重ねる (v2921)。重ねないと
@@ -400,16 +399,16 @@ html, body {
 .answer-card:hover {
   transform: translateY(-2px);
   border-color: var(--theme-border-normal);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 10px 20px rgba(0,0,0,0.08);
+  box-shadow: var(--elevation-2);
 }
 /* 注目マークは「拡大 + 強い外光」から、面を保ったままの ring に。周囲のカードを
    押しのけずに 1 枚だけ立ち上がって見える状態を狙う。 */
 .answer-card.highlighted {
   border-color: var(--brand-highlight);
-  box-shadow: 0 0 0 1px var(--brand-highlight), 0 4px 6px rgba(0,0,0,0.07), 0 12px 28px color-mix(in srgb, var(--brand-highlight) 22%, transparent);
+  box-shadow: 0 0 0 1px var(--brand-highlight), var(--elevation-2), 0 12px 28px color-mix(in srgb, var(--brand-highlight) 22%, transparent);
 }
 .answer-card.highlighted:hover {
-  box-shadow: 0 0 0 1px var(--brand-highlight), 0 6px 10px rgba(0,0,0,0.09), 0 16px 36px color-mix(in srgb, var(--brand-highlight) 28%, transparent);
+  box-shadow: 0 0 0 1px var(--brand-highlight), var(--elevation-2), 0 16px 36px color-mix(in srgb, var(--brand-highlight) 28%, transparent);
 }
 .answer-card.loading {
   opacity: 0.7;
@@ -915,12 +914,12 @@ button.highlight-badge:hover {
   border-radius: var(--radius-lg);
   background: var(--theme-bg-surface);
   border: var(--border-primary);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  box-shadow: var(--elevation-2);
   pointer-events: auto;
   transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .column-slider-panel:hover {
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  box-shadow: var(--elevation-3);
 }
 .column-slider {
   width: 50%;
@@ -930,6 +929,6 @@ button.highlight-badge:hover {
 }
 .column-slider:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent-cyan) 50%, transparent);
+  box-shadow: var(--ring-focus);
 }
 </style>
