@@ -194,9 +194,26 @@
   text-align: center;
   max-width: min(100%, 60rem);
   margin: 0;
-  /* お題見出しは brand cyan とは別系統の強調色 (pink) で「問い」 を視覚的に区別。
-     Tailwind utility `text-theme-accent-pink` も Page.html で重複指定済 (defensive)。 */
-  color: var(--theme-accent-pink);
+  /* 問いの文字色は無彩色に寄せる (v2920)。
+     Why: 画面で最も大きい文字を高彩度にすると、彩度が「意味」ではなく「装飾」として
+     効いてしまい、しかも本文 (無彩色) との方針が食い違う。現代的な作りでは文字は
+     無彩色に寄せ、彩度は操作・状態・符号のために取っておく。
+     「問い = pink」という意味付けは下のアクセントラインで保つ。 */
+  color: var(--theme-text-primary);
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+/* 「問い」であることを示す小さな pink のしるし。文字を塗らずに意味だけ残す。 */
+.eab-question::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 2.5rem;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--theme-accent-pink);
 }
 @media (min-width: 640px) { .eab-question { font-size: 1.5rem; } }
 @media (min-width: 768px) { .eab-question { font-size: 1.875rem; } }
@@ -257,8 +274,6 @@ header {
   top: 0;
   z-index: var(--z-elevated);
   contain: layout;
-  backdrop-filter: var(--glass-backdrop);
-  -webkit-backdrop-filter: var(--glass-backdrop);
   transition: transform 0.25s ease-out;
   will-change: transform;
 }
@@ -289,7 +304,6 @@ header.header-hidden {
   font-size: 0.875rem;
   font-weight: 500;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(8px);
   pointer-events: none;
   /* transform は JS が指に追随させるため transition から外す。opacity / border-color だけ CSS 側。 */
   transition: opacity var(--transition-normal) ease-out, border-color var(--transition-quick) ease-out, box-shadow var(--transition-quick) ease-out;
@@ -453,8 +467,6 @@ html, body {
 }
 .admin-toggle {
   transition: background-color var(--animation-normal) var(--transition-easing);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 .admin-toggle:hover {
   background-color: color-mix(in srgb, var(--brand-accent-light) 10%, transparent);
@@ -632,8 +644,10 @@ button.highlight-badge:hover {
 .answer-card.reaction-border-3::before { width: 7px; }
 
 .answer-card {
-  height: 232px;
-  min-height: 200px;
+  /* v2920: 組版を締めた分だけ高さも詰める。232px では本文の下に余白が残り、
+     区切り線とリアクションだけが浮いて見えていた。 */
+  height: 208px;
+  min-height: 180px;
 }
 
 @media (max-width: 640px) {
@@ -644,9 +658,10 @@ button.highlight-badge:hover {
   }
 }
 .answer-preview {
-  min-height: 60px;
-  max-height: 150px;
-  overflow: hidden;
+  /* 高さの上限は line-clamp (意見 3 行 / 理由 2 行) だけで決める。
+     px の max-height を併用すると、clamp が許した行を途中で切ってしまい
+     「できないから。」のように文字が半分だけ見える状態になる。 */
+  min-height: 52px;
 }
 
 /* 意見と理由を同じ 4 行 clamp で並べていたため、意見が長いカードでは理由が
@@ -660,11 +675,18 @@ button.highlight-badge:hover {
   text-overflow: ellipsis;
 }
 .opinion-text {
+  /* 右上の ★ (highlight-badge, 1.5rem) と重ならないよう逃げを作る */
+  padding-right: 1.75rem;
   -webkit-line-clamp: 3;
   line-clamp: 3;
   font-size: 1.0625rem;
   line-height: 1.45;
   letter-spacing: 0.01em;
+  /* 意見テキストは無彩色 (v2920)。以前は全カードの見出しを cyan で塗っており、
+     6 枚並ぶと画面が彩度で埋まっていた。主役は文章そのものなので、色ではなく
+     大きさと太さで理由 (secondary) との主従を作る。cyan は識別 pill / リンク /
+     focus といった「操作」の側に残す。 */
+  color: var(--theme-text-primary);
 }
 @media (min-width: 768px) {
   .opinion-text { font-size: 1.125rem; }
@@ -848,7 +870,14 @@ button.highlight-badge:hover {
   font-size: 0.75rem;
   line-height: 1rem;
   color: var(--theme-text-muted);
-  border-top: 2px dashed color-mix(in srgb, var(--theme-accent-cyan) 80%, transparent);
+  border-top: 1px solid var(--theme-border-subtle);
+}
+
+/* カード内の区切り (v2920)。以前は 2px の破線 cyan で、カード 1 枚ごとに
+   高彩度の線が入り視線が散っていた。区切りは「そこに境目がある」ことだけ
+   伝われば十分なので、1px の subtle 実線にする。 */
+.card-footer-divider {
+  border-top: 1px solid var(--theme-border-subtle);
 }
 
 /* 画面下の列数スライダー (教師のみ表示) */

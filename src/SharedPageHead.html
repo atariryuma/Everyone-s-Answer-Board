@@ -726,8 +726,6 @@
   .glass-panel {
     background: var(--theme-bg-surface);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-    -webkit-backdrop-filter: var(--glass-backdrop);
-    backdrop-filter: var(--glass-backdrop);
     border: var(--border-primary);
     transition: all var(--transition-normal) var(--transition-easing);
     border-radius: 1rem;
@@ -1011,8 +1009,6 @@
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   .loading-message {
@@ -1431,8 +1427,6 @@
     max-width: 28rem;  /* デフォルト = max-w-md (確認 dialog 想定) */
     margin: 0 var(--space-4);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-    -webkit-backdrop-filter: var(--glass-backdrop);
-    backdrop-filter: var(--glass-backdrop);
   }
   .modal-card-md { max-width: 42rem; }   /* max-w-2xl */
   .modal-card-lg { max-width: 64rem; }   /* max-w-5xl */
@@ -1563,8 +1557,6 @@
     border-radius: 0.75rem;
     color: var(--theme-text-primary);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-slow) ease, transform var(--transition-slow) ease;
@@ -1739,8 +1731,6 @@
       margin: 0.5rem;
       padding: 1rem;
       /* Performance optimization for low-end devices */
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
       background: var(--theme-bg-elevated);
     }
 
@@ -2955,7 +2945,6 @@
   .border { border-width: 1px; border-style: solid; }
   .border-2 { border-width: 2px; border-style: solid; }
   .border-cyan-400 { border-color: #22d3ee; }
-  .border-cyan-400\/80 { border-color: color-mix(in srgb, #22d3ee 80%, transparent); }
   .border-l-2 { border-left-width: 2px; border-style: solid; }
   .border-t { border-top-width: 1px; border-style: solid; }
   .border-theme-normal { border-color: var(--theme-border-normal); }

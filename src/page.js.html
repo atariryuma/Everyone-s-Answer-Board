@@ -2648,7 +2648,10 @@
     createCardElement(safeData) {
       const card = document.createElement('div');
       const highlightClass = safeData.highlight ? 'highlighted' : '';
-      card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+      // v2920: shadow-lg / border-2 / border-cyan-400/80 は虹色枠時代の名残で、
+      //   .answer-card 側の border/shadow に後勝ちで潰されていた死んだ指定。
+      //   rounded-xl も .answer-card の border-radius と重複するため落とす。
+      card.className = 'relative answer-card glass-panel p-4 flex flex-col justify-between cursor-pointer' + highlightClass;
       card.dataset.rowIndex = safeData.rowIndex;
       card.setAttribute('role', 'article');
       card.setAttribute('tabindex', '0');
@@ -2704,8 +2707,8 @@
         `<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-theme-accent-cyan bg-theme-card-1 px-2 py-1 rounded border border-cyan-400">${window.sharedUtilities.security.escapeHtml(displayName)}</span></div>` : '';
 
       const containerClass = nameHtml ?
-        'text-xs text-theme-muted pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' :
-        'text-xs text-theme-muted pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+        'text-xs text-theme-muted pt-3 card-footer-divider flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' :
+        'text-xs text-theme-muted pt-3 card-footer-divider flex justify-end items-center';
 
       return { nameHtml, containerClass };
     }
@@ -2752,7 +2755,7 @@
       const opinionTitle = document.createElement('h2');
       // text-cyan-200 は light mode の白背景で 1.25:1 しか出ず、ボードの主役である
       //   意見テキストがほぼ読めなかった。theme token 経由にして両モードで AA を満たす。
-      opinionTitle.className = 'opinion-text text-theme-accent-cyan whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+      opinionTitle.className = 'opinion-text whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
       opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
 
       contentDiv.appendChild(opinionTitle);
