@@ -24,7 +24,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { checkBrandAliasResidue } = require('./lib/brand-alias-check');
-const { extractBlockBody } = require('./lib/theme-core');
+const { extractBlockBody, scaleMap } = require('./lib/theme-core');
+const { isGeneratedSource, isVendor } = require('./lib/src-files');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -52,32 +53,6 @@ const matrix = spawnSync('node', ['scripts/theme-matrix.js', '--uncovered'], { c
 const bleedMatch = matrix.stdout.match(/actionable theme-bleed:\s*(\d+)/);
 const bleedCount = bleedMatch ? parseInt(bleedMatch[1]) : -1;
 check('1. CSS hardcoded theme-bleed = 0', bleedCount === 0, `${bleedCount} 件`);
-
-// 2. theme 非対応の生パレット文字色 = 0
-//   v2925: 判定を theme-pair-tailwind.js に外注していたが、移行完了で同ツールを
-//   削除したため、この軸だけで自己完結させる (外部ツールに依存すると、そのツールを
-//   消した瞬間にゲートが無言で落ちる)。
-//   対象は「light mode で読めなくなる淡い文字色」。text-{palette}-100..300 は
-//   dark 前提の色で、白背景では 1.2:1 程度まで落ちる (v2916 で実害を確認済み)。
-//   面の色や solid ボタンは対象外 — 文字色だけが可読性に直結する。
-function countUnpairedText() {
-  const PALETTE = 'cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|red|orange|'
-    + 'amber|yellow|lime|green|emerald|teal|slate|gray|zinc|neutral|stone';
-  const re = new RegExp(`\\btext-(?:${PALETTE})-(?:100|200|300)\\b`, 'g');
-  const hits = [];
-  for (const f of HTML_FILES) {
-    if (f === 'UtilityStyles.css.html' || f === 'SharedPageHead.html') continue;
-    readSrc(f).split('\n').forEach((line, i) => {
-      const t = line.trim();
-      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
-      for (const m of line.match(re) || []) hits.push(`${f}:${i + 1} ${m}`);
-    });
-  }
-  return hits;
-}
-const unpaired = countUnpairedText();
-check('2. theme 非対応の淡い文字色 = 0', unpaired.length === 0,
-  unpaired.length === 0 ? '✓ 0 件' : `${unpaired.length} 件: ${unpaired.slice(0, 3).join(', ')}`);
 
 // 3. inline style="color:#xxx" / "background:#xxx" — exempt-block 範囲を AST 風に解析
 let inlineHex = 0;
@@ -328,7 +303,8 @@ check('24. Typography token (size/weight/leading) 定義', missingFont.length ==
 // 25. font-size の Tailwind スケール準拠率 ≥ 90% (Tailwind の text-xs/sm/base/lg/xl/2xl/3xl/4xl に近接)
 function countFontSizes() {
   const files = ['UnifiedStyles.css.html', 'page.css.html', 'page.viz.css.html'];
-  const STD = new Set(['0.75rem', '0.875rem', '1rem', '1.125rem', '1.25rem', '1.5rem', '1.875rem', '2.25rem']);
+  // 準拠とみなす値は --font-size-* の定義そのものから読む (書き写すとスケール変更で嘘になる)。
+  const STD = new Set(Object.keys(scaleMap(SRC, 'font-size')));
   let std = 0, total = 0;
   for (const f of files) {
     const text = readSrc(f);
@@ -471,7 +447,8 @@ check('29. Theme utility 利用率 ≥ 80%', cons.ratio >= 0.8, `${cons.themeUti
 // 26. border-radius の Tailwind スケール準拠率 ≥ 80%
 function countRadii() {
   const files = ['UnifiedStyles.css.html', 'page.css.html', 'page.viz.css.html'];
-  const STD = new Set(['0.25rem', '0.5rem', '0.75rem', '1rem', '1.5rem', '9999px', '50%']);
+  // --radius-* の定義 + 円 (50%)。50% は token 化する意味がない値なので明示的に足す。
+  const STD = new Set([...Object.keys(scaleMap(SRC, 'radius')), '50%']);
   let std = 0, total = 0;
   for (const f of files) {
     const text = readSrc(f);
@@ -562,7 +539,9 @@ check('31. Status + Accent rgba hardcoded = 0 (color-mix 統一)',
 //   themeManager 側 (SharedUtilities) は CSS 読み込み後なので --theme-bg-base を直接読んでおり、
 //   ここでは検査対象外。
 function checkThemeBarSync() {
-  const css = fs.readFileSync(path.join(SRC, 'UnifiedStyles.css.html'), 'utf8');
+  // readSrc / HTML_FILES を使う。以前は fs 直読み + readdirSync で、他のどの軸も
+  //   読まない d3.min.html (280KB) 等まで読み込んでいた。
+  const css = readSrc('UnifiedStyles.css.html');
   const grab = (startRe) => {
     const body = extractBlockBody(css, startRe) || '';
     const m = body.match(/--theme-bg-base:\s*([^;]+);/);
@@ -575,7 +554,7 @@ function checkThemeBarSync() {
   const bad = [];
 
   // SharedThemeBoot の literal
-  const boot = fs.readFileSync(path.join(SRC, 'SharedThemeBoot.html'), 'utf8');
+  const boot = readSrc('SharedThemeBoot.html');
   const bm = boot.match(/THEME_BAR_COLORS\s*=\s*\{\s*dark:\s*'([^']+)'\s*,\s*light:\s*'([^']+)'/);
   if (!bm) bad.push('SharedThemeBoot: THEME_BAR_COLORS を読めない');
   else {
@@ -584,9 +563,10 @@ function checkThemeBarSync() {
   }
 
   // 静的 meta[name=theme-color] を持つページ (初期表示用。dark 既定)
-  for (const f of fs.readdirSync(SRC).filter((x) => x.endsWith('.html'))) {
-    if (f === 'SharedPageHead.html') continue; // 生成物。元ファイル側で検査済み
-    const s = fs.readFileSync(path.join(SRC, f), 'utf8');
+  for (const f of HTML_FILES) {
+    if (!f.endsWith('.html') || isVendor(f)) continue;
+    const s = readSrc(f);
+    if (isGeneratedSource(s)) continue;  // 生成物。元ファイル側で検査済み
     const m = s.match(/<meta\s+name="theme-color"\s+content="([^"]+)"/i);
     if (m && m[1].toLowerCase() !== dark) bad.push(`${f} meta ${m[1]} ≠ --theme-bg-base ${dark}`);
   }
@@ -600,6 +580,9 @@ const barSync = checkThemeBarSync();
 check('32. mobile chrome bar 色 = --theme-bg-base', barSync.ok, barSync.detail);
 
 // 33. light mode で読めなくなる生 Tailwind 文字色が残っていないか
+//   v2927: 同じ検査を軸 2 としても書いており、1 つの違反を 2 回減点していた
+//   (軸 2 の除外リスト UtilityStyles/SharedPageHead は該当 0 件で無意味だった)。
+//   検査はここ 1 本に統合する。
 // Why: text-<color>-100..300 は dark 前提の淡い色で、light mode の白背景に載ると
 //   コントラストが 1.2:1 程度まで落ちて実質読めない。実際 page.js の意見カード見出しが
 //   text-cyan-200 のまま残り、ボードの主役テキストが light mode で 1.25:1 だった。

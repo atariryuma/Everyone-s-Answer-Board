@@ -17,6 +17,10 @@
  *   6. HTML の要素 ID を JS が参照しているとき、その ID が存在するか
  *   7. appsscript.json が JSON として妥当か
  *   8. *.css.html の中身が <style> の外にはみ出していないか
+ *   9. HTML コメント内に scriptlet が残っていないか (GAS はコメント内も評価する)
+ *  10. include 対象が scriptlet を持たないか (include はテンプレート評価しない)
+ *  11. <use href="#i-X"> の X が SVG sprite に定義されているか
+ *  12. アイコンを使うページが sprite を include しているか
  *
  * 使い方:
  *   npm run check:gas          # 全項目
@@ -56,6 +60,16 @@ function check(name, ok, detail) {
   results.push({ name, ok, detail });
   if (!ok) problems.push(`${name}: ${detail}`);
 }
+
+// HTML コメントを同じ長さの空白に潰す (行番号を保つため)。
+//   コメント内の記述を「実際のコード」と誤認しないために各所で使う。
+const blankComments = (src) => src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+
+// scriptlet 内の include('x') が指す名前を列挙する。
+//   Why: 同じ 3 行 (コメント潰し → matchAll → .html 落とし) を項目 10/11/13 が
+//   それぞれ書いており、片方だけ直すと検査がずれる状態だった。
+const includesOf = (src) => [...blankComments(src)
+  .matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)].map((m) => m[1].replace(/\.html$/, ''));
 
 // 行番号の算出（エラーメッセージ用）
 function lineOf(src, index) {
@@ -234,7 +248,7 @@ for (const s of jsSrc.values()) {
 }
 
 // ── 9. HTML コメント内に生きた scriptlet が残っていないか ────────────
-// Why: include() は createTemplateFromFile().evaluate() (main.js) なので、
+// Why: ページ本体は doGet が createTemplateFromFile().evaluate() で描画するため、
 //   テンプレートエンジンは HTML より先に走る。つまり <!-- --> の中に書いた
 //   <? ... ?> も「コメントだから無害」ではなく、そのまま評価される。
 //   使い方の説明をファイル冒頭のコメントに書く運用と相性が最悪で、用例のつもりで
@@ -254,61 +268,29 @@ for (const s of jsSrc.values()) {
   check('9. HTML コメント内に生きた scriptlet がない', bad.length === 0, bad.join(', '));
 }
 
-// ── 10. include() が循環していないか ────────────────────────────────
-// Why: 9 で塞ぐのはコメント経由の自己 include だけ。通常のコードで A→B→A と
-//   組んでも同じく無限再帰になり、症状は「全ページが落ちる」で同じ。
-//   9 とは独立した経路なので別項目として持つ。
-{
-  const graph = new Map();
-  for (const [f, src] of htmlSrc) {
-    const deps = [];
-    // コメント内は 9 が担当するので、ここでは実コードのみ見る。
-    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
-    for (const m of code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)) {
-      deps.push(m[1].replace(/\.html$/, ''));
-    }
-    graph.set(f.replace(/\.html$/, ''), deps);
-  }
-  const cycles = [];
-  const seen = new Set();
-  const walk = (node, stack) => {
-    for (const next of graph.get(node) || []) {
-      if (stack.includes(next)) {
-        const cycle = [...stack.slice(stack.indexOf(next)), next].join(' → ');
-        if (!seen.has(cycle)) { seen.add(cycle); cycles.push(cycle); }
-        continue;
-      }
-      walk(next, [...stack, next]);
-    }
-  };
-  for (const node of graph.keys()) walk(node, [node]);
-  check('10. include() が循環していない', cycles.length === 0, cycles.join(', '));
-}
-
-// ── 11. include 対象が scriptlet を持たないか ───────────────────────
+// ── 10. include 対象が scriptlet を持たないか ───────────────────────
 // Why: include() は createHtmlOutputFromFile().getContent() (main.js) で、テンプレート評価を
 //   しない。これは include 対象 13 ファイル (計 963KB) が scriptlet を 1 つも持たないことを
 //   前提にした最適化で、この前提が崩れると scriptlet が生テキストとして画面に出る。
 //   9/10 が「評価される側」の事故を防ぐのに対し、これは「評価されない側」の前提を守る。
-//   入れ子 include もここで弾かれるため、循環は構造的に発生しない。
+//   入れ子 include もここで弾かれるため、include の深さは常に 1 で、循環は構造的に
+//   発生し得ない。以前は循環検出を別項目で持っていたが、この項目に完全に包含される
+//   (常に true を返すだけの) 検査だったので畳んだ。
 {
   const targets = new Set();
-  for (const [, src] of [...jsSrc, ...htmlSrc]) {
-    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
-    for (const m of code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)) targets.add(m[1]);
-  }
+  for (const [, src] of [...jsSrc, ...htmlSrc]) for (const n of includesOf(src)) targets.add(n);
   const bad = [];
   for (const name of targets) {
-    const f = htmlFiles.includes(name) ? name : `${name}.html`;
+    const f = `${name}.html`;
     const src = htmlSrc.get(f);
     if (src === undefined) continue; // 1 が実在チェックを担当
     const s = src.match(/<\?/);
     if (s) bad.push(`${f}:${lineOf(src, s.index)} include 対象に scriptlet がある`);
   }
-  check('11. include 対象が scriptlet を持たない', bad.length === 0, bad.join(', '));
+  check('10. include 対象が scriptlet を持たない', bad.length === 0, bad.join(', '));
 }
 
-// ── 12. SVG sprite の参照先が実在するか ─────────────────────────
+// ── 11. SVG sprite の参照先が実在するか ─────────────────────────
 // Why: <use href="#i-xxx"> は参照先が無くても例外を出さず、ただ「何も描画されない」。
 //   コンソールにも出ないので、アイコンだけが消えた画面が本番に出ても気付けない。
 //   実際 i-alert-triangle (ログイン画面とエラー画面の警告)、i-grid-2x2 (列設定)、
@@ -317,36 +299,39 @@ for (const s of jsSrc.values()) {
 {
   const sprite = htmlSrc.get('SharedIcons.html') || '';
   const defined = new Set([...sprite.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].map((m) => m[1]));
-  // page.js の getIcon() が持つ PAIRED 集合と一致させる
-  const PAIRED = new Set(['hand-thumb-up', 'lightbulb', 'magnifying-glass-plus', 'star']);
+  // PAIRED 集合は page.js の getIcon() 定義から読む。書き写すと、対に増減があったとき
+  //   検査だけが古い規則で展開し、存在しない symbol を「ある」と誤判定する。
+  const pairedLiteral = (htmlSrc.get('page.js.html') || '').match(/PAIRED\s*=\s*new Set\(\[([^\]]*)\]/);
+  const PAIRED = new Set(pairedLiteral ? [...pairedLiteral[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : []);
+  if (!pairedLiteral) problems.push('11. page.js.html の PAIRED 定義を読めなかった (getIcon の実装が変わった?)');
   const missing = [];
   const want = (id, f, s, idx) => {
     if (!defined.has(id)) missing.push(`${f}:${lineOf(s, idx)} #${id}`);
   };
   for (const [f, s] of [...jsSrc, ...htmlSrc]) {
     for (const m of s.matchAll(/getIcon\(\s*'([a-zA-Z0-9_-]+)'/g)) {
-      const n = m.group ? m.group(1) : m[1];
+      const n = m[1];
       if (PAIRED.has(n)) { want(`i-${n}-outline`, f, s, m.index); want(`i-${n}-solid`, f, s, m.index); }
       else want(`i-${n}`, f, s, m.index);
     }
     if (f === 'SharedIcons.html') continue; // sprite 自身の内部参照は対象外
     for (const m of s.matchAll(/href="#(i-[a-zA-Z0-9_-]+)"/g)) want(m[1], f, s, m.index);
   }
-  check('12. SVG sprite の参照先が実在する', missing.length === 0, missing.join(', '));
+  check('11. SVG sprite の参照先が実在する', missing.length === 0, missing.join(', '));
 }
 
-// ── 13. アイコンを使うページが sprite を読み込んでいるか ─────────
+// ── 12. アイコンを使うページが sprite を読み込んでいるか ─────────
 // Why: symbol が定義されていても、そのページが SharedIcons を include していなければ
 //   <use> は解決先を見つけられず、やはり無言で何も描画されない。12 とは別の失敗経路。
 //   実際 ErrorBoundary と Unpublished が参照だけ持っていて sprite を読んでいなかった。
 {
-  const PAGES = ['LoginPage', 'AdminPanel', 'Page', 'TeacherManual', 'ErrorBoundary',
-    'Unpublished', 'SetupPage', 'AppSetupPage', 'AccessRestricted'];
-  const depsOf = (name) => {
-    const src = htmlSrc.get(`${name}.html`) || '';
-    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
-    return [...code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)].map((m) => m[1].replace(/\.html$/, ''));
-  };
+  // ページの列挙は直書きしない。新しいページを足した人がこの配列を更新し忘れると、
+  //   検査は「全ページ OK」と言いながらそのページだけ素通しする = 無言で失敗するゲートになる。
+  //   <body> を持つファイル = 単体で描画される画面、という構造から導出する。
+  const PAGES = [...htmlSrc]
+    .filter(([, src]) => /<body[\s>]/.test(src))
+    .map(([f]) => f.replace(/\.html$/, ''));
+  const depsOf = (name) => includesOf(htmlSrc.get(`${name}.html`) || '');
   const treeOf = (name, seen = new Set()) => {
     if (seen.has(name)) return seen;
     seen.add(name);
@@ -363,7 +348,7 @@ for (const s of jsSrc.values()) {
     });
     if (usesIcon && !tree.has('SharedIcons')) bad.push(`${page}.html が SharedIcons を include していない`);
   }
-  check('13. アイコン使用ページが sprite を読み込む', bad.length === 0, bad.join(', '));
+  check('12. アイコン使用ページが sprite を読み込む', bad.length === 0, bad.join(', '));
 }
 
 // ── 出力 ──────────────────────────────────────────────────────────

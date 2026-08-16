@@ -24,18 +24,15 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { listSourceHtml } = require('./lib/src-files');
 
 const SRC = path.resolve(__dirname, '../src');
 const OUT = path.join(SRC, 'UtilityStyles.css.html');
 const CHECK = process.argv.includes('--check');
 
-const VENDOR = new Set(['d3.min.html', 'tinySegmenter.html']);
-// 生成物は走査しない。中身は元ファイルの複製なので、読むと「生成物が入力に混ざる」
-// フィードバックループになり、生成のたびに結果が育っていく。
-// SharedPageHead.html は gen-pagehead.js が UtilityStyles.css.html ごと展開した生成物。
-const GENERATED = new Set(['UtilityStyles.css.html', 'SharedPageHead.html']);
-const htmlFiles = fs.readdirSync(SRC)
-  .filter((f) => f.endsWith('.html') && !VENDOR.has(f) && !GENERATED.has(f));
+// 生成物 / vendor の判定は lib/src-files が持つ。生成物を走査すると「生成物が入力に
+// 混ざる」フィードバックループになり、生成のたびに結果が育つ (v2910 で実際に起きた)。
+const htmlFiles = listSourceHtml(SRC);
 
 // ── 1. 使用クラスの収集 ────────────────────────────────────────────
 const used = new Set();

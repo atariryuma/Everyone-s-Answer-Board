@@ -469,7 +469,7 @@
     });
 
     // dropdown が開いている間だけ親カードの z-index を上げる。
-    // Why: .glass-panel の backdrop-filter が各カードを独立 stacking context にするため、
+    // Why: カードは transition / box-shadow で独立した stacking context を作るため、
     //   メニュー内の z-index では右側パネルカード (DOM 後方 = ソース順で上) を超えられない。
     //   親カード自体の z-index を持ち上げれば、その stacking context 全体が上に出る。
     document.addEventListener('toggle', (e) => {

@@ -380,9 +380,11 @@ html, body {
               box-shadow var(--animation-normal) var(--transition-easing),
               border-color var(--animation-normal) var(--transition-easing);
   contain: layout style;
-  position: relative;
-  overflow: hidden;
   padding-left: var(--space-5);
+  /* v2920: 組版を締めた分だけ高さも詰める。232px では本文の下に余白が残り、
+     区切り線とリアクションだけが浮いて見えていた。 */
+  height: 208px;
+  min-height: 180px;
 }
 /* 左端のアクセントバー = リアクション符号の置き場。既定は不可視 (幅 0)。
    inset を -1px にして 1px の枠線に重ねる (v2921)。重ねないと
@@ -528,12 +530,6 @@ html, body {
     --animation-duration: 0.1s;
   }
 
-  .glass-panel {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: var(--theme-bg-surface);
-  }
-
   .answer-card:hover {
     transform: none;
   }
@@ -579,11 +575,6 @@ html, body {
 .low-performance .answer-card:hover {
   transform: none;
   box-shadow: var(--shadow-sm);
-}
-
-.low-performance .glass-panel {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 /* Optimize for high DPI displays */
@@ -658,13 +649,6 @@ button.highlight-badge:hover {
 .answer-card.reaction-border-1::before { width: 4px; }
 .answer-card.reaction-border-2::before { width: 6px; }
 .answer-card.reaction-border-3::before { width: 8px; }
-
-.answer-card {
-  /* v2920: 組版を締めた分だけ高さも詰める。232px では本文の下に余白が残り、
-     区切り線とリアクションだけが浮いて見えていた。 */
-  height: 208px;
-  min-height: 180px;
-}
 
 @media (max-width: 640px) {
   .answer-card {

@@ -23,45 +23,39 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { listSourceHtml } = require('./lib/src-files');
+const { scaleMap } = require('./lib/theme-core');
 
 const SRC = path.resolve(__dirname, '../src');
 const DRY = process.argv.includes('--dry-run');
 const CHECK = process.argv.includes('--check');
 
-// 生成物と vendor は対象外
-const SKIP = new Set(['d3.min.html', 'tinySegmenter.html', 'SharedPageHead.html', 'UtilityStyles.css.html']);
+// 生成物と vendor の判定は lib/src-files が持つ (名前ではなく中身の【自動生成】で判定)
 
-// 値 → token。UnifiedStyles.css.html の定義と一致していること。
-const RADIUS = { '0': 'none', '0.25rem': 'sm', '0.5rem': 'md', '0.75rem': 'lg', '1rem': 'xl', '9999px': 'full' };
-const FONT = {
-  '0.75rem': 'xs', '0.875rem': 'sm', '1rem': 'base', '1.125rem': 'lg',
-  '1.25rem': 'xl', '1.5rem': '2xl', '1.875rem': '3xl', '2.25rem': '4xl',
-};
-const SPACE = {
-  '0.25rem': '1', '0.5rem': '2', '0.75rem': '3', '1rem': '4', '1.25rem': '5',
-  '1.5rem': '6', '2rem': '8', '2.5rem': '10', '3rem': '12', '4rem': '16', '5rem': '20',
-};
-
-// 対象プロパティ → 使う変換表
+// 対象プロパティ → 使う変換表。接頭辞から token 名を組み立てる。
 const RULES = [
-  { props: ['border-radius'], map: RADIUS, tok: (v) => `var(--radius-${v})` },
-  { props: ['font-size'], map: FONT, tok: (v) => `var(--font-size-${v})` },
+  { props: ['border-radius'], prefix: 'radius' },
+  { props: ['font-size'], prefix: 'font-size' },
   {
     props: ['gap', 'row-gap', 'column-gap', 'padding', 'padding-top', 'padding-right',
       'padding-bottom', 'padding-left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left'],
-    map: SPACE,
-    tok: (v) => `var(--space-${v})`,
+    prefix: 'space',
   },
-];
+].map((r) => ({
+  ...r,
+  map: scaleMap(SRC, r.prefix),
+  // 正規表現は起動時に 1 回だけ組む (以前はファイル x セグメント x ルールで再生成していた)
+  re: new RegExp(`(^|[;{\\s])(${r.props.join('|')})\\s*:\\s*([^;{}!]+)(;|\\})`, 'g'),
+}));
 
 const findings = [];
 
-function convertDeclValue(prop, raw, map, tok) {
+function convertDeclValue(raw, map, prefix) {
   // 複数値 (padding: 0.5rem 1rem) は 1 つずつ見る。すべて変換できる場合のみ置換する
   //   (一部だけ token になると、かえって読みにくくなるため)。
   const parts = raw.trim().split(/\s+/);
   if (!parts.length || parts.length > 4) return null;
-  const out = parts.map((p) => (Object.prototype.hasOwnProperty.call(map, p) ? tok(map[p]) : null));
+  const out = parts.map((p) => (Object.prototype.hasOwnProperty.call(map, p) ? `var(--${prefix}-${map[p]})` : null));
   if (out.some((x) => x === null)) return null;
   return out.join(' ');
 }
@@ -78,10 +72,9 @@ function processFile(file) {
     const converted = segments.map((seg) => {
       if (seg.startsWith('/*')) return seg;
       let s = seg;
-      for (const { props, map, tok } of RULES) {
-        const re = new RegExp(`(^|[;{\\s])(${props.join('|')})\\s*:\\s*([^;{}!]+)(;|\\})`, 'g');
+      for (const { map, prefix, re } of RULES) {
         s = s.replace(re, (m, pre, prop, val, post) => {
-          const conv = convertDeclValue(prop, val, map, tok);
+          const conv = convertDeclValue(val, map, prefix);
           if (!conv) return m;
           changed += 1;
           findings.push(`${file}: ${prop}: ${val.trim()} → ${conv}`);
@@ -97,7 +90,7 @@ function processFile(file) {
   return changed;
 }
 
-const files = fs.readdirSync(SRC).filter((f) => f.endsWith('.html') && !SKIP.has(f));
+const files = listSourceHtml(SRC);
 let total = 0;
 for (const f of files) total += processFile(f);
 

@@ -1,4 +1,6 @@
 'use strict';
+const fs = require('fs');
+const path = require('path');
 
 /**
  * theme-core.js — theme-*.js CLI 群で重複していた色/CSS token ユーティリティの
@@ -94,7 +96,34 @@ function extractTokensFromBody(body) {
   return tokens;
 }
 
+/**
+ * UnifiedStyles.css.html の :root から「値 → token 名」の対応表を作る。
+ *
+ * Why: この対応表を各ツールに書き写すと、スケールを再調整した瞬間 (--radius-md を
+ *   0.375rem にする等) に古い値を正として扱い始める。tokenize は誤変換を全ファイルへ
+ *   適用し、theme-perfect は「スケール準拠」を旧スケールで採点する。定義から読めば
+ *   その事故は起こり得ない。
+ * @param {string} srcDir  src/ の絶対パス
+ * @param {string} prefix  'radius' | 'font-size' | 'space'
+ * @returns {Record<string, string>} 例: { '1rem': 'xl' }
+ */
+function scaleMap(srcDir, prefix) {
+  const css = fs.readFileSync(path.join(srcDir, 'UnifiedStyles.css.html'), 'utf8');
+  const tokens = extractTokensFromBody(extractBlockBody(css, /:root\s*\{/));
+  const map = {};
+  for (const [name, value] of Object.entries(tokens)) {
+    if (!name.startsWith(`--${prefix}-`)) continue;
+    const key = value.trim();
+    // 0 は単位を持たず「スケール上の値」ではない。var(--space-0) と書いても読みやすくならない。
+    if (key === '0' || key === '0px') continue;
+    // 同値の token が複数あるときは先に定義された方を採る (スケールは一意が前提)。
+    if (!(key in map)) map[key] = name.slice(prefix.length + 3);
+  }
+  return map;
+}
+
 module.exports = {
+  scaleMap,
   parseColor,
   blendOnBg,
   relativeLuminance,

@@ -732,10 +732,8 @@
   /* Glass Panel Effects (v2815+: card elevation を border + shadow で明示)
    * dark: bg-surface slate-800 で page bg slate-900 から浮く
    * light: 純白カード on slate-100 page bg、 さらに shadow で elevation 確立 */
-  .glass-panel {
-    /* 面としての差分なし (共通定義のみ)。旧 glassmorphism 由来の名前を
-       互換のため残している。新規 UI では .card を使うこと。 */
-  }
+  /* .glass-panel 自体は面としての差分を持たない (上の共通定義がすべて)。
+     旧 glassmorphism 由来の名前を互換のため残しているだけで、新規 UI では .card を使う。 */
 
   .glass-panel:hover {
     border-color: var(--theme-border-normal);
@@ -887,17 +885,12 @@
 
   /* Answer Card System (from Page.html) */
   .answer-card {
-    /* Card-specific CSS variables for better encapsulation */
+    /* 面 (背景 / 枠 / 角丸 / 影 / transition) は上の Surface 共通定義が与える。
+       ここに書けるのは回答カード固有の差分だけ。 */
     --card-hover-transform: translateY(-2px);
-    --card-border-radius: 1rem;
     --card-padding: 1.5rem;
-    --card-transition: all var(--transition-normal) var(--transition-easing);
 
-    background: var(--theme-bg-surface);
-    border: var(--border-primary);
-    border-radius: var(--card-border-radius);
     padding: var(--card-padding);
-    transition: var(--card-transition);
     position: relative;
     overflow: hidden;
   }
