@@ -462,6 +462,25 @@
     --elevation-2: 0 4px 6px rgba(0, 0, 0, 0.07), 0 10px 20px rgba(0, 0, 0, 0.08);
     --elevation-3: 0 12px 32px rgba(0, 0, 0, 0.5);
     /* focus ring: 太さと色を 1 箇所で持つ。色は用途側で上書きできるよう変数に逃がす */
+    /* =============================================================================
+     * Component density — 「この種類の部品はこの詰まり具合」の唯一の定義 (v2925)
+     *
+     * Why: padding が 126 箇所で 78 通りに分裂していた。役割ごとに見ると
+     *   ピル 14 箇所で 12 通り、メニュー項目 13 箇所で 11 通りといった状態で、
+     *   差はすべて 1px 前後 (0.3/0.7 と 0.35/0.65 等)。意図した差ではなく揺れ。
+     *   部品の詰まり具合をここで決め、各所はこの token を参照する。
+     *
+     * space スケールに乗らない端数を持つのは意図的。UI 部品の詰まりは
+     * レイアウトの余白 (--space-*) とは別の粒度で決まるため。
+     * ============================================================================= */
+    --pad-badge: 0.1rem 0.45rem;      /* 文字だけの小ラベル (状態バッジ等) */
+    --pad-pill: 0.35rem 0.65rem;      /* 押せるピル (フィルタ、識別チップ) */
+    --pad-menu: 0.4rem;               /* ドロップダウンの外枠 */
+    --pad-menu-item: 0.5rem 0.7rem;   /* ドロップダウンの各項目 */
+    --pad-input: 0.875rem 1rem;       /* フォーム入力欄 */
+    --pad-input-sm: 0.3rem 0.5rem;    /* 表内などの小さい入力欄 */
+    --pad-nested: 0.6rem 0.8rem;      /* 面の中に置く小さい面 (行、内訳ボックス、tooltip) */
+
     --ring-width: 2px;
     --ring-focus: 0 0 0 var(--ring-width) color-mix(in srgb, var(--theme-accent-cyan) 45%, transparent);
 
@@ -1125,7 +1144,7 @@
     transform: translateX(-50%);
     background: var(--theme-overlay-black-90);
     color: white;
-    padding: 6px 10px;
+    padding: var(--pad-nested);
     border-radius: var(--radius-md);
     font-size: var(--font-size-xs);  /* 12px — token に統一 */
     white-space: nowrap;
@@ -1380,7 +1399,7 @@
   /* 状態バッジ (admin 一覧表内)。色は 2 値だけに絞り、面ではなく文字色で表す。 */
   .admin-badge {
     display: inline-block;
-    padding: 0.1rem 0.45rem;
+    padding: var(--pad-badge);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
@@ -1850,7 +1869,7 @@
   /* Modern Input Styling - modern-selectと統一デザイン */
   .modern-input {
     width: 100%;
-    padding: 0.875rem 1rem;
+    padding: var(--pad-input);
     background: var(--theme-overlay-white-05);
     border: var(--border-primary);
     border-radius: var(--radius-lg);
@@ -2120,7 +2139,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.3rem 0.7rem;
+    padding: var(--pad-pill);
     border-radius: var(--radius-full);
     background: color-mix(in srgb, var(--brand-primary) 18%, transparent);  /* brand-primary 薄背景 */
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
@@ -2283,7 +2302,7 @@
   /* Phase preview & detail UI (Wizard Step 2) */
   .phase-preview {
     margin-bottom: 0.6rem;
-    padding: 0.5rem 0.6rem;
+    padding: var(--pad-nested);
     background: color-mix(in srgb, var(--theme-accent-cyan-deep) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 25%, transparent);
     border-radius: var(--radius-md);
@@ -2357,7 +2376,7 @@
     color: var(--theme-text-muted); font-size: var(--font-size-sm);
   }
   .phase-detail-row input {
-    flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: var(--font-size-sm);
+    flex: 1; min-width: 0; padding: var(--pad-input-sm); font-size: var(--font-size-sm);
   }
   .phase-choice-list {
     margin-top: 0.4rem;
@@ -2367,7 +2386,7 @@
     display: flex; gap: 0.3rem; align-items: center;
   }
   .phase-choice-row input {
-    flex: 1; padding: 0.3rem 0.5rem; font-size: var(--font-size-sm);
+    flex: 1; padding: var(--pad-input-sm); font-size: var(--font-size-sm);
   }
   .phase-choice-del {
     background: none; border: none;
@@ -2440,7 +2459,7 @@
     color: var(--theme-accent-cyan);
     font-size: var(--font-size-sm);
     text-align: center;
-    padding: 0.4rem;
+    padding: var(--pad-menu);
   }
   .phase-image-hint-icon { font-size: var(--font-size-xl); }
   .phase-image-preview {
@@ -2478,7 +2497,7 @@
     margin-left: 0.4rem;
     font-size: var(--font-size-xs);
     color: color-mix(in srgb, var(--theme-accent-cyan-strong) 90%, transparent);
-    padding: 0.05rem 0.4rem;
+    padding: var(--pad-badge);
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
     border-radius: var(--radius-md);
   }
@@ -2489,7 +2508,7 @@
     background: var(--theme-card-2);
     border: 1px solid var(--theme-border-subtle);
     border-radius: var(--radius-md);
-    padding: 0.5rem 0.6rem;
+    padding: var(--pad-nested);
   }
   .phase-extra-label {
     font-size: var(--font-size-xs);
@@ -2601,7 +2620,7 @@
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: var(--radius-md);
-    padding: 0.4rem;
+    padding: var(--pad-menu);
     box-shadow: var(--elevation-3);
     z-index: 100;
   }
@@ -2610,7 +2629,7 @@
     flex-direction: column;
     width: 100%;
     text-align: left;
-    padding: 0.55rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -2663,7 +2682,7 @@
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
     border-radius: var(--radius-md);
-    padding: 0.35rem;
+    padding: var(--pad-menu);
     box-shadow: var(--elevation-3);
     z-index: 50;
   }
@@ -2671,7 +2690,7 @@
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -2703,7 +2722,7 @@
     background: var(--theme-card-3);
     border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: var(--radius-md);
-    padding: 0.4rem;
+    padding: var(--pad-menu);
     box-shadow: var(--elevation-3);
     z-index: 50;
   }
@@ -2712,7 +2731,7 @@
     flex-direction: column;
     width: 100%;
     text-align: left;
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -2745,7 +2764,7 @@
     display: flex;
     gap: 0.7rem;
     align-items: flex-start;
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
     border-radius: var(--radius-md);
@@ -2771,14 +2790,14 @@
     background: color-mix(in srgb, var(--status-warning) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-warning) 40%, transparent);
     border-radius: var(--radius-md);
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     font-size: var(--font-size-sm);
     color: var(--theme-status-warning-text);
   }
   .confirm-warnings li { margin: 0.15rem 0; }
   .confirm-ok {
     margin: 0;
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: color-mix(in srgb, var(--status-success) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-success) 30%, transparent);
     border-radius: var(--radius-md);
@@ -2789,7 +2808,7 @@
   /* lesson.start エラー時の retry box */
   .lesson-start-error-box {
     margin-top: 0.7rem;
-    padding: 0.7rem 1rem;
+    padding: var(--pad-nested);
     background: color-mix(in srgb, var(--status-error) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
     border-radius: var(--radius-md);
@@ -2856,7 +2875,7 @@
 
   /* Lesson list (過去レッスン一覧) */
   #lesson-list li {
-    padding: 0.6rem 0.8rem;
+    padding: var(--pad-nested);
     background: var(--theme-card-2);
     border-radius: var(--radius-md);
     display: flex;
@@ -2871,7 +2890,7 @@
   #lesson-list li > .flex-1 { min-width: 8rem; }
   #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
-    font-size: var(--font-size-xs); padding: 0.1rem 0.5rem; border-radius: var(--radius-full);
+    font-size: var(--font-size-xs); padding: var(--pad-badge); border-radius: var(--radius-full);
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
   }
   #lesson-list .lesson-state-badge.state-active {

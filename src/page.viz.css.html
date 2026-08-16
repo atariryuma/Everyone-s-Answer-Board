@@ -184,7 +184,7 @@
     color: var(--brand-accent-light);
     background: color-mix(in srgb, var(--theme-accent-cyan) 10%, transparent);  /* accent-cyan の薄め */
     border: 1px solid color-mix(in srgb, var(--theme-accent-cyan) 30%, transparent);
-    padding: 0.1rem 0.4rem;
+    padding: var(--pad-badge);
     border-radius: var(--radius-md);
     font-weight: 600;
     vertical-align: middle;
@@ -288,7 +288,7 @@
     color: var(--theme-text-primary);
     border: 1px solid var(--theme-border-normal);
     border-radius: var(--radius-md);
-    padding: 0.6rem 0.8rem;
+    padding: var(--pad-nested);
     max-width: 22rem;
     font-size: var(--font-size-sm);
     line-height: 1.45;
@@ -513,7 +513,7 @@
     color: var(--theme-accent-cyan);
     font-weight: 700;
     text-align: center;
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: var(--theme-accent-cyan-soft);
     border-radius: var(--radius-md);
     border: 1px solid var(--theme-accent-cyan);
@@ -604,7 +604,7 @@
   .qs-cell {
     border: 1px solid var(--theme-border-subtle);
     border-radius: var(--radius-md);
-    padding: 0.5rem 0.7rem;
+    padding: var(--pad-menu-item);
     background: var(--theme-card-2);
     min-height: 4rem;
   }
@@ -625,7 +625,7 @@
     border: 1px solid color-mix(in srgb, var(--theme-accent-indigo) 35%, transparent);
     color: var(--theme-accent-cyan);
     border-radius: var(--radius-full);
-    padding: 0.12rem 0.55rem;
+    padding: var(--pad-badge);
     font-size: var(--font-size-sm);
     line-height: 1.3;
   }
