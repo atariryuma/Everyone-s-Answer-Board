@@ -53,11 +53,31 @@ const bleedMatch = matrix.stdout.match(/actionable theme-bleed:\s*(\d+)/);
 const bleedCount = bleedMatch ? parseInt(bleedMatch[1]) : -1;
 check('1. CSS hardcoded theme-bleed = 0', bleedCount === 0, `${bleedCount} 件`);
 
-// 2. Tailwind unpaired actionable = 0  (theme-pair-tailwind を実行して何件出るか)
-const pairDry = spawnSync('node', ['scripts/theme-pair-tailwind.js', '--dry-run'], { cwd: ROOT, encoding: 'utf8' });
-const pairMatch = pairDry.stdout.match(/Total pairings:\s*(\d+)/);
-const pairCount = pairMatch ? parseInt(pairMatch[1]) : -1;
-check('2. Tailwind unpaired auto-fixable = 0', pairCount === 0, `${pairCount} 件 (auto-pair で修正可能なもの)`);
+// 2. theme 非対応の生パレット文字色 = 0
+//   v2925: 判定を theme-pair-tailwind.js に外注していたが、移行完了で同ツールを
+//   削除したため、この軸だけで自己完結させる (外部ツールに依存すると、そのツールを
+//   消した瞬間にゲートが無言で落ちる)。
+//   対象は「light mode で読めなくなる淡い文字色」。text-{palette}-100..300 は
+//   dark 前提の色で、白背景では 1.2:1 程度まで落ちる (v2916 で実害を確認済み)。
+//   面の色や solid ボタンは対象外 — 文字色だけが可読性に直結する。
+function countUnpairedText() {
+  const PALETTE = 'cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|red|orange|'
+    + 'amber|yellow|lime|green|emerald|teal|slate|gray|zinc|neutral|stone';
+  const re = new RegExp(`\\btext-(?:${PALETTE})-(?:100|200|300)\\b`, 'g');
+  const hits = [];
+  for (const f of HTML_FILES) {
+    if (f === 'UtilityStyles.css.html' || f === 'SharedPageHead.html') continue;
+    readSrc(f).split('\n').forEach((line, i) => {
+      const t = line.trim();
+      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+      for (const m of line.match(re) || []) hits.push(`${f}:${i + 1} ${m}`);
+    });
+  }
+  return hits;
+}
+const unpaired = countUnpairedText();
+check('2. theme 非対応の淡い文字色 = 0', unpaired.length === 0,
+  unpaired.length === 0 ? '✓ 0 件' : `${unpaired.length} 件: ${unpaired.slice(0, 3).join(', ')}`);
 
 // 3. inline style="color:#xxx" / "background:#xxx" — exempt-block 範囲を AST 風に解析
 let inlineHex = 0;
@@ -255,8 +275,11 @@ check('19. page.viz light override ≥ 9 件', lightOverrideCount >= 9, `${light
 //   2026-07 の docs 再編で theme の詳細 (保守 CLI フロー含む) を CLAUDE.md から
 //   docs/THEME.md へ移譲し、CLAUDE.md からはリンクで辿る構成にした。本 axis の意図は
 //   「フローが文書化され追跡可能なこと」なので、移譲先の docs/THEME.md も判定対象に含める。
+//   v2925: 判定条件に theme:tokenize (削除済みコマンド) を含めていたため、
+//   ツール削除で無言で落ちる状態だった。現行の保守コマンド名で判定する。
 const hasMaintenanceFlow = (text) =>
-  /theme:matrix.*theme:uncovered.*theme:tokenize/s.test(text) ||
+  /theme:matrix.*theme:uncovered/s.test(text) ||
+  /check:tokens|tokenize:dim/.test(text) ||
   /theme-card-1.*theme-card-2.*theme-card-3/s.test(text);
 const claudemd = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
 const themeDocPath = path.join(ROOT, 'docs', 'THEME.md');

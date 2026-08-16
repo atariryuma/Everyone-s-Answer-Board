@@ -322,24 +322,22 @@ npm run test:coverage                 # 既存カバレッジを記録
 
 ---
 
-## 7. 一回限り / 移行専用ツールの棚卸し
+## 7. 移行専用ツールについて
 
-移行が終わったツールを放置すると「使うべき現役ツール」と見分けがつかなくなる。残作業の有無を
-定期的に確認し、ゼロなら削除候補として下表に記録する（**削除自体はユーザー判断**）。
+移行が終わったツールは残さず削除する。残すと「使うべき現役ツール」と見分けがつかず、
+しかも削除時に「そのツールを呼んでいたゲート」が無言で壊れる (実際 theme-perfect の
+軸 2 が theme-pair-tailwind に判定を外注しており、削除で落ちた)。
 
-確認日: 2026-08-14
+**判定を外部ツールに外注しない。** ゲートは自己完結させ、移行ツールは変換だけを担う。
 
-| スクリプト | 残作業 | 判定 |
-| ---------- | ------ | ---- |
-| `theme-tokenize.js` | 1 件 | **現役**。`npm run theme:tokenize:dry` で確認 |
-| `theme-pair-tailwind.js` | 0 件 | 削除候補（移行完了） |
-| `theme-normalize-typography.js` | 0 件 | 削除候補（移行完了）。npm scripts 未登録 |
-| `export-board-data.js` | — | 削除候補。道徳 5/14 の 3 スプレッドシートを ID 直書きした一回限りの書き出し（v2727）。npm scripts 未登録 |
+削除済み (2026-08-15、いずれも残作業 0 を確認してから削除):
 
-残作業の確認方法：
+| スクリプト | 役割 | 完了時点 |
+| ---------- | ---- | -------- |
+| `theme-tokenize.js` | slate/gray rgba → semantic token | v2925 |
+| `theme-pair-tailwind.js` | 生パレット文字色 → theme 対応 | v2925 |
+| `theme-normalize-typography.js` | 中途半端な寸法 → Tailwind scale | v2925 |
+| `export-board-data.js` | 道徳 5/14 の 3 SS を CSV 書き出し (一回限り) | — |
 
-```bash
-node scripts/theme-tokenize.js --dry-run
-node scripts/theme-pair-tailwind.js --dry-run
-node scripts/theme-normalize-typography.js --dry-run
-```
+現役の変換ツールは `tokenize-dimensions.js` (`npm run tokenize:dim`) のみ。
+生値の再混入は `npm run check:tokens` が CI で止める。

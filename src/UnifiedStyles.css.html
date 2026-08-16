@@ -38,7 +38,6 @@
      * 文脈依存の背景・前景・境界は --theme-* を直接使う ( alias 廃止 v2849)
      * ============================================================================= */
     --brand-primary: #3b82f6;
-    --brand-primary-secondary: #1d4ed8;
     --brand-accent: #fbbf24;
     --brand-accent-light: #8be9fd;
 
@@ -152,10 +151,6 @@
     /* Pink accent (お題見出し用 — brand cyan とは別系統の強調色) */
     --theme-accent-pink: #f472b6;            /* pink-400 — vibrant on dark bg */
 
-    /* Scrollbar (Page.html answer modal で使う) */
-    --theme-scrollbar-thumb: rgba(255, 255, 255, 0.20);
-    --theme-scrollbar-track: rgba(255, 255, 255, 0.05);
-
     /* Link hover (cyan accent の hover 状態) */
     --theme-accent-cyan-hover: #67e8f9;                /* cyan-300 (brighter than --theme-accent-cyan) */
 
@@ -198,10 +193,6 @@
     /* =============================================================================
      * Google Workspace Integration
      * ============================================================================= */
-    --google-blue: #4285f4;
-    --google-green: #34a853;
-    --google-yellow: #fbbc05;
-    --google-red: #ea4335;
 
     /* =============================================================================
      * Z-Index Hierarchy System - Logical Layering
@@ -250,11 +241,6 @@
     /* =============================================================================
      * Responsive Breakpoint System - Tailwind Compliant
      * ============================================================================= */
-    --breakpoint-sm: 640px;   /* Small screens */
-    --breakpoint-md: 768px;   /* Medium screens */
-    --breakpoint-lg: 1024px;  /* Large screens */
-    --breakpoint-xl: 1280px;  /* Extra large screens */
-    --breakpoint-2xl: 1536px; /* 2X Extra large screens */
 
     /* =============================================================================
      * Alpha Values & Opacity System - Comprehensive
@@ -295,8 +281,6 @@
 
     --border-style: solid;
     --border-primary: var(--border-width-thin) var(--border-style) var(--theme-border-subtle);
-    --border-accent: var(--border-width-normal) var(--border-style) var(--brand-primary);
-    --border-status-error: var(--border-width-thin) var(--border-style) var(--status-error);
     --border-status-success: var(--border-width-thin) var(--border-style) var(--status-success);
 
     /* Border Radius System */
@@ -360,9 +344,6 @@
     /* =============================================================================
      * Performance Optimized Computed Values
      * ============================================================================= */
-    --glass-backdrop: blur(var(--backdrop-blur));
-    --transition-standard: all var(--transition-normal) var(--transition-easing);
-    --transition-transform: transform var(--transition-normal) var(--transition-easing);
 
     /* =============================================================================
      * Animation & Transform System - Standardized Values
@@ -376,15 +357,6 @@
     --animation-fast: 0.15s;                       /* fade-in / entry — transition-quick の base */
     --animation-normal: 0.3s;
     --animation-slow: 0.5s;
-
-    --transform-subtle: translateY(-1px);
-    --transform-normal: translateY(-2px);
-    --transform-strong: translateY(-4px);
-    --transform-float: translateY(-8px);
-
-    --scale-subtle: 1.02;
-    --scale-normal: 1.05;
-    --scale-strong: 1.1;
 
     --backdrop-blur: 12px;
   }
@@ -499,10 +471,6 @@
     --theme-status-highlight-text: #7e22ce;  /* purple-700 — light 5.4:1 */
     --theme-status-accent-soft: #cffafe;     /* cyan-100 opaque — 他 status-X-soft と統一 (v2854) */
     --theme-status-accent-strong: #0e7490;
-
-    /* Scrollbar (light) */
-    --theme-scrollbar-thumb: rgba(15, 23, 42, 0.25);
-    --theme-scrollbar-track: rgba(15, 23, 42, 0.05);
 
     /* Link hover (cyan accent の hover 状態) - light mode は さらに濃く */
     --theme-accent-cyan-hover: #155e75;                /* cyan-800 */
@@ -737,7 +705,6 @@
     color: white;
   }
 
-
   /* btn-success / btn-warning: 緑/黄 brand bg は本質的に light なので、 white 文字では
      AA contrast fail (white on emerald-500 = 2.5:1, on amber-500 = 2.15:1)。
      dark text (slate-900) を使うことで両モードで 5:1 以上確保 (5.0/9.7:1)。 */
@@ -781,7 +748,6 @@
     color: var(--theme-status-info-text);
   }
 
-
   /* Button Size Variants */
 
   /* CTA Button with Shimmer Effect */
@@ -819,7 +785,6 @@
   .answer-card:not(:hover) {
     will-change: auto;
   }
-
 
   .answer-card.loading {
     opacity: 0.7;
@@ -952,7 +917,6 @@
     animation: spin 1s linear infinite;
     margin-bottom: var(--space-6);
   }
-
 
   /* Ensure QuickStart progress bar is visible */
   #quickstart-progress {
@@ -1587,7 +1551,6 @@
     }
   }
 
-
   @keyframes slideInFromBottom {
     0% {
       opacity: 0;
@@ -1600,7 +1563,6 @@
       will-change: auto;
     }
   }
-
 
   /* Font Styles */
 
@@ -1648,7 +1610,6 @@
       font-size: 16px;
     }
 
-
     .glass-panel {
       margin: 0.5rem;
       padding: var(--space-4);
@@ -1673,9 +1634,6 @@
       will-change: transform;
     }
   }
-
-
-
 
   /* Accessibility support - prefers-reduced-motion (btn:disabled only) */
   @media (prefers-reduced-motion: reduce) {

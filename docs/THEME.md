@@ -64,7 +64,6 @@ body.theme-light {
 - Transition: `--transition-{fast,normal,slow}` = 0.1/0.2/0.3s
 - Z-index: `--z-{base,content,elevated,overlay,dropdown,modal,notification,tooltip,critical}` = 0..9999 9 段
 
-非標準値は段階的に最近接 token へ移行 (CLI: [scripts/theme-normalize-typography.js](../scripts/theme-normalize-typography.js))。
 
 ---
 
@@ -144,8 +143,6 @@ themeManager.subscribe(fn)  // 切替時 callback (unsub 関数を返す)
 ```bash
 npm run theme:matrix      # 全 token (dark/light 値) + 主要 contrast マトリクス + hardcoded 集計
 npm run theme:uncovered   # body.theme-light 上書きの無い hardcoded を一覧 (修正 worklist)
-npm run theme:tokenize:dry # slate/gray rgba を token に置換するプレビュー
-npm run theme:tokenize    # 実行 (テスト + theme:contrast で検証推奨)
 npm run theme:contrast    # WCAG AA 全 pair 検証 (≥4.5 本文 / ≥3 アイコン)
 npm run theme:verify      # 統合ゲート: 12 軸 / 120 点満点 / CI 用
 ```
@@ -164,16 +161,13 @@ apply モードの移行が完了していても削除してはいけない。
 **(a) gate 依存** — `theme:perfect` / `theme:verify` が dry-run を spawn して regression を検出する
 ([scripts/theme-perfect.js](../scripts/theme-perfect.js)):
 
-- `theme-pair-tailwind.js` (`theme:pair`): apply 移行は完了 (残 0 件) だが `--dry-run` を
   `theme:perfect` axis 2「Tailwind unpaired = 0」が実行する。削除すると axis 2 が fail する。
 - `theme-matrix.js` (axis 1) / `theme-contrast.js` (axis 6) / `theme-verify.js` (axis 7) /
   `theme-audit.js` も gate から spawn される現役依存。
 
 **(b) 再利用可能な正規化ユーティリティ** — 新しい非標準値が入るたびに再実行できる linter 的ツール:
 
-- `theme-tokenize.js` (`theme:tokenize`): rgba/slate → token 置換。現状残 1 件 (page.viz.css.html の
   `rgba(148,163,184,0.5)` → `--theme-border-strong`。light mode で border が追従しない軽微な残り)。
-- `theme-normalize-typography.js`: 中途半端な font-size / border-radius → Tailwind scale token。
   現状残 0 件だが、新規非標準値の再検出に使える。
 
 **参考: `theme:uncovered`** は 43 件残るが actionable な theme-bleed は 0 件 (brand-identity 色/shadow は

@@ -8,7 +8,8 @@
  *   padding 20/126)。同じ「0.5rem の角丸」を 48 箇所で個別に書いている状態で、
  *   スケールを変えたくても一括で変えられない。値を token に寄せて管理点を 1 つにする。
  *
- *   色は theme-tokenize.js が担当する。ここは寸法 (radius / font-size / space) のみ。
+ *   対象は寸法 (radius / font-size / space) のみ。色は semantic theme token として
+ *   既に統一済みで、theme-perfect が生値の混入を検出する。
  *
  * 安全性:
  *   token と完全に同値のものだけを置換する (0.5rem → var(--radius-md))。
