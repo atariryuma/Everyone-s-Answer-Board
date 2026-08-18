@@ -4436,15 +4436,23 @@
       const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
       const container = document.getElementById('lesson-runner-phases');
       if (container) {
+        // カードは押せるステッパー: 隣以外へも直接ジャンプできる (サーバは targetIndex 対応済)。
+        //   現在地だけ押せない = 位置の表示に徹する (ボード上の pill と同じ規約)。
         container.innerHTML = phases.map((p, i) => {
           const cls = i < activeIdx ? 'completed': i === activeIdx ? 'active': '';
           const marker = i < activeIdx ? '': i === activeIdx ? '▶': '';
-          return `<div class="lesson-phase-card ${cls}">
+          const current = i === activeIdx;
+          return `<button type="button" class="lesson-phase-card ${cls}" data-phase-jump="${i}"
+            ${current ? 'disabled aria-current="true"' : ''}
+            title="${current ? '現在のフェーズ' : 'このフェーズに切替える'}">
             <div class="phase-number">${marker} フェーズ ${i + 1}</div>
             <div class="phase-name">${window.sharedUtilities.security.escapeHtml(p.name || '')}</div>
             <div class="phase-meta"> ${p.formTemplate}</div>
-          </div>`;
+          </button>`;
         }).join('');
+        container.querySelectorAll('[data-phase-jump]').forEach((card) => {
+          card.addEventListener('click', () => lessonAdvance('next', Number(card.dataset.phaseJump)));
+        });
       }
       const prevBtn = document.getElementById('lesson-prev-btn');
       const nextBtn = document.getElementById('lesson-next-btn');
@@ -4452,13 +4460,15 @@
       if (nextBtn) nextBtn.disabled = activeIdx >= phases.length - 1;
     }
 
-    function lessonAdvance(direction) {
+    function lessonAdvance(direction, targetIndex) {
       if (!currentLessonId) return;
       // Why: onclick="lessonAdvance(...)" の inline 呼出から this を渡す代わりに、
       //   既知の DOM id で button を引いて withBusy にかける (連打抑制 + spinner)。
       const btn = document.getElementById(direction === 'next'? 'lesson-next-btn': 'lesson-prev-btn');
       const busyText = direction === 'next'? '切替中...': '戻し中...';
-      const task = () => gasRun('lesson.advance', { userId, lessonId: currentLessonId, direction }).then((res) => {
+      const params = { userId, lessonId: currentLessonId, direction };
+      if (Number.isInteger(targetIndex)) params.targetIndex = targetIndex;
+      const task = () => gasRun('lesson.advance', params).then((res) => {
         if (res && res.success) {
           currentLessonEtag = res.data.lesson.etag;
           renderRunner(res.data.lesson);
@@ -4473,6 +4483,21 @@
       }
     }
     window.lessonAdvance = lessonAdvance;
+
+    // Runner ヘッダーのボード導線。URL は決定的 (mode=view&userId) なので都度組み立てる。
+    (function initRunnerBoardActions() {
+      const openBtn = document.getElementById('lesson-runner-open-board');
+      const copyBtn = document.getElementById('lesson-runner-copy-url');
+      if (openBtn) openBtn.addEventListener('click', () => {
+        if (!window.sharedUtilities?.buttons?.navOnce(openBtn)) return;
+        buildWebAppUrl('view', { userId }, (url) => window.open(url, '_blank'),
+          () => window.showError && window.showError('ボードの URL を取得できませんでした'));
+      });
+      if (copyBtn) copyBtn.addEventListener('click', () => {
+        buildWebAppUrl('view', { userId }, (url) => copyViewUrl(url),
+          () => window.showError && window.showError('ボードの URL を取得できませんでした'));
+      });
+    })();
 
     function lessonEnd() {
       if (!currentLessonId) return;

@@ -2182,6 +2182,17 @@
     padding: 0.85rem 1rem;
     min-width: 180px;
     transition: border-color var(--transition-quick) ease, background var(--transition-quick) ease;
+    /* Runner ではカード自体がステッパーの button になる */
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  button.lesson-phase-card:hover:not(:disabled) {
+    border-color: var(--theme-border-normal);
+  }
+  button.lesson-phase-card:disabled {
+    cursor: default; /* 現在地 = 位置の表示に徹する */
   }
   .lesson-phase-card.active {
     border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);

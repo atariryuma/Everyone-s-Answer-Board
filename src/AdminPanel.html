@@ -520,6 +520,25 @@
         </details>
       </section>
 
+      <!-- 連携先を開く: 設問文や回答本文の実体は Google 側にある。その入口はデータソースの隣に置く。 -->
+      <section class="subsection">
+        <h3 class="subsection-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>
+          連携先を開く
+        </h3>
+        <div class="resource-buttons flex flex-wrap gap-2">
+          <button id="open-spreadsheet-btn" class="btn btn-secondary" disabled type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-table"></use></svg>
+            スプレッドシート
+          </button>
+          <button id="open-form-btn" class="btn btn-secondary" disabled type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-form"></use></svg>
+            フォーム
+          </button>
+        </div>
+        <div id="resource-status" class="text-xs text-theme-muted mt-2">設定を読み込み中...</div>
+      </section>
+
       <!-- ② 列設定: フォーム接続時に自動推定が走るので、UI は controlled disclosure -->
       <section class="subsection">
         <h3 class="subsection-title">
@@ -538,6 +557,7 @@
             <div id="answer-confidence" class="text-xs mt-1 hidden">
               <span class="confidence-badge"></span>
             </div>
+            <p class="text-xs text-theme-muted mt-1">この列の見出し（＝フォームの質問文）がボードの設問として表示されます。設問を変えるには上の「フォーム」からフォーム側の質問文を編集してください。</p>
           </div>
 
           <!-- 数値列の明示マッピング (matrix/numberline/auto で表示).
@@ -769,24 +789,6 @@
 
       </section>
 
-      <!-- ⑤ 連携先を開く -->
-      <section class="subsection">
-        <h3 class="subsection-title">
-          <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>
-          連携先を開く
-        </h3>
-        <div class="resource-buttons flex flex-wrap gap-2">
-          <button id="open-spreadsheet-btn" class="btn btn-secondary" disabled type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-table"></use></svg>
-            スプレッドシート
-          </button>
-          <button id="open-form-btn" class="btn btn-secondary" disabled type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-form"></use></svg>
-            フォーム
-          </button>
-        </div>
-        <div id="resource-status" class="text-xs text-theme-muted mt-2">設定を読み込み中...</div>
-      </section>
 
       </div><!-- /.card -->
       </div><!-- /#tab-board -->

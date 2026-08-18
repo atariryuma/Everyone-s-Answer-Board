@@ -128,10 +128,26 @@
 
 <!-- ============== Runner (実行中、body.mode-run-lesson 時に表示) ============== -->
 <section id="lesson-runner" class="card">
-  <header class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-semibold text-theme inline-flex items-center gap-2">
+  <header class="flex items-center gap-3 mb-4 flex-wrap">
+    <!-- 全画面モードの出口。授業は実行中のまま (終了は「授業終了」だけが行う)。 -->
+    <button type="button" class="btn btn-secondary" onclick="exitLessonCreateMode()"
+      title="授業は実行中のまま管理パネルに戻ります">
+      <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg> パネルに戻る
+    </button>
+    <h2 class="text-xl font-semibold text-theme inline-flex items-center gap-2" style="margin:0;">
        <span id="lesson-runner-name">授業中</span>
     </h2>
+    <span class="ml-auto"></span>
+    <!-- 授業中に一番使う導線: 投影用にボードを開く / 生徒に URL を配る。
+         旧実装はステータスバーごと takeover で隠れ、授業中だけ届かなかった。 -->
+    <button type="button" id="lesson-runner-copy-url" class="btn btn-secondary"
+      title="閲覧用URLをコピー（生徒への共有用）">
+      <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
+    </button>
+    <button type="button" id="lesson-runner-open-board" class="btn btn-primary"
+      title="回答ボードを開く（投影用）">
+      <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
+    </button>
   </header>
 
   <!-- フェーズカード横並び -->
