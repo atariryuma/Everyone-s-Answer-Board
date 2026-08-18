@@ -65,6 +65,31 @@ SA pool の shared 設定 (SA pool 全員を editor 追加) は [SharingHelper.j
 
 ---
 
+## データ保存則 (v2931)
+
+共有 DB (テナントごとに別スプレッドシート) は 1 つのルールで統一する:
+
+> **有界で書き換わる状態 = JSON セル / 無界で追記一回きりのアーカイブ = 1 件 1 行**
+
+| シート | 種別 | 中身 |
+| ------ | ---- | ---- |
+| `users` | 状態 | `configJson` (1 ユーザー数 KB、有界) |
+| `lessons` | 状態 | `lessonJson` = 授業の定義 + 遷移履歴 + **範囲ポインタ** (~4KB) |
+| `lesson_responses` | アーカイブ | 1 回答 1 行 × 9 列、追記のみ |
+
+- snapshot は `{sheet, startRow, rowCount}` のポインタを持ち、読み出しは範囲読み
+  (規模に依らず 1 フェーズ分のセルのみ)。行は `lessonId + phaseIndex` を照合し、
+  ポインタずれで他授業の回答が混入しない。
+- 書込は SA proxy の `appendRows` (values:append)。複数行が連続範囲で原子的に入り、
+  応答の updatedRange から開始行を得る (lock 不要)。
+- 授業削除は `lessons` 行のみ (アーカイブ行は孤児として残る = 照合ガードで無害)。
+- **アーカイブ行を lessonJson に戻さない**こと。Sheets の 1 セル 50,000 字上限に対する
+  本文切り詰め (shrink) サブシステムが復活する。v2931 で 1 授業 44,698 字 → 4,198 字。
+- ポインタは sheet 名を持つので、将来 `lesson_responses_2027` のような年次分割へ
+  移行しても過去ポインタはそのまま読める。
+- 保守: `lesson.migrateArchive` (旧形式→ポインタ) / `lesson.recaptureArchive`
+  (元 SS が読める phase を全文で焼き直す)。
+
 ## 負荷検証 (CI 対象外、手動)
 
 ```bash
