@@ -3209,6 +3209,7 @@
             <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
+            ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-reopen="${safeId}" title="授業を再開して回答受付を再開する">再開</button>` : ''}
             <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="この授業をテンプレートとして複製"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製</button>
             <button class="btn btn-danger text-xs" data-lesson-delete="${safeId}" title="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg>削除</button>
           </li>`;
@@ -3244,6 +3245,30 @@
           // draft → wizard で続きから編集
           openLessonWizard(lessonId);
         }
+        return;
+      }
+      const reopenTarget = event.target.closest('[data-lesson-reopen]');
+      if (reopenTarget) {
+        const lessonId = reopenTarget.dataset.lessonReopen;
+        window.modals.confirm(
+          '授業を再開しますか？終了時のフェーズから回答受付が再開されます。',
+          { title: '授業を再開', okLabel: '再開する' }
+        ).then((ok) => {
+          if (!ok) return;
+          const task = () => gasRun('lesson.reopen', { userId, lessonId }).then((res) => {
+            if (res && res.success) {
+              window.notifications.success(res.message || '授業を再開しました');
+              loadLessonList();
+            } else {
+              window.showError((res && res.message) || '再開に失敗しました');
+            }
+          });
+          if (window.sharedUtilities && window.sharedUtilities.buttons) {
+            window.sharedUtilities.buttons.withBusy(reopenTarget, task, { busyText: '再開中...' });
+          } else {
+            task();
+          }
+        });
         return;
       }
       const delTarget = event.target.closest('[data-lesson-delete]');

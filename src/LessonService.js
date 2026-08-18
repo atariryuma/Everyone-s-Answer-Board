@@ -1190,6 +1190,16 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx, lessonId) {
 // snapshots[] への upsert: 同 phaseIndex があれば replace、なければ append。
 //   phaseIndex 昇順を維持 (replay の slider が時系列で歩けるように)。
 function __upsertSnapshot_(lessonJson, snapshot) {
+  // 失敗 capture (reason 付き・中身なし) で、データを持つ既存 snapshot を上書きしない。
+  //   Why: 再開した授業のフェーズ切替中に一時的な read 失敗があっても、過去の正常な
+  //   記録 (ポインタ or 旧形式 rows) が空の失敗記録に置き換わる事故を防ぐ。
+  const existing = (lessonJson.snapshots || []).find(s => s && s.phaseIndex === snapshot.phaseIndex);
+  const hasData = (sn) => !!sn && ((sn.rowCount > 0) || (Array.isArray(sn.rows) && sn.rows.length > 0));
+  if (snapshot.reason && !hasData(snapshot) && hasData(existing)) {
+    console.warn('__upsertSnapshot_: capture 失敗のため既存 snapshot を保持: phase '
+      + snapshot.phaseIndex + ' (' + snapshot.reason + ')');
+    return;
+  }
   lessonJson.snapshots = (lessonJson.snapshots || [])
     .filter(s => s && s.phaseIndex !== snapshot.phaseIndex)
     .concat(snapshot)
@@ -1426,6 +1436,65 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     });
   } catch (error) {
     logError_('advanceLessonPhase', error);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 完了した授業を再開する (completed → active)。
+ *
+ * Why: 「翌日に続きを受け付けたい」「終了操作が早すぎた」を救う逆遷移。
+ *   再開位置は profileTransitions の最終 to (= 終了時に active だった phase)。
+ *
+ * 順序は advanceLessonPhase と同じ思想: lesson row (真実) を先に確定し、
+ * 冪等な副作用 (Form 受付再開 / config patch) を後に適用する。
+ * snapshot は触らない — 次にフェーズを離れるとき通常経路で焼き直され、
+ * 読めなかった場合も __upsertSnapshot_ のガードが既存記録を守る。
+ */
+function reopenLesson(userId, lessonId) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const { found } = auth;
+
+    if (found.lesson.state === 'active') {
+      return createSuccessResponse('already active', { lesson: found.lesson });
+    }
+    if (found.lesson.state !== 'completed') {
+      return createErrorResponse('FORBIDDEN_STATE: 完了した授業のみ再開できます');
+    }
+
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    if (phases.length === 0) return createErrorResponse('phase が定義されていません');
+    const idx = Math.min(__activePhaseIndex_(lessonJson), phases.length - 1);
+
+    const result = __updateLessonRow_(lessonId, { state: 'active', endedAt: '', lessonJson });
+    if (!result.success) {
+      return createErrorResponse(result.message || result.error, null,
+        result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
+    }
+
+    // 再開 phase の Form だけ受付再開 (他 phase は advance が通過時に開閉する)。
+    __setFormAcceptingResponses_(phases[idx].formId, true);
+
+    // config を再開 phase に合わせる + auto-archive の safety net marker を立てる
+    //   (通常は publishApp が立てるが、再開はボード公開済みのまま行われうる)。
+    const patch = Object.assign(
+      __buildPhaseConfigPatch_(phases[idx], lessonJson, lessonId),
+      { currentLessonStartedAt: new Date().toISOString() }
+    );
+    const patchResult = applyConfigPatch_(userId, patch, { publish: false });
+    if (!patchResult.success) {
+      return createErrorResponse(`再開しましたが board 設定の切替に失敗しました: ${patchResult.message || 'unknown'}`);
+    }
+
+    return createSuccessResponse(`授業を再開しました (フェーズ ${idx + 1}: ${phases[idx].name})`, {
+      lesson: result.lesson,
+      activePhaseIndex: idx
+    });
+  } catch (error) {
+    logError_('reopenLesson', error);
     return createExceptionResponse(error);
   }
 }

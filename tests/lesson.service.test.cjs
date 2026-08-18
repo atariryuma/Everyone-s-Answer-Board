@@ -1043,3 +1043,84 @@ test('capture: lesson_responses が無い環境では ARCHIVE_WRITE_FAILED で�
   const ptr = context.__writeArchiveRows_('lesson_x', 0, [{ rowIndex: 2, answer: 'a' }]);
   assert.equal(ptr, null);
 });
+
+// ── 授業の再開 (completed → active) と snapshot 上書きガード ──
+
+test('reopenLesson: completed → active、終了時のフェーズで Form 受付と config が復帰する', () => {
+  const { context, formCloses, configPatches } = loadLessonContext({
+    getPublishedSheetData: () => ({ success: true, data: [{ rowIndex: 2, answer: 'a' }] })
+  });
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  context.advanceLessonPhase('u1', lessonId, 'next');   // phase 1 が active
+  context.endLesson('u1', lessonId);
+
+  const res = context.reopenLesson('u1', lessonId);
+  assert.equal(res.success, true);
+  assert.equal(res.data.lesson.state, 'active');
+  assert.equal(res.data.lesson.endedAt, '');
+  assert.equal(res.data.activePhaseIndex, 1);           // 終了時の phase に戻る
+
+  // 再開 phase の Form だけ受付再開 (最後の open が phase 1 の form)
+  const lastOpen = formCloses.filter(f => f.accepting === true).pop();
+  assert.equal(lastOpen.formId, 'form_2');
+
+  // config は再開 phase + auto-archive marker
+  const lastPatch = configPatches[configPatches.length - 1].patch;
+  assert.equal(lastPatch.activeLessonId, lessonId);
+  assert.equal(typeof lastPatch.currentLessonStartedAt, 'string');
+
+  // 再開後は getActiveLessonNav にも現れる (board pill の供給元)
+  const nav = context.getActiveLessonNav('u1');
+  assert.equal(nav.data.lessonId, lessonId);
+  assert.equal(nav.data.activePhaseIndex, 1);
+});
+
+test('reopenLesson: draft は再開できない / active は冪等', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  assert.equal(context.reopenLesson('u1', lessonId).success, false); // draft
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  const res = context.reopenLesson('u1', lessonId);                  // active
+  assert.equal(res.success, true);
+  assert.match(res.message, /already active/);
+});
+
+test('__upsertSnapshot_: 失敗 capture はデータを持つ既存 snapshot を上書きしない', () => {
+  const { context } = loadLessonContext();
+  const lessonJson = { snapshots: [
+    { phaseIndex: 0, phaseName: 'p0', rows: [], rowCount: 96,
+      sheet: 'lesson_responses', startRow: 2 }
+  ] };
+  // 失敗 capture → 保持される
+  context.__upsertSnapshot_(lessonJson, {
+    phaseIndex: 0, rows: [], rowCount: 0, reason: 'CAPTURE_FAILED:read error'
+  });
+  assert.equal(lessonJson.snapshots[0].rowCount, 96);
+  assert.equal(lessonJson.snapshots[0].startRow, 2);
+  // 正常 capture → 置き換わる
+  context.__upsertSnapshot_(lessonJson, {
+    phaseIndex: 0, rows: [], rowCount: 97, sheet: 'lesson_responses', startRow: 300
+  });
+  assert.equal(lessonJson.snapshots[0].startRow, 300);
+});
+
+test('reopen → advance: 再開後の切替で snapshot が通常どおり焼き直される', () => {
+  const { context } = loadLessonContext({
+    getPublishedSheetData: () => ({ success: true, data: [{ rowIndex: 2, answer: '再開後の回答' }] })
+  });
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  context.endLesson('u1', lessonId);      // phase 0 capture (startRow 2)
+  context.reopenLesson('u1', lessonId);
+  const adv = context.advanceLessonPhase('u1', lessonId, 'next');  // phase 0 を焼き直し
+  assert.equal(adv.success, true);
+  const sn = adv.data.lesson.lessonJson.snapshots.find(s => s.phaseIndex === 0);
+  assert.equal(sn.startRow, 3);           // 新しい範囲を指す (孤児行 1 行は無害)
+});
