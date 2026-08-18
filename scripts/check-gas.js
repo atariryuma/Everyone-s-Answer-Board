@@ -21,6 +21,7 @@
  *  10. include 対象が scriptlet を持たないか (include はテンプレート評価しない)
  *  11. <use href="#i-X"> の X が SVG sprite に定義されているか
  *  12. アイコンを使うページが sprite を include しているか
+ *  13. .modal-overlay が markup 上で閉じた状態から始まるか
  *
  * 使い方:
  *   npm run check:gas          # 全項目
@@ -349,6 +350,29 @@ for (const s of jsSrc.values()) {
     if (usesIcon && !tree.has('SharedIcons')) bad.push(`${page}.html が SharedIcons を include していない`);
   }
   check('12. アイコン使用ページが sprite を読み込む', bad.length === 0, bad.join(', '));
+}
+
+// ── 13. overlay が既定で閉じているか ────────────────────────────
+// Why: .modal-overlay は position:fixed + display:flex なので、markup に閉じ状態が
+//   無いとページ読込の瞬間から画面を覆う。JS は開閉を hidden class で行うが、
+//   「閉じている」初期状態を markup 側に書き忘れても JS は何も文句を言わない。
+//   実際 answerModalContainer / infoModalContainer / delete-modal の 3 つが
+//   読込直後から開いており、中身が空のモーダルが出ていた (v2928)。
+//   さらに showInfoModal は「既に開いていれば return」する作りなので、開きっぱなしだと
+//   教師への抑止・リアクション OFF ボードでの抑止が丸ごと skip されるという二次被害も出る。
+{
+  const bad = [];
+  for (const [f, src] of htmlSrc) {
+    for (const m of src.matchAll(/<div\b[^>]*class="([^"]*\bmodal-overlay\b[^"]*)"[^>]*>/g)) {
+      const tag = m[0];
+      const closedByClass = /\bhidden\b/.test(m[1]);
+      const closedByStyle = /style="[^"]*display:\s*none/.test(tag);
+      if (!closedByClass && !closedByStyle) {
+        bad.push(`${f}:${lineOf(src, m.index)} overlay が開いた状態で出力される`);
+      }
+    }
+  }
+  check('13. overlay が既定で閉じている', bad.length === 0, bad.join(', '));
 }
 
 // ── 出力 ──────────────────────────────────────────────────────────
