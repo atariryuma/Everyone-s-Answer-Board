@@ -277,6 +277,7 @@
           const nameEl = document.getElementById('lesson-review-name');
           if (banner) banner.classList.remove('hidden');
           if (nameEl) nameEl.textContent = (this.state.reviewLesson.name || '無題');
+          this.__initReviewPhases();
         }
 
         this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
@@ -1746,7 +1747,158 @@
      * @param {boolean} isInitialLoad - 初期ロードかどうか
      * @returns {Promise} データ取得結果
      */
+    /* ==========================================================================
+     * 授業の振り返り (mode=review, 教師 / 管理者のみ)
+     *
+     * Why: lesson には終了時に各 phase の snapshot が焼き込まれている。振り返りは
+     *   「そのとき何が起きたか」を後から読む行為なので、生きた SS を引き直さず
+     *   snapshot を唯一の出典にする。SS が消えていても授業記録は読める。
+     *
+     *   描画は通常のボードと同じ経路 (performDataLoad → renderBoard) を通す。
+     *   getUserData だけを差し替える設計にしているので、boardMode / axisConfig /
+     *   クラスフィルタ / 各可視化は phase ごとに何もせず追従する。
+     * ========================================================================== */
+    __initReviewPhases() {
+      const lj = (this.state.reviewLesson && this.state.reviewLesson.lessonJson) || {};
+      const phases = Array.isArray(lj.phases) ? lj.phases : [];
+      const snapshots = Array.isArray(lj.snapshots) ? lj.snapshots : [];
+      const byIndex = new Map();
+      snapshots.forEach((sn, i) => {
+        const idx = (typeof sn.phaseIndex === 'number') ? sn.phaseIndex : i;
+        byIndex.set(idx, sn);
+      });
+
+      this.state.reviewPhases = phases.map((ph, i) => {
+        const sn = byIndex.get(i) || null;
+        return {
+          index: i,
+          name: (sn && sn.phaseName) || ph.name || ('フェーズ ' + (i + 1)),
+          question: ph.question || '',
+          templateOptions: ph.templateOptions || {},
+          rows: (sn && Array.isArray(sn.rows)) ? sn.rows : [],
+          boardMode: (sn && sn.boardMode) || (ph.displaySettings && ph.displaySettings.boardMode) || 'auto',
+          truncated: Boolean(sn && sn.truncated)
+        };
+      });
+
+      // 授業の時系列を尊重しつつ、最初に中身のある phase を開く。
+      //   データが取れなかった phase を初期表示にすると「壊れている」と誤解される。
+      const first = this.state.reviewPhases.findIndex(p => p.rows.length > 0);
+      this.state.reviewPhaseIndex = first >= 0 ? first : 0;
+      this.__renderReviewPhasePills();
+    }
+
+    __renderReviewPhasePills() {
+      const host = document.getElementById('lesson-review-phases');
+      if (!host) return;
+      const phases = this.state.reviewPhases || [];
+      // phase が 1 つだけなら切り替える先が無いので pill 自体を出さない。
+      if (phases.length < 2) { host.textContent = ''; return; }
+      host.textContent = '';
+      phases.forEach((ph) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'lesson-review-phase';
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', String(ph.index === this.state.reviewPhaseIndex));
+        btn.disabled = ph.rows.length === 0;
+        btn.textContent = ph.name + ' (' + ph.rows.length + ')';
+        if (btn.disabled) btn.title = 'この phase は記録が残っていません';
+        btn.addEventListener('click', () => this.__selectReviewPhase(ph.index));
+        host.appendChild(btn);
+      });
+    }
+
+    async __selectReviewPhase(index) {
+      if (index === this.state.reviewPhaseIndex) return;
+      this.state.reviewPhaseIndex = index;
+      this.__renderReviewPhasePills();
+      // 前 phase のクラス選択が次 phase に無いことがあるので毎回リセットする。
+      if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';
+      await this.loadSheetData({ showLoading: true, isInitialLoad: false });
+    }
+
+    /**
+     * snapshot 1 phase 分を getPublishedSheetData と同じ形に組み立てる。
+     * Why: 呼び出し側 (performDataLoad) に review 用の分岐を持ち込まないため。
+     *   ここが唯一の差分になるので、可視化を足しても review が置いていかれない。
+     */
+    __buildReviewPhaseResult(fetchParams) {
+      const phases = this.state.reviewPhases || [];
+      const ph = phases[this.state.reviewPhaseIndex] || null;
+      if (!ph) {
+        return { success: false, error: 'この授業には記録が残っていません', data: [], header: '振り返り' };
+      }
+
+      let rows = ph.rows.map((r) => ({
+        id: 'review_' + ph.index + '_' + r.rowIndex,
+        rowIndex: r.rowIndex,
+        timestamp: r.timestamp || '',
+        formattedTimestamp: r.timestamp || '',
+        // snapshot は個人特定フィールドを落としてある (__projectBoardRowForExport_)。
+        //   名前 / リアクションは「無い」のが正で、空で補って read-only を構造的に保証する。
+        name: '',
+        email: '',
+        class: r.class || '',
+        opinion: r.answer,
+        answer: r.answer,
+        reason: r.reason,
+        numericX: (typeof r.numericX === 'number') ? r.numericX : null,
+        numericY: (typeof r.numericY === 'number') ? r.numericY : null,
+        reactions: {},
+        highlight: false
+      }));
+
+      if (fetchParams && fetchParams.classFilter) {
+        rows = rows.filter(r => r.class === fetchParams.classFilter);
+      }
+      if (fetchParams && fetchParams.sortOrder === 'oldest') {
+        rows = rows.slice().reverse();
+      }
+
+      const t = ph.templateOptions || {};
+      const displaySettings = {
+        boardMode: this.__resolveReviewBoardMode(ph),
+        // 振り返りは read-only。名前もリアクションも snapshot に無いので表示しない。
+        showNames: false,
+        showReactions: false,
+        showCounts: false
+      };
+      this.updateDisplaySettingsFromAPI(displaySettings);
+
+      return {
+        success: true,
+        data: rows,
+        header: ph.question || ph.name,
+        sheetName: '',
+        displaySettings,
+        axisConfig: {
+          xAxisLabels: { min: t.xLow || '', max: t.xHigh || '' },
+          yAxisLabels: { min: t.yLow || '', max: t.yHigh || '' },
+          matrixQuadrantLabels: t.matrixQuadrantLabels || {},
+          allowResubmit: false,
+          defaultMin: 1,
+          defaultMax: 5
+        },
+        viewerIsTeacher: true
+      };
+    }
+
+    /** snapshot の boardMode が 'auto' のときだけ、データ形状から解決する。 */
+    __resolveReviewBoardMode(ph) {
+      if (ph.boardMode && ph.boardMode !== 'auto') return ph.boardMode;
+      const hasX = ph.rows.some(r => typeof r.numericX === 'number');
+      const hasY = ph.rows.some(r => typeof r.numericY === 'number');
+      if (hasX && hasY) return 'matrix';
+      if (hasX) return 'numberline';
+      return 'board';
+    }
+
     async getUserData(fetchParams, isInitialLoad) {
+      // 振り返りは lesson の snapshot が出典。サーバへは行かない (SS が消えていても読める)。
+      if (this.state.isReviewMode) {
+        return this.__buildReviewPhaseResult(fetchParams);
+      }
       if (fetchParams.showAdminFeatures == null || fetchParams.showAdminFeatures === undefined) {
         fetchParams.showAdminFeatures = window.UNIFIED_CONFIG?.isAdminUser || this.state?.isAdminUser || false;
       }

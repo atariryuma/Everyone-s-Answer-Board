@@ -2690,6 +2690,28 @@
     max-width: 1200px; margin: 0 auto;
     display: flex; align-items: center; gap: var(--space-2);
   }
+  /* フェーズ切替 pill。教師専用画面なので順序 = 授業の時系列をそのまま出す。 */
+  #lesson-review-banner .lesson-review-phases {
+    max-width: 1200px; margin: var(--space-2) auto 0;
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
+  }
+  #lesson-review-banner .lesson-review-phase {
+    padding: 0.2rem var(--space-3);
+    border-radius: var(--radius-full);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 60%, transparent);
+    background: transparent;
+    color: var(--theme-text-primary);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+  }
+  #lesson-review-banner .lesson-review-phase[aria-selected="true"] {
+    background: var(--theme-overlay-white-20);
+    font-weight: 700;
+  }
+  /* データが取れなかった phase は押しても空。押せないことを見た目で示す。 */
+  #lesson-review-banner .lesson-review-phase:disabled {
+    opacity: 0.5; cursor: not-allowed;
+  }
   #lesson-review-banner .lesson-review-readonly {
     margin-left: auto;
     font-size: var(--font-size-xs);

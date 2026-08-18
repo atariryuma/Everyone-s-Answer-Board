@@ -1426,7 +1426,16 @@
       showDetails: CONFIG.showDetails !== false,
       setupStatus: CONFIG.setupStatus || 'pending',
       displaySettings: CONFIG.displaySettings || { showNames: false, showReactions: false },
-      columnMapping: CONFIG.columnMapping || {}
+      columnMapping: CONFIG.columnMapping || {},
+      // Why: ここは allowlist なので、書き忘れたキーは main.js が渡していても黙って消える。
+      //   実際 sheetName (Page.html が window.SHEET_NAME に使う)、boardModes
+      //   (?boardMode= override の許可値)、isReviewMode / reviewLesson (振り返り画面の
+      //   起動条件そのもの) の 4 つが落ちており、振り返りは開いても通常ボードが出ていた。
+      //   consumer が読むキーは必ずここに載せる。
+      sheetName: CONFIG.sheetName || '',
+      boardModes: Array.isArray(CONFIG.boardModes) ? CONFIG.boardModes : [],
+      isReviewMode: CONFIG.isReviewMode === true,
+      reviewLesson: CONFIG.reviewLesson || null
     };
   };
 

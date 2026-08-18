@@ -357,8 +357,9 @@ function handleReviewMode_(params, currentEmail) {
   const template = HtmlService.createTemplateFromFile('Page.html');
   template.userId = targetUserId;
   template.userEmail = currentEmail;
-  // Why: heading は hydrate 完了後 client 側 (__updateReviewHeading) で該当 phase の question
-  //   に上書きされる。banner 側で lesson 名を出すので、heading にレッスン名を入れると重複。
+  // Why: heading は hydrate 完了後、client が選択中 phase の question で上書きする
+  //   (__buildReviewPhaseResult が result.header として返し、performDataLoad が反映)。
+  //   banner 側で lesson 名を出すので、heading にレッスン名を入れると重複する。
   //   ここは placeholder としてのみ機能 (skeleton 中の短時間だけ表示される)。
   template.questionText = '📖 読み込み中…';
   template.boardTitle = '📖 振り返り: ' + (lesson.name || '');
