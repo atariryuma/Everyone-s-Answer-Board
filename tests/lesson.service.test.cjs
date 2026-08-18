@@ -821,3 +821,82 @@ test('installLessonTriggers: トリガーが無ければ 1 つ作成', () => {
   assert.equal(createCount, 1);
   assert.equal(scheduledHour, 23);
 });
+
+// ── targetIndex による直接ジャンプ (回答ボード上の phase pill 用) ──
+// Why: pill は全 phase を並べるので隣以外も押せる。±1 しか無いと死んだ UI になる。
+
+test('advanceLessonPhase: targetIndex で任意フェーズへ直接ジャンプできる', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+
+  // phase 0 から 2 へ、間を経由せず 1 回で飛ぶ
+  const res = context.advanceLessonPhase('u1', lessonId, null, 2);
+  assert.equal(res.success, true);
+  assert.equal(res.data.activePhaseIndex, 2);
+});
+
+test('advanceLessonPhase: targetIndex が現在と同じなら reject', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+
+  const res = context.advanceLessonPhase('u1', lessonId, null, 0);
+  assert.equal(res.success, false);
+  assert.match(res.message, /既にそのフェーズ/);
+});
+
+test('advanceLessonPhase: 範囲外の targetIndex は reject', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+
+  assert.equal(context.advanceLessonPhase('u1', lessonId, null, 99).success, false);
+  assert.equal(context.advanceLessonPhase('u1', lessonId, null, -1).success, false);
+  // 整数でない値も弾く (client から文字列が来ても壊れない)
+  assert.equal(context.advanceLessonPhase('u1', lessonId, null, 'abc').success, false);
+});
+
+test('advanceLessonPhase: targetIndex 指定でも移行前フェーズの snapshot を残す', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+
+  const res = context.advanceLessonPhase('u1', lessonId, null, 2);
+  const snaps = res.data.lesson.lessonJson.snapshots || [];
+  // 出発点 (phase 0) が焼かれていること。飛び先の 2 ではない。
+  assert.ok(snaps.some(s => s.phaseIndex === 0));
+});
+
+test('getActiveLessonNav: 実行中の授業が無ければ data を付けない (正常系)', () => {
+  const { context } = loadLessonContext();
+  const res = context.getActiveLessonNav('u1');
+  // createSuccessResponse の規約: data が null なら data フィールド自体を出さない。
+  //   client 側は falsy 判定なので、これで「授業なし = pill を出さない」になる。
+  assert.equal(res.success, true);
+  assert.ok(!res.data);
+});
+
+test('getActiveLessonNav: 実行中の授業の phase 一覧と現在位置を返す', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  context.advanceLessonPhase('u1', lessonId, 'next');
+
+  const res = context.getActiveLessonNav('u1');
+  assert.equal(res.success, true);
+  assert.equal(res.data.lessonId, lessonId);
+  assert.equal(res.data.activePhaseIndex, 1);
+  assert.equal(res.data.phases.length, 3);
+  assert.equal(res.data.phases[0].index, 0);
+});

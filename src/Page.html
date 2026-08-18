@@ -152,7 +152,9 @@
           <span class="eab-pill-text"> 回答フォーム</span>
         </a>
 
-        <!-- Phase pills: ensureViewToolbar (page.viz.js) がここに #vizProfilePills を注入 -->
+        <!-- Phase pills: 授業が実行中のときだけ、教師にフェーズ切替を出す (page.js が中身を注入)。
+             生徒には出さない。時間軸は教師が 1 本に保つ。 -->
+        <div id="boardPhaseNav" class="board-phase-nav hidden" role="group" aria-label="授業のフェーズ切替"></div>
 
         <!-- Filters group: 件数 + クラスフィルタ + 並び順 -->
         <div class="eab-filters">

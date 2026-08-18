@@ -513,6 +513,51 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
   }
 }
 
+/**
+ * 回答ボード (mode=view) の phase pill 用に、実行中の授業の最小情報だけを返す。
+ *
+ * Why 専用 API: 生徒は 5 秒ごとに getPublishedSheetData を叩く。そこへ授業情報を
+ *   相乗りさせると、生徒に不要なデータを配りながら lessons シートを 5 秒ごとに読む
+ *   ことになる。教師が明示的に呼ぶ経路として切り出す。
+ * Why owner 限定: 切替は授業の進行そのもの。閲覧者に見せる情報ではない。
+ *
+ * @returns {Object} 実行中の授業が無ければ data フィールドを付けない (これは正常系)
+ */
+function getActiveLessonNav(targetUserId) {
+  try {
+    const userId = targetUserId || null;
+    if (!userId) return createErrorResponse('userId is required');
+    // lessonId を渡さない = 「この user の lesson を触る権限があるか」だけを見る。
+    const auth = __requireLessonOwner_(userId, null);
+    if (auth.error) return auth.error;
+
+    const listed = listLessons(userId);
+    if (!listed || !listed.success) return listed;
+    const lessons = (listed.data && listed.data.lessons) || [];
+    const active = lessons.find(l => l && l.state === 'active');
+    if (!active) return createSuccessResponse('no active lesson', null);
+
+    const found = __findLessonById_(active.lessonId);
+    if (!found) return createSuccessResponse('no active lesson', null);
+    const lessonJson = found.lesson.lessonJson || {};
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+
+    return createSuccessResponse('loaded', {
+      lessonId: active.lessonId,
+      name: found.lesson.name || '',
+      activePhaseIndex: __activePhaseIndex_(lessonJson),
+      phases: phases.map((p, i) => ({
+        index: i,
+        name: (p && p.name) || ('フェーズ ' + (i + 1)),
+        formTemplate: (p && p.formTemplate) || ''
+      }))
+    });
+  } catch (error) {
+    logError_('getActiveLessonNav', error);
+    return createExceptionResponse(error);
+  }
+}
+
 function listLessons(userId) {
   try {
     const access = __requireLessonOwner_(userId, null, { resourceLabel: 'lesson 一覧' });
@@ -1298,7 +1343,7 @@ function startLesson(userId, lessonId) {
  *   - 累積回答は削除しない (= 戻して再進行で同じ Form が再開する)
  *   - publishApp は呼ばず applyConfigPatch_ で user config を直接書き換える
  */
-function advanceLessonPhase(userId, lessonId, direction) {
+function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
@@ -1308,11 +1353,23 @@ function advanceLessonPhase(userId, lessonId, direction) {
       return createErrorResponse('FORBIDDEN_STATE: lesson が active でないため進められません');
     }
 
-    const dir = direction === 'previous' ? 'previous' : 'next';
     const lessonJson = deepClone(found.lesson.lessonJson || {});
     const phases = lessonJson.phases || [];
     const fromIdx = __activePhaseIndex_(lessonJson);
-    const toIdx = dir === 'next' ? fromIdx + 1 : fromIdx - 1;
+
+    // targetIndex を渡せば任意 phase へ直接ジャンプできる。
+    //   Why: 回答ボード側の phase pill は「今どこにいるか」を全 phase 並べて見せるので、
+    //   隣以外を押せてしまう。±1 しか無いと押しても何も起きない死んだ UI になる。
+    //   遷移の中身 (snapshot → row write → Form 開閉 → config patch) は from/to が
+    //   何であっても同じなので、経路は 1 本のまま添字の決め方だけを分ける。
+    let toIdx;
+    if (targetIndex !== undefined && targetIndex !== null && targetIndex !== '') {
+      toIdx = Number(targetIndex);
+      if (!Number.isInteger(toIdx)) return createErrorResponse('targetIndex が不正です');
+      if (toIdx === fromIdx) return createErrorResponse('既にそのフェーズです');
+    } else {
+      toIdx = direction === 'previous' ? fromIdx - 1 : fromIdx + 1;
+    }
 
     if (toIdx < 0) return createErrorResponse('既に最初のフェーズです');
     if (toIdx >= phases.length) return createErrorResponse('既に最後のフェーズです (終了するには「⏹ 終了」を押してください)');

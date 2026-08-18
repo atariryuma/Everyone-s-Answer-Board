@@ -2804,6 +2804,39 @@
     border-radius: var(--radius-md);
   }
 
+  /* 回答ボード上のフェーズ切替 (教師のみ / 授業が実行中のときだけ)。
+     Why ここに置く: 授業中の教師はボードを見ている (投影していることも多い)。
+     切替のたびに管理パネルへ戻るのは授業のテンポを壊す。 */
+  .board-phase-nav.hidden { display: none; }
+  .board-phase-nav {
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .board-phase-nav .board-phase-btn {
+    padding: 0.15rem var(--space-2);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--theme-border-subtle);
+    background: transparent;
+    color: var(--theme-text-secondary);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--transition-easing);
+  }
+  .board-phase-nav .board-phase-btn:hover:not(:disabled) {
+    border-color: var(--theme-border-normal);
+    color: var(--theme-text-primary);
+  }
+  /* 現在のフェーズ。押しても何も起きないので disabled にし、位置の表示に徹する。 */
+  .board-phase-nav .board-phase-btn[aria-current="true"] {
+    background: var(--theme-bg-elevated);
+    border-color: var(--theme-accent-cyan-strong);
+    color: var(--theme-text-primary);
+    font-weight: 700;
+  }
+  .board-phase-nav .board-phase-btn:disabled { cursor: default; }
+  .board-phase-nav .board-phase-btn.is-busy { opacity: 0.6; cursor: wait; }
+
   /* Lesson review banner (Phase 2): Page.html 上部に固定表示 */
   #lesson-review-banner.hidden { display: none; }
   #lesson-review-banner {

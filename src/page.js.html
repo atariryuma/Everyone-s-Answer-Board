@@ -300,7 +300,9 @@
           // loadSheetData starts.
           await Promise.all([
             this.initializeFormButton(),
-            this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false })
+            this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false }),
+            // 授業中のフェーズ切替 (教師のみ)。失敗しても board 本体は動くので待たせない。
+            this.__initBoardPhaseNav()
           ]);
         } catch (error) {
           console.error('Data loading failed during initialization:', error);
@@ -1747,6 +1749,92 @@
      * @param {boolean} isInitialLoad - 初期ロードかどうか
      * @returns {Promise} データ取得結果
      */
+    /* ==========================================================================
+     * 授業中のフェーズ切替 (mode=view, 教師のみ)
+     *
+     * Why: 授業中の教師はボードを見ている (電子黒板に投影していることも多い)。
+     *   フェーズを進めるたびに管理パネルへ戻るのは 45 分の授業のテンポを壊す。
+     *   v2894 で profiles を廃止した際、教師のボード上 pill も一緒に消えていた。
+     *
+     * 生徒には出さない (時間軸は教師が 1 本に保つ)。実行中の授業が無ければ何も出ない。
+     * ========================================================================== */
+    async __initBoardPhaseNav() {
+      const host = document.getElementById('boardPhaseNav');
+      if (!host) return;
+      // 生徒 / 振り返り画面では出さない。念のため state ごと畳んでから返る
+      // (再 init されても前の描画が残らないようにする)。
+      if (this.state.isReviewMode || (!this.state.isEditor && !this.state.isAdminUser)) {
+        this.state.boardPhaseNav = null;
+        this.__renderBoardPhaseNav();
+        return;
+      }
+      try {
+        const res = await runServer('getActiveLessonNav', this.state.userId);
+        // 実行中の授業が無いのは正常系。何も出さずに終わる。
+        const nav = (res && res.success) ? res.data : null;
+        this.state.boardPhaseNav = (nav && Array.isArray(nav.phases) && nav.phases.length > 1) ? nav : null;
+      } catch (err) {
+        console.warn('getActiveLessonNav failed:', err);
+        this.state.boardPhaseNav = null;
+      }
+      this.__renderBoardPhaseNav();
+    }
+
+    __renderBoardPhaseNav() {
+      const host = document.getElementById('boardPhaseNav');
+      if (!host) return;
+      const nav = this.state.boardPhaseNav;
+      host.textContent = '';
+      if (!nav) { host.classList.add('hidden'); return; }
+      host.classList.remove('hidden');
+      nav.phases.forEach((ph) => {
+        const current = ph.index === nav.activePhaseIndex;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'board-phase-btn';
+        btn.textContent = ph.name;
+        btn.title = current ? '現在のフェーズ' : '「' + ph.name + '」に切替える';
+        if (current) {
+          btn.setAttribute('aria-current', 'true');
+          btn.disabled = true;   // 現在地なので押す意味がない
+        } else {
+          btn.addEventListener('click', () => this.__switchBoardPhase(ph));
+        }
+        host.appendChild(btn);
+      });
+    }
+
+    async __switchBoardPhase(phase) {
+      const nav = this.state.boardPhaseNav;
+      if (!nav || this.state.__phaseSwitching) return;
+      // 切替は Form の開閉と config 書き換えを伴う。連打で二重遷移させない。
+      this.state.__phaseSwitching = true;
+      const host = document.getElementById('boardPhaseNav');
+      if (host) host.querySelectorAll('.board-phase-btn').forEach(b => b.classList.add('is-busy'));
+      try {
+        const res = await runServer('advanceLessonPhase', this.state.userId, nav.lessonId, null, phase.index);
+        if (!res || !res.success) {
+          window.notifications.error((res && (res.message || res.error)) || 'フェーズ切替に失敗しました');
+          return;
+        }
+        nav.activePhaseIndex = (res.data && typeof res.data.activePhaseIndex === 'number')
+          ? res.data.activePhaseIndex
+          : phase.index;
+        this.__renderBoardPhaseNav();
+        window.notifications.success('「' + phase.name + '」に切替えました');
+        // 自分が起こした切替なので、生徒向けの「切替わりました」バナーは出さない。
+        this.state.__suppressBoardSwitchToast = true;
+        if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+      } catch (err) {
+        console.error('phase switch failed:', err);
+        window.notifications.error('フェーズ切替に失敗しました');
+      } finally {
+        this.state.__phaseSwitching = false;
+        if (host) host.querySelectorAll('.board-phase-btn').forEach(b => b.classList.remove('is-busy'));
+      }
+    }
+
     /* ==========================================================================
      * 授業の振り返り (mode=review, 教師 / 管理者のみ)
      *
