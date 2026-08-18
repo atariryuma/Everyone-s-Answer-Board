@@ -220,10 +220,17 @@
 
     @media (max-width: 768px) {
       .status-bar { flex-direction: column; align-items: stretch; }
-      .status-bar-actions { justify-content: stretch; flex-wrap: wrap; }
-      .status-bar-actions .btn { flex: 1; }
+      /* ボタンは語中改行も見切れもさせない: 幅いっぱいに広げず、要素単位で折り返す */
+      .status-bar-actions { flex-wrap: wrap; }
       #currentQuestionText { white-space: normal; }
     }
+
+    /* 見出し・ボタン類は語中で改行させない。狭い画面での調整は
+       flex-wrap (要素単位の折返し) で行い、文字を縦に割らない。 */
+    .section-head { flex-wrap: wrap; row-gap: var(--space-2); }
+    .section-title { white-space: nowrap; }
+    .lesson-template-picker summary,
+    .admin-tab { white-space: nowrap; }
 
     /* =============================================================================
      * タブナビゲーション: 「授業」(日々の運用) と「ボード設定」(接続と表示) を分ける。
