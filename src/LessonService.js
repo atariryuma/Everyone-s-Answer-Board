@@ -1690,6 +1690,79 @@ function installLessonTriggers() {
 }
 
 /**
+ * phase の並び順を入れ替える (保守オペレーション)。
+ *
+ * Why: v2894 の profiles 取り込みは「保存順」を phase 順として引き継いだため、
+ *   実際の授業順 (遷移ログ) と配列順が食い違う lesson が存在する。pill は配列順で
+ *   並ぶので、教師には「導入より本時が先」に見える。
+ *
+ * 整合性: phaseIndex は 3 箇所に現れる — phases 配列 / snapshots / lesson_responses の
+ *   行 (hydrate の照合キー)。行は in-place 編集せず、hydrate で読み戻してから新しい
+ *   phaseIndex で追記し直し、ポインタを差し替える (旧範囲は孤児 = 無害)。
+ *
+ * @param {number[]} order - 新しい並び。旧 index の列挙 (例 [1,0,2] = 旧1 が先頭へ)
+ */
+function reorderLessonPhases(userId, lessonId, order) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const { found } = auth;
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+
+    // order は 0..n-1 の順列であること
+    if (!Array.isArray(order) || order.length !== phases.length
+        || [...order].sort((a, b) => a - b).some((v, i) => v !== i)) {
+      return createErrorResponse('order は phase 数と同じ長さの順列で指定してください');
+    }
+    if (order.every((v, i) => v === i)) {
+      return createSuccessResponse('並び順は既にその通りです', { changed: false });
+    }
+    const newIndexOf = [];            // 旧 index → 新 index
+    order.forEach((oldIdx, newIdx) => { newIndexOf[oldIdx] = newIdx; });
+
+    // アーカイブ行の phaseIndex を新順序で書き直すため、先に読み戻す
+    __hydrateLessonSnapshots_({ lessonId, lessonJson });
+
+    lessonJson.phases = order.map(i => phases[i]);
+    lessonJson.profileTransitions = (lessonJson.profileTransitions || []).map(t => ({
+      ...t,
+      from: (t.from === null || t.from === undefined) ? t.from : newIndexOf[t.from],
+      to: newIndexOf[t.to]
+    }));
+    if (lessonJson.meta && Array.isArray(lessonJson.meta.profileNames)) {
+      lessonJson.meta.profileNames = lessonJson.phases.map(p => p.name);
+    }
+
+    lessonJson.snapshots = (lessonJson.snapshots || []).map(sn => {
+      const newIdx = newIndexOf[sn.phaseIndex];
+      const rows = Array.isArray(sn.rows) ? sn.rows : [];
+      if (rows.length > 0) {
+        const pointer = __writeArchiveRows_(lessonId, newIdx, rows);
+        if (pointer) {
+          return { ...sn, phaseIndex: newIdx, rows: [],
+            sheet: pointer.sheet, startRow: pointer.startRow, rowCount: pointer.rowCount };
+        }
+        // 書き直せなければ旧ポインタを捨てて inline のまま保持 (データ喪失より整合性劣化を選ぶ)
+        return { ...sn, phaseIndex: newIdx, sheet: null, startRow: -1, rowCount: rows.length, rows };
+      }
+      return { ...sn, phaseIndex: newIdx };
+    }).sort((a, b) => Number(a.phaseIndex) - Number(b.phaseIndex));
+
+    const result = __updateLessonRow_(lessonId, { lessonJson });
+    if (!result.success) return createErrorResponse(result.message || result.error);
+    return createSuccessResponse('phase の並び順を変更しました', {
+      changed: true,
+      phases: lessonJson.phases.map((p, i) => i + ':' + p.name),
+      activePhaseIndex: __activePhaseIndex_(lessonJson)
+    });
+  } catch (error) {
+    logError_('reorderLessonPhases', error);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
  * 旧形式 lesson (rows が lessonJson に同居) を lesson_responses シートへ移行する。
  *
  * 非破壊 2 段階: まず行をアーカイブへ追記してポインタを付け、書込が確認できた

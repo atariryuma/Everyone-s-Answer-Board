@@ -1124,3 +1124,57 @@ test('reopen → advance: 再開後の切替で snapshot が通常どおり焼�
   const sn = adv.data.lesson.lessonJson.snapshots.find(s => s.phaseIndex === 0);
   assert.equal(sn.startRow, 3);           // 新しい範囲を指す (孤児行 1 行は無害)
 });
+
+// ── phase 並べ替え (reorderLessonPhases) ──
+
+test('reorderLessonPhases: 配列・遷移・snapshot・アーカイブ行の phaseIndex が揃って入れ替わる', () => {
+  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
+  // profiles 取り込み由来の「本時が先頭」lesson を再現 (実授業順は 導入(1)→本時(0))
+  responsesSheet.appendRow(['lesson_ro1', 0, 2, 't', '1組', '本時の回答', '', 4, 5]);
+  responsesSheet.appendRow(['lesson_ro1', 1, 2, 't', '1組', '導入の回答', '', '', '']);
+  const json = {
+    phases: [
+      { name: '本時の議論', formTemplate: 'matrix' },
+      { name: '導入アンケート', formTemplate: 'pie' }
+    ],
+    profileTransitions: [
+      { ts: 't1', from: null, to: 1 },
+      { ts: 't2', from: 1, to: 0 }
+    ],
+    snapshots: [
+      { phaseIndex: 0, phaseName: '本時の議論', rows: [], sheet: 'lesson_responses', startRow: 2, rowCount: 1 },
+      { phaseIndex: 1, phaseName: '導入アンケート', rows: [], sheet: 'lesson_responses', startRow: 3, rowCount: 1 }
+    ],
+    meta: { profileNames: ['本時の議論', '導入アンケート'] }
+  };
+  lessonsSheet.appendRow(['lesson_ro1', 'u1', '道徳', 'active', 't', 't', '', 1, 1, 'e', JSON.stringify(json)]);
+
+  const res = context.reorderLessonPhases('u1', 'lesson_ro1', [1, 0]);
+  assert.equal(res.success, true);
+  assert.equal(res.data.phases[0], '0:導入アンケート');
+  assert.equal(res.data.phases[1], '1:本時の議論');
+  // 遷移も remap: 授業は「導入(新0) から始まり 本時(新1) へ」
+  const saved = JSON.parse(lessonsSheet._data[1][10]);
+  assert.equal(saved.profileTransitions[0].to, 0);
+  assert.equal(saved.profileTransitions[1].to, 1);
+  assert.equal(res.data.activePhaseIndex, 1); // 最終遷移 = 本時 (新 index 1)
+
+  // hydrate で正しい回答が正しい phase に付く (アーカイブ行は新 phaseIndex で焼き直し)
+  const review = context.getLessonForReview('u1', 'lesson_ro1');
+  const snaps = review.data.lesson.lessonJson.snapshots;
+  assert.equal(snaps[0].phaseName, '導入アンケート');
+  assert.equal(snaps[0].rows[0].answer, '導入の回答');
+  assert.equal(snaps[1].phaseName, '本時の議論');
+  assert.equal(snaps[1].rows[0].answer, '本時の回答');
+});
+
+test('reorderLessonPhases: 順列でない order は reject / 恒等順は no-op', () => {
+  const { context, lessonsSheet } = loadLessonContext();
+  const json = { phases: [{ name: 'a', formTemplate: 'board' }, { name: 'b', formTemplate: 'board' }], snapshots: [] };
+  lessonsSheet.appendRow(['lesson_ro2', 'u1', 'x', 'completed', 't', 't', 't', 1, 1, 'e', JSON.stringify(json)]);
+  assert.equal(context.reorderLessonPhases('u1', 'lesson_ro2', [0, 0]).success, false);
+  assert.equal(context.reorderLessonPhases('u1', 'lesson_ro2', [0]).success, false);
+  const noop = context.reorderLessonPhases('u1', 'lesson_ro2', [0, 1]);
+  assert.equal(noop.success, true);
+  assert.equal(noop.data.changed, false);
+});
