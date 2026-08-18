@@ -1117,6 +1117,25 @@ function createServiceAccountSpreadsheetProxy(sheetId, accessToken, saEmail) {
       const auth = resolveAuth();
       return createServiceAccountSheetProxy(sheetId, sheetName, auth.token, {}, auth.saEmail, resolveAuth);
     },
+    // シート作成 (batchUpdate addSheet)。SA は DB の editor なので API 経由で作れる。
+    //   Why: lazy bootstrap (lesson_responses 等) を SpreadsheetApp.openById に頼ると、
+    //   「呼び出し元が DB の編集権を持つとき」しか動かない (CLI の API キー経路や教師の
+    //   セッションでは失敗する)。SA 経由なら誰が呼んでも同じに動く。
+    insertSheet: (sheetName) => {
+      const auth = resolveAuth();
+      fetchSheetsAPIWithRetry(
+        `${baseUrl}:batchUpdate`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+          payload: JSON.stringify({ requests: [{ addSheet: { properties: { title: sheetName } } }] })
+        },
+        `insertSheet(${sheetName})`,
+        auth.saEmail, resolveAuth,
+        { idempotent: false }  // 同名シートが既に在ると 400 (成功済みの再実行を弾けるので安全)
+      );
+      return createServiceAccountSheetProxy(sheetId, sheetName, auth.token, {}, auth.saEmail, resolveAuth);
+    },
     getSheets: () => {
       try {
         const auth = resolveAuth();
@@ -1287,6 +1306,40 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         );
       } catch (error) {
         console.warn('appendRow via API failed after retries:', error.message);
+        throw error;
+      }
+    },
+    // 複数行を 1 回の :append で「連続した範囲」として原子的に追記し、開始行を返す。
+    //   Why: lesson アーカイブは行範囲ポインタ (startRow, rowCount) で参照する。
+    //   1 行ずつ appendRow すると、別授業の同時 capture と行が交錯して範囲が壊れる。
+    //   :append は 1 呼び出し分の values を必ず連続で書き、書いた範囲を応答で返すので、
+    //   getLastRow → 書込 の 2 手に分けたときの race が存在しない (lock 不要)。
+    appendRows: (values) => {
+      try {
+        const auth = resolveAuth();
+        const payload = { values };
+        const response = fetchSheetsAPIWithRetry(
+          `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+            payload: JSON.stringify(payload)
+          },
+          `appendRows(${sheetName})`,
+          auth.saEmail, resolveAuth,
+          { idempotent: false }  // appendRow と同じ理由で盲目 retry 禁止
+        );
+        // updates.updatedRange 例: "'lesson_responses'!A5:I100" → 開始行 5
+        const body = safeJsonParse_(response.getContentText(), {});
+        const range = (body && body.updates && body.updates.updatedRange) || '';
+        const m = /![A-Z]+([0-9]+)/.exec(range);
+        return {
+          startRow: m ? Number(m[1]) : -1,
+          rowCount: values.length,
+          updatedRange: range
+        };
+      } catch (error) {
+        console.warn('appendRows via API failed after retries:', error.message);
         throw error;
       }
     }

@@ -4,14 +4,18 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
+/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
 // Sheets 1 cell 文字数上限 50000 に対する defensive cap。lessonJson が超えるなら save reject。
+//   回答アーカイブは lesson_responses シートに分離済みなので、ここに残るのは
+//   定義 + 遷移履歴 + 範囲ポインタ (~4KB) のみ。この guard は通常発火しない。
 const LESSON_JSON_MAX_BYTES = 45000;
-// 1 phase snapshot あたりの char 予算 (Phase 1 設計): 全 phase 合計 + meta が 45000 を超えないよう逆算。
-const LESSON_PHASE_SNAPSHOT_BUDGET_BYTES = 12000;
+// 回答アーカイブの置き場所。1 回答 = 1 行 (schema は LESSON_RESPONSES_SHEET_HEADERS)。
+//   snapshot ポインタは sheet 名を持つので、将来 lesson_responses_2027 のような
+//   年次シートへ移行しても過去ポインタはそのまま読める。
+const LESSON_RESPONSES_SHEET = 'lesson_responses';
 // startLesson 内部の double-click 防止 lock。
 const LESSON_START_LOCK_TIMEOUT_MS = 5000;
 // Auto-archive thresholds (unpublishBoard hook + daily sweep)。
@@ -25,14 +29,86 @@ const LESSON_DAILY_TRIGGER_HOUR = 23;                    // 23:00 JST に sweep
 // Why: SA-backed spreadsheet proxy の getSheetByName('lessons') は sheet 不存在でも
 //   proxy オブジェクトを返してしまい、実際に getValues() するまで失敗を検出できない。
 //   getSheets() で実存をチェックしてから handle を返す。
-function __lessonsSheetExists_(spreadsheet) {
+function __dbSheetExists_(spreadsheet, name) {
   try {
     const sheets = (spreadsheet.getSheets ? spreadsheet.getSheets() : []) || [];
     return sheets.some(s => {
-      try { return s.getName && s.getName() === 'lessons'; }
+      try { return s.getName && s.getName() === name; }
       catch (_) { return false; }
     });
   } catch (_) { return false; }
+}
+
+function __lessonsSheetExists_(spreadsheet) {
+  return __dbSheetExists_(spreadsheet, 'lessons');
+}
+
+// 回答アーカイブシートの handle。__getLessonsSheet_ と同じ lazy bootstrap 方式。
+//   createIfMissing の SpreadsheetApp 経路は呼び出し元に DB の編集権があるときだけ通る
+//   (setup 済みテナントでは setupApp が ensure 済みなので、実運用でここが走ることは稀)。
+function __getResponsesSheet_(opts) {
+  const spreadsheet = openDatabase();
+  if (!spreadsheet) return null;
+  if (!__dbSheetExists_(spreadsheet, LESSON_RESPONSES_SHEET)) {
+    if (!opts || !opts.createIfMissing) return null;
+    try {
+      // SA proxy の insertSheet (batchUpdate) を優先: 呼び出し元の権限に依らず動く。
+      //   proxy でない native Spreadsheet (setup 経路) でも同名 API があるので共通で呼べる。
+      const newSheet = spreadsheet.insertSheet(LESSON_RESPONSES_SHEET);
+      if (newSheet && newSheet.appendRow) newSheet.appendRow(LESSON_RESPONSES_SHEET_HEADERS);
+    } catch (createErr) {
+      logError_('__getResponsesSheet_:create', createErr);
+      return null;
+    }
+  }
+  return spreadsheet.getSheetByName(LESSON_RESPONSES_SHEET) || null;
+}
+
+/**
+ * 回答アーカイブを lesson_responses へ「連続した行範囲」として追記し、ポインタを返す。
+ *
+ * @param {string} lessonId
+ * @param {number} phaseIndex
+ * @param {Array} projectedRows - __projectBoardRowForExport_ 済みの行 (PII なし)
+ * @returns {Object|null} { sheet, startRow, rowCount } / 書けなければ null
+ *
+ * 整合性の要:
+ *   - 追記は 1 回の呼び出しで行う (SA proxy の appendRows = values:append は連続範囲を保証)。
+ *   - proxy 経由でない sheet (test / native) には getLastRow → setValues で fallback する。
+ *   - 再 capture 時に旧範囲の行は残る (孤児行)。ポインタが差し替わるだけなので無害で、
+ *     読み出しは lessonId + phaseIndex を照合するため誤読もしない。
+ */
+function __writeArchiveRows_(lessonId, phaseIndex, projectedRows) {
+  if (!projectedRows || projectedRows.length === 0) {
+    return { sheet: null, startRow: -1, rowCount: 0 };
+  }
+  const sheet = __getResponsesSheet_({ createIfMissing: true });
+  if (!sheet) return null;
+  const values = projectedRows.map(r => [
+    lessonId,
+    phaseIndex,
+    (typeof r.rowIndex === 'number') ? r.rowIndex : '',
+    r.timestamp || '',
+    r.class || '',
+    (r.answer === null || r.answer === undefined) ? '' : r.answer,
+    (r.reason === null || r.reason === undefined) ? '' : r.reason,
+    (typeof r.numericX === 'number') ? r.numericX : '',
+    (typeof r.numericY === 'number') ? r.numericY : ''
+  ]);
+  try {
+    if (typeof sheet.appendRows === 'function') {
+      const res = sheet.appendRows(values);
+      if (!res || !(res.startRow > 0)) return null;
+      return { sheet: LESSON_RESPONSES_SHEET, startRow: res.startRow, rowCount: values.length };
+    }
+    // fallback (test harness / native Sheet): 単一実行内なので getLastRow → setValues で足りる
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, values.length, values[0].length).setValues(values);
+    return { sheet: LESSON_RESPONSES_SHEET, startRow, rowCount: values.length };
+  } catch (err) {
+    logError_('__writeArchiveRows_', err);
+    return null;
+  }
 }
 
 function __getLessonsSheet_(opts) {
@@ -618,10 +694,60 @@ function getLessonForReview(userId, lessonId) {
     const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true });
     if (auth.error) return auth.error;
     // active / completed どちらも review 可。draft は wizard で開く方が自然。
+    // アーカイブ行はポインタ経由で読み戻す (クライアントは rows が埋まった snapshot を期待する)。
+    __hydrateLessonSnapshots_(auth.found.lesson);
     return createSuccessResponse('loaded', { lesson: auth.found.lesson });
   } catch (error) {
     logError_('getLessonForReview', error);
     return createExceptionResponse(error);
+  }
+}
+
+/**
+ * snapshot のポインタ {sheet, startRow, rowCount} から lesson_responses の行を読み戻し、
+ * snapshots[].rows を埋める (in-place)。旧形式 (rows 同居) の snapshot は触らない。
+ *
+ * 読み取り量はポインタの範囲だけ (1 フェーズ ≈ 数百セル)。シート全件は読まない。
+ * Why 照合ガード: 行の物理削除やシートの手編集でポインタがずれた場合、範囲読みは
+ *   「別の授業の行」を返しうる。lessonId + phaseIndex を各行で照合し、他授業の回答を
+ *   振り返りに混ぜる事故を構造的に塞ぐ (ずれた行は静かに落ち、rows が減るだけ)。
+ */
+function __hydrateLessonSnapshots_(lesson) {
+  const lessonJson = lesson && lesson.lessonJson;
+  const snaps = (lessonJson && Array.isArray(lessonJson.snapshots)) ? lessonJson.snapshots : [];
+  const targets = snaps.filter(sn => sn && sn.sheet && sn.startRow > 0 && sn.rowCount > 0
+    && (!Array.isArray(sn.rows) || sn.rows.length === 0));
+  if (targets.length === 0) return;
+
+  const spreadsheet = openDatabase();
+  if (!spreadsheet) return;
+  const width = LESSON_RESPONSES_SHEET_HEADERS.length;
+  const toNum = (v) => (v === '' || v === null || v === undefined) ? null : Number(v);
+
+  for (const sn of targets) {
+    try {
+      const sheet = spreadsheet.getSheetByName(sn.sheet);
+      if (!sheet) { sn.reason = 'ARCHIVE_SHEET_MISSING:' + sn.sheet; continue; }
+      const values = sheet.getRange(sn.startRow, 1, sn.rowCount, width).getValues() || [];
+      sn.rows = values
+        .filter(v => String(v[0]) === String(lesson.lessonId) && Number(v[1]) === Number(sn.phaseIndex))
+        .map(v => ({
+          rowIndex: toNum(v[2]),
+          timestamp: String(v[3] || ''),
+          class: String(v[4] || ''),
+          answer: v[5],
+          reason: v[6],
+          numericX: toNum(v[7]),
+          numericY: toNum(v[8])
+        }));
+      if (sn.rows.length !== sn.rowCount) {
+        sn.reason = 'ARCHIVE_POINTER_DRIFT:' + sn.rows.length + '/' + sn.rowCount;
+      }
+    } catch (err) {
+      logError_('__hydrateLessonSnapshots_', err);
+      sn.reason = 'ARCHIVE_READ_FAILED';
+      sn.rows = [];
+    }
   }
 }
 
@@ -730,7 +856,7 @@ function __extractFormPublishedId_(formUrl) {
 // ボード行を「実践報告書 / 過去授業 archive 用」の slim row に整形する。
 //   個人特定可能フィールド (name / email / emailHash / reactions / highlight / opinion / id) は除外。
 //   `includeName: true` で名前列も残せる (校内資料用)。
-//   exportBoardData (AdminApis.js) と __buildImportSnapshotRows_ で共用。
+//   exportBoardData (AdminApis.js) と snapshot capture (__captureSnapshot_ / import) で共用。
 function __projectBoardRowForExport_(row, options) {
   const includeName = options && options.includeName === true;
   const out = {
@@ -746,19 +872,6 @@ function __projectBoardRowForExport_(row, options) {
   return out;
 }
 
-// answer / reason を cap 文字に切り詰める。row を mutate し、切り詰めたかを返す。
-function __truncateRowAnswerReason_(r, cap) {
-  let truncated = false;
-  if (typeof r.answer === 'string' && r.answer.length > cap) {
-    r.answer = r.answer.slice(0, cap) + '…';
-    truncated = true;
-  }
-  if (typeof r.reason === 'string' && r.reason.length > cap) {
-    r.reason = r.reason.slice(0, cap) + '…';
-    truncated = true;
-  }
-  return truncated;
-}
 
 function __extractClassesFromSnapshots_(snapshots) {
   const seen = new Set();
@@ -770,103 +883,7 @@ function __extractClassesFromSnapshots_(snapshots) {
   return Array.from(seen).sort();
 }
 
-// 1 phase 分の rows を privacy-stripped + budget-truncated な snapshot rows に整形。
-//   __captureSnapshot_ と budget は揃える (LESSON_PHASE_SNAPSHOT_BUDGET_BYTES)。
-function __buildImportSnapshotRows_(rawRows) {
-  const slim = (rawRows || []).map(r => __projectBoardRowForExport_(r));
-  let total = 0;
-  let truncated = false;
-  for (let i = 0; i < slim.length; i++) {
-    const r = slim[i];
-    let sz = JSON.stringify(r).length;
-    if (total + sz > LESSON_PHASE_SNAPSHOT_BUDGET_BYTES) {
-      if (__truncateRowAnswerReason_(r, 60)) {
-        truncated = true;
-        sz = JSON.stringify(r).length;
-      }
-    }
-    total += sz;
-  }
-  return { rows: slim, truncated };
-}
 
-const LESSON_SHRINK_STAGES = Object.freeze({
-  CAP80: 'cap80',
-  CAP40: 'cap40',
-  ROW_DROP: 'rowDrop',
-  META_ONLY: 'metaOnly'
-});
-
-// lessonJson 全体が LESSON_JSON_MAX_BYTES を超えていたら snapshots を段階的に縮めて収める。
-//   段階: ① answer/reason 80 char cap → ② 40 char cap → ③ 末尾から行を間引き → ④ snapshots 空。
-//   Why: 振り返り wordcloud のように 1 行 200-700 char で cell 上限 (50000) 超過するケースを救う。
-// 結果は lessonJson を mutate し、shrink した場合は `meta.shrinkStage` を直接書き込む
-//   (caller は単に呼ぶだけでよく、後から meta を書き戻す必要なし)。
-// パフォーマンス: row drop は per-snapshot サイズキャッシュで `JSON.stringify(snapshot)` を 1 iter / 1 回に。
-//   全件 stringify は cap 段階と初回 measure のみ。
-function __shrinkLessonJsonToFit_(lessonJson) {
-  const measure = () => JSON.stringify(lessonJson || {}).length;
-  if (measure() <= LESSON_JSON_MAX_BYTES) return { shrunk: false };
-
-  const snapshots = (lessonJson && Array.isArray(lessonJson.snapshots)) ? lessonJson.snapshots : [];
-  if (snapshots.length === 0) return { shrunk: false };
-  if (!lessonJson.meta) lessonJson.meta = {};
-
-  const truncateAllRowsToCap = (cap) => {
-    snapshots.forEach((s) => {
-      (s.rows || []).forEach((r) => {
-        if (__truncateRowAnswerReason_(r, cap)) s.truncated = true;
-      });
-    });
-  };
-
-  truncateAllRowsToCap(80);
-  if (measure() <= LESSON_JSON_MAX_BYTES) {
-    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.CAP80;
-    return { shrunk: true };
-  }
-
-  truncateAllRowsToCap(40);
-  if (measure() <= LESSON_JSON_MAX_BYTES) {
-    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.CAP40;
-    return { shrunk: true };
-  }
-
-  const snapshotSizes = snapshots.map(s => JSON.stringify(s).length);
-  let totalSize = measure();
-  let guard = 5000;
-  while (totalSize > LESSON_JSON_MAX_BYTES && guard-- > 0) {
-    let biggestIdx = -1;
-    let biggestSize = -1;
-    for (let i = 0; i < snapshots.length; i++) {
-      if ((snapshots[i].rows || []).length > 0 && snapshotSizes[i] > biggestSize) {
-        biggestSize = snapshotSizes[i];
-        biggestIdx = i;
-      }
-    }
-    if (biggestIdx < 0) break;
-    const target = snapshots[biggestIdx];
-    target.rows.pop();
-    target.droppedRows = (target.droppedRows || 0) + 1;
-    target.truncated = true;
-    const newSize = JSON.stringify(target).length;
-    totalSize -= (snapshotSizes[biggestIdx] - newSize);
-    snapshotSizes[biggestIdx] = newSize;
-  }
-  if (totalSize <= LESSON_JSON_MAX_BYTES) {
-    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.ROW_DROP;
-    return { shrunk: true };
-  }
-
-  snapshots.forEach((s) => {
-    s.droppedRows = (s.rowCount || 0);
-    s.rows = [];
-    s.truncated = true;
-    s.reason = (s.reason ? s.reason + ';' : '') + 'OVERSIZE_SHRINK';
-  });
-  lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.META_ONLY;
-  return { shrunk: true };
-}
 
 /**
  * 既存 user config の profiles[] を lessons シートに「完了済み授業」として取り込む。
@@ -883,8 +900,8 @@ function __shrinkLessonJsonToFit_(lessonJson) {
  *
  * 制約:
  *   - 既に lessons シートに同 profile 構成の record があっても dedup しない (呼び出し側責任)
- *   - lessonJson 全体が 45000 bytes を超えるとエラー (Sheets 1cell 50000 char 上限対策)
- *   - snapshot rows は LESSON_PHASE_SNAPSHOT_BUDGET_BYTES の予算内で answer/reason truncate
+ *   - lessonJson は定義 + ポインタのみで小さい (45000 bytes guard は通常発火しない)
+ *   - snapshot rows は lesson_responses シートへ全文で書き、lessonJson にはポインタのみ残す
  *
  * @param {string} userId - 対象ユーザー (= 呼び出し元 = profiles 所有者)
  * @param {Object} [options]
@@ -934,6 +951,9 @@ function importLessonFromProfiles(userId, options) {
       prev = idx;
     }
 
+    // lessonId は snapshot より先に確定させる (アーカイブ行が lessonId を持つため)。
+    const lessonId = 'lesson_' + Utilities.getUuid().slice(0, 12);
+
     const snapshots = phases.map((ph, idx) => {
       const base = {
         phaseIndex: idx,
@@ -961,14 +981,18 @@ function importLessonFromProfiles(userId, options) {
         base.reason = 'CAPTURE_FAILED:' + ((fetched && fetched.error) || 'no_data');
         return base;
       }
-      const built = __buildImportSnapshotRows_(fetched.data);
-      base.rows = built.rows;
-      base.rowCount = built.rows.length;
-      base.truncated = built.truncated;
+      // live capture (__captureSnapshot_) と同じ経路: PII を落として lesson_responses へ。
+      const projected = fetched.data.map(r => __projectBoardRowForExport_(r));
+      const pointer = __writeArchiveRows_(lessonId, idx, projected);
+      if (!pointer) {
+        base.reason = 'ARCHIVE_WRITE_FAILED';
+        return base;
+      }
+      base.sheet = pointer.sheet;
+      base.startRow = pointer.startRow;
+      base.rowCount = pointer.rowCount;
       return base;
     });
-
-    const lessonId = 'lesson_' + Utilities.getUuid().slice(0, 12);
     const now = new Date().toISOString();
     const earliest = transitions.length > 0 ? (transitions[0].ts || now) : now;
     const latest = transitions.length > 0 ? (transitions[transitions.length - 1].ts || now) : now;
@@ -990,11 +1014,6 @@ function importLessonFromProfiles(userId, options) {
       }
     };
 
-    // セルサイズ上限 (50000 char) に収まるまで snapshots を段階的に縮める。
-    //   原本データは元 spreadsheet に残るので、ここでは「過去授業の概形」を保てれば十分。
-    //   shrink 関数自身が lessonJson.meta.shrinkStage を書き込むので caller は意識不要。
-    const shrinkInfo = __shrinkLessonJsonToFit_(lessonJson);
-
     const record = {
       lessonId,
       userId,
@@ -1012,8 +1031,6 @@ function importLessonFromProfiles(userId, options) {
     }
     return createSuccessResponse('lesson を過去授業として記録しました', {
       lesson: written,
-      shrunk: shrinkInfo.shrunk,
-      shrinkStage: lessonJson.meta.shrinkStage || null,
       sizeBytes: written.sizeBytes
     });
   } catch (error) {
@@ -1115,13 +1132,22 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   return patch;
 }
 
-// Phase boundary で「その時点の rows + reactions + columnMapping」を freeze。
-//   - rows は getPublishedSheetData 経由で取得 (live board と同じ projection を再利用)。
-//   - reactions は deep-copy で freeze (live row.reactions の以後の mutate を遮断)。
-//   - サイズ超過時は answer/reason を切り詰めて truncated=true フラグ (lesson 全体を失わない)。
-//   - 失敗時は reason 付きの空 snapshot を残す (endLesson が常に完了するためのフォールバック)。
-//   - 同 phaseIndex の snapshot が既にあれば replace (advance→end の double capture 対策)。
-function __captureSnapshot_(userId, lessonJson, phaseIdx) {
+/**
+ * 現在の board データを凍結して snapshot を作る。
+ *
+ * 回答本文は lesson_responses シートへ 1 件 1 行で追記し、snapshot には範囲ポインタ
+ * {sheet, startRow, rowCount} だけを残す。lessonJson は定義 + ポインタのみ (~4KB) になり、
+ * Sheets 1 セル 50,000 字上限に触れない = 本文の切り詰めが不要になった。
+ *
+ * 行は __projectBoardRowForExport_ で PII (name / email / reactions) を落としてから書く。
+ * Why: 旧実装は live capture だけ生 row を凍結しており、import 経路 (PII 除去済み) と
+ *   非対称だった。アーカイブに児童の氏名・メールを持つ理由はない。
+ *
+ * 劣化系: fetch 失敗 / アーカイブ書込失敗時は rows 無しの snapshot に reason を残して返す
+ * (授業の進行を止めない)。元データは先生の spreadsheet に残っているので、後から
+ * lesson.recaptureArchive で焼き直せる。
+ */
+function __captureSnapshot_(userId, lessonJson, phaseIdx, lessonId) {
   const phases = (lessonJson && lessonJson.phases) || [];
   const phase = phases[phaseIdx] || {};
   const baseSnapshot = {
@@ -1149,29 +1175,15 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx) {
     return baseSnapshot;
   }
 
-  const frozen = deepClone(rawRows);
-  let total = 0;
-  let truncated = false;
-  for (let i = 0; i < frozen.length; i++) {
-    const r = frozen[i];
-    let rowSize = JSON.stringify(r).length;
-    if (total + rowSize > LESSON_PHASE_SNAPSHOT_BUDGET_BYTES) {
-      const remaining = Math.max(0, LESSON_PHASE_SNAPSHOT_BUDGET_BYTES - total);
-      if (typeof r.answer === 'string' && r.answer.length > 40) {
-        r.answer = r.answer.slice(0, Math.max(20, Math.floor(remaining / 2))) + '…';
-      }
-      if (typeof r.reason === 'string' && r.reason.length > 40) {
-        r.reason = r.reason.slice(0, Math.max(20, Math.floor(remaining / 2))) + '…';
-      }
-      truncated = true;
-      rowSize = JSON.stringify(r).length;
-    }
-    total += rowSize;
+  const projected = rawRows.map(r => __projectBoardRowForExport_(r));
+  const pointer = __writeArchiveRows_(lessonId, phaseIdx, projected);
+  if (!pointer) {
+    baseSnapshot.reason = 'ARCHIVE_WRITE_FAILED';
+    return baseSnapshot;
   }
-
-  baseSnapshot.rows = frozen;
-  baseSnapshot.rowCount = frozen.length;
-  baseSnapshot.truncated = truncated;
+  baseSnapshot.sheet = pointer.sheet;
+  baseSnapshot.startRow = pointer.startRow;
+  baseSnapshot.rowCount = pointer.rowCount;
   return baseSnapshot;
 }
 
@@ -1377,7 +1389,7 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     // Why: 移行 *前* に outgoing phase の rows を freeze する。順序を逆にすると
     //   user config が次 phase の columnMapping を指した状態で capture することになり、
     //   replay が破綻する。capture は config 切替より前 (= 現状 fromIdx) で行う。
-    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx));
+    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx, lessonId));
 
     lessonJson.profileTransitions = lessonJson.profileTransitions || [];
     lessonJson.profileTransitions.push({ ts: new Date().toISOString(), from: fromIdx, to: toIdx });
@@ -1443,7 +1455,7 @@ function endLesson(userId, lessonId) {
     // 現フェーズの rows を freeze して snapshots に upsert。capture 失敗時は reason 付き空 snapshot
     //   が積まれ、endLesson 自体は成功する (lesson は必ず completed に遷移する原則)。
     const currentIdx = __activePhaseIndex_(lessonJson);
-    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx));
+    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx, lessonId));
 
     const endedAt = new Date().toISOString();
     const result = __updateLessonRow_(lessonId, {
@@ -1605,6 +1617,94 @@ function installLessonTriggers() {
       .create();
   } catch (error) {
     logError_('installLessonTriggers', error);
+  }
+}
+
+/**
+ * 旧形式 lesson (rows が lessonJson に同居) を lesson_responses シートへ移行する。
+ *
+ * 非破壊 2 段階: まず行をアーカイブへ追記してポインタを付け、書込が確認できた
+ * snapshot だけ rows を落とす。書込に失敗した snapshot は旧形式のまま残る
+ * (hydrate は rows 同居の snapshot を触らないので、読み出しはどちらでも動く)。
+ *
+ * 旧 live capture の rows は PII (name/email/reactions) を含むため、
+ * __projectBoardRowForExport_ で 9 列に射影してから書く。
+ */
+function migrateLessonArchive(userId, lessonId) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const { found } = auth;
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
+    const snaps = Array.isArray(lessonJson.snapshots) ? lessonJson.snapshots : [];
+    const migrated = [];
+    const skipped = [];
+
+    for (const sn of snaps) {
+      if (!sn || !Array.isArray(sn.rows) || sn.rows.length === 0) {
+        skipped.push({ phaseIndex: sn && sn.phaseIndex, reason: 'no-inline-rows' });
+        continue;
+      }
+      const projected = sn.rows.map(r => __projectBoardRowForExport_(r));
+      const pointer = __writeArchiveRows_(lessonId, sn.phaseIndex, projected);
+      if (!pointer) {
+        skipped.push({ phaseIndex: sn.phaseIndex, reason: 'archive-write-failed' });
+        continue;
+      }
+      sn.sheet = pointer.sheet;
+      sn.startRow = pointer.startRow;
+      sn.rowCount = pointer.rowCount;
+      sn.rows = [];
+      migrated.push({ phaseIndex: sn.phaseIndex, rowCount: pointer.rowCount, startRow: pointer.startRow });
+    }
+
+    if (migrated.length === 0) {
+      return createSuccessResponse('移行対象なし', { migrated, skipped });
+    }
+    const result = __updateLessonRow_(lessonId, { lessonJson });
+    if (!result.success) {
+      // lessonJson 更新に失敗した場合、書いた行は孤児になるが旧形式が無傷で残る (安全側)。
+      return createErrorResponse(result.message || result.error);
+    }
+    return createSuccessResponse('アーカイブを lesson_responses へ移行しました', {
+      migrated, skipped, sizeBytes: result.lesson.sizeBytes
+    });
+  } catch (error) {
+    logError_('migrateLessonArchive', error);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 指定 phase のアーカイブを「現在の公開ボード」から焼き直す。
+ * 用途: 移行時に本文が切り詰められていた phase を、元 SS が読める状態で全文化する。
+ *   config.spreadsheetId が対象 phase の SS を指していることは呼び出し側の責任
+ *   (previewBoard で件数を確認してから呼ぶ)。
+ */
+function recaptureLessonArchive(userId, lessonId, phaseIndex) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const { found } = auth;
+    const idx = Number(phaseIndex);
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    if (!Number.isInteger(idx) || idx < 0 || idx >= phases.length) {
+      return createErrorResponse('phaseIndex が不正です');
+    }
+    const snapshot = __captureSnapshot_(userId, lessonJson, idx, lessonId);
+    if (snapshot.reason) {
+      return createErrorResponse('再取得失敗: ' + snapshot.reason);
+    }
+    __upsertSnapshot_(lessonJson, snapshot);
+    const result = __updateLessonRow_(lessonId, { lessonJson });
+    if (!result.success) return createErrorResponse(result.message || result.error);
+    return createSuccessResponse('phase ' + idx + ' を全文で焼き直しました', {
+      phaseIndex: idx, rowCount: snapshot.rowCount, startRow: snapshot.startRow
+    });
+  } catch (error) {
+    logError_('recaptureLessonArchive', error);
+    return createExceptionResponse(error);
   }
 }
 

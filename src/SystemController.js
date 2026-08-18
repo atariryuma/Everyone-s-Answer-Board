@@ -34,6 +34,14 @@ const USERS_SHEET_HEADERS = ['userId', 'userEmail', 'googleId', 'isActive', 'con
 const LESSONS_SHEET_HEADERS = ['lessonId', 'userId', 'name', 'state', 'createdAt', 'startedAt', 'endedAt', 'schemaVersion', 'sizeBytes', 'etag', 'lessonJson'];
 
 /**
+ * lesson アーカイブ (授業終了/フェーズ切替時に凍結する回答) の行スキーマ。
+ * Why 別シート: lessonJson (1 セル) に回答を同居させると Sheets の 1 セル 50,000 字上限で
+ *   破裂し、本文が段階的に切り詰められていた。回答は「無界・追記一回きり」のデータなので
+ *   1 件 1 行で持ち、lessonJson 側は範囲ポインタ {sheet, startRow, rowCount} だけを持つ。
+ */
+const LESSON_RESPONSES_SHEET_HEADERS = ['lessonId', 'phaseIndex', 'rowIndex', 'timestamp', 'class', 'answer', 'reason', 'numericX', 'numericY'];
+
+/**
  * プロパティキャッシュTTL (ミリ秒)
  * PropertiesServiceのメモリキャッシュ用
  * CLAUDE.md準拠: 30秒TTLで自動期限切れ
@@ -1837,6 +1845,7 @@ function __ensureDatabaseSheets_(trimmedDatabaseId, parsedCredentials) {
     }
     __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
     __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
+    __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
   } catch (dbError) {
     console.warn('setupApp: Database initialization failed:', dbError.message);
   }
@@ -1883,6 +1892,8 @@ function createDatabase() {
     // lessons シート (lesson archive 用) も同時に作成
     const lessonsSheet = ss.insertSheet('lessons');
     lessonsSheet.appendRow(LESSONS_SHEET_HEADERS);
+    const responsesSheet = ss.insertSheet('lesson_responses');
+    responsesSheet.appendRow(LESSON_RESPONSES_SHEET_HEADERS);
 
     if (folder) {
       DriveApp.getFileById(ss.getId()).moveTo(folder);

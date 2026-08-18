@@ -84,7 +84,11 @@ function createFakeLessonsSheet(headers) {
 
 function loadLessonContext(overrides = {}) {
   const LESSONS_HEADERS = ['lessonId', 'userId', 'name', 'state', 'createdAt', 'startedAt', 'endedAt', 'schemaVersion', 'sizeBytes', 'etag', 'lessonJson'];
+  const RESPONSES_HEADERS = ['lessonId', 'phaseIndex', 'rowIndex', 'timestamp', 'class', 'answer', 'reason', 'numericX', 'numericY'];
   const lessonsSheet = overrides.lessonsSheet || createFakeLessonsSheet(LESSONS_HEADERS);
+  // アーカイブ側。appendRows (SA proxy 専用) は持たせず getLastRow + setValues の
+  //   fallback 経路を通す = native Sheet 相当の挙動でテストする。
+  const responsesSheet = overrides.responsesSheet || createFakeLessonsSheet(RESPONSES_HEADERS);
   const formCreations = [];
   const formCloses = [];
   const configPatches = [];
@@ -94,15 +98,17 @@ function loadLessonContext(overrides = {}) {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     ...gasResponseStubs(),
     openDatabase: () => ({
-      getSheetByName: (name) => name === 'lessons' ? lessonsSheet : null,
+      getSheetByName: (name) => name === 'lessons' ? lessonsSheet
+        : name === 'lesson_responses' ? responsesSheet : null,
       // Production の sheet 不存在チェック (SA proxy) に合わせて getSheets() も提供。
-      getSheets: () => [{ getName: () => 'lessons' }]
+      getSheets: () => [{ getName: () => 'lessons' }, { getName: () => 'lesson_responses' }]
     }),
     // SpreadsheetApp.openById で direct admin write (deleteLesson 用)。
     SpreadsheetApp: {
       openById: () => ({ getSheetByName: (name) => name === 'lessons' ? lessonsSheet : null })
     },
     LESSONS_SHEET_HEADERS: ['lessonId', 'userId', 'name', 'state', 'createdAt', 'startedAt', 'endedAt', 'schemaVersion', 'sizeBytes', 'etag', 'lessonJson'],
+    LESSON_RESPONSES_SHEET_HEADERS: RESPONSES_HEADERS,
     // helpers.js の deepClone を test 環境にも提供 (LessonService が依存)。
     deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
     getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
@@ -166,7 +172,7 @@ function loadLessonContext(overrides = {}) {
   vm.createContext(context);
   vm.runInContext(LESSON_SOURCE, context, { filename: 'LessonService.js' });
 
-  return { context, lessonsSheet, formCreations, formCloses, configPatches };
+  return { context, lessonsSheet, responsesSheet, formCreations, formCloses, configPatches };
 }
 
 // =====================================================================
@@ -644,9 +650,13 @@ test('deleteLesson: draft は削除可、active は reject', () => {
 // Phase 2: snapshot capture + auto-archive
 // =====================================================================
 
-test('endLesson: snapshots に rows を freeze + reactions deep-copy', () => {
-  const liveRow = { rowIndex: 2, emailHash: 'h1', answer: '回答1', reactions: { UNDERSTAND: ['h2'], LIKE: [] } };
-  const { context } = loadLessonContext({
+test('endLesson: rows は lesson_responses へ書き、snapshot はポインタになる', () => {
+  const liveRow = {
+    rowIndex: 2, name: '児童A', email: 'kid@example.com', emailHash: 'h1',
+    answer: '回答1', reason: '理由1', class: '5-1', numericX: 4, numericY: 5,
+    reactions: { UNDERSTAND: ['h2'], LIKE: [] }
+  };
+  const { context, responsesSheet } = loadLessonContext({
     getPublishedSheetData: () => ({ success: true, data: [liveRow] })
   });
   const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
@@ -660,13 +670,28 @@ test('endLesson: snapshots に rows を freeze + reactions deep-copy', () => {
   const snaps = endRes.data.lesson.lessonJson.snapshots;
   assert.equal(snaps.length, 1);
   assert.equal(snaps[0].phaseIndex, 0);
+  // snapshot 本体は rows を持たない (ポインタのみ)
+  assert.equal(snaps[0].rows.length, 0);
+  assert.equal(snaps[0].sheet, 'lesson_responses');
+  assert.equal(snaps[0].startRow, 2);
   assert.equal(snaps[0].rowCount, 1);
-  assert.equal(snaps[0].rows[0].answer, '回答1');
 
-  // freeze: live row.reactions を後から mutate しても snapshot は影響を受けない
-  liveRow.reactions.UNDERSTAND.push('h99');
-  // cross-realm Array なので JSON 経由で比較
-  assert.equal(JSON.stringify(snaps[0].rows[0].reactions.UNDERSTAND), '["h2"]');
+  // アーカイブ行は 9 列に射影され、PII (name/email/reactions) は書かれない
+  const archived = responsesSheet._data[1];
+  assert.equal(archived[0], lessonId);
+  assert.equal(archived[5], '回答1');
+  assert.equal(archived[6], '理由1');
+  assert.equal(JSON.stringify(archived).includes('児童A'), false);
+  assert.equal(JSON.stringify(archived).includes('kid@example.com'), false);
+
+  // getLessonForReview はポインタから rows を読み戻す (クライアント互換の形)
+  const review = context.getLessonForReview('u1', lessonId);
+  assert.equal(review.success, true);
+  const hydrated = review.data.lesson.lessonJson.snapshots[0];
+  assert.equal(hydrated.rows.length, 1);
+  assert.equal(hydrated.rows[0].answer, '回答1');
+  assert.equal(hydrated.rows[0].numericX, 4);
+  assert.equal(hydrated.rows[0].numericY, 5);
 });
 
 test('endLesson: capture 失敗時も lesson は completed に遷移 (reason 付き空 snapshot)', () => {
@@ -706,8 +731,9 @@ test('advanceLessonPhase: 移行前 (fromIdx) の rows を snapshot に保存す
   const snaps = advRes.data.lesson.lessonJson.snapshots;
   assert.equal(snaps.length, 1);
   assert.equal(snaps[0].phaseIndex, 0);
-  // phase 0 終了時の row が記録されている
-  assert.equal(snaps[0].rows[0].answer, 'phase1 ans');
+  // phase 0 終了時の row がアーカイブに記録され、hydrate で読み戻せる
+  const review = context.getLessonForReview('u1', lessonId);
+  assert.equal(review.data.lesson.lessonJson.snapshots[0].rows[0].answer, 'phase1 ans');
 });
 
 test('advance → end: 同 phaseIndex の double capture は replace (append しない)', () => {
@@ -899,4 +925,121 @@ test('getActiveLessonNav: 実行中の授業の phase 一覧と現在位置を�
   assert.equal(res.data.activePhaseIndex, 1);
   assert.equal(res.data.phases.length, 3);
   assert.equal(res.data.phases[0].index, 0);
+});
+
+// ── アーカイブ分離 (lesson_responses) の周辺仕様 ──
+
+test('migrateLessonArchive: 旧形式 (rows 同居) をポインタ + アーカイブ行へ移す', () => {
+  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
+  // 旧形式の lesson を直接シートに置く (v2894 移行期のデータを再現)
+  const legacyJson = {
+    phases: [{ name: 'p0', formTemplate: 'matrix' }],
+    snapshots: [{
+      phaseIndex: 0, phaseName: 'p0', boardMode: 'matrix',
+      columnMapping: {}, displaySettings: {},
+      rows: [
+        { rowIndex: 2, timestamp: 't1', class: '1組', answer: 'こたえ', reason: 'りゆう', numericX: 3, numericY: 4 },
+        { rowIndex: 3, timestamp: 't2', class: '2組', answer: 5, reason: '数値回答', numericX: 5, numericY: 5 }
+      ],
+      rowCount: 2, truncated: true
+    }]
+  };
+  lessonsSheet.appendRow(['lesson_legacy1', 'u1', '旧授業', 'completed', 't', 't', 't', 1,
+    JSON.stringify(legacyJson).length, 'etag0', JSON.stringify(legacyJson)]);
+
+  const res = context.migrateLessonArchive('u1', 'lesson_legacy1');
+  assert.equal(res.success, true);
+  assert.equal(res.data.migrated.length, 1);
+  assert.equal(res.data.migrated[0].rowCount, 2);
+
+  // アーカイブ行が書かれ、lessonJson からは rows が消えた
+  assert.equal(responsesSheet._data.length, 3); // header + 2
+  const saved = JSON.parse(lessonsSheet._data[1][10]);
+  assert.equal(saved.snapshots[0].rows.length, 0);
+  assert.equal(saved.snapshots[0].sheet, 'lesson_responses');
+  assert.equal(saved.snapshots[0].startRow, 2);
+
+  // hydrate で元どおり読める (answer の数値も保持)
+  const review = context.getLessonForReview('u1', 'lesson_legacy1');
+  const rows = review.data.lesson.lessonJson.snapshots[0].rows;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].answer, 'こたえ');
+  assert.equal(rows[1].answer, 5);
+  assert.equal(rows[1].numericY, 5);
+});
+
+test('migrateLessonArchive: 二重実行は no-op (rows が空なので移行対象なし)', () => {
+  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
+  const legacyJson = {
+    phases: [{ name: 'p0', formTemplate: 'board' }],
+    snapshots: [{ phaseIndex: 0, phaseName: 'p0', rows: [
+      { rowIndex: 2, timestamp: 't', class: '', answer: 'a', reason: '' }
+    ], rowCount: 1 }]
+  };
+  lessonsSheet.appendRow(['lesson_legacy2', 'u1', '旧', 'completed', 't', 't', 't', 1, 1, 'e', JSON.stringify(legacyJson)]);
+  assert.equal(context.migrateLessonArchive('u1', 'lesson_legacy2').success, true);
+  const rowsAfterFirst = responsesSheet._data.length;
+  const second = context.migrateLessonArchive('u1', 'lesson_legacy2');
+  assert.equal(second.success, true);
+  assert.match(second.message, /移行対象なし/);
+  assert.equal(responsesSheet._data.length, rowsAfterFirst); // 重複追記しない
+});
+
+test('hydrate: ポインタがずれて他授業の行を指しても照合ガードで混入しない', () => {
+  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
+  // 別授業の行がアーカイブに先に存在する
+  responsesSheet.appendRow(['lesson_other', 0, 2, 't', '1組', '他授業の回答', '', '', '']);
+  // ポインタが誤ってその行 (row 2) を指している lesson
+  const json = {
+    phases: [{ name: 'p0', formTemplate: 'board' }],
+    snapshots: [{ phaseIndex: 0, phaseName: 'p0', rows: [],
+      sheet: 'lesson_responses', startRow: 2, rowCount: 1 }]
+  };
+  lessonsSheet.appendRow(['lesson_drift', 'u1', 'ずれ', 'completed', 't', 't', 't', 1, 1, 'e', JSON.stringify(json)]);
+
+  const review = context.getLessonForReview('u1', 'lesson_drift');
+  const sn = review.data.lesson.lessonJson.snapshots[0];
+  assert.equal(sn.rows.length, 0);                    // 他授業の回答は返さない
+  assert.match(sn.reason || '', /ARCHIVE_POINTER_DRIFT/);
+});
+
+test('recaptureLessonArchive: 現在の公開ボードから全文で焼き直す', () => {
+  const { context, responsesSheet } = loadLessonContext({
+    getPublishedSheetData: () => ({ success: true, data: [
+      { rowIndex: 2, class: '1組', answer: '全文の回答', reason: '全文の理由', numericX: 2, numericY: 3 }
+    ] })
+  });
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  context.endLesson('u1', lessonId); // phase 0 が 1 度 capture される
+
+  const before = responsesSheet._data.length;
+  const res = context.recaptureLessonArchive('u1', lessonId, 0);
+  assert.equal(res.success, true);
+  // 旧範囲は孤児として残り (無害)、ポインタは新範囲を指す
+  assert.equal(responsesSheet._data.length, before + 1);
+  const review = context.getLessonForReview('u1', lessonId);
+  const sn = review.data.lesson.lessonJson.snapshots[0];
+  assert.equal(sn.startRow, before + 1);
+  assert.equal(sn.rows[0].answer, '全文の回答');
+
+  assert.equal(context.recaptureLessonArchive('u1', lessonId, 99).success, false); // 範囲外
+});
+
+test('capture: lesson_responses が無い環境では ARCHIVE_WRITE_FAILED で劣化し授業は止めない', () => {
+  const { context } = loadLessonContext({
+    getPublishedSheetData: () => ({ success: true, data: [{ rowIndex: 2, answer: 'a' }] }),
+    // responses シートを見えなくする
+    responsesSheet: null
+  });
+  // openDatabase を lessons のみに差し替え
+  context.openDatabase = () => ({
+    getSheetByName: (name) => null,
+    getSheets: () => [{ getName: () => 'lessons' }]
+  });
+  // ここでは __writeArchiveRows_ を直接検証 (シート無し + createIfMissing 失敗)
+  const ptr = context.__writeArchiveRows_('lesson_x', 0, [{ rowIndex: 2, answer: 'a' }]);
+  assert.equal(ptr, null);
 });
