@@ -178,10 +178,6 @@ function handleLoginMode_() {
   return HtmlService.createTemplateFromFile('LoginPage.html').evaluate().setTitle('ログイン');
 }
 
-function handleManualMode_() {
-  return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate().setTitle('使い方ガイド');
-}
-
 function handleAdminMode_(params, currentEmail) {
   if (!currentEmail) {
     return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
@@ -392,7 +388,6 @@ function handleMainMode_(params, currentEmail) {
 
 const DO_GET_HANDLERS = {
   login: handleLoginMode_,
-  manual: handleManualMode_,
   admin: handleAdminMode_,
   setup: handleSetupMode_,
   appSetup: handleAppSetupMode_,

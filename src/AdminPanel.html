@@ -48,38 +48,6 @@
       padding: var(--space-6) var(--space-4) var(--space-16);
     }
 
-    /* 折りたたみセクション: 「詳細設定」の外枠。card と同じ見た目で、
-       summary 行だけが常時見える。 */
-    .disclosure {
-      padding: 0;
-    }
-
-    .disclosure > summary {
-      list-style: none;
-      cursor: pointer;
-      padding: var(--space-4) var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      border-radius: var(--radius-xl);
-      color: var(--theme-text-secondary);
-    }
-
-    .disclosure > summary::-webkit-details-marker { display: none; }
-    .disclosure > summary:hover { color: var(--theme-text-primary); }
-
-    .disclosure > summary .disclosure-chevron {
-      margin-left: auto;
-      transition: transform var(--transition-normal) var(--transition-easing);
-    }
-
-    .disclosure[open] > summary .disclosure-chevron { transform: rotate(180deg); }
-
-    .disclosure-body {
-      padding: 0 var(--space-6) var(--space-6);
-      border-top: var(--border-primary);
-      padding-top: var(--space-5);
-    }
 
     /* セクション見出し: アイコン + テキストを 1 行で揃える共通形。 */
     .section-head {
@@ -167,8 +135,6 @@
     @media (max-width: 640px) {
       .app-header-inner { flex-wrap: wrap; }
       .app-main { padding: var(--space-4) var(--space-3) var(--space-16); }
-      .disclosure > summary { padding: var(--space-4); }
-      .disclosure-body { padding: var(--space-4) var(--space-4) var(--space-5); }
     }
 
     /* card / info-card / lesson-hero-card 旧 alias マーカー は UnifiedStyles の
@@ -212,63 +178,95 @@
     /* SharedUtilitiesのローディングシステムを使用 */
 
     /* =============================================================================
-     * フッター：現在のボード情報表示スタイル
+     * ステータスバー: 「今どうなっているか」を常に画面最上部に置く。
+     * Why: 旧実装は公開状態と主要操作を画面最下部の固定フッターに置き、しかも
+     *   非公開時はバー自体を隠していた。管理画面で一番知りたい情報が
+     *   「公開中のときだけ・視線の終点に」ある状態だった。状態は隠さない。
      * ============================================================================= */
-    #boardInfoFooter {
-      /* 既存のz-indexよりも低く設定（通知コンテナより下） */
-      z-index: var(--z-elevated);
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-6);
+      margin-bottom: var(--space-4);
     }
 
-    #boardInfoFooter .glass-panel {
-      /* フッター専用のガラス調スタイル - CSS変数統一 */
-      background: var(--theme-bg-surface);
-      border: var(--border-primary);
+    .status-bar-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-width: 0;
+      flex: 1;
     }
 
-    #boardInfoFooter .glass-panel:hover {
-      border-color: color-mix(in srgb, var(--brand-accent-light) 40%, transparent);
-      transition: border-color var(--transition-normal) var(--transition-easing);
-    }
-
-    /* 問題文表示エリア — お題見出しは brand cyan とは別の pink で「問い」 を強調 */
+    /* 問い は brand cyan とは別の pink で強調 (旧フッターの規約を継承) */
     #currentQuestionText {
-      max-width: 100%;
       line-height: 1.4;
       color: var(--theme-accent-pink);
-    }
-
-    /* アクションボタンのレスポンシブ対応 */
-    @media (max-width: 768px) {
-      #boardInfoFooter .flex.items-center.justify-between {
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--space-4);
-      }
-
-      #boardInfoFooter .flex-1.min-w-0 {
-        flex: none;
-        text-align: center;
-      }
-
-      #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
-        justify-content: center;
-        flex-wrap: wrap;
-      }
-
-      #currentQuestionText {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: unset;
-      }
-    }
-
-    /* ボタンスタイル微調整 */
-    #boardInfoFooter .btn-primary,
-    #boardInfoFooter .btn-secondary {
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: -webkit-fill-available;
-      min-width: fit-content;
     }
+
+    .status-bar-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-shrink: 0;
+    }
+
+    .status-bar-actions .btn { white-space: nowrap; }
+
+    @media (max-width: 768px) {
+      .status-bar { flex-direction: column; align-items: stretch; }
+      .status-bar-actions { justify-content: stretch; flex-wrap: wrap; }
+      .status-bar-actions .btn { flex: 1; }
+      #currentQuestionText { white-space: normal; }
+    }
+
+    /* =============================================================================
+     * タブナビゲーション: 「授業」(日々の運用) と「ボード設定」(接続と表示) を分ける。
+     * Why: 旧実装はボード設定一式を「詳細設定」という折りたたみに隠していた。
+     *   隠すと初見の教師は開くまで存在に気付けず、マニュアルで補う構図になる。
+     *   タブなら全領域が常に見出しとして見えていて、1 クリックで届く。
+     * ============================================================================= */
+    .admin-tabs {
+      display: flex;
+      gap: var(--space-1);
+      border-bottom: var(--border-primary);
+      margin-bottom: var(--space-4);
+    }
+
+    .admin-tab {
+      appearance: none;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;             /* 下線をタブ列の境界線に重ねる */
+      padding: var(--space-2) var(--space-4);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--theme-text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      transition: color var(--transition-fast) var(--transition-easing);
+    }
+
+    .admin-tab:hover { color: var(--theme-text-primary); }
+
+    .admin-tab[aria-selected="true"] {
+      color: var(--theme-text-primary);
+      border-bottom-color: var(--theme-accent-cyan-strong);
+    }
+
+    [data-tab-panel][hidden] { display: none; }
+
+    /* 破壊的操作は行内で主張させない (hover で意図が立つ)。confirm モーダルが本防壁。 */
+    .lesson-delete-btn { color: var(--theme-text-muted); }
+    .lesson-delete-btn:hover { color: var(--status-error); border-color: var(--status-error); }
 
     /* コピー完了状態のスタイル */
     #copyViewUrlBtn:disabled {
@@ -307,11 +305,6 @@
     <div class="app-header-inner">
       <h1>みんなの回答ボード</h1>
       <div class="flex items-center gap-2">
-        <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
-          title="はじめての方向けの手順を開きます">
-          <svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg>
-          使い方
-        </button>
         <!-- アカウント: 旧「ユーザー情報」カード + 「アプリ設定」を集約。
              常時 4 カードを右カラムに置く必要が無くなる。 -->
         <details class="account-menu">
@@ -342,6 +335,42 @@
   <!-- data-normal-mode: body.mode-create-lesson / body.mode-run-lesson 時に CSS で非表示。
        これで wizard / Runner が main workspace を takeover する。 -->
   <main class="app-main" data-normal-mode>
+
+      <!-- ステータスバー: 公開状態と主要操作。状態は非公開でも隠さない。 -->
+      <div id="board-status-bar" class="card status-bar">
+        <div class="status-bar-info">
+          <span id="board-state-badge" class="status-badge unpublished">読み込み中</span>
+          <div class="min-w-0">
+            <div id="currentQuestionText" class="text-theme font-medium">-</div>
+            <div id="boardStatus" class="text-xs text-theme-muted"></div>
+          </div>
+        </div>
+        <div class="status-bar-actions">
+          <button id="copyViewUrlBtn" class="btn btn-secondary text-sm px-3 py-2" title="閲覧用URLをコピー（共有用）" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
+          </button>
+          <button id="openBoardBtn" class="btn btn-primary text-sm px-3 py-2" title="回答ボードを開く" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
+          </button>
+          <button id="unpublishBoardBtn" class="btn btn-danger text-sm px-3 py-2" title="ボードの公開を終了する" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg> 公開を終了
+          </button>
+        </div>
+      </div>
+
+      <!-- タブ: 授業 (日々の運用) / ボード設定 (接続と表示) -->
+      <nav class="admin-tabs" role="tablist" aria-label="管理メニュー">
+        <button type="button" class="admin-tab" role="tab" id="tab-btn-lessons"
+          aria-selected="true" aria-controls="tab-lessons" data-tab="lessons">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-layers"></use></svg> 授業
+        </button>
+        <button type="button" class="admin-tab" role="tab" id="tab-btn-board"
+          aria-selected="false" aria-controls="tab-board" data-tab="board">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-sliders"></use></svg> ボード設定
+        </button>
+      </nav>
+
+      <div id="tab-lessons" data-tab-panel role="tabpanel" aria-labelledby="tab-btn-lessons">
       <!-- =========================================================
         授業 — この画面で唯一の主導線。
         Why: 旧構成は「レッスン」「個別ボード」「保存済みボード(プロファイル)」の
@@ -391,16 +420,11 @@
         既存ユーザーの運用経路をそのまま残すため機能は一切削らず、
         既定で折りたたむことで初見の教師の視界からだけ外す。
       ======================================================== -->
-      <details class="card disclosure">
-        <summary>
-          <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
-          <span>
-            <span class="text-theme font-medium">詳細設定</span>
-            <span class="text-xs text-theme-muted block">Google フォームを直接つないで 1 枚のボードを作る</span>
-          </span>
-          <svg class="icon disclosure-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
-        </summary>
-        <div class="disclosure-body">
+      </div><!-- /#tab-lessons -->
+
+      <div id="tab-board" data-tab-panel role="tabpanel" aria-labelledby="tab-btn-board" hidden>
+      <div class="card">
+        <p class="text-xs text-theme-muted mb-4">Google フォームをつないでボードの中身と見せ方を決めます。授業を使う場合は自動で設定されるので、通常はここを触る必要はありません。</p>
 
       <!-- ① フォーム連携: URL paste を primary、新規作成/一覧は代替経路として 1 details に集約 -->
       <section class="subsection">
@@ -757,8 +781,8 @@
         <div id="resource-status" class="text-xs text-theme-muted mt-2">設定を読み込み中...</div>
       </section>
 
-        </div>
-      </details>
+      </div><!-- /.card -->
+      </div><!-- /#tab-board -->
   </main>
 
   <!-- =====================================================================
@@ -785,40 +809,6 @@
   <?!= include('LessonWorkspace'); ?>
 
 
-  <!-- 現在のボード情報フッター -->
-  <footer id="boardInfoFooter" class="fixed bottom-0 left-0 right-0 z-30 p-3 hidden">
-    <div class="card max-w-5xl mx-auto">
-      <div class="flex items-center justify-between gap-4">
-        <!-- 左側：問題文表示 -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-theme-status-warning-text-on-soft"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-form"></use></svg></span>
-            <span class="text-xs text-theme-muted">現在の回答ボード</span>
-          </div>
-          <div id="currentQuestionText" class="text-theme font-medium truncate">
-            読み込み中...
-          </div>
-        </div>
-
-        <!-- 右側：アクションボタン -->
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <button id="copyViewUrlBtn" class="btn btn-secondary text-sm px-3 py-2" title="閲覧用URLをコピー（共有用）" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
-          </button>
-          <button id="openBoardBtn" class="btn btn-primary text-sm px-3 py-2" title="回答ボードを開く" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
-          </button>
-          <button id="unpublishBoardBtn" class="btn btn-danger text-sm px-3 py-2" title="ボードの公開を終了する" type="button">
-            <svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg> 公開を終了
-          </button>
-        </div>
-      </div>
-
-
-      <!-- ステータス表示（最小限） -->
-      <div class="text-xs text-theme-muted mt-2" id="boardStatus">最終更新: --:--</div>
-    </div>
-  </footer>
 
   <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
   <?!= include('SharedUtilities'); ?>

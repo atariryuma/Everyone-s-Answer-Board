@@ -72,11 +72,6 @@ test('doGet: login mode loads LoginPage template', () => {
   assert.ok(templates.includes('LoginPage.html'));
 });
 
-test('doGet: manual mode loads TeacherManual template', () => {
-  const { context, templates } = loadDoGetContext();
-  context.doGet(createGetEvent({ mode: 'manual' }));
-  assert.ok(templates.includes('TeacherManual.html'));
-});
 
 // --- mode=admin error paths ---
 

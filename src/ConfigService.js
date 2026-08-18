@@ -113,8 +113,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
       webAppUrl: webAppUrl || '',
       adminPanelUrl: webAppUrl ? `${webAppUrl}?mode=admin&userId=${userId}` : '',
       viewBoardUrl: webAppUrl ? `${webAppUrl}?mode=view&userId=${userId}` : '',
-      setupUrl: webAppUrl ? `${webAppUrl}?mode=setup&userId=${userId}` : '',
-      manualUrl: webAppUrl ? `${webAppUrl}?mode=manual` : ''
+      setupUrl: webAppUrl ? `${webAppUrl}?mode=setup&userId=${userId}` : ''
     };
 
   } catch (error) {

@@ -213,8 +213,22 @@
     systemState.initializationStep = 'started';
 
     try {
+      // タブはデータ取得を待たずに操作可能にする (体感の初期化を速く見せる)。
+      try { initAdminTabs(); } catch (e) { console.warn('initAdminTabs skipped:', e.message); }
+
       systemState.initializationStep = 'batched initialization';
       await initializeBatchedAdminPanel();
+
+      // データソース未接続ならボード設定タブから始める。
+      //   授業を使う教師には不要だが、既存フォームを繋ぎたい教師が
+      //   空の授業タブだけを見て迷子になるのを防ぐ。
+      try {
+        const cfg = systemState.config || {};
+        const lessons = document.querySelectorAll('#lesson-list li [data-lesson-open]').length;
+        if (!cfg.spreadsheetId && lessons === 0 && typeof window.__adminSelectTab === 'function') {
+          window.__adminSelectTab('board');
+        }
+      } catch (e) { /* タブ初期選択は best-effort */ }
 
       // Why ここで prefetch: CLAUDE.md「top-level に google.script.run を置かない」ルールに
       //   従い、以前 EOF の独立 IIFE で動かしていた prefetchAppSetupUrl() を init() 内へ移す。
@@ -301,38 +315,12 @@
         }
       } catch (_) {}
 
-      // 初回アクセス時のウェルカムモーダル表示
-      checkAndShowWelcomeModal();
 
     } catch (error) {
       console.error('Batched admin panel initialization error:', error);
       throw error;
     } finally {
       window.setLoading(false);
-    }
-  }
-
-  /**
-   * 初回アクセス時のウェルカムモーダル表示チェック
-   */
-  function checkAndShowWelcomeModal() {
-    const hasSeenWelcome = systemState.config?.hasSeenWelcome;
-
-    if (!hasSeenWelcome && window.sharedModals) {
-      window.sharedModals.showWelcome({
-        onStart: () => {
-          // モーダルを閉じて通常フローへ (sharedModals 側で自動クローズ)
-        },
-        onManual: () => {
-          // マニュアルを開く
-          openManualGuide();
-        },
-        onDontShow: (checked) => {
-          if (checked) {
-            markWelcomeSeenOnServer();
-          }
-        }
-      });
     }
   }
 
@@ -1000,16 +988,6 @@
       console.warn('buildWebAppUrl fetch failed:', err && err.message);
       if (typeof onError === 'function') onError(err);
     });
-  }
-
-  function openManualGuide() {
-    if (window.notifications) {
-      window.notifications.info('使い方ガイドを開いています...', 2000);
-    }
-    buildWebAppUrl('manual', null,
-      (url) => { window.open(url, '_blank'); },
-      () => { if (window.notifications) window.notifications.error('使い方ガイドを開けませんでした。', 3000); }
-    );
   }
 
   function updateResourceButtons(config) {
@@ -3045,48 +3023,61 @@
 
   let currentBoardInfo = null;
 
+  // ステータスバー: 公開状態と主要操作の唯一の表示先。
+  //   Why 非公開でも隠さない: 管理画面で一番知りたいのは「今公開されているか」。
+  //   旧フッターは非公開時に消えていたため、状態が「無」で表現されていた。
   function updateFooterDisplay(boardInfo) {
-    const footer = document.getElementById('boardInfoFooter');
+    const badge = document.getElementById('board-state-badge');
     const questionText = document.getElementById('currentQuestionText');
     const openBtn = document.getElementById('openBoardBtn');
     const copyBtn = document.getElementById('copyViewUrlBtn');
     const unpublishBtn = document.getElementById('unpublishBoardBtn');
     const statusText = document.getElementById('boardStatus');
+    if (!badge) return;
 
     const isPublished = Boolean(boardInfo?.isPublished);
+    badge.textContent = isPublished ? '公開中' : '非公開';
+    badge.classList.toggle('published', isPublished);
+    badge.classList.toggle('unpublished', !isPublished);
 
-    if (!isPublished) {
-      footer.classList.add('hidden');
-      return;
+    if (isPublished) {
+      questionText.textContent = boardInfo.questionText || '(設問なし)';
+      if (statusText) statusText.textContent = '最終更新: ' + (boardInfo.lastUpdated || '不明');
+    } else {
+      questionText.textContent = (boardInfo && boardInfo.questionText) || 'ボードは非公開です';
+      if (statusText) statusText.textContent = '「ボード設定」タブの公開スイッチ、または授業の開始で公開されます';
     }
 
-    footer.classList.remove('hidden');
-
-    questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
-
-    if (isPublished && boardInfo.urls) {
-      openBtn.style.display = 'block';
-      copyBtn.style.display = 'block';
-      if (unpublishBtn) unpublishBtn.style.display = 'block';
-
+    const showActions = isPublished && boardInfo.urls;
+    openBtn.style.display = showActions ? '' : 'none';
+    copyBtn.style.display = showActions ? '' : 'none';
+    if (unpublishBtn) unpublishBtn.style.display = showActions ? '' : 'none';
+    if (showActions) {
       openBtn.onclick = () => {
         // 連打で新タブが複数開かないよう 800ms 内の重複 click を抑制。
         if (!window.sharedUtilities?.buttons?.navOnce(openBtn)) return;
         window.open(boardInfo.urls.view, '_blank');
       };
       copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
-
-      if (statusText) {
-        statusText.textContent = '最終更新: '+ (boardInfo.lastUpdated || '不明');
-      }
-    } else {
-      openBtn.style.display = 'none';
-      copyBtn.style.display = 'none';
-      if (unpublishBtn) unpublishBtn.style.display = 'none';
-      if (statusText) {
-        statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
-      }
     }
+  }
+
+  // タブ切替。状態は URL に持たない (リロードで授業タブに戻るのが自然な既定)。
+  function initAdminTabs() {
+    const tabs = Array.from(document.querySelectorAll('.admin-tab'));
+    if (tabs.length === 0) return;
+    const select = (name) => {
+      tabs.forEach((btn) => {
+        const active = btn.dataset.tab === name;
+        btn.setAttribute('aria-selected', String(active));
+        const panel = document.getElementById(btn.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !active;
+      });
+    };
+    tabs.forEach((btn) => btn.addEventListener('click', () => select(btn.dataset.tab)));
+    // データソース未接続 (初期セットアップ中) はボード設定タブから始める。
+    //   「授業を使えば自動」だが、既存フォームを繋ぎたい教師が迷子にならないように。
+    window.__adminSelectTab = select;
   }
 
   function copyViewUrl(url) {
@@ -3211,7 +3202,7 @@
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
             ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-reopen="${safeId}" title="授業を再開して回答受付を再開する">再開</button>` : ''}
             <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="この授業をテンプレートとして複製"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製</button>
-            <button class="btn btn-danger text-xs" data-lesson-delete="${safeId}" title="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg>削除</button>
+            <button class="btn btn-secondary text-xs lesson-delete-btn" data-lesson-delete="${safeId}" title="この授業を削除" aria-label="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg></button>
           </li>`;
         }).join('');
       }).catch((err) => {

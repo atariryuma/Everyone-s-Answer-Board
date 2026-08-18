@@ -275,7 +275,7 @@ const bootExists = FILE_SET.has('SharedThemeBoot.html');
 const headBundlesBoot = FILE_SET.has('SharedPageHead.html')
   && /SharedThemeBoot/.test(readSrc('SharedPageHead.html'));
 const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'LoginPage', 'AppSetupPage', 'SetupPage',
-                            'TeacherManual', 'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
+                            'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
 let bootMissing = 0;
 for (const p of PAGES_NEEDING_BOOT) {
   const name = `${p}.html`;

@@ -78,7 +78,6 @@ const SCAN_FILES = [
   'AccessRestricted.html',
   'LoginPage.html',
   'login.js.html',
-  'TeacherManual.html',
   'Unpublished.html',
   'AppSetupPage.html',
   'ErrorBoundary.html',
