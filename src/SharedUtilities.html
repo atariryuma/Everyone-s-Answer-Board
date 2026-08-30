@@ -786,6 +786,32 @@
   };
 
   /**
+   * サーバ応答からユーザー向けメッセージを取り出す唯一の窓口。
+   *
+   * Why: サーバ側の失敗レスポンスは歴史的に 2 系統ある。
+   *   - createErrorResponse 系: message と error の両方に同じ文字列
+   *   - 手書きの literal: どちらか片方だけ (しかも error に機械コードが入る形もある)
+   *   呼び出し側が毎回 `res.message || res.error` と書くと、書き忘れた 1 か所だけが
+   *   「エラーなのに何も出ない」になる。読み手を 1 本にして、その事故を構造的に潰す。
+   *
+   * error が機械コード (UPPER_SNAKE_CASE) のときは人間向けではないので採用しない。
+   *
+   * @param {Object} res - サーバ応答
+   * @param {string} [fallback] - 取り出せなかったときの文言
+   * @returns {string}
+   */
+  function messageOfResponse(res, fallback) {
+    const fb = fallback || 'エラーが発生しました';
+    if (!res || typeof res !== 'object') return fb;
+    const msg = typeof res.message === 'string' ? res.message.trim() : '';
+    if (msg) return msg;
+    const err = typeof res.error === 'string' ? res.error.trim() : '';
+    // 'UNKNOWN_ACTION' のような機械コードは画面に出さない
+    if (err && !/^[A-Z][A-Z0-9_]*$/.test(err)) return err;
+    return fb;
+  }
+
+  /**
    * 安全な JSON.parse。 parse 失敗時は fallback を返す (例外 throw しない)。
    * 7 ファイル / ~73 行で散在する JSON.parse(...) の silent failure を排除する。
    */
@@ -798,6 +824,9 @@
       return fallback;
     }
   };
+
+  // サーバ応答のメッセージ取り出し (message / error の 2 系統を吸収する唯一の窓口)
+  window.serverMessage = messageOfResponse;
 
 
 

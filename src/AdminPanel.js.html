@@ -405,7 +405,7 @@
             updatePublishStatus('unpublished');
             updateFooterDisplay({ ...currentBoardInfo, isPublished: false });
           } else {
-            showError((result && (result.message || result.error)) || 'ボードの非公開に失敗しました');
+            showError(window.serverMessage(result, 'ボードの非公開に失敗しました'));
           }
         } catch (error) {
           console.error('公開終了エラー:', error);
@@ -894,7 +894,7 @@
     try {
       const result = await getColumnAnalysis(spreadsheetId, sheetName);
       if (!result || !result.success || !Array.isArray(result.headers)) {
-        setStatus('フォーム情報取得失敗: ' + ((result && (result.message || result.error)) || '不明'), 'warning');
+        setStatus('フォーム情報取得失敗: ' + window.serverMessage(result, '不明'), 'warning');
         return;
       }
       const mapping = (savedMapping && Object.keys(savedMapping).length > 0)
@@ -1867,7 +1867,7 @@
           }
         }
       } else {
-        handleConnectionError(result.message || result.error || 'データソース接続に失敗しました', { spreadsheetId, sheetName, method });
+        handleConnectionError(window.serverMessage(result, 'データソース接続に失敗しました'), { spreadsheetId, sheetName, method });
       }
     } catch (error) {
       console.error('connectToDataSource エラー:', error);
@@ -2584,7 +2584,7 @@
           }
           finish(true);
         } else {
-          if (!silent) showError((result && (result.message || result.error)) || '設定の保存に失敗しました');
+          if (!silent) showError(window.serverMessage(result, '設定の保存に失敗しました'));
           finish(false);
         }
       }, (error) => {
@@ -2683,7 +2683,7 @@
           showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
           if (typeof loadAndApplyCurrentConfig === 'function') loadAndApplyCurrentConfig();
         } else {
-          showError((result && (result.message || result.error)) || '回答ボードの公開に失敗しました');
+          showError(window.serverMessage(result, '回答ボードの公開に失敗しました'));
         }
         window.setLoading(false);
         ClientMutex.release('publishApp');
@@ -3156,7 +3156,7 @@
       }
       gasRun('lesson.list', { userId }).then((res) => {
         if (!res || !res.success) {
-          const msg = (res && (res.message || res.error)) || '不明なエラー';
+          const msg = window.serverMessage(res, '不明なエラー');
           // 詳細を console + 画面の両方に出す (Cloud Logging にも client/error として届く)。
           console.error('[lesson.list] backend rejected:', msg, res);
           listEl.innerHTML = `<li class="text-theme-status-error">読み込み失敗: ${window.sharedUtilities.security.escapeHtml(String(msg))}</li>`;
@@ -4393,7 +4393,7 @@
         }
         // 失敗: backend は resumable (FORM_CREATE_FAILED 時、完了済み formId は次回 skip)。
         //   alert ではなく card 内に「再試行」ボタンを出す。
-        const msg = (res && (res.message || res.error)) || 'レッスン開始失敗';
+        const msg = window.serverMessage(res, 'レッスン開始失敗');
         const completed = (res && res.completedPhases) || 0;
         const esc = window.sharedUtilities.security.escapeHtml;
         if (errBox) {

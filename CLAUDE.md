@@ -192,6 +192,7 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 | リダイレクトモーダル (公開遷移用) | `showRedirectModal({ title, message, redirectUrl, variant? })` | 同上 |
 | サーバ呼び出し (Promise) | `await runServer('funcName', arg1, arg2)` | 同上 |
 | 安全な JSON parse (fallback 返却) | `safeJsonParse(text, fallback)` | 同上 |
+| サーバ応答のエラー文言取り出し | `serverMessage(res, fallback)` | 同上 |
 | HTML escape | `sharedUtilities.security.escapeHtml(s)` | 同上 |
 | ローディングオーバーレイ | `setLoading(true, msg)` / `setLoading(false)` | 同上 |
 | デバウンス (key 共有可) | `sharedUtilities.debounce.debounce(fn, key, delayMs)` | 同上 |
@@ -203,6 +204,9 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 - 新規の native `confirm()` / `alert()` (緊急 fallback 用途を除く) → `modals.confirm/alert` を使う
 - `withSuccessHandler/withFailureHandler` の手書きチェーン → `runServer(...)` を使う
 - `JSON.parse(...)` を try/catch なしで呼ぶ → `safeJsonParse(...)` を使う
+- `res.message || res.error` と手書きする → `serverMessage(res, fallback)` を使う
+  (サーバの失敗レスポンスは `message` のみ / `error` のみの 2 系統が混在する。
+   書き忘れた 1 か所だけが「エラーなのに何も出ない」になるので読み手を 1 本にする)
 
 ### Data Store
 

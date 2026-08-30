@@ -906,77 +906,43 @@
 
       const promise = this.executeWithRetry(async () => {
         this.activeRequests++;
-        return new Promise((resolve, reject) => {
-          const handleSuccess = (result) => {
-            this.activeRequests--;
+        try {
+          const hasGas = typeof google !== 'undefined' && google.script && google.script.run;
+          // google.script.run に触れるのは SharedUtilities.runServer 1 か所だけにする。
+          //   ここ (runGas) が担うのは cache / retry / 同時実行制限 / mock fallback で、
+          //   transport そのものではない。以前は独自に withSuccessHandler チェーンを
+          //   組んでおり、成功判定や失敗の包み方が runServer と微妙に違っていた。
+          const result = hasGas
+            ? await window.runServer(funcName, ...mappedArgs)
+            : await this.getMockData(funcName, ...mappedArgs);
 
-            if (!isStateChanging && result !== null && result !== undefined) {
-              this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
-            }
-            resolve(result);
-          };
-
-          const handleError = (error) => {
-            this.activeRequests--;
-
-            if (!isStateChanging && this.cache.has(cacheKey)) {
-              this.cache.delete(cacheKey);
-            }
-
-            console.error(` handleError for ${funcName}`, {
-              error: error.message || error.toString(),
-              errorType: typeof error,
-              isEnhanced: !!error.functionName,
-              cacheCleared: !isStateChanging,
-              timestamp: new Date().toISOString(),
-              activeRequests: this.activeRequests
-            });
-
-            reject(error);
-          };
-
-          if (typeof google !== 'undefined' && google.script && google.script.run) {
-            if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
-              const safeFuncName = funcName || 'unknown';
-              handleError(new Error(`API function '${safeFuncName}' not available`));
-              return;
-            }
-
-            google.script.run
-              .withSuccessHandler((result) => {
-
-                if (result === null || result === undefined) {
-                  handleError(new Error(`Function ${funcName} returned null/undefined response`));
-                  return;
-                }
-
-                if (typeof result === 'object'&& result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
-                  result.success = Boolean(result.success);
-                }
-
-                handleSuccess(result);
-              })
-              .withFailureHandler((error) => {
-                console.error(` google.script.run failure for ${funcName}:`, {
-                  funcName,
-                  originalArgs: args,
-                  mappedArgs,
-                  error,
-                  timestamp: new Date().toISOString()
-                });
-                handleError(this.enhanceError(error, funcName, args));
-              })
-              .withUserObject({ userId: this.state.userId })
-            [funcName](...mappedArgs);
-          } else {
-            this.getMockData(funcName, ...mappedArgs).then((result) => {
-              if (!isStateChanging) {
-                this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
-              }
-              resolve(result);
-            }).catch(reject);
+          if (result === null || result === undefined) {
+            throw new Error(`Function ${funcName} returned null/undefined response`);
           }
-        });
+          // 一部のサーバ関数が truthy な非 boolean を success に入れて返すため正規化。
+          if (typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'success')
+              && typeof result.success !== 'boolean') {
+            result.success = Boolean(result.success);
+          }
+          if (!isStateChanging) {
+            this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
+          }
+          return result;
+        } catch (error) {
+          if (!isStateChanging && this.cache.has(cacheKey)) {
+            this.cache.delete(cacheKey);
+          }
+          console.error(` handleError for ${funcName}`, {
+            error: (error && error.message) || String(error),
+            isEnhanced: !!(error && error.functionName),
+            cacheCleared: !isStateChanging,
+            timestamp: new Date().toISOString(),
+            activeRequests: this.activeRequests
+          });
+          throw (error && error.functionName) ? error : this.enhanceError(error, funcName, args);
+        } finally {
+          this.activeRequests--;
+        }
       }, {
         maxRetries: isStateChanging ? 1 : 2, // State-changing operations get fewer retries
         baseDelay: 500,
@@ -2296,7 +2262,7 @@
       try {
         const res = await runServer('advanceLessonPhase', this.state.userId, nav.lessonId, null, phase.index);
         if (!res || !res.success) {
-          window.notifications.error((res && (res.message || res.error)) || 'フェーズ切替に失敗しました');
+          window.notifications.error(window.serverMessage(res, 'フェーズ切替に失敗しました'));
           return;
         }
         nav.activePhaseIndex = (res.data && typeof res.data.activePhaseIndex === 'number')

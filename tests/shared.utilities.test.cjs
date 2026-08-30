@@ -294,3 +294,63 @@ test('ButtonBusyManager.withBusy: null btn の場合は asyncFn だけ実行', a
   assert.equal(executed, true);
   assert.equal(result, 42);
 });
+
+// =====================================================================
+// serverMessage — サーバ応答からユーザー向け文言を取り出す唯一の窓口 (v2896)
+//
+// Why: 失敗レスポンスは message のみ / error のみ / 両方 の 3 系統が混在する。
+//   呼び出し側が毎回 `res.message || res.error` と書くと、書き忘れた 1 か所だけが
+//   「エラーなのに何も出ない」になる。ここでその吸収規則を pin する。
+// =====================================================================
+
+function loadServerMessage() {
+  const { ctx } = loadSharedUtilities();
+  return vm.runInContext('messageOfResponse', ctx);
+}
+
+test('serverMessage: message があればそれを返す', () => {
+  const m = loadServerMessage();
+  assert.equal(m({ success: false, message: '保存に失敗しました' }), '保存に失敗しました');
+});
+
+test('serverMessage: message が無く error が人間向けならそれを返す', () => {
+  const m = loadServerMessage();
+  assert.equal(m({ success: false, error: '対象ユーザーが見つかりません' }), '対象ユーザーが見つかりません');
+});
+
+test('serverMessage: message が優先される (両方ある createErrorResponse 形)', () => {
+  const m = loadServerMessage();
+  assert.equal(m({ success: false, message: '人間向け', error: '人間向け' }), '人間向け');
+});
+
+test('serverMessage: error が機械コードなら画面に出さず fallback を返す', () => {
+  const m = loadServerMessage();
+  // doPost の UNKNOWN_ACTION / etag_mismatch のような enum を児童・教師に見せない
+  assert.equal(m({ success: false, error: 'UNKNOWN_ACTION' }, '操作できませんでした'), '操作できませんでした');
+  assert.equal(m({ success: false, error: 'DOMAIN_ACCESS_DENIED' }, 'だめ'), 'だめ');
+});
+
+test('serverMessage: 機械コードでも message があればそちらを使う', () => {
+  const m = loadServerMessage();
+  assert.equal(
+    m({ success: false, error: 'FORM_CREATE_FAILED', message: 'フォームを作成できませんでした' }),
+    'フォームを作成できませんでした'
+  );
+});
+
+test('serverMessage: 空文字・空白のみは採用しない', () => {
+  const m = loadServerMessage();
+  assert.equal(m({ success: false, message: '   ', error: '' }, 'fallback'), 'fallback');
+});
+
+test('serverMessage: null / 非オブジェクトでも落ちない', () => {
+  const m = loadServerMessage();
+  assert.equal(m(null, 'fallback'), 'fallback');
+  assert.equal(m(undefined, 'fallback'), 'fallback');
+  assert.equal(m('string', 'fallback'), 'fallback');
+});
+
+test('serverMessage: fallback 未指定でも既定文言を返す', () => {
+  const m = loadServerMessage();
+  assert.equal(m(null), 'エラーが発生しました');
+});
