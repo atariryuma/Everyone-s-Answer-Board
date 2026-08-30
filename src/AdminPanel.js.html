@@ -146,8 +146,6 @@
       btn.setAttribute('aria-pressed', String(isPub));
       if (lastPubState !== isPub) {
         lastPubState = isPub;
-        try {
-        } catch (_) {}
       }
     };
 
@@ -313,7 +311,10 @@
         if (cfg.spreadsheetId && cfg.sheetName) {
           setTimeout(() => silentlyRestoreColumnMapping(cfg.spreadsheetId, cfg.sheetName, cfg.columnMapping || {}), 100);
         }
-      } catch (_) {}
+      } catch (err) {
+        // 列マッピングの復元に失敗するとボードの列がずれた状態で表示される。
+        console.warn('silentlyRestoreColumnMapping scheduling failed:', err && err.message);
+      }
 
 
     } catch (error) {

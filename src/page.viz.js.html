@@ -52,8 +52,8 @@
           source: JSON.stringify(extra || {}).substring(0, 200)
         });
       }
-      try { console.info('[viz/heartbeat]', mode, extra || {}); } catch (_) {}
-    } catch (_) {}
+      try { console.info('[viz/heartbeat]', mode, extra || {}); } catch (_) { /* テレメトリのみ。描画には影響しない */ }
+    } catch (_) { /* テレメトリのみ。描画には影響しない */ }
   }
 
   // ---------------------------------------------------------------------
@@ -1290,7 +1290,7 @@
     if (typeof TinySegmenter !== 'undefined') {
       try { _segmenterInstance = new TinySegmenter(); } catch (_) { /* fallback */ }
     } else if (typeof window !== 'undefined' && window.TinySegmenter) {
-      try { _segmenterInstance = new window.TinySegmenter(); } catch (_) {}
+      try { _segmenterInstance = new window.TinySegmenter(); } catch (_) { /* 未ロードなら正規表現フォールバックに退化する (tokenizeJapanese 参照) */ }
     }
     return _segmenterInstance;
   }
@@ -1896,7 +1896,7 @@
         if (params.get('display') === 'projector') {
           document.body.classList.add('projector-mode');
         }
-      } catch (_) {}
+      } catch (_) { /* URL 解析不可なら通常表示のまま (投影用の装飾のみ) */ }
     });
   } else {
     try {
@@ -1904,7 +1904,7 @@
       if (params.get('display') === 'projector') {
         document.body.classList.add('projector-mode');
       }
-    } catch (_) {}
+    } catch (_) { /* URL 解析不可なら通常表示のまま (投影用の装飾のみ) */ }
   }
 })();
 </script>

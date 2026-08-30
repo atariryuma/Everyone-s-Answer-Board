@@ -364,7 +364,7 @@
               try {
                 const config = JSON.parse(user.configJson || '{}');
                 boardPublished = config.isPublished === true;
-              } catch (_) {}
+              } catch (_) { /* config 破損時は未公開扱い (fail-closed) */ }
 
               const boardBadge = boardPublished
                 ? '<span class="admin-badge admin-badge-on">公開中</span>'                : '<span class="admin-badge admin-badge-off">非公開</span>';

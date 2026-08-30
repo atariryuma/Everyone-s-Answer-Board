@@ -52,7 +52,7 @@
           document.head && document.head.appendChild(metaTC);
         }
         metaTC.setAttribute('content', THEME_BAR_COLORS[resolved]);
-      } catch (_) {}
+      } catch (_) { /* theme-color meta は装飾。失敗しても配色は成立する */ }
     } catch (e) { /* never break page load */ }
   })();
 </script>

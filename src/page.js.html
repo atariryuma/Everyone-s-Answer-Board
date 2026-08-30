@@ -44,13 +44,13 @@
           if (fallbackUserId && fallbackUserId.trim()) {
             return fallbackUserId.trim();
           }
-        } catch (_) {}
+        } catch (_) { /* URL 解析不可でも下の window.USER_ID で解決を試みる */ }
 
         try {
           if (typeof window.USER_ID !== 'undefined' && window.USER_ID && window.USER_ID.trim()) {
             return window.USER_ID.trim();
           }
-        } catch (_) {}
+        } catch (_) { /* 解決できなければ呼び出し元が空 userId として扱う */ }
 
         return '';
       }
@@ -356,7 +356,11 @@
     async initializeFormButton() {
       try {
         await loadFormLink();
-      } catch (_) {}
+      } catch (err) {
+        // 黙って落とさない: 失敗すると「回答フォーム」ボタンが出ないまま
+        //   児童がフォームに辿り着けない。症状だけ出て原因が追えなくなる。
+        console.warn('loadFormLink failed (form button hidden):', err && err.message);
+      }
     }
 
     /**
@@ -1966,7 +1970,7 @@
         if (this.handlers.onBroadcastMessage) {
           this.broadcastChannel.removeEventListener('message', this.handlers.onBroadcastMessage);
         }
-        try { this.broadcastChannel.close(); } catch (_) {}
+        try { this.broadcastChannel.close(); } catch (_) { /* 既に閉じている / 未対応ブラウザ */ }
         this.broadcastChannel = null;
       }
       if (this.handlers.onOnline) {
@@ -2654,7 +2658,7 @@
             });
             this._modeLogged = this.state.boardMode;
           }
-        } catch (_) {}
+        } catch (_) { /* テレメトリのみ。描画には影響しない */ }
         const hadAxisConfig = Boolean(this.state.axisConfig);
         this.state.axisConfig = result.axisConfig || null;
         // 授業モードの入力画面は軸ラベルを axisConfig から描く。init では
@@ -2889,7 +2893,7 @@
               }).substring(0, 200)
             });
           }
-        } catch (_) {}
+        } catch (_) { /* テレメトリのみ。描画には影響しない */ }
         return result;
       } catch (error) {
         console.error('renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);

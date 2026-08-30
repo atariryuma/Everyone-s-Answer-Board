@@ -175,7 +175,7 @@ window.ClientErrorReporter = (function () {
       };
     });
     // 視覚的に分かるよう原 console.info で 1 回告知
-    try { console.info('[ClientErrorReporter] debug=1: console.log/warn → Cloud Logging に転送中'); } catch (_) {}
+    try { console.info('[ClientErrorReporter] debug=1: console.log/warn → Cloud Logging に転送中'); } catch (_) { /* 告知のみ。収集自体は続行 */ }
   }
 
   return { report: report, enableDebugConsoleCapture: enableDebugConsoleCapture };

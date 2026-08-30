@@ -642,7 +642,7 @@
         html.classList.remove('dark', 'light', 'theme-dark', 'theme-light');
         html.classList.add(resolved, 'theme-' + resolved);
         try { html.setAttribute('data-theme', resolved); } catch (_) { /* DOM 未準備時。次の適用機会で反映される */ }
-        try { if (html.style) html.style.colorScheme = resolved; } catch (_) {}
+        try { if (html.style) html.style.colorScheme = resolved; } catch (_) { /* 未対応ブラウザ。配色は CSS 側で成立する */ }
       }
 
       // body も同期 (body.theme-light selector が要求)
@@ -669,7 +669,7 @@
           }
           metaTC.setAttribute('content', barColor);
         }
-      } catch (_) {}
+      } catch (_) { /* theme-color meta は装飾。失敗しても配色は成立する */ }
 
       subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
       return resolved;
