@@ -888,3 +888,52 @@ test('__nativeColumnMapping_: answer は必須。matrix は座標、board は本
   assert.equal(bd.answer, 6);
   assert.equal(bd.reason, undefined);
 });
+
+// =====================================================================
+// 匿名性 (デジタルシティズンシップ)
+//
+// 授業モードは道徳的な立場を表明する場なので、児童同士に名前を見せない。
+// 「誰の意見か」が見えると同調圧力が働く (少数派だと分かると言い直す等)。
+// 教師は isOwnBoard なのでこの設定に関わらず名前を見られる。
+// =====================================================================
+
+test('授業モードは児童同士に名前を見せない (ボードの既存設定を引き継がない)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'ss1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  for (let i = 0; i < phases.length; i++) {
+    const patch = h.context.__buildPhaseConfigPatch_(phases[i], lessonJson, 'l1');
+    assert.equal(patch.displaySettings.showNames, false,
+      `phase ${i} で名前が見える設定になっている`);
+  }
+});
+
+test('phase が明示的に showNames=true を指定した場合だけ従う', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phase = lessonJson.phases[0];
+  phase.spreadsheetId = 'ss1';
+  phase.sheetName = 'phase1';
+  phase.displaySettings = { showNames: true };
+  const patch = h.context.__buildPhaseConfigPatch_(phase, lessonJson, 'l1');
+  assert.equal(patch.displaySettings.showNames, true);
+});
+
+test('掲示板モード (Form 経由) の授業は既存の設定を尊重する', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', '通常授業', 'doutoku-3phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phase = lessonJson.phases[0];
+  phase.formUrl = 'https://forms.example/1';
+  phase.spreadsheetId = 'ss1';
+  phase.sheetName = 'フォームの回答 1';
+  const patch = h.context.__buildPhaseConfigPatch_(phase, lessonJson, 'l1');
+  // native ではないので showNames に手を出さない (config 側の設定が生きる)
+  assert.equal(patch.displaySettings.showNames, undefined);
+});

@@ -1207,6 +1207,18 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
       patch.spreadsheetId = nativeSource.spreadsheetId;
       patch.sheetName = nativeSource.sheetName;
     }
+    // 児童同士には名前を見せない (既定)。
+    //   Why 設計として固定するか: 授業モードは道徳的な立場を表明する場で、
+    //   「誰の意見か」が見えると同調圧力が働く (Aさんが言うなら正しい/
+    //   少数派だと分かると言い直す)。ボードの既存設定を引き継ぐ作りだと、
+    //   教師が別の目的で名前表示を ON にしたときに、この授業の匿名性が
+    //   静かに失われる。授業モードの側で既定を持つ。
+    //   教師は isOwnBoard なのでこの設定に関わらず名前を見られる
+    //   (buildSafePublishedDataResult の includeIdentity)。
+    //   phase 側で明示的に true を指定した場合だけ従う。
+    if (baseDisplay.showNames !== true) {
+      displaySettings.showNames = false;
+    }
   }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
   if (yAxisLabels) patch.yAxisLabels = yAxisLabels;

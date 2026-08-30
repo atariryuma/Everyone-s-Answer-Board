@@ -321,6 +321,26 @@ for (const s of jsSrc.values()) {
   check('11. SVG sprite の参照先が実在する', missing.length === 0, missing.join(', '));
 }
 
+// ── 14. sprite の <use> を持つ <svg> は class に icon を含むか ──────────
+// Why: .icon (SharedIcons.html) が fill:none / stroke:currentColor を与えている。
+//   class を付け忘れると SVG 既定の fill=black になり、暗い画面で黒い塊として出る。
+//   例外もコンソール出力も無いので、画面を見るまで気付けない (実際 v2903 で発生)。
+//   項目 11 は「参照先が在るか」だけを見ており、着色されるかは未検査だった。
+{
+  const bad = [];
+  for (const [f, s] of [...jsSrc, ...htmlSrc]) {
+    if (f === 'SharedIcons.html') continue; // sprite 自身の定義は対象外
+    // <svg ...> ... <use href="#i-xxx"> の組を、開始タグ単位で見る
+    for (const m of s.matchAll(/<svg\b([^>]*)>\s*<use\s+href="#i-[a-zA-Z0-9_-]+"/g)) {
+      const attrs = m[1];
+      const cls = attrs.match(/class="([^"]*)"/);
+      const hasIcon = cls && /(^|\s)icon(\s|$)/.test(cls[1]);
+      if (!hasIcon) bad.push(`${f}:${lineOf(s, m.index)}`);
+    }
+  }
+  check('14. sprite の <use> は class="icon" を持つ', bad.length === 0, bad.join(', '));
+}
+
 // ── 12. アイコンを使うページが sprite を読み込んでいるか ─────────
 // Why: symbol が定義されていても、そのページが SharedIcons を include していなければ
 //   <use> は解決先を見つけられず、やはり無言で何も描画されない。12 とは別の失敗経路。

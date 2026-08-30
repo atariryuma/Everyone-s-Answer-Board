@@ -1096,7 +1096,11 @@ button.highlight-badge:hover {
   text-align: center;
   gap: var(--space-2);
 }
-.lesson-quiet-icon {
+/* .icon (SharedIcons) が fill:none / stroke:currentColor を与える。
+   サイズと色だけをここで上書きする (class="icon lesson-quiet-icon")。
+   svg. を付けて詳細度を上げるのは、SharedIcons の <style> が body 側 (Page.html:114) で
+   page.css (同 109) より後に読まれ、同じ詳細度だと .icon の 1.25em が勝つため。 */
+svg.lesson-quiet-icon {
   width: var(--space-12);
   height: var(--space-12);
   align-self: center;
