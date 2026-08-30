@@ -3182,14 +3182,30 @@
           const safeName = window.sharedUtilities.security.escapeHtml(l.name || '無題');
           const safeId = window.sharedUtilities.security.escapeHtml(l.lessonId);
           const action = l.state === 'completed'? '振り返り'                       : l.state === 'active'? '続きから'                       : '編集';
+          const menuItems = [
+            l.state === 'completed'
+              ? `<button type="button" class="lesson-row-item" data-lesson-reopen="${safeId}">
+                   <svg class="icon icon-sm" aria-hidden="true"><use href="#i-refresh"></use></svg>授業を再開する</button>`
+              : '',
+            l.state === 'completed'
+              ? `<button type="button" class="lesson-row-item" data-lesson-close-forms="${safeId}">
+                   <svg class="icon icon-sm" aria-hidden="true"><use href="#i-lock"></use></svg>フォームを締め切る</button>`
+              : '',
+            `<button type="button" class="lesson-row-item" data-lesson-duplicate="${safeId}">
+               <svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製する</button>`,
+            `<button type="button" class="lesson-row-item is-danger lesson-delete-btn" data-lesson-delete="${safeId}">
+               <svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg>削除する</button>`
+          ].join('');
           return `<li>
             <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
-            ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-reopen="${safeId}" title="授業を再開して回答受付を再開する">再開</button>` : ''}
-            ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-close-forms="${safeId}" title="この授業の Google フォームの回答受付を締め切る">フォーム締切</button>` : ''}
-            <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="この授業をテンプレートとして複製"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製</button>
-            <button class="btn btn-secondary text-xs lesson-delete-btn" data-lesson-delete="${safeId}" title="この授業を削除" aria-label="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg></button>
+            <details class="lesson-row-menu">
+              <summary title="その他の操作" aria-label="その他の操作">
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+              </summary>
+              <div class="lesson-row-panel">${menuItems}</div>
+            </details>
           </li>`;
         }).join('');
       }).catch((err) => {
@@ -3200,6 +3216,15 @@
     }
 
     const busyBtns = () => window.sharedUtilities && window.sharedUtilities.buttons;
+    // メニュー内の操作を押したら畳む。開いたまま残ると、次にどの行を触っているか
+    //   分からなくなる (行が増えるほど混乱する)。
+    document.addEventListener('click', (event) => {
+      const item = event.target.closest && event.target.closest('.lesson-row-item');
+      const openMenu = document.querySelector('.lesson-row-menu[open]');
+      if (openMenu && (item || !event.target.closest('.lesson-row-menu'))) {
+        openMenu.open = false;
+      }
+    });
     document.addEventListener('click', (event) => {
       const openTarget = event.target.closest('[data-lesson-open]');
       if (openTarget) {

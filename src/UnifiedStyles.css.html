@@ -2804,6 +2804,69 @@
   /* 授業名は余った幅を占め、狭いときは折り返し先の行を独占する */
   #lesson-list li > .flex-1 { min-width: 8rem; }
   #lesson-list li:hover { background: var(--theme-card-3); }
+
+  /* 行の操作は「主操作 1 つ + その他メニュー」。
+     Why: 完了した授業は操作が 5 つになり行がボタンで埋まっていた。日常的に使うのは
+       主操作だけで、再開 / フォーム締切 / 複製 / 削除 は稀。アイコンだけにする案も
+       あったが、「再開」「フォーム締切」は記号で意味が伝わらない。畳めば文言のまま
+       置けるうえ、削除が主操作の隣から離れて誤操作も減る。
+     型は既存の .account-menu (details + 絶対配置パネル) に合わせる。 */
+  .lesson-row-menu { position: relative; }
+  .lesson-row-menu > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--radius-md);
+    border: var(--border-primary);
+    color: var(--theme-text-muted);
+    transition: color var(--transition-quick) ease, background var(--transition-quick) ease;
+  }
+  .lesson-row-menu > summary::-webkit-details-marker { display: none; }
+  .lesson-row-menu > summary:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-bg-elevated);
+  }
+  .lesson-row-menu > summary:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+  .lesson-row-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--space-1));
+    /* 語中で折り返さない幅を確保する (最長は「フォームを締め切る」)。
+       折返しは要素単位で行う方針 (v2934 の見出し・ボタン規約と同じ)。 */
+    min-width: 13rem;
+    background: var(--theme-bg-elevated);
+    border: var(--border-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-1);
+    z-index: var(--z-modal);
+    display: flex;
+    flex-direction: column;
+  }
+  .lesson-row-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    color: var(--theme-text-secondary);
+    font-size: var(--font-size-sm);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .lesson-row-item:hover { background: var(--theme-bg-elevated-hover); color: var(--theme-text-primary); }
+  .lesson-row-item:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+  /* 削除だけは色で区別する (取り消せない操作) */
+  .lesson-row-item.is-danger { color: var(--theme-status-error-text); }
+  .lesson-row-item.is-danger:hover { background: var(--theme-status-error-soft); }
   #lesson-list .lesson-state-badge {
     font-size: var(--font-size-xs); padding: var(--pad-badge); border-radius: var(--radius-full);
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
