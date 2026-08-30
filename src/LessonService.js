@@ -2330,7 +2330,7 @@ function getMyLessonTrajectory(targetUserId) {
       const entry = __readOwnLessonAnswer_(ph, actorEmail);
       if (entry) out.push(Object.assign({ phaseIndex: i, phaseName: ph.name || '' }, entry));
     }
-    return createSuccessResponse('航跡', { phases: out });
+    return createSuccessResponse('自分の記録を取得しました', { phases: out });
   } catch (error) {
     logError_('getMyLessonTrajectory', error);
     return createExceptionResponse(error);
