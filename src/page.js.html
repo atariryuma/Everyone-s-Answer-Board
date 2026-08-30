@@ -2608,7 +2608,14 @@
             this._modeLogged = this.state.boardMode;
           }
         } catch (_) {}
+        const hadAxisConfig = Boolean(this.state.axisConfig);
         this.state.axisConfig = result.axisConfig || null;
+        // 授業モードの入力画面は軸ラベルを axisConfig から描く。init では
+        //   loadSheetData と __initLessonPhase が並走するので、先にフェーズが
+        //   適用されると軸ラベルが空のまま出てしまう。軸が届いた時点で描き直す。
+        if (!hadAxisConfig && this.state.axisConfig && this.state.lessonPhase) {
+          this.__renderLessonScreen();
+        }
         // Why: server が判定した teacher フラグ (isOwnBoard || isAdmin) を尊重。
         //      client の window.isEditor / state.isAdminUser は bootstrap 時の値で、
         //      poll のたびにサーバ側の最新権限状態と整合させる。
