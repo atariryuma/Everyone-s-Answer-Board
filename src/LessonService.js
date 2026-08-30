@@ -33,9 +33,25 @@ const LESSON_NATIVE_SHEET_HEADERS = [
 ];
 // 列推定 (inferColumnRoles) を通さず、この固定 index を columnMapping に直接入れる。
 //   native シートは我々が作るので、列の意味は最初から確定している。
-const LESSON_NATIVE_COLUMN_MAPPING = Object.freeze({
-  email: 1, class: 2, name: 3, numericX: 4, numericY: 5, answer: 6, reason: 6
-});
+// native phase の columnMapping。
+//   validateMapping の規約に合わせる (実際に稼働している matrix ボードと同じ形):
+//     - answer は必須列
+//     - numericX / numericY だけ重複が免除される (「立場」列を answer としても
+//       numericX としても見る、という設計が意図されている)
+//     - answer と reason が同じ列だと「列インデックスに重複があります」で
+//       config 保存が落ちる = 教師が「開始」を押した瞬間に失敗する
+//   matrix / numberline は「回答 = 座標」なので answer を軸列に、本文は reason。
+//   board / pie は自由記述そのものが回答なので answer を本文列に置く。
+function __nativeColumnMapping_(formTemplate) {
+  const base = { email: 1, class: 2, name: 3 };
+  if (formTemplate === 'board' || formTemplate === 'pie') {
+    return Object.assign({}, base, { answer: 6 });
+  }
+  const m = Object.assign({}, base, { numericX: 4, answer: 4, reason: 6 });
+  if (formTemplate === 'matrix') m.numericY = 5;
+  return m;
+}
+
 const LESSON_NATIVE_COL_TIMESTAMP = 1;   // 1-based (getRange 用)
 const LESSON_NATIVE_COL_EMAIL = 2;
 const LESSON_NATIVE_COL_X = 5;
@@ -1181,7 +1197,7 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   // native phase はシートを我々が作っているので列の意味が確定している。
   //   推定 (inferColumnRoles) を通さず固定 index を渡す = 推定ミスが起きない。
   if (__isNativePhase_(phase, lessonJson)) {
-    patch.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);
+    patch.columnMapping = __nativeColumnMapping_(phase.formTemplate);
     // 児童は画面から投稿するので、Form へ誘導する導線は出さない。
     patch.formUrl = '';
     // 投稿を受け付けないフェーズ (出会う/議論する/ふりかえる) は自分のシートが空なので、
@@ -1365,7 +1381,7 @@ function startLesson(userId, lessonId) {
             const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName, boardOwnerEmail);
             phase.spreadsheetId = native.spreadsheetId;
             phase.sheetName = native.sheetName;
-            phase.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);
+            phase.columnMapping = __nativeColumnMapping_(phase.formTemplate);
           } catch (nativeErr) {
             logError_('startLesson:native', nativeErr);
             __updateLessonRow_(lessonId, { lessonJson });

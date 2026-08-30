@@ -804,3 +804,80 @@ test('getMyLessonTrajectory: 未投稿なら空 (先に他人を見せない)', 
   assert.equal(res.success, true);
   assert.equal(Array.from(res.data.phases).length, 0);
 });
+
+// =====================================================================
+// config パッチが実際の検証を通るか (本番で「開始」が失敗した回帰)
+//
+// Why これが要るか: パッチの中身だけを assert しても、それが
+//   validateConfig を通るかは分からない。実際 answer と reason を同じ列 (6) に
+//   割り当てていたため validateMapping の「列インデックス重複」で弾かれ、
+//   教師が「開始」を押した瞬間に「設定検証エラー」で落ちていた。
+//   ここでは本物の validators.js に通して、その経路ごと pin する。
+// =====================================================================
+
+const VALIDATORS_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/validators.js'), 'utf8');
+const HELPERS_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/helpers.js'), 'utf8');
+
+function loadValidator() {
+  const ctx = {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    SYSTEM_LIMITS: { DEFAULT_PAGE_SIZE: 20, MAX_PAGE_SIZE: 100 }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(HELPERS_SOURCE, ctx, { filename: 'helpers.js' });
+  vm.runInContext(VALIDATORS_SOURCE, ctx, { filename: 'validators.js' });
+  return ctx.validateConfig;
+}
+
+test('native phase の config パッチが validateConfig を通る (全 5 フェーズ)', () => {
+  const validateConfig = loadValidator();
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = '1g7cGEiskD7w7DO2a6lSjSsgYHwa_vYRyLnk_BI5fYmY';
+    phases[i].sheetName = 'phase' + (i + 1);
+    phases[i].columnMapping = h.context.__nativeColumnMapping_(phases[i].formTemplate);
+  }
+  phases[0].templateOptions = { xLow: '自首を勧める', xHigh: '逃がす', yLow: '迷いあり', yHigh: '迷いなし' };
+
+  for (let i = 0; i < phases.length; i++) {
+    const patch = h.context.__buildPhaseConfigPatch_(phases[i], lessonJson, 'lesson_x');
+    const res = validateConfig(JSON.parse(JSON.stringify(patch)));
+    assert.equal(res.isValid, true,
+      `phase ${i} の patch が検証を通らない: ${JSON.stringify(res.errors)}`);
+  }
+});
+
+test('__nativeColumnMapping_: answer と reason を同じ列にしない', () => {
+  const h = loadContext();
+  // validateMapping は numericX / numericY だけ重複を免除する
+  //   (「立場」列を answer としても numericX としても見る設計)。
+  //   それ以外が重複すると config 保存が落ちる。
+  for (const tpl of ['matrix', 'numberline', 'board', 'pie']) {
+    const m = h.context.__nativeColumnMapping_(tpl);
+    const checked = Object.keys(m).filter((k) => k !== 'numericX' && k !== 'numericY');
+    const idx = checked.map((k) => m[k]);
+    assert.equal(new Set(idx).size, idx.length, `${tpl} で列が重複している: ${JSON.stringify(m)}`);
+  }
+});
+
+test('__nativeColumnMapping_: answer は必須。matrix は座標、board は本文に割り当てる', () => {
+  const h = loadContext();
+  // answer は validateMapping の必須列なので、どのテンプレでも必ず存在する。
+  for (const tpl of ['matrix', 'numberline', 'board', 'pie']) {
+    assert.equal(typeof h.context.__nativeColumnMapping_(tpl).answer, 'number', tpl);
+  }
+  // matrix は「回答 = 座標」なので answer は軸列 (4)、本文は reason (6)。
+  //   象限キーワード抽出が reason を見るので reason も必須。
+  const mx = h.context.__nativeColumnMapping_('matrix');
+  assert.equal(mx.answer, 4);
+  assert.equal(mx.numericX, 4);
+  assert.equal(mx.numericY, 5);
+  assert.equal(mx.reason, 6);
+  // board は自由記述そのものが回答。
+  const bd = h.context.__nativeColumnMapping_('board');
+  assert.equal(bd.answer, 6);
+  assert.equal(bd.reason, undefined);
+});
