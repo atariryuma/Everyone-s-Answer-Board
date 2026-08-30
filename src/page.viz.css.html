@@ -69,12 +69,9 @@
     stroke-width: 2.5;
     stroke-opacity: 1;   /* hover 時はリングをはっきり出して判別しやすく */
   }
-  /* 揺らぎが大きい点（道徳指導案：意図的指名の素材） */
-  .viz-dot.swing-high {
-    fill: #fde047;  /* yellow-300 */
-    stroke: var(--status-warning);
-    stroke-width: 2;
-  }
+  /* .swing-high は廃止 (移動量でドットを強調しない)。
+     Why: 「大きく動いた児童」を黄色で目立たせると、移動量が学びの深さに見え、
+       位置が変わらないまま理由が深まった学びが不可視になる。分布は記述に徹する。 */
   /* 教師注目マーク（HIGHLIGHT）: 金縁 + 微発光。
      Why: 教師が「みんなで考えたい」とマークした意見を viz でも一目で識別できるようにする。
        同調圧力 (児童間リアクション) は subtle ring で抑制しているのに対し、
@@ -87,9 +84,9 @@
     /* 電子黒板 / プロジェクタでも視認しやすいよう glow を強める */
     filter: drop-shadow(0 0 7px color-mix(in srgb, var(--brand-accent) 85%, transparent));
   }
-  /* ghost マーカー: 揺らぎ大 (swing-trace) で「過去位置」を示す薄色 dot。
-     groupByStudent は ghost を空配列にするので、画面に出るのは matrix renderer の
-     swing-trace ブロックが描画する .ghost.swing（vizComputeSwings 上位 N 人だけ）。 */
+  /* ghost マーカー: 「過去位置」を示す薄色 dot。
+     学級全体の分布では使わない (groupByStudent は ghost を常に空配列で返す)。
+     残しているのは本人の画面で自分の ● (最初の考え) を描くため。 */
   .viz-dot.ghost {
     opacity: 0.55;
     stroke: #fde047;  /* yellow-300 */

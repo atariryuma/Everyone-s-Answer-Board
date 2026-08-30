@@ -16,7 +16,8 @@
  *                              即座に解決する (v2901 で CDN ロードを廃止)
  *   - renderNumberLine()     : M1 ビーズワーム
  *   - renderMatrix()         : M2 散布図
- *   - vizComputeSwings()     : 揺らぎ計算（再投稿した児童の点を大きく描くため）
+ *   - vizComputeSwings()     : 児童ごとの最初→最新の移動を算出（本人の ● → ★ 表示と
+ *                              教師の授業後グリッド用。学級全体の分布では使わない）
  *   - vizApplyProjectorMode(): URL クエリ ?display=projector のクラス付与
  * ===================================================================== */
 (function () {
@@ -389,9 +390,13 @@
   }
 
   /**
-   * 揺らぎ計算: 同一 emailHash の最新と過去の差分（distance）を測定。
-   * Why: 教師ダッシュボードで「意見が大きく動いた児童」上位 N を提示するため。
-   *      M1 は |Δx|、M2 は √(Δx² + Δy²) のユークリッド距離。
+   * 同一 emailHash の最初と最新の差分（distance）を測定。
+   * M1 は |Δx|、M2 は √(Δx² + Δy²) のユークリッド距離。
+   *
+   * Why 用途を限定するか: distance は「本人に自分の ● → ★ を見せる」ためと
+   *   「教師が授業後に一人ずつ読む」ための素材であって、学級全体の分布で
+   *   誰が大きく動いたかを強調するためのものではない (移動量 ≠ 学びの深さ)。
+   *   授業後グリッドの既定ソートは distance 昇順 = 位置が動かなかった児童から読む。
    */
   /**
    * 児童(emailHash)ごとの回答イベントを ts 昇順の配列で返す共有集計。
@@ -702,24 +707,21 @@
         .attr('cx', (d) => xScale(d.numericX))
         .attr('cy', () => yCenter + 70);
 
-      // Why: 揺らぎを「円の大きさ」で可視化（道徳指導案準拠）。
-      //      同一児童の最初〜最新の移動距離 distance を radius に線形マップ。
-      //      distance=0 (揺れなし) → base radius 7、distance>=4 → max radius 14。
-      //      これにより教師が一目で「動いた児童」を判別できる。
-      const swings = this.vizComputeSwings(rows, 'numberline');
-      const swingByHash = new Map(swings.map(s => [s.emailHash, s.distance]));
-      const BASE_R = 7, MAX_R = 14;
-      const radiusFor = (d) => {
-        if (!d.data || !d.data.emailHash) return BASE_R;
-        const dist = swingByHash.get(d.data.emailHash) || 0;
-        // 数直線の最大移動距離 = max - min = 4 (1-5 scale)
-        const norm = Math.min(dist / 4, 1);
-        return BASE_R + (MAX_R - BASE_R) * norm;
-      };
+      // ドット半径は全員一律。
+      //
+      // Why 揺らぎ (移動距離) を radius にマップしないか:
+      //   「考えが変わった児童」を大きく描くと、移動量そのものが学びの深さに見える。
+      //   実際には位置が変わらないまま理由だけが深まる学びがあり (「友達だから助ける」→
+      //   「友情には厳しさも含まれると分かった上で、やはり助ける」)、移動量による強調は
+      //   それを不可視にした上で「動いた方が良い」という評価を画面が発してしまう。
+      //   個人の変化は本人の画面と教師の授業後グリッドで ● → ★ として見る。
+      //   学級全体の分布は「今どこに誰がいるか」の記述に徹する。
+      const DOT_R = 7;
+      const radiusFor = () => DOT_R;
 
       // 現在点（ビーズワーム配置）— force simulation で重なりを回避
       // Why: collide の半径は最大想定値で確保しないと大きい点同士が重なる。
-      const COLLIDE_R = MAX_R + 1.5;
+      const COLLIDE_R = DOT_R + 1.5;
       // Why: d3.forceSimulation を 1 回 tick して final position を確定する。
       //      アニメーションは CSS の vizEnter で十分。data is static after each load。
       const nodes = current.map((r) => ({
@@ -749,7 +751,7 @@
           .attr('cx', (d) => d.x)
           .attr('cy', (d) => d.y)
           .attr('r', (d) => radiusFor(d))
-          .classed('swing-high', (d) => radiusFor(d) > BASE_R + 3)
+          .classed('swing-high', false)
           .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
       )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, selfL))
@@ -1016,17 +1018,10 @@
       // 「揺らぎ大の子だけ」の限定 ghost + trace は下の swing-trace 描画で扱う。
       g.selectAll('.viz-dot.ghost').remove();
 
-      // M2 でも揺らぎを radius で可視化。2 軸 (1-5) の対角線最大は √(4²+4²) ≈ 5.66。
-      // ドット半径は「ブロブ化」を避けるため意図的に小さめ (BASE=5, MAX=9)。
-      const swings = this.vizComputeSwings(rows, 'matrix');
-      const swingByHashM = new Map(swings.map(s => [s.emailHash, s.distance]));
-      const BASE_R_M = 5, MAX_R_M = 9;
-      const radiusForMatrix = (d) => {
-        if (!d.data || !d.data.emailHash) return BASE_R_M;
-        const dist = swingByHashM.get(d.data.emailHash) || 0;
-        const norm = Math.min(dist / 5.66, 1);
-        return BASE_R_M + (MAX_R_M - BASE_R_M) * norm;
-      };
+      // ドット半径は全員一律 (numberline の DOT_R と同じ理由: 移動量を評価しない)。
+      //   「ブロブ化」を避けるため意図的に小さめ。
+      const DOT_R_M = 6;
+      const radiusForMatrix = () => DOT_R_M;
 
       // 現在点：軸の整数値の近傍に寄せつつ、重なりは forceCollide で押し戻し。
       //
@@ -1103,7 +1098,7 @@
       // collide 半径 + spread balance:
       //   strength 0.5 + 250 tick で、(3,3) に 10 件密集しても十分に散らばる。
       //   ドット縮小 (MAX 14→9) に合わせ collide も自然に小さくなり、間ができる。
-      const COLLIDE_R_M = MAX_R_M + 1.5;
+      const COLLIDE_R_M = DOT_R_M + 1.5;
       const simM = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(0.5))
         .force('y', d3.forceY((d) => d.targetY).strength(0.5))
@@ -1111,8 +1106,9 @@
         .stop();
       for (let i = 0; i < 250; i++) simM.tick();
 
-      // 揺らぎは「現在 dot の半径 + swing-high 黄色」で十分視覚化されているので、
-      // 過去位置 ghost + 黄色 trace 線は採用せず（教師フィードバック 2026-05-13）。
+      // 学級全体の分布に個人の変化 (ghost / trace) は一切描かない。
+      //   2026-05-13 の教師フィードバックで「全員分の ghost + trace」は画面が混雑するため
+      //   不採用。個人の ● → ★ は本人の画面と教師の授業後グリッドでのみ見せる。
       // 既存 .ghost / .viz-trace 要素が前回 render 残ってないよう exit clean だけ走らせる。
       g.selectAll('.viz-dot.ghost').remove();
       g.selectAll('.viz-trace').remove();
@@ -1128,7 +1124,7 @@
           .attr('cx', (d) => d.x)
           .attr('cy', (d) => d.y)
           .attr('r', (d) => radiusForMatrix(d))
-          .classed('swing-high', (d) => radiusForMatrix(d) > BASE_R_M + 3)
+          .classed('swing-high', false)
           .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
           .classed('lone-voice', (d) => isLoneVoice(d))
       )

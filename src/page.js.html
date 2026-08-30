@@ -138,7 +138,12 @@
         // Why: 可視化モード（M1/M2）切替用の state。デフォルトは既存挙動の 'board'。
         //      server の displaySettings.boardMode（auto→具体モード解決済み）で上書きされる。
         boardMode: 'board',
-        axisConfig: null
+        axisConfig: null,
+        // 授業モード: 現在フェーズ / 未送信の選択 / 自分の最初の位置。
+        //   授業をしていないときは全て null のままで、通常のボード表示に影響しない。
+        lessonPhase: null,
+        lessonDraft: null,
+        lessonPrevPoint: null
       };
 
       this.lastActivityTime = Date.now();
@@ -302,7 +307,10 @@
             this.initializeFormButton(),
             this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false }),
             // 授業中のフェーズ切替 (教師のみ)。失敗しても board 本体は動くので待たせない。
-            this.__initBoardPhaseNav()
+            this.__initBoardPhaseNav(),
+            // 授業モード: 最初の polling (最大 5 秒後) を待たずにフェーズを反映する。
+            //   途中から参加した児童が、議論中なのに入力画面を見る、といったズレを防ぐ。
+            this.__initLessonPhase()
           ]);
         } catch (error) {
           console.error('Data loading failed during initialization:', error);
@@ -1221,6 +1229,13 @@
             this.state.lastSeenFormUrl = response.formMeta.formUrl || this.state.lastSeenFormUrl || '';
           }
 
+          // 授業モード: 教師のフェーズ送りを検知して画面の役割を切り替える。
+          //   Why formMeta と別経路か: native 入力の授業は Form を持たないので formUrl が
+          //   常に空のまま = 上の URL 比較では切替を検知できない。
+          if (response.lessonPhase !== undefined && !viewingPast) {
+            this.__applyLessonPhase(response.lessonPhase);
+          }
+
           this.polling.errorCount = 0;
 
         } catch (error) {
@@ -1275,6 +1290,15 @@
       }
 
       const timeSinceActivity = Date.now() - this.lastActivityTime;
+
+      // 議論フェーズは端末を見ない時間なので、polling を最低限まで落とす。
+      //   Why: 画面を止めているのに 5 秒ごとに通信するのは無駄で、教室の Wi-Fi と
+      //   GAS quota を 30 人分浪費する。次のフェーズへの追従は 15 秒でも遅すぎない
+      //   (議論は数分続く)。ふりかえりも自分の記録を読む時間なので同じ扱い。
+      const quietRoles = ['discuss', 'reflect'];
+      if (this.state.lessonPhase && quietRoles.indexOf(this.state.lessonPhase.screenRole) >= 0) {
+        return 15000;
+      }
 
       // Why (授業テンポ優先): 道徳の 45 分授業で教師がフェーズを進めたとき、
       //   生徒側で 15 秒以上待つと授業がもたつく。直近アクティブ (1 分以内) のときは
@@ -1458,6 +1482,372 @@
     showToast(message) {
       if (!window.notifications) return;
       window.notifications.banner(String(message || ''));
+    }
+
+    // =====================================================================
+    // 授業モード: フェーズが画面の役割を決める
+    //
+    // 児童は 1 つの URL を開いたまま。何ができるか (書く / 読む / 止まる) は
+    // 教師のフェーズ送りだけが決める。ここはその適用層。
+    //
+    // 注意: これは「見せ方」の制御であって権限ではない。投稿してよいかどうかの
+    //   最終判定はサーバ (submitLessonAnswer) が行う。画面を細工しても
+    //   議論フェーズに投稿は通らない。
+    // =====================================================================
+
+    /**
+     * 初期表示時に一度だけフェーズを取りに行く。
+     * polling と同じ getNotificationUpdate を使う (専用 API を増やさない)。
+     */
+    async __initLessonPhase() {
+      if (this.state.isReviewMode) return;   // 振り返り画面は凍結された過去を見ている
+      try {
+        const res = await this.runGas('getNotificationUpdate', this.state.userId, {
+          lastUpdateTime: this.state.lastSeenTimestamp
+        });
+        if (res && res.success && res.lessonPhase !== undefined) {
+          this.__applyLessonPhase(res.lessonPhase);
+        }
+      } catch (_) {
+        // 取れなくても polling が数秒後に拾う。board 本体の表示は妨げない。
+      }
+    }
+
+    /**
+     * polling で受け取った現在フェーズを画面に適用する。
+     * @param {Object|null} phase - { lessonId, phaseIndex, phaseName, screenRole, question, phaseCount }
+     */
+    __applyLessonPhase(phase) {
+      const prev = this.state.lessonPhase || null;
+      const changed = !prev || !phase
+        || prev.phaseIndex !== phase.phaseIndex
+        || prev.lessonId !== phase.lessonId;
+      this.state.lessonPhase = phase || null;
+
+      if (!phase) {
+        // 授業が終わった / 掲示板モードに戻った
+        this.__teardownLessonScreen();
+        return;
+      }
+      if (!changed) return;
+
+      // フェーズが変わったら、前のフェーズの入力内容は持ち越さない。
+      this.state.lessonDraft = null;
+      if (prev) {
+        this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
+      }
+      this.__renderLessonScreen();
+
+      // 出会うフェーズに入った瞬間は、最新の分布を読み直す。
+      if (phase.screenRole === 'browse' && typeof this.loadSheetData === 'function') {
+        this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+      }
+    }
+
+    // 授業用オーバーレイを取り除き、通常のボード表示に戻す。
+    __teardownLessonScreen() {
+      const el = document.getElementById('lessonScreen');
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      document.body.classList.remove('lesson-active');
+    }
+
+    /**
+     * 現在フェーズに対応する画面を描く。
+     *
+     * browse は通常のボード (分布 + 理由) をそのまま見せたいので、オーバーレイを外す。
+     * それ以外はボードの上にフェーズ専用の画面をかぶせる。
+     */
+    __renderLessonScreen() {
+      const phase = this.state.lessonPhase;
+      if (!phase) return this.__teardownLessonScreen();
+
+      if (phase.screenRole === 'browse') {
+        this.__teardownLessonScreen();
+        return;
+      }
+
+      let host = document.getElementById('lessonScreen');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'lessonScreen';
+        host.className = 'lesson-screen';
+        document.body.appendChild(host);
+      }
+      document.body.classList.add('lesson-active');
+
+      if (phase.screenRole === 'discuss') {
+        this.__renderLessonDiscuss(host, phase);
+      } else if (phase.screenRole === 'reflect') {
+        this.__renderLessonReflect(host, phase);
+      } else {
+        this.__renderLessonInput(host, phase);
+      }
+    }
+
+    // 議論フェーズ: 端末に用事がないことを、画面自身が伝える。
+    __renderLessonDiscuss(host, phase) {
+      const esc = this.__escape.bind(this);
+      host.innerHTML =
+        '<div class="lesson-card lesson-quiet">' +
+          '<svg class="lesson-quiet-icon" aria-hidden="true"><use href="#i-message-square"></use></svg>' +
+          '<h2 class="lesson-quiet-title">画面をとじて、話そう</h2>' +
+          '<p class="lesson-quiet-note">' + esc(phase.question || '友達と考えをぶつけてみよう') + '</p>' +
+        '</div>';
+    }
+
+    // ふりかえり: 学級の分布は出さず、自分の航跡と自分の言葉だけを見せる。
+    __renderLessonReflect(host, phase) {
+      const esc = this.__escape.bind(this);
+      host.innerHTML =
+        '<div class="lesson-card">' +
+          '<h2 class="lesson-title">きょうの あなたの航跡</h2>' +
+          '<div id="lessonTrajectory" class="lesson-trajectory">読み込み中…</div>' +
+          '<p class="lesson-final-q">' + esc(phase.question || '') + '</p>' +
+        '</div>';
+
+      this.runGas('getMyLessonTrajectory', this.state.userId)
+        .then((res) => {
+          const box = document.getElementById('lessonTrajectory');
+          if (!box) return;
+          const phases = (res && res.success && res.data && res.data.phases) || [];
+          box.innerHTML = this.__buildTrajectoryHtml(phases);
+        })
+        .catch(() => {
+          const box = document.getElementById('lessonTrajectory');
+          if (box) box.textContent = '航跡を読み込めませんでした。';
+        });
+    }
+
+    // 航跡の HTML。● 最初 → ★ いま を、移動量ではなく「ことば」の並びとして見せる。
+    __buildTrajectoryHtml(phases) {
+      const esc = this.__escape.bind(this);
+      if (!phases.length) return '<p class="lesson-empty">まだ記録がありません。</p>';
+      const first = phases[0];
+      const last = phases[phases.length - 1];
+      let html = '';
+      if (phases.length > 1) {
+        html += this.__buildTrajectorySvg(first, last);
+      }
+      html += '<div class="lesson-quote lesson-quote-first">' +
+        '<span class="lesson-quote-label">● 最初のことば</span>' +
+        esc(first.reason || '') + '</div>';
+      if (phases.length > 1) {
+        html += '<div class="lesson-quote lesson-quote-now">' +
+          '<span class="lesson-quote-label">★ いまのことば</span>' +
+          esc(last.reason || '') + '</div>';
+        if (last.addedInsight) {
+          html += '<div class="lesson-quote lesson-quote-insight">' +
+            '<span class="lesson-quote-label">＋ 加わったこと</span>' +
+            esc(last.addedInsight) + '</div>';
+        }
+      }
+      return html;
+    }
+
+    // 自分の ● と ★ だけの小さな 4 象限。学級の点は描かない。
+    __buildTrajectorySvg(first, last) {
+      const pos = (v) => 20 + ((Number(v) || 3) - 1) / 4 * 160;   // 1-5 → 20-180
+      const x1 = pos(first.numericX), y1 = 200 - pos(first.numericY);
+      const x2 = pos(last.numericX),  y2 = 200 - pos(last.numericY);
+      return '<svg class="lesson-traj-svg" viewBox="0 0 200 200" role="img" ' +
+        'aria-label="最初の考えといまの考えの位置">' +
+        '<line class="lesson-axis" x1="100" y1="10" x2="100" y2="190" />' +
+        '<line class="lesson-axis" x1="10" y1="100" x2="190" y2="100" />' +
+        '<line class="lesson-traj-line" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" />' +
+        '<circle class="lesson-dot-first" cx="' + x1 + '" cy="' + y1 + '" r="7" />' +
+        '<text class="lesson-dot-now" x="' + x2 + '" y="' + (y2 + 6) + '" text-anchor="middle">★</text>' +
+        '</svg>';
+    }
+
+    // 入力 / 再入力フェーズ。reinput では自分の ● を下敷きに出す。
+    __renderLessonInput(host, phase) {
+      const esc = this.__escape.bind(this);
+      const isReinput = phase.screenRole === 'reinput';
+      const storedName = this.__lessonStoredName();
+      host.innerHTML =
+        '<div class="lesson-card">' +
+          '<h2 class="lesson-title">' + esc(phase.question || 'いまの考えは？') + '</h2>' +
+          (storedName ? '' :
+            '<label class="lesson-label" for="lessonName">名前</label>' +
+            '<input id="lessonName" class="lesson-input" type="text" maxlength="50" ' +
+              'placeholder="名前を入力してください" value="" />') +
+          '<div class="lesson-grid-wrap">' +
+            '<div id="lessonGrid" class="lesson-grid" role="application" ' +
+              'aria-label="考えの位置を選ぶ4象限"></div>' +
+          '</div>' +
+          '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
+          '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
+            'placeholder="そこを選んだ理由を書いてください"></textarea>' +
+          (isReinput
+            ? '<label class="lesson-label" for="lessonInsight">友達の考えを聞いて、加わったこと・変わったことは？</label>' +
+              '<textarea id="lessonInsight" class="lesson-input" rows="3" maxlength="500" ' +
+                'placeholder="考えが変わらなくても、気づいたことがあれば書いてください"></textarea>'
+            : '') +
+          '<button id="lessonSubmit" class="lesson-submit" type="button">考えをおくる</button>' +
+          '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>' +
+        '</div>';
+
+      this.__buildLessonGrid(isReinput);
+      const btn = document.getElementById('lessonSubmit');
+      if (btn) {
+        btn.addEventListener('click', () => this.__submitLessonAnswer());
+      }
+    }
+
+    /**
+     * 5×5 のタップ格子を作る。
+     * Why セルの明示グリッドか: 自由座標だと「どこでもよい」に見えてしまい、
+     *   何を選んだのかが本人にも説明できなくなる。5 段階なら理由が言葉にしやすく、
+     *   Form の線形尺度とも同じ値域なので過去データと互換になる。
+     */
+    __buildLessonGrid(isReinput) {
+      const grid = document.getElementById('lessonGrid');
+      if (!grid) return;
+      const prev = (isReinput && this.state.lessonPrevPoint) || null;
+      // DOM を組み立てる (innerHTML を使わない)。セルは数値だけで構成されるが、
+      //   ボードの DOM 生成規約に合わせて textContent 経路で作る。
+      grid.textContent = '';
+      for (let y = 5; y >= 1; y--) {
+        for (let x = 1; x <= 5; x++) {
+          const isPrev = !!(prev && prev.numericX === x && prev.numericY === y);
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'lesson-cell' + (isPrev ? ' is-prev' : '');
+          cell.setAttribute('data-x', String(x));
+          cell.setAttribute('data-y', String(y));
+          cell.setAttribute('aria-label',
+            '横' + x + ' 縦' + y + (isPrev ? '（最初に選んだところ）' : ''));
+          if (isPrev) {
+            const mark = document.createElement('span');
+            mark.className = 'lesson-cell-prev';
+            mark.setAttribute('aria-hidden', 'true');
+            mark.textContent = '●';
+            cell.appendChild(mark);
+          }
+          grid.appendChild(cell);
+        }
+      }
+      grid.addEventListener('click', (ev) => {
+        const cell = ev.target.closest ? ev.target.closest('.lesson-cell') : null;
+        if (!cell) return;
+        const cells = grid.querySelectorAll('.lesson-cell');
+        for (let i = 0; i < cells.length; i++) cells[i].classList.remove('is-selected');
+        cell.classList.add('is-selected');
+        this.state.lessonDraft = {
+          numericX: Number(cell.getAttribute('data-x')),
+          numericY: Number(cell.getAttribute('data-y'))
+        };
+      });
+
+      // 再入力フェーズでは自分の最初の位置を下敷きに出す (まだ取得していなければ読む)。
+      if (isReinput && !prev) {
+        this.runGas('getMyLessonTrajectory', this.state.userId)
+          .then((res) => {
+            const phases = (res && res.success && res.data && res.data.phases) || [];
+            if (!phases.length) return;
+            this.state.lessonPrevPoint = {
+              numericX: phases[0].numericX,
+              numericY: phases[0].numericY
+            };
+            this.__buildLessonGrid(true);
+          })
+          .catch(() => {});
+      }
+    }
+
+    // 投稿。サーバがフェーズ権能を再検証するので、ここは UX の担当。
+    async __submitLessonAnswer() {
+      const phase = this.state.lessonPhase;
+      const draft = this.state.lessonDraft;
+      const btn = document.getElementById('lessonSubmit');
+      if (!phase) return;
+      if (!draft) {
+        this.showToast('まず、自分の考えの位置をえらんでください');
+        return;
+      }
+      const reasonEl = document.getElementById('lessonReason');
+      const insightEl = document.getElementById('lessonInsight');
+      const reason = reasonEl ? String(reasonEl.value || '').trim() : '';
+      if (!reason) {
+        this.showToast('理由を書いてください');
+        if (reasonEl) reasonEl.focus();
+        return;
+      }
+
+      // 名前欄が出ているのは、この端末で初めて送るときだけ。
+      const nameEl = document.getElementById('lessonName');
+      if (nameEl) {
+        const typed = String(nameEl.value || '').trim();
+        if (!typed) {
+          this.showToast('名前を入力してください');
+          nameEl.focus();
+          return;
+        }
+        this.__saveLessonName(typed);
+      }
+
+      const send = async () => {
+        // 30 人が号令で一斉に押すケースを想定し、送信を 0-1.5 秒ばらけさせる。
+        //   GAS の同時実行上限に全員が同じ瞬間に当たるのを避ける。
+        await new Promise((resolve) => setTimeout(resolve, Math.random() * 1500));
+        const res = await this.runGas('submitLessonAnswer', this.state.userId, {
+          lessonId: phase.lessonId,
+          phaseIndex: phase.phaseIndex,
+          numericX: draft.numericX,
+          numericY: draft.numericY,
+          reason,
+          addedInsight: insightEl ? String(insightEl.value || '').trim() : '',
+          class: this.__lessonClass(),
+          name: this.__lessonStoredName()
+        });
+        if (!res || !res.success) {
+          throw new Error((res && res.message) || '送信に失敗しました');
+        }
+        this.showToast('考えを送りました');
+      };
+
+      if (window.sharedUtilities && window.sharedUtilities.buttons && btn) {
+        await window.sharedUtilities.buttons.withBusy(btn, send, { busyText: '送っています…' })
+          .catch((err) => this.showToast(err.message || '送信に失敗しました'));
+      } else {
+        try { await send(); } catch (err) { this.showToast(err.message || '送信に失敗しました'); }
+      }
+    }
+
+    /**
+     * 児童の名前。本人確認は email で行うので、これは表示のためだけの情報。
+     *
+     * Why localStorage か: 毎フェーズ名前を打たせるのは 45 分の授業では邪魔。
+     *   ボードごとに 1 度だけ聞いて端末に覚える。端末が変われば聞き直すが、
+     *   記録の同定は email なので、名前が空でもデータは壊れない。
+     */
+    __lessonStoredName() {
+      try {
+        return localStorage.getItem('lessonName:' + this.state.userId) || '';
+      } catch (_) { return ''; }
+    }
+
+    __saveLessonName(name) {
+      try {
+        localStorage.setItem('lessonName:' + this.state.userId, String(name || '').slice(0, 50));
+      } catch (_) { /* プライベートモード等では覚えないだけ */ }
+    }
+
+    // クラス。ヘッダのクラスフィルタが選ばれていればそれを使う。
+    __lessonClass() {
+      const el = this.elements && this.elements.classFilter;
+      const v = el ? String(el.value || '') : '';
+      return (!v || v === 'すべて') ? '' : v;
+    }
+
+    // 共有の escapeHtml。未ロード時も最低限のエスケープに落とす。
+    __escape(s) {
+      if (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml) {
+        return window.sharedUtilities.security.escapeHtml(String(s == null ? '' : s));
+      }
+      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
     }
 
     destroy() {

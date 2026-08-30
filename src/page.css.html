@@ -915,4 +915,200 @@ button.highlight-badge:hover {
   outline: none;
   box-shadow: var(--ring-focus);
 }
+
+/* =====================================================================
+   授業モード: フェーズが画面の役割を決める
+   ボードの上にかぶせる 1 枚のレイヤー。browse フェーズでは DOM ごと外れるので、
+   掲示板モードのスタイルには一切干渉しない。
+   ===================================================================== */
+.lesson-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--theme-bg-base);
+}
+.lesson-card {
+  width: 100%;
+  max-width: 34rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background: var(--theme-bg-surface);
+  border: 1px solid var(--theme-border-subtle);
+  box-shadow: var(--elevation-2);
+}
+.lesson-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  text-wrap: balance;
+  margin: 0;
+}
+.lesson-label {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--theme-text-secondary);
+}
+.lesson-input {
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-border-subtle);
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+}
+.lesson-input:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+/* 5×5 のタップ格子。自由座標にしないのは「なぜそこか」を言葉にしやすくするため。 */
+.lesson-grid-wrap {
+  display: flex;
+  justify-content: center;
+}
+.lesson-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-1);
+  width: min(100%, 20rem);
+  aspect-ratio: 1;
+}
+.lesson-cell {
+  position: relative;
+  border-radius: var(--radius-sm);
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-border-subtle);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.lesson-cell:hover {
+  background: var(--theme-bg-elevated);
+}
+.lesson-cell:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+.lesson-cell.is-selected {
+  background: var(--theme-bg-elevated-hover);
+  border-color: var(--brand-accent);
+}
+/* 最初に置いた位置 (再入力フェーズの下敷き)。選択中の点とは別の記号で示す。 */
+.lesson-cell-prev {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-accent);
+  opacity: 0.55;
+  font-size: var(--font-size-sm);
+}
+
+.lesson-submit {
+  align-self: stretch;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--brand-accent);
+  color: var(--theme-bg-base);
+  font-weight: 700;
+  font-size: var(--font-size-base);
+  border: none;
+  cursor: pointer;
+}
+.lesson-submit:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+.lesson-hint,
+.lesson-empty {
+  font-size: var(--font-size-xs);
+  color: var(--theme-text-secondary);
+  margin: 0;
+}
+
+/* 議論フェーズ: 端末に用事がないことを画面自身が伝える。 */
+.lesson-quiet {
+  text-align: center;
+  gap: var(--space-2);
+}
+.lesson-quiet-icon {
+  width: var(--space-12);
+  height: var(--space-12);
+  align-self: center;
+  color: var(--theme-text-secondary);
+}
+.lesson-quiet-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  margin: 0;
+}
+.lesson-quiet-note {
+  font-size: var(--font-size-base);
+  color: var(--theme-text-secondary);
+  margin: 0;
+}
+
+/* ふりかえり: 自分の航跡と自分の言葉だけ。学級の分布は出さない。 */
+.lesson-trajectory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.lesson-traj-svg {
+  width: min(100%, 14rem);
+  align-self: center;
+}
+.lesson-axis {
+  stroke: var(--theme-border-subtle);
+  stroke-width: 1;
+}
+.lesson-traj-line {
+  stroke: var(--brand-accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 4;
+}
+.lesson-dot-first {
+  fill: var(--theme-text-secondary);
+}
+.lesson-dot-now {
+  fill: var(--brand-accent);
+  font-size: var(--font-size-lg);
+}
+.lesson-quote {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--theme-bg-base);
+  border-left: 3px solid var(--theme-border-subtle);
+  font-size: var(--font-size-sm);
+  color: var(--theme-text-primary);
+}
+.lesson-quote-now,
+.lesson-quote-insight {
+  border-left-color: var(--brand-accent);
+}
+.lesson-quote-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--theme-text-secondary);
+  margin-bottom: var(--space-1);
+}
+.lesson-final-q {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  text-align: center;
+  margin: var(--space-2) 0 0;
+}
 </style>

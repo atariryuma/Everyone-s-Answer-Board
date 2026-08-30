@@ -4460,6 +4460,65 @@
       if (nextBtn) nextBtn.disabled = activeIdx >= phases.length - 1;
     }
 
+    /**
+     * 見取りグリッド: 児童ごとの ● 最初 → ★ いま を読む (授業後用)。
+     *
+     * 開いたときにだけ読み込む。授業中に常時表示すると、教師の注意が
+     * 児童の顔から画面に移ってしまう。
+     */
+    function renderLessonReviewGrid() {
+      const box = document.getElementById('lesson-review-grid');
+      if (!box || !currentLessonId) return;
+      const esc = window.sharedUtilities.security.escapeHtml;
+      box.textContent = '読み込み中...';
+      gasRun('lesson.reviewGrid', { userId, lessonId: currentLessonId }).then((res) => {
+        if (!res || !res.success) {
+          box.textContent = (res && res.message) || '見取りを読み込めませんでした';
+          return;
+        }
+        const students = res.data.students || [];
+        if (!students.length) {
+          box.textContent = 'まだ回答がありません。';
+          return;
+        }
+        const cell = (a) => a
+          ? `<div class="text-xs text-theme-muted">(${a.numericX ?? '-'}, ${a.numericY ?? '-'})</div>
+             <div>${esc(a.reason || '')}</div>`
+          : '<span class="text-theme-muted">—</span>';
+        box.innerHTML =
+          '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead><tr class="text-xs text-theme-muted text-left">' +
+            '<th class="p-2">児童</th><th class="p-2">● 最初のことば</th>' +
+            '<th class="p-2">★ いまのことば</th><th class="p-2">＋ 加わったこと</th>' +
+          '</tr></thead><tbody>' +
+          students.map((s) => (
+            '<tr class="border-t border-theme-subtle align-top">' +
+              '<td class="p-2 whitespace-nowrap">' +
+                '<div class="font-bold">' + esc(s.name || s.email || '') + '</div>' +
+                '<div class="text-xs text-theme-muted">' +
+                  (s.moved ? '位置が動いた' : '位置は同じ') + '</div>' +
+              '</td>' +
+              '<td class="p-2">' + cell(s.first) + '</td>' +
+              '<td class="p-2">' + cell(s.last) + '</td>' +
+              '<td class="p-2">' + (s.last && s.last.addedInsight
+                ? esc(s.last.addedInsight)
+                : '<span class="text-theme-muted">—</span>') + '</td>' +
+            '</tr>'
+          )).join('') +
+          '</tbody></table></div>';
+      }).catch((err) => {
+        box.textContent = (err && err.message) || '見取りの読み込みに失敗しました';
+      });
+    }
+
+    (function initLessonReviewGrid() {
+      const wrap = document.getElementById('lesson-review-grid-wrap');
+      if (!wrap) return;
+      wrap.addEventListener('toggle', () => {
+        if (wrap.open) renderLessonReviewGrid();
+      });
+    })();
+
     function lessonAdvance(direction, targetIndex) {
       if (!currentLessonId) return;
       // Why: onclick="lessonAdvance(...)" の inline 呼出から this を渡す代わりに、

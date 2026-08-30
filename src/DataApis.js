@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -890,6 +890,37 @@ function buildSheetDataErrorResult_(result) {
   };
 }
 
+/**
+ * 授業モードの「考える」フェーズでは、児童に他者の回答を返さない。
+ *
+ * Why UI ではなくサーバで落とすか: 「先入観より先に自分の考えを持つ」は授業の構造そのもの。
+ *   画面のオーバーレイで隠すだけだと、読み込みの一瞬や DevTools で分布が見えてしまい、
+ *   構造の保証にならない。データを渡さないことで初めて保証になる。
+ *
+ * 教師 (own board) と管理者は対象外 = 分布を投影して授業を進められる。
+ * 自分の回答は返す (送信済みかどうかを本人が確認できるように)。
+ *
+ * @returns {Object} 元の result、または data を絞った複製
+ */
+function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnBoard, isAdmin) {
+  try {
+    if (isOwnBoard || isAdmin) return result;
+    if (typeof __getViewerLessonPhase_ !== 'function') return result;
+    const phase = __getViewerLessonPhase_(targetUserId);
+    if (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput')) return result;
+
+    const rows = Array.isArray(result.data) ? result.data : [];
+    const me = String(viewerEmail || '').trim().toLowerCase();
+    const mine = rows.filter(r => r && String(r.email || '').trim().toLowerCase() === me);
+    return Object.assign({}, result, { data: mine });
+  } catch (error) {
+    // 判定できないときは「見せない」側に倒さない: 授業モードでなければ通常のボードなので、
+    //   ここで空配列を返すと掲示板が壊れる。元データをそのまま通す。
+    logError_('__maskOthersDuringInputPhase_', error);
+    return result;
+  }
+}
+
 function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
@@ -1161,10 +1192,11 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
-      return buildSafePublishedDataResult(result, targetUserConfig, {
-        isAdmin: isSystemAdmin,
-        isOwnBoard
-      });
+      return buildSafePublishedDataResult(
+        __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin),
+        targetUserConfig,
+        { isAdmin: isSystemAdmin, isOwnBoard }
+      );
     }
 
     const user = findUserByEmail(viewerEmail, {
@@ -1438,7 +1470,14 @@ function getNotificationUpdate(targetUserId, options = {}) {
         formUrl: (targetConfig && typeof targetConfig.formUrl === 'string') ? targetConfig.formUrl : '',
         formTitle: (targetConfig && typeof targetConfig.formTitle === 'string') ? targetConfig.formTitle : ''
       },
-      activeProfile: (targetConfig && targetConfig.activeProfile) || null
+      activeProfile: (targetConfig && targetConfig.activeProfile) || null,
+      // 授業モード: 教師のフェーズ送りを児童の polling で検知する。
+      //   Why formUrl 変化に頼らないか: native 入力の授業は Form を持たないので
+      //   formUrl が常に空のまま = フェーズ切替が検知できない。
+      //   授業中でなければ null (掲示板モードは何も変わらない)。
+      lessonPhase: (typeof __getViewerLessonPhase_ === 'function')
+        ? __getViewerLessonPhase_(targetUserId)
+        : null
     };
 
   } catch (error) {

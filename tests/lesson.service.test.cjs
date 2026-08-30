@@ -412,12 +412,15 @@ test('listLessons: owner は自分の lesson のみ取得', () => {
   assert.equal(res.data.lessons.every(l => l.name.startsWith('mine')), true);
 });
 
-test('listLessonTemplates: 全テンプレート (4 種) が返る', () => {
+test('listLessonTemplates: 全テンプレート (5 種) が返る', () => {
   const { context } = loadLessonContext();
   const res = context.listLessonTemplates();
   assert.equal(res.success, true);
   const keys = Array.from(res.data.templates).map(t => t.key).sort();
-  assert.deepEqual(keys, ['before-after-2phase', 'doutoku-3phase', 'inquiry-3phase', 'kid-3phase']);
+  assert.deepEqual(keys, [
+    'before-after-2phase', 'dialogue-reconsider-5phase',
+    'doutoku-3phase', 'inquiry-3phase', 'kid-3phase'
+  ]);
   const kid = Array.from(res.data.templates).find(t => t.key === 'kid-3phase');
   // 2026-05-16: ラベルを「低学年向け」に変更 (旧「児童向け」)。教科ニュートラル化と整合。
   assert.ok(kid && kid.label.includes('低学年'));

@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
+/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -18,6 +18,42 @@ const LESSON_JSON_MAX_BYTES = 45000;
 const LESSON_RESPONSES_SHEET = 'lesson_responses';
 // startLesson 内部の double-click 防止 lock。
 const LESSON_START_LOCK_TIMEOUT_MS = 5000;
+
+// ----- 授業モード (native 入力) -----
+//
+// Google Form を経由せず、回答ボードの画面から直接投稿する phase の入力経路。
+// Why Form を使わないか: 「最初の自分を見ながら、もう一度置く」体験は Form では作れない
+//   (Form 画面に自分の過去は存在しない)。児童の同定も Form の氏名欄ではなく
+//   Session の email で行うため、表記ゆれによる突合ミスが原理的に起きない。
+//
+// 回答シートの列は Form 回答シートと同じ形に揃える。こうすることで
+// getPublishedSheetData / renderMatrix / snapshot capture が一切の分岐なしに動く。
+const LESSON_NATIVE_SHEET_HEADERS = [
+  'タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと'
+];
+// 列推定 (inferColumnRoles) を通さず、この固定 index を columnMapping に直接入れる。
+//   native シートは我々が作るので、列の意味は最初から確定している。
+const LESSON_NATIVE_COLUMN_MAPPING = Object.freeze({
+  email: 1, class: 2, name: 3, numericX: 4, numericY: 5, answer: 6, reason: 6
+});
+const LESSON_NATIVE_COL_TIMESTAMP = 1;   // 1-based (getRange 用)
+const LESSON_NATIVE_COL_EMAIL = 2;
+const LESSON_NATIVE_COL_X = 5;
+const LESSON_NATIVE_COL_INSIGHT = 8;
+
+// 画面の権能。教師のフェーズ送りが、全児童の画面で「何ができるか」を決める。
+//   Why 権能を phase に持たせるか: 「アプリが議論を代替しない」「先入観より先に自分の考えを持つ」
+//   は機能の有無では守れない。見えるもの・できることをフェーズが制御して初めて構造で保証される。
+const LESSON_SCREEN_ROLES = Object.freeze({
+  INPUT: 'input',       // 自分の考えを入力。他者は見えない (先入観の遮断)
+  BROWSE: 'browse',     // 学級の分布と理由を読む。入力はロック
+  DISCUSS: 'discuss',   // 端末は停止。対話の時間 (アプリが黙る)
+  REINPUT: 'reinput',   // 自分の ● を見ながら ★ を置き直す + 加わったことを書く
+  REFLECT: 'reflect'    // 自分の航跡と自分の言葉だけ。学級の分布は出さない
+});
+const LESSON_INPUT_ROLES = [LESSON_SCREEN_ROLES.INPUT, LESSON_SCREEN_ROLES.REINPUT];
+// 理由 / 加わったこと の文字数上限 (Sheets セル上限ではなく、児童が書く現実的な長さ)。
+const LESSON_ANSWER_TEXT_MAX = 500;
 // Auto-archive thresholds (unpublishBoard hook + daily sweep)。
 const LESSON_AUTO_ARCHIVE_MIN_MS = 5 * 60 * 1000;        // < 5 分 = テスト操作とみなして skip
 const LESSON_AUTO_ARCHIVE_MIN_RESPONSES = 1;             // 0 回答 = 授業として成立してない
@@ -470,8 +506,58 @@ const LESSON_TEMPLATES = {
       { name: '議論のまえ', formTemplate: 'numberline', question: 'いまのあなたの立場は？' },
       { name: '議論のあと', formTemplate: 'numberline', question: '議論をしたあと、いまの立場は？' }
     ]
+  },
+  // 「考え、議論する道徳」向け。他のテンプレと違い Form を作らず、画面から直接投稿する
+  //   (inputMode: 'native')。フェーズが児童画面の権能を切り替えるのがこのテンプレの本体。
+  //
+  // Why 5 段階か: 「自分の考えをもつ → 他者の考えに出会う → 議論する → 問い直す → 言語化する」
+  //   が道徳科の学習過程 (文科省 特別の教科 道徳編) だから。可視化はこの過程を支える手段であり、
+  //   意見を集めること自体は目的にしない。
+  // Why 縦軸が「迷い」か: 立場の正誤を軸にすると多数派が正解に見える。確信度を縦に取ると
+  //   「立場は同じだが迷いが増えた」という深まりも位置として現れ、かつ優劣がつかない。
+  'dialogue-reconsider-5phase': {
+    label: '考え、議論する道徳（5段階）',
+    description: '考える → 出会う → 議論する → もう一度考える → ふりかえる',
+    inputMode: 'native',
+    phases: [
+      {
+        name: '考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.INPUT,
+        question: 'いまのあなたの考えは、どこにありますか？'
+      },
+      {
+        name: '出会う', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.BROWSE,
+        question: '友達はどう考えた？ 理由を読んでみよう'
+      },
+      {
+        name: '議論する', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.DISCUSS,
+        question: '画面をとじて、話し合おう'
+      },
+      {
+        name: 'もう一度考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REINPUT,
+        question: '話し合ったいま、あなたはどこに立ちますか？'
+      },
+      {
+        name: 'ふりかえる', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REFLECT,
+        question: '自分の考えは、どう変わった／変わらなかった？'
+      }
+    ]
   }
 };
+
+// phase が native 入力かを判定する。phase 個別指定 > lesson 全体の順で解決する。
+function __isNativePhase_(phase, lessonJson) {
+  if (phase && phase.inputMode) return phase.inputMode === 'native';
+  return Boolean(lessonJson && lessonJson.inputMode === 'native');
+}
+
+// phase の画面権能。未指定なら 'browse' (= 見るだけ) に倒す。
+//   Why 既定を browse にするか: 権能の指定漏れが「誰でも書ける」に倒れると、
+//   議論中に投稿できてしまう等、授業の構造が静かに壊れる。安全側は「書けない」。
+function __phaseScreenRole_(phase) {
+  const role = phase && phase.screenRole;
+  const known = Object.keys(LESSON_SCREEN_ROLES).map(k => LESSON_SCREEN_ROLES[k]);
+  return known.indexOf(role) >= 0 ? role : LESSON_SCREEN_ROLES.BROWSE;
+}
 
 // public: フロントから利用可能なテンプレ一覧を返す (creation dropdown 用)
 function listLessonTemplates() {
@@ -501,10 +587,14 @@ function createLessonDraft(userId, name, template) {
     const lessonJson = {
       template: templateKey,
       classes: [],
+      // 'native' なら Form を作らず画面から直接投稿する (授業モード)。
+      inputMode: tpl.inputMode || 'form',
       phases: tpl.phases.map(p => ({
         name: p.name,
         formTemplate: p.formTemplate,
         question: p.question,
+        // 画面の権能 (input/browse/discuss/reinput/reflect)。native テンプレのみ持つ。
+        screenRole: p.screenRole || '',
         // Form 生成は startLesson で行うので、draft 時点では空。
         formId: '',
         formUrl: '',
@@ -1084,6 +1174,57 @@ function __templateToBoardMode_(formTemplate) {
   return 'auto';
 }
 
+/**
+ * native phase 用の回答シートを用意する。
+ *
+ * 1 授業 = 1 スプレッドシート、1 フェーズ = 1 シート。
+ * Why フェーズごとにシートを分けるか: 「最初の考え」と「いまの考え」は別の記録であって
+ *   同じ列の上書きではない。分けておけば片方が消えることがなく、フェーズ内では
+ *   1 児童 1 行が保証されるので突合も単純になる。
+ *
+ * @returns {{spreadsheetId:string, sheetName:string}|null}
+ */
+function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
+  // スプレッドシートは授業に 1 つ。既に作ってあれば使い回す (resume 時の二重作成防止)。
+  let ssId = lessonJson.nativeSpreadsheetId || '';
+  let ss = null;
+  if (ssId) {
+    try {
+      ss = SpreadsheetApp.openById(ssId);
+    } catch (openErr) {
+      logError_('__ensureNativeAnswerSheet_:open', openErr);
+      ss = null;
+      ssId = '';
+    }
+  }
+  if (!ss) {
+    ss = SpreadsheetApp.create(`「${lessonName || '授業'}」の回答`);
+    ssId = ss.getId();
+    lessonJson.nativeSpreadsheetId = ssId;
+    // 児童の投稿は SA pool 経由で書かれる (児童は SS への直接権限を持たない)。
+    //   Form 回答シートと同じ共有既定を当てないと、投稿が権限エラーで落ちる。
+    try {
+      applySpreadsheetSharingDefaults(ssId);
+    } catch (shareErr) {
+      logError_('__ensureNativeAnswerSheet_:share', shareErr);
+    }
+  }
+
+  const sheetName = `phase${phaseIdx + 1}`;
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    // 1 枚目は create 時の既定シートを流用して名前を変える (空シートを残さない)。
+    const sheets = ss.getSheets();
+    if (sheets.length === 1 && sheets[0].getLastRow() === 0) {
+      sheet = sheets[0].setName(sheetName);
+    } else {
+      sheet = ss.insertSheet(sheetName);
+    }
+    sheet.appendRow(LESSON_NATIVE_SHEET_HEADERS);
+  }
+  return { spreadsheetId: ssId, sheetName };
+}
+
 function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   // displaySettings が phase に明示指定されていればそれを優先、
   //   無ければ formTemplate から決定。templateOptions から axis ラベルも反映。
@@ -1127,6 +1268,13 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     allowResubmit,
     activeLessonId: lessonId
   };
+  // native phase はシートを我々が作っているので列の意味が確定している。
+  //   推定 (inferColumnRoles) を通さず固定 index を渡す = 推定ミスが起きない。
+  if (__isNativePhase_(phase, lessonJson)) {
+    patch.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);
+    // 児童は画面から投稿するので、Form へ誘導する導線は出さない。
+    patch.formUrl = '';
+  }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
   if (yAxisLabels) patch.yAxisLabels = yAxisLabels;
   return patch;
@@ -1285,6 +1433,31 @@ function startLesson(userId, lessonId) {
       const lessonAllowResubmit = Boolean(lessonJson && lessonJson.allowResubmit);
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i];
+
+        // 授業モード (native): Form を作らず、回答シートだけ用意する。
+        //   Why 全 phase に作るか: browse/discuss/reflect は投稿を受け付けないが、
+        //   config が指す先が無いと board が「データソース未接続」になってしまう。
+        //   フェーズの見え方 (何が描かれるか) は screenRole が決める。
+        if (__isNativePhase_(phase, lessonJson)) {
+          if (phase.sheetName) continue; // resume: 既に用意済みは skip
+          try {
+            const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName);
+            phase.spreadsheetId = native.spreadsheetId;
+            phase.sheetName = native.sheetName;
+            phase.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);
+          } catch (nativeErr) {
+            logError_('startLesson:native', nativeErr);
+            __updateLessonRow_(lessonId, { lessonJson });
+            return createErrorResponse(
+              `phase ${i + 1} (${phase.name}) の回答シート作成に失敗しました: ${nativeErr && nativeErr.message ? nativeErr.message : 'unknown'}`,
+              null,
+              { error: 'NATIVE_SHEET_CREATE_FAILED', completedPhases: i, lessonId }
+            );
+          }
+          if (i < phases.length - 1) __updateLessonRow_(lessonId, { lessonJson });
+          continue;
+        }
+
         if (phase.formId) continue; // resume: 既に作成済みは skip
 
         const phaseAllowResubmit = phase.templateOptions && phase.templateOptions.allowResubmit;
@@ -1898,5 +2071,366 @@ function migrateLegacyProfilesToLesson_(userId) {
   } catch (error) {
     logError_('migrateLegacyProfilesToLesson_', error);
     return { migrated: false, reason: 'exception' };
+  }
+}
+
+// =====================================================================
+// 授業モード (native 入力) の公開 API
+//
+// 児童の端末から直接呼ばれる。owner 限定の管理 API とは別経路で、認可は
+// 「公開中のボードを見ている本人」であること (リアクションと同じ基準)。
+// =====================================================================
+
+/**
+ * 児童が見ている授業の「今のフェーズ」を返す。
+ *
+ * getActiveLessonNav (owner 限定・全フェーズ一覧) とは別物。こちらは閲覧者に見せてよい
+ * 最小限 = 今どのフェーズで、画面で何ができて、問いは何か、だけを返す。
+ * Why 分けるか: 児童に未来のフェーズの問いや構成を先に見せない。
+ *
+ * @param {string} targetUserId - ボード所有者 (教師) の userId
+ * @returns {Object|null} 授業中でなければ null
+ */
+function __getViewerLessonPhase_(targetUserId) {
+  try {
+    if (!targetUserId) return null;
+    const config = getConfigOrDefault(targetUserId);
+    const lessonId = config && config.activeLessonId;
+    if (!lessonId) return null;
+
+    const found = __findLessonById_(lessonId);
+    if (!found || !found.lesson || found.lesson.state !== 'active') return null;
+
+    const lessonJson = found.lesson.lessonJson || {};
+    if (!__isNativePhase_({}, lessonJson)) return null;  // Form 経由の授業では使わない
+
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    const idx = __activePhaseIndex_(lessonJson);
+    const phase = phases[idx];
+    if (!phase) return null;
+
+    return {
+      lessonId,
+      phaseIndex: idx,
+      phaseName: phase.name || '',
+      screenRole: __phaseScreenRole_(phase),
+      question: phase.question || '',
+      phaseCount: phases.length
+    };
+  } catch (error) {
+    logError_('__getViewerLessonPhase_', error);
+    return null;
+  }
+}
+
+// 線形尺度 (1-5) の検証。範囲外・非数値は null。
+function __validateLessonScale_(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+}
+
+// 児童が書くテキストの正規化。制御文字を落とし、長さで切る。
+function __sanitizeLessonText_(value, maxLen) {
+  if (value === null || value === undefined) return '';
+  const limit = maxLen || LESSON_ANSWER_TEXT_MAX;
+  return String(value)
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .trim()
+    .slice(0, limit);
+}
+
+// 同一フェーズ内の自分の行番号 (1-based) を返す。無ければ -1。
+//   email 列だけを読む (全列読みは 30 人 × 投稿で無駄が大きい)。
+function __findOwnLessonRow_(sheet, actorEmail) {
+  try {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return -1;
+    const emails = sheet.getRange(2, LESSON_NATIVE_COL_EMAIL, lastRow - 1, 1).getValues();
+    const target = String(actorEmail || '').trim().toLowerCase();
+    for (let i = 0; i < emails.length; i++) {
+      if (String(emails[i][0] || '').trim().toLowerCase() === target) return i + 2;
+    }
+    return -1;
+  } catch (error) {
+    logError_('__findOwnLessonRow_', error);
+    return -1;
+  }
+}
+
+/**
+ * 児童の投稿を受け付ける (doPost: submitLessonAnswer)。
+ *
+ * 権能の最終防衛線: 画面側で入力 UI を隠していても、フェーズが input/reinput でなければ
+ * サーバが拒否する。「議論中は投稿できない」は UI ではなくここで保証される。
+ *
+ * 1 フェーズ 1 児童 1 行。同じフェーズ内の置き直しは既存行を更新する
+ * (「送ったけれど、やっぱり違う」を許す)。フェーズをまたぐ差分だけが航跡になる。
+ *
+ * @param {string} targetUserId
+ * @param {Object} payload - { lessonId, phaseIndex, numericX, numericY, reason, addedInsight, class, name }
+ */
+function submitLessonAnswer(targetUserId, payload) {
+  try {
+    const actorEmail = getCurrentEmail();
+    if (!actorEmail) return createAuthError();
+
+    const p = payload || {};
+    const phase = __getViewerLessonPhase_(targetUserId);
+    if (!phase) return createErrorResponse('この授業はいま投稿を受け付けていません');
+
+    // client の lessonId / phaseIndex は「ズレの検出」にのみ使う。真実はサーバの active phase。
+    //   フェーズ切替の直後に届いた投稿を、前のフェーズの行として書かないための照合。
+    if (p.lessonId && String(p.lessonId) !== String(phase.lessonId)) {
+      return createErrorResponse('PHASE_CHANGED: 授業が切り替わりました。画面を読み込み直してください');
+    }
+    if (p.phaseIndex !== undefined && p.phaseIndex !== null && Number(p.phaseIndex) !== phase.phaseIndex) {
+      return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。画面を読み込み直してください');
+    }
+    if (LESSON_INPUT_ROLES.indexOf(phase.screenRole) < 0) {
+      return createErrorResponse('いまは考えを送る時間ではありません');
+    }
+
+    const found = __findLessonById_(phase.lessonId);
+    if (!found || !found.lesson) return createErrorResponse('授業が見つかりません');
+    const lessonJson = found.lesson.lessonJson || {};
+    const phaseDef = (lessonJson.phases || [])[phase.phaseIndex];
+    if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) {
+      return createErrorResponse('回答シートが未設定です');
+    }
+
+    const isMatrix = phaseDef.formTemplate === 'matrix';
+    const x = __validateLessonScale_(p.numericX);
+    if (x === null) return createErrorResponse('横軸の値が不正です');
+    const y = isMatrix ? __validateLessonScale_(p.numericY) : null;
+    if (isMatrix && y === null) return createErrorResponse('縦軸の値が不正です');
+
+    const reason = __sanitizeLessonText_(p.reason);
+    if (!reason) return createErrorResponse('理由を書いてください');
+    const addedInsight = __sanitizeLessonText_(p.addedInsight);
+
+    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_submit' });
+    if (!ss) return createErrorResponse('回答シートを開けませんでした');
+    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    if (!sheet) return createErrorResponse('回答シートが見つかりません');
+
+    const row = [
+      new Date().toISOString(),
+      actorEmail,
+      __sanitizeLessonText_(p.class, 50),
+      __sanitizeLessonText_(p.name, 50),
+      x,
+      (y === null) ? '' : y,
+      reason,
+      addedInsight
+    ];
+
+    const existingRow = __findOwnLessonRow_(sheet, actorEmail);
+    if (existingRow > 0) {
+      sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
+
+    // browse フェーズを見ている他の児童の画面に反映されるよう board cache を落とす。
+    if (typeof bumpBoardDataVersion_ === 'function') {
+      try { bumpBoardDataVersion_(targetUserId); } catch (_) {}
+    }
+
+    return createSuccessResponse('考えを送りました', {
+      phaseIndex: phase.phaseIndex,
+      updated: existingRow > 0
+    });
+  } catch (error) {
+    logError_('submitLessonAnswer', error);
+    return createExceptionResponse(error);
+  }
+}
+
+// 1 フェーズ分の自分の回答を読む。無ければ null。
+function __readOwnLessonAnswer_(phaseDef, actorEmail) {
+  try {
+    if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return null;
+    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_trajectory' });
+    if (!ss) return null;
+    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    if (!sheet) return null;
+    const rowNum = __findOwnLessonRow_(sheet, actorEmail);
+    if (rowNum < 2) return null;
+    const v = sheet.getRange(rowNum, 1, 1, LESSON_NATIVE_SHEET_HEADERS.length).getValues()[0];
+    const x = Number(v[LESSON_NATIVE_COL_X - 1]);
+    const y = Number(v[LESSON_NATIVE_COL_X]);
+    return {
+      numericX: Number.isFinite(x) ? x : null,
+      numericY: Number.isFinite(y) ? y : null,
+      reason: String(v[LESSON_NATIVE_COL_INSIGHT - 2] || ''),
+      addedInsight: String(v[LESSON_NATIVE_COL_INSIGHT - 1] || '')
+    };
+  } catch (error) {
+    logError_('__readOwnLessonAnswer_', error);
+    return null;
+  }
+}
+
+/**
+ * 教師の見取りグリッド: 児童ごとの ● 最初 → ★ いま を一覧で返す。
+ *
+ * 授業「後」に読むための API。授業中の教師はフェーズ送りと投影に集中する想定で、
+ * この画面は児童の顔を見ている時間には出さない。
+ *
+ * 並び順は移動距離の昇順 = 位置が動かなかった児童が先頭に来る。
+ * Why: 「位置は変わらないが理由が深まった」学びは、移動量で並べると最後尾に沈む。
+ *   教師が最初に読むべきものを最初に置く。深さの判定そのものはしない (教師がする)。
+ *
+ * @param {string} userId - 授業の所有者
+ * @param {string} lessonId
+ * @returns {Object} { students: [{ name, email, class, first, last, distance, moved }] }
+ */
+function getLessonReviewGrid(userId, lessonId) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const lessonJson = (auth.found.lesson.lessonJson) || {};
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+
+    // 入力フェーズだけを時系列で読む (browse/discuss には投稿が存在しない)。
+    const inputPhases = [];
+    for (let i = 0; i < phases.length; i++) {
+      if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0) {
+        inputPhases.push({ index: i, def: phases[i] });
+      }
+    }
+    if (inputPhases.length === 0) {
+      return createSuccessResponse('入力フェーズなし', { students: [], phaseCount: 0 });
+    }
+
+    // email をキーに、フェーズごとの回答を集める。
+    const byEmail = new Map();
+    for (let p = 0; p < inputPhases.length; p++) {
+      const rows = __readAllLessonRows_(inputPhases[p].def);
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row.email) continue;
+        const entry = byEmail.get(row.email) || { email: row.email, name: '', class: '', answers: [] };
+        // 名前は後のフェーズで入力されることもあるので、空でなければ最新で更新する。
+        if (row.name) entry.name = row.name;
+        if (row.class) entry.class = row.class;
+        entry.answers.push(Object.assign({ phaseIndex: inputPhases[p].index }, row));
+        byEmail.set(row.email, entry);
+      }
+    }
+
+    const students = [];
+    byEmail.forEach((entry) => {
+      const answers = entry.answers.sort((a, b) => a.phaseIndex - b.phaseIndex);
+      const first = answers[0] || null;
+      const last = answers.length > 1 ? answers[answers.length - 1] : null;
+      let distance = 0;
+      if (first && last) {
+        const dx = (Number(last.numericX) || 0) - (Number(first.numericX) || 0);
+        const dy = (Number(last.numericY) || 0) - (Number(first.numericY) || 0);
+        distance = Math.sqrt(dx * dx + dy * dy);
+      }
+      students.push({
+        name: entry.name,
+        email: entry.email,
+        class: entry.class,
+        first,
+        last,
+        distance,
+        // 位置が動いたかどうかは事実として返すだけ。評価はしない。
+        moved: distance > 0,
+        answeredPhases: answers.length
+      });
+    });
+
+    students.sort((a, b) => {
+      // 未提出 (last なし) は最後に。それ以外は移動距離の小さい順。
+      if (!a.last && b.last) return 1;
+      if (a.last && !b.last) return -1;
+      return a.distance - b.distance;
+    });
+
+    return createSuccessResponse('見取りグリッド', {
+      students,
+      phaseCount: inputPhases.length
+    });
+  } catch (error) {
+    logError_('getLessonReviewGrid', error);
+    return createExceptionResponse(error);
+  }
+}
+
+// 1 フェーズ分の全回答を読む (教師の見取り用)。
+function __readAllLessonRows_(phaseDef) {
+  try {
+    if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return [];
+    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_review_grid' });
+    if (!ss) return [];
+    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    if (!sheet) return [];
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    // 全行を 1 回で読む (行ごとの getValue は 70x 遅い)。
+    const values = sheet.getRange(2, 1, lastRow - 1, LESSON_NATIVE_SHEET_HEADERS.length).getValues();
+    const out = [];
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      const email = String(v[1] || '').trim().toLowerCase();
+      if (!email) continue;
+      const x = Number(v[4]);
+      const y = Number(v[5]);
+      out.push({
+        email,
+        class: String(v[2] || ''),
+        name: String(v[3] || ''),
+        numericX: Number.isFinite(x) ? x : null,
+        numericY: Number.isFinite(y) ? y : null,
+        reason: String(v[6] || ''),
+        addedInsight: String(v[7] || '')
+      });
+    }
+    return out;
+  } catch (error) {
+    logError_('__readAllLessonRows_', error);
+    return [];
+  }
+}
+
+/**
+ * 自分の航跡 (● 最初の考え → ★ いまの考え) を返す。
+ *
+ * Why 本人にしか返さないか: 学級全体の分布に個人の変化を重ねると、誰がどう動いたかが
+ * 教室で可視になり、移動そのものが評価に見える。変化は本人と (授業後に) 教師だけが見る。
+ */
+function getMyLessonTrajectory(targetUserId) {
+  try {
+    const actorEmail = getCurrentEmail();
+    if (!actorEmail) return createAuthError();
+
+    const config = getConfigOrDefault(targetUserId);
+    const lessonId = config && config.activeLessonId;
+    if (!lessonId) return createSuccessResponse('授業なし', { phases: [] });
+
+    const found = __findLessonById_(lessonId);
+    if (!found || !found.lesson) return createSuccessResponse('授業なし', { phases: [] });
+    const lessonJson = found.lesson.lessonJson || {};
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    const activeIdx = __activePhaseIndex_(lessonJson);
+
+    const out = [];
+    for (let i = 0; i <= activeIdx && i < phases.length; i++) {
+      const ph = phases[i];
+      // 入力フェーズだけが航跡の点になる (browse/discuss には投稿が存在しない)。
+      if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(ph)) < 0) continue;
+      const entry = __readOwnLessonAnswer_(ph, actorEmail);
+      if (entry) out.push(Object.assign({ phaseIndex: i, phaseName: ph.name || '' }, entry));
+    }
+    return createSuccessResponse('航跡', { phases: out });
+  } catch (error) {
+    logError_('getMyLessonTrajectory', error);
+    return createExceptionResponse(error);
   }
 }

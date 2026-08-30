@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator */
+/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -501,6 +501,27 @@ function doPostHandleToggleHighlight(request) {
 }
 
 /**
+ * submitLessonAnswer ハンドラ — 授業モードで児童が画面から考えを投稿する。
+ *
+ * ここでは payload の「形」だけを見る。投稿してよいフェーズかどうか (権能)、
+ * 尺度の値域、本人の同定は submitLessonAnswer 側がサーバ状態を真実として判定する。
+ * Why 二層にするか: 形の検証をここで済ませると、下流は「値はあるが意味が違う」
+ *   ケースだけを見ればよくなる。addReaction の rowId 検証と同じ分担。
+ *
+ * @param {Object} request
+ * @returns {Object} response
+ */
+function doPostHandleSubmitLessonAnswer(request) {
+  if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
+    return createErrorResponse('Target user ID required for lesson answer');
+  }
+  if (!isPlainObject(request.answer)) {
+    return createErrorResponse('Lesson answer payload required');
+  }
+  return submitLessonAnswer(request.userId, request.answer);
+}
+
+/**
  * publishApp ハンドラ — ボード公開（owner 認証は publishApp 内で行う）。
  */
 function doPostHandlePublishApp(request) {
@@ -624,7 +645,8 @@ function doPost(e) {
     //   - adminApi : 管理者全 op（APIキー + timingSafeEqual 比較）
     //   - setupApiKey : 初回 APIキー設定（一度だけ、管理者のみ）
     //   - reportClientError : フロントエンドエラー → Cloud Logging へ
-    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey', 'reportClientError'];
+    //   - submitLessonAnswer : 授業モードで児童が画面から考えを投稿（フェーズ権能はサーバで検証）
+    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey', 'reportClientError', 'submitLessonAnswer'];
     if (!allowedActions.includes(action)) {
       return jsonResponse({
         success: false,
@@ -736,6 +758,7 @@ const DO_POST_ACTION_HANDLERS = {
   addReaction: (req) => doPostHandleAddReaction(req),
   toggleHighlight: (req) => doPostHandleToggleHighlight(req),
   publishApp: (req) => doPostHandlePublishApp(req),
+  submitLessonAnswer: (req) => doPostHandleSubmitLessonAnswer(req),
   reportClientError: (req, email) => handleClientErrorReport(email, req.payload)
 };
 
