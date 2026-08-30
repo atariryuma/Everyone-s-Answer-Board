@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
+/* global VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -986,15 +986,6 @@ function getBatchedAdminData(targetUserId) {
 
     if (!isAdmin && !targetUser.isActive) {
       return { success: false, error: '対象ユーザーがアクティブではありません' };
-    }
-
-    // 旧「保存済みボード (profiles)」を授業へ吸収する一方向移行 (v2894)。
-    //   profiles は授業と同じものを別々に表す 2 つ目の実装だった。UI と API を撤去した
-    //   ので、残っている config.profiles を「過去の授業」として lessons へ移して消す。
-    //   自分のボードを開いたときだけ実行する (管理者が他人の画面を見た副作用で
-    //   他人のデータを書き換えないため)。失敗しても管理画面は開けるようにする。
-    if (isOwnBoard) {
-      migrateLegacyProfilesToLesson_(targetUserId);
     }
 
     const config = getConfigOrDefault(targetUserId, targetUser);

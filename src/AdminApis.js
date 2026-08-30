@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, migrateLessonArchive, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -1394,29 +1394,12 @@ function dispatchAdminOperation(operation, params) {
       if (!Array.isArray(params.order)) return createErrorResponse('order (配列) が必要です');
       return reorderLessonPhases(params.userId, params.lessonId, params.order);
     }
-    case 'lesson.migrateArchive': {
-      // 旧形式 lesson (rows 同居) を lesson_responses へ移す一回きりの保守オペレーション。
-      { const e = reqStr('userId'); if (e) return e; }
-      { const e = reqStr('lessonId'); if (e) return e; }
-      return migrateLessonArchive(params.userId, params.lessonId);
-    }
     case 'lesson.recaptureArchive': {
       { const e = reqStr('userId'); if (e) return e; }
       { const e = reqStr('lessonId'); if (e) return e; }
       if (!Number.isInteger(params.phaseIndex)) return createErrorResponse('phaseIndex (整数) が必要です');
       return recaptureLessonArchive(params.userId, params.lessonId, params.phaseIndex);
     }
-    case 'lesson.importFromProfiles': {
-      // 既存 profiles[] (= plain profile 構成) を「過去授業の lesson 記録」として
-      //   lessons シートに取り込む。lesson 機能 (Phase 1+2) 導入以前に運用していた授業を
-      //   履歴に残すための一方向 import。詳細は LessonService.importLessonFromProfiles の jsdoc。
-      { const e = reqStr('userId'); if (e) return e; }
-      return importLessonFromProfiles(params.userId, {
-        name: params.name,
-        includeSnapshots: params.includeSnapshots !== false && params.includeSnapshots !== 'false'
-      });
-    }
-
     default:
       return createErrorResponse(`Unknown operation: ${op}`, null, { error: 'UNKNOWN_OPERATION' });
   }

@@ -932,61 +932,6 @@ test('getActiveLessonNav: 実行中の授業の phase 一覧と現在位置を�
 
 // ── アーカイブ分離 (lesson_responses) の周辺仕様 ──
 
-test('migrateLessonArchive: 旧形式 (rows 同居) をポインタ + アーカイブ行へ移す', () => {
-  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
-  // 旧形式の lesson を直接シートに置く (v2894 移行期のデータを再現)
-  const legacyJson = {
-    phases: [{ name: 'p0', formTemplate: 'matrix' }],
-    snapshots: [{
-      phaseIndex: 0, phaseName: 'p0', boardMode: 'matrix',
-      columnMapping: {}, displaySettings: {},
-      rows: [
-        { rowIndex: 2, timestamp: 't1', class: '1組', answer: 'こたえ', reason: 'りゆう', numericX: 3, numericY: 4 },
-        { rowIndex: 3, timestamp: 't2', class: '2組', answer: 5, reason: '数値回答', numericX: 5, numericY: 5 }
-      ],
-      rowCount: 2, truncated: true
-    }]
-  };
-  lessonsSheet.appendRow(['lesson_legacy1', 'u1', '旧授業', 'completed', 't', 't', 't', 1,
-    JSON.stringify(legacyJson).length, 'etag0', JSON.stringify(legacyJson)]);
-
-  const res = context.migrateLessonArchive('u1', 'lesson_legacy1');
-  assert.equal(res.success, true);
-  assert.equal(res.data.migrated.length, 1);
-  assert.equal(res.data.migrated[0].rowCount, 2);
-
-  // アーカイブ行が書かれ、lessonJson からは rows が消えた
-  assert.equal(responsesSheet._data.length, 3); // header + 2
-  const saved = JSON.parse(lessonsSheet._data[1][10]);
-  assert.equal(saved.snapshots[0].rows.length, 0);
-  assert.equal(saved.snapshots[0].sheet, 'lesson_responses');
-  assert.equal(saved.snapshots[0].startRow, 2);
-
-  // hydrate で元どおり読める (answer の数値も保持)
-  const review = context.getLessonForReview('u1', 'lesson_legacy1');
-  const rows = review.data.lesson.lessonJson.snapshots[0].rows;
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].answer, 'こたえ');
-  assert.equal(rows[1].answer, 5);
-  assert.equal(rows[1].numericY, 5);
-});
-
-test('migrateLessonArchive: 二重実行は no-op (rows が空なので移行対象なし)', () => {
-  const { context, lessonsSheet, responsesSheet } = loadLessonContext();
-  const legacyJson = {
-    phases: [{ name: 'p0', formTemplate: 'board' }],
-    snapshots: [{ phaseIndex: 0, phaseName: 'p0', rows: [
-      { rowIndex: 2, timestamp: 't', class: '', answer: 'a', reason: '' }
-    ], rowCount: 1 }]
-  };
-  lessonsSheet.appendRow(['lesson_legacy2', 'u1', '旧', 'completed', 't', 't', 't', 1, 1, 'e', JSON.stringify(legacyJson)]);
-  assert.equal(context.migrateLessonArchive('u1', 'lesson_legacy2').success, true);
-  const rowsAfterFirst = responsesSheet._data.length;
-  const second = context.migrateLessonArchive('u1', 'lesson_legacy2');
-  assert.equal(second.success, true);
-  assert.match(second.message, /移行対象なし/);
-  assert.equal(responsesSheet._data.length, rowsAfterFirst); // 重複追記しない
-});
 
 test('hydrate: ポインタがずれて他授業の行を指しても照合ガードで混入しない', () => {
   const { context, lessonsSheet, responsesSheet } = loadLessonContext();

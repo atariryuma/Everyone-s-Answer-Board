@@ -87,7 +87,7 @@ SA pool の shared 設定 (SA pool 全員を editor 追加) は [SharingHelper.j
   本文切り詰め (shrink) サブシステムが復活する。v2931 で 1 授業 44,698 字 → 4,198 字。
 - ポインタは sheet 名を持つので、将来 `lesson_responses_2027` のような年次分割へ
   移行しても過去ポインタはそのまま読める。
-- 保守: `lesson.migrateArchive` (旧形式→ポインタ) / `lesson.recaptureArchive`
+- 保守: `lesson.recaptureArchive`
   (元 SS が読める phase を全文で焼き直す)。
 
 ## 負荷検証 (CI 対象外、手動)

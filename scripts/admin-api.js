@@ -79,7 +79,6 @@ const OPERATIONS = [
   'lesson.advance', 'lesson.end',
   'lesson.list', 'lesson.review', 'lesson.delete',
   'lesson.duplicate', 'lesson.templates', 'lesson.knownClasses',
-  'lesson.importFromProfiles',
 ];
 
 /**
