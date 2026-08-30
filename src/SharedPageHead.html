@@ -2175,6 +2175,12 @@
   .lesson-step[hidden] { display: none; }
 
   /* Phase card (Wizard Step 2 / Runner) */
+  /* 見取りグリッド (授業後): 複数行の記述を並べて読むので、セルは上揃えにする。
+     行の高さが揃わないと「最初のことば」と「いまのことば」を目で対応させられない。 */
+  .lesson-review-row > td {
+    vertical-align: top;
+  }
+
   .lesson-phase-card {
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
@@ -3162,6 +3168,7 @@
   .text-center { text-align: center; }
   .text-green-400 { color: #4ade80; }
   .text-green-500 { color: #22c55e; }
+  .text-left { text-align: left; }
   .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
   .text-red-400 { color: #f87171; }
   .text-red-500 { color: #ef4444; }
