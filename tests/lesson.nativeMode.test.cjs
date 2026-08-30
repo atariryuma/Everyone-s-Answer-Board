@@ -208,6 +208,88 @@ test('startLesson: native シートは Form 回答シートと同じ列構成で
 });
 
 // =====================================================================
+// フェーズごとの表示データ源
+// =====================================================================
+
+test('出会うフェーズは「考える」のシートを見る (自分のシートは空なので)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  // startLesson 相当のシート割当を手で入れる
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+
+  const browse = h.context.__buildPhaseConfigPatch_(phases[1], lessonJson, 'l1');
+  assert.equal(browse.sheetName, 'phase1', '出会うフェーズが空のシートを指している');
+
+  const discuss = h.context.__buildPhaseConfigPatch_(phases[2], lessonJson, 'l1');
+  assert.equal(discuss.sheetName, 'phase1');
+});
+
+test('ふりかえりフェーズは「もう一度考える」のシートを見る (直近の入力フェーズ)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  const reflect = h.context.__buildPhaseConfigPatch_(phases[4], lessonJson, 'l1');
+  assert.equal(reflect.sheetName, 'phase4');
+});
+
+test('入力フェーズは自分のシートを見る', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  assert.equal(h.context.__buildPhaseConfigPatch_(phases[0], lessonJson, 'l1').sheetName, 'phase1');
+  assert.equal(h.context.__buildPhaseConfigPatch_(phases[3], lessonJson, 'l1').sheetName, 'phase4');
+});
+
+test('出会うフェーズは「考える」の軸ラベルを引き継ぐ (データと軸の意味を一致させる)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  // 教師は「考える」にだけ軸を設定した (出会う は既定のまま)
+  phases[0].templateOptions = {
+    xLow: '自首を勧める', xHigh: '逃がす', yLow: '迷いあり', yHigh: '迷いなし'
+  };
+  const browse = h.context.__buildPhaseConfigPatch_(phases[1], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, browse.xAxisLabels), { min: '自首を勧める', max: '逃がす' });
+  assert.deepEqual(Object.assign({}, browse.yAxisLabels), { min: '迷いあり', max: '迷いなし' });
+});
+
+test('軸ラベルは native phase でも config に載る (ロレンゾの軸が board に届く)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  phases[0].spreadsheetId = 'native_ss_1';
+  phases[0].sheetName = 'phase1';
+  phases[0].templateOptions = {
+    xLow: '自首を勧める', xHigh: '逃がす', yLow: '迷いあり', yHigh: '迷いなし'
+  };
+  const patch = h.context.__buildPhaseConfigPatch_(phases[0], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, patch.xAxisLabels), { min: '自首を勧める', max: '逃がす' });
+  assert.deepEqual(Object.assign({}, patch.yAxisLabels), { min: '迷いあり', max: '迷いなし' });
+  assert.equal(patch.displaySettings.boardMode, 'matrix');
+});
+
+// =====================================================================
 // フェーズの権能 (submitLessonAnswer)
 // =====================================================================
 

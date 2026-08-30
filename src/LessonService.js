@@ -1225,11 +1225,40 @@ function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
   return { spreadsheetId: ssId, sheetName };
 }
 
+/**
+ * native phase が「どのシートのデータを見せるか」を決める。
+ *
+ * 入力フェーズ (考える / もう一度考える) は自分のシート。
+ * 投稿を受け付けないフェーズ (出会う / 議論する / ふりかえる) は、直前の入力フェーズの
+ * シートを見る。「出会う」で見るのは「考える」で集まった考えだから。
+ *
+ * 軸ラベルもこの phase のものを使う。表示するデータと軸の意味は一致していなければ
+ * ならないので、データ源と軸は必ず同じ phase から取る。
+ *
+ * @returns {Object|null} 参照先の phase / 自分のシートでよければ null
+ */
+function __nativeDataSourcePhase_(phase, lessonJson) {
+  const phases = (lessonJson && Array.isArray(lessonJson.phases)) ? lessonJson.phases : [];
+  if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phase)) >= 0) return null;
+  const idx = phases.indexOf(phase);
+  if (idx < 0) return null;
+  for (let i = idx - 1; i >= 0; i--) {
+    const p = phases[i];
+    if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(p)) >= 0 && p.sheetName) return p;
+  }
+  return null;  // まだ入力フェーズを通っていない (授業の冒頭) = 空でよい
+}
+
 function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   // displaySettings が phase に明示指定されていればそれを優先、
   //   無ければ formTemplate から決定。templateOptions から axis ラベルも反映。
   const baseDisplay = phase.displaySettings || {};
-  const opts = phase.templateOptions || {};
+  // native の非入力フェーズは直前の入力フェーズのデータを表示するので、
+  //   軸ラベルもそのフェーズのものを使う (データと軸の意味を一致させる)。
+  const nativeSource = __isNativePhase_(phase, lessonJson)
+    ? __nativeDataSourcePhase_(phase, lessonJson)
+    : null;
+  const opts = (nativeSource && nativeSource.templateOptions) || phase.templateOptions || {};
   const displaySettings = Object.assign({}, baseDisplay);
   if (!displaySettings.boardMode) {
     displaySettings.boardMode = __templateToBoardMode_(phase.formTemplate);
@@ -1274,6 +1303,13 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     patch.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);
     // 児童は画面から投稿するので、Form へ誘導する導線は出さない。
     patch.formUrl = '';
+    // 投稿を受け付けないフェーズ (出会う/議論する/ふりかえる) は自分のシートが空なので、
+    //   直前の入力フェーズのシートを指す。これがないと「出会う」で分布が空になる
+    //   = 他者の考えに出会えず、授業の中心が成立しない。
+    if (nativeSource) {
+      patch.spreadsheetId = nativeSource.spreadsheetId;
+      patch.sheetName = nativeSource.sheetName;
+    }
   }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
   if (yAxisLabels) patch.yAxisLabels = yAxisLabels;
