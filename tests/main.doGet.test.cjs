@@ -163,3 +163,54 @@ test('doGet: null event defaults to main mode', () => {
   context.doGet(null);
   assert.ok(templates.includes('AccessRestricted.html'));
 });
+
+// --- 未公開ボードの扱い (v2895) ---
+//
+// 公開前でも編集者は実物を確認できる必要がある (確認のために一度児童へ公開する、
+// という運用を避ける)。児童には従来どおり「準備中」を返す。
+
+// main.js 内で定義される関数 (getCurrentEmail / getBatchedViewerData) は context override では
+// 上書きできないので、その依存を差し替える。
+function viewerStubs(email, { isPublished = false, isActive = true, isAdmin = false, isCollaborator = false } = {}) {
+  return {
+    Session: { getActiveUser: () => ({ getEmail: () => email }) },
+    isAdministrator: (e) => isAdmin && e === email,
+    findPublishedBoardOwner: () => ({ userId: 'u1', userEmail: 'owner@example.com', isActive }),
+    getConfigOrDefault: () => ({ isPublished, sheetName: 'Sheet1', displaySettings: {} }),
+    isBoardCollaborator: () => isCollaborator,
+    DEFAULT_DISPLAY_SETTINGS: {},
+    VALIDATOR_BOARD_MODES: ['board']
+  };
+}
+
+test('doGet view: 未公開ボードを児童が開くと「準備中」ページ', () => {
+  const { context, templates } = loadDoGetContext(viewerStubs('child@example.com'));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.ok(templates.includes('Unpublished.html'));
+  assert.ok(!templates.includes('Page.html'));
+});
+
+test('doGet view: 未公開でも所有者にはボードを描く (プレビュー)', () => {
+  const { context, templates } = loadDoGetContext(viewerStubs('owner@example.com'));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.ok(templates.includes('Page.html'));
+  assert.ok(!templates.includes('Unpublished.html'));
+});
+
+test('doGet view: 未公開でも管理者にはボードを描く', () => {
+  const { context, templates } = loadDoGetContext(viewerStubs('admin@example.com', { isAdmin: true }));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.ok(templates.includes('Page.html'));
+});
+
+test('doGet view: 未公開でも共同教師にはボードを描く', () => {
+  const { context, templates } = loadDoGetContext(viewerStubs('colleague@example.com', { isCollaborator: true }));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.ok(templates.includes('Page.html'));
+});
+
+test('doGet view: 無効化されたユーザーのボードは所有者以外に「準備中」', () => {
+  const { context, templates } = loadDoGetContext(viewerStubs('child@example.com', { isPublished: true, isActive: false }));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.ok(templates.includes('Unpublished.html'));
+});

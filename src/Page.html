@@ -119,6 +119,21 @@
       <p class="text-theme">読み込み中...</p>
     </div>
   </div>
+  <!-- 未公開プレビュー: 編集者が公開前に実物を確認するときだけ JS が表示。
+       児童はこの画面自体に到達しない (main.js が「準備中」ページを返す)。 -->
+  <div id="unpublished-preview-banner" class="hidden">
+    <div class="unpublished-banner-inner">
+      <span class="unpublished-banner-label">未公開プレビュー</span>
+      <span class="unpublished-banner-note">児童にはまだ見えていません</span>
+      <button type="button" id="unpublished-copy-url" class="btn btn-secondary text-xs">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg> 児童用URL
+      </button>
+      <button type="button" id="unpublished-publish-btn" class="btn btn-primary text-xs">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-megaphone"></use></svg> 公開する
+      </button>
+    </div>
+  </div>
+
   <!-- Lesson Review banner (Phase 2): isReviewMode のときだけ JS が表示 -->
   <div id="lesson-review-banner" class="hidden">
     <div class="lesson-review-banner-inner"> 振り返り中: <span id="lesson-review-name">-</span>

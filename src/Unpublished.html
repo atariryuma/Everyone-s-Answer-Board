@@ -24,43 +24,8 @@
   </div>
 
   <div class="w-full max-w-2xl mx-auto px-4 py-8">
-    <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
-    <!-- 編集者用: 再公開セクション -->
-    <div class="card">
-      <h1 class="text-xl font-semibold mb-2 text-theme">回答ボード管理</h1>
-      <p class="text-theme-muted mb-5">回答ボードは現在非公開状態です</p>
-
-      <? if (typeof editorName !== 'undefined' && editorName) { ?>
-      <p class="text-xs text-theme-muted mb-4">管理者:
-        <?= editorName ?>
-      </p>
-      <? } ?>
-
-      <!-- 生徒用URL表示 -->
-      <div class="box mb-6">
-        <p class="text-sm text-theme-muted mb-2">生徒用URL:</p>
-        <div class="flex gap-2">
-          <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined'? boardUrl : '' ?>"
-            class="modern-input flex-1"
-            onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
-          <button type="button" onclick="copyBoardUrl()" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> コピー</button>
-        </div>
-      </div>
-
-      <!-- 再公開ボタン -->
-      <button type="button" id="republish-btn" onclick="republishBoard()"
-        class="btn btn-primary w-full">
-        <svg class="icon" aria-hidden="true"><use href="#i-megaphone"></use></svg> 回答ボードを再び公開する
-      </button>
-
-      <!-- 管理パネル遷移ボタン -->
-      <a id="admin-panel-btn" target="_top"
-        class="btn btn-secondary w-full mt-3 is-disabled"> 読み込み中...
-      </a>
-
-    </div>
-    <? } else { ?>
-    <!-- 閲覧者用: 準備中メッセージ -->
+    <!-- 児童用の「準備中」ページ。編集者はここに到達しない:
+         未公開でも main.js がボード本体 + 未公開バナーを返すため。 -->
     <div class="card p-8">
       <h1 class="text-4xl font-bold mb-4 text-theme-status-warning">現在は準備中です</h1>
       <p class="text-theme-muted mb-4">先生が回答ボードを設定中です。しばらくお待ちください。</p>
@@ -77,66 +42,18 @@
         </a>
       </div>
     </div>
-    <? } ?>
   </div>
 
   <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
   <?!= include('SharedUtilities'); ?>
   <?!= include('SharedErrorHandling'); ?>
 
-  <script> function copyBoardUrl() {
-      const urlInput = document.getElementById('board-url');
-      if (urlInput) {
-        try {
-          if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(urlInput.value);
-          } else {
-            urlInput.select();
-            document.execCommand('copy');
-          }
-          showMessage('URLをコピーしました', 'success');
-        } catch (error) {
-          showMessage('コピーに失敗しました', 'error');
-        }
-      }
-    }
-
-    async function republishBoard() {
-      const button = document.getElementById('republish-btn');
-      if (!button) return;
-
-      const originalContent = button.innerHTML;
-      button.disabled = true;
-      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再び公開中...';
-
-      try {
-        const result = await runServer('republishMyBoard');
-        if (result && result.success) {
-          window.showRedirectModal({
-            title: '再び公開しました',
-            message: '公開ページへ移動します。',
-            redirectUrl: result.redirectUrl,
-            buttonLabel: '回答ボードを開く',
-            variant: 'green'
-          });
-        } else {
-          showMessage((result && result.message) || '再び公開できませんでした', 'error');
-          button.disabled = false;
-          button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
-        }
-      } catch (error) {
-        showMessage('再び公開する処理でエラーが発生しました: '+ (error.message || error), 'error');
-        button.disabled = false;
-        button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
-      }
-    }
-
+  <script>
     /**
      * ページ読み込み時にURLをプリフェッチ（GAS iFrame対応）
      */
     async function prefetchNavigationUrls() {
       const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-      const adminBtn = document.getElementById('admin-panel-btn');
       const refreshBtn = document.getElementById('refresh-btn');
 
       let webAppUrl;
@@ -154,11 +71,6 @@
       }
       if (!userId) return;
 
-      if (adminBtn) {
-        adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
-        adminBtn.textContent = '管理パネルを開く';
-        adminBtn.classList.remove('is-disabled');
-      }
       if (refreshBtn) {
         refreshBtn.href = webAppUrl + '?mode=view&userId=' + userId;
         refreshBtn.textContent = '更新';

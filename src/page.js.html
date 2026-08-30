@@ -285,6 +285,10 @@
           this.__initReviewPhases();
         }
 
+        // 未公開プレビュー: 編集者だけがここに到達する (main.js が児童を弾く)。
+        //   「いま児童には見えていない」ことと、そのまま公開できる導線を上部に常駐させる。
+        this.__initUnpublishedPreview();
+
         this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
         this.showInfoModal(); // デジタルシティズンシップモーダル
 
@@ -1494,6 +1498,60 @@
     //   最終判定はサーバ (submitLessonAnswer) が行う。画面を細工しても
     //   議論フェーズに投稿は通らない。
     // =====================================================================
+
+    /**
+     * 未公開プレビューのバナー。
+     *
+     * 公開前でも編集者は実物を見られる (main.js)。ただし「これは児童に見えていない」
+     * ことが一目で分かり、そのまま公開できないと、確認のために一度公開する運用に戻る。
+     */
+    __initUnpublishedPreview() {
+      const banner = document.getElementById('unpublished-preview-banner');
+      if (!banner) return;
+      const isPublished = window.UNIFIED_CONFIG ? window.UNIFIED_CONFIG.isPublished !== false : true;
+      if (isPublished) return;   // 公開中なら何も出さない
+
+      banner.classList.remove('hidden');
+      document.body.classList.add('is-unpublished-preview');
+
+      const copyBtn = document.getElementById('unpublished-copy-url');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          const url = window.location.href.split('#')[0];
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url)
+              .then(() => this.showNotification('児童用URLをコピーしました', 'success'))
+              .catch(() => this.showNotification('コピーできませんでした', 'error'));
+          } else {
+            this.showNotification('この端末ではコピーできません', 'warning');
+          }
+        });
+      }
+
+      const publishBtn = document.getElementById('unpublished-publish-btn');
+      if (!publishBtn) return;
+      publishBtn.addEventListener('click', async () => {
+        const ok = await window.modals.confirm(
+          'このボードを公開しますか？児童がURLから入れるようになります。',
+          { title: 'ボードを公開', okLabel: '公開する' }
+        );
+        if (!ok) return;
+        const task = async () => {
+          const res = await this.runGas('republishMyBoard');
+          if (!res || !res.success) throw new Error((res && res.message) || '公開できませんでした');
+          this.showNotification('公開しました', 'success');
+          banner.classList.add('hidden');
+          document.body.classList.remove('is-unpublished-preview');
+        };
+        const buttons = window.sharedUtilities && window.sharedUtilities.buttons;
+        if (buttons) {
+          await buttons.withBusy(publishBtn, task, { busyText: '公開中...' })
+            .catch((err) => this.showNotification(err.message || '公開できませんでした', 'error'));
+        } else {
+          try { await task(); } catch (err) { this.showNotification(err.message || '公開できませんでした', 'error'); }
+        }
+      });
+    }
 
     /**
      * 初期表示時に一度だけフェーズを取りに行く。

@@ -288,22 +288,29 @@ function handleViewMode_(params, currentEmail) {
     return template.evaluate().setTitle('未公開');
   }
 
-  if (!isPublished) {
-    const template = HtmlService.createTemplateFromFile('Unpublished.html');
-    template.isEditor = isAdminUser || isOwnBoard;
-    template.editorName = targetUser.userName || targetUser.userEmail || '';
-    template.userId = targetUserId;
-    const baseUrl = getWebAppUrl();
-    template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
-    return template.evaluate().setTitle('未公開');
-  }
-
   // v2855+: ボード SS の editor (writer/owner) として共有された共同教師は collaborator として
   //   owner と同じ「進行操作」 (highlight / unpublish / リアクション削除) を実行可能。
   //   ボード設定変更や lesson 編集は引き続き owner / admin 専用 (AccessControl.js 参照)。
   const isCollaborator = !isAdminUser && !isOwnBoard
     && (typeof isBoardCollaborator === 'function' && isBoardCollaborator(targetUser, currentEmail));
   const isEditor = isAdminUser || isOwnBoard || isCollaborator;
+
+  // 未公開ボードの扱い:
+  //   - 児童: 従来どおり「準備中」ページ (公開の意味は変わらない)
+  //   - 編集者 (owner/admin/collaborator): ボードを描画し、未公開バナーを重ねる
+  //
+  // Why 編集者に見せるか: 公開してからでないと自分のボードを確認できないと、
+  //   「児童に見せてから直す」しかなくなる。授業モードでは特に、確認したいのは
+  //   データではなく画面そのもの (議論フェーズで止まるか、格子が押せるか) なので、
+  //   公開前に実物を見られる必要がある。データ層 (resolveViewerBoardAccess_) は
+  //   もともと owner/admin を公開チェックから除外しているので、経路はここだけで揃う。
+  if (!isPublished && !isEditor) {
+    const template = HtmlService.createTemplateFromFile('Unpublished.html');
+    template.editorName = targetUser.userName || targetUser.userEmail || '';
+    template.userId = targetUserId;
+    return template.evaluate().setTitle('未公開');
+  }
+
   const template = HtmlService.createTemplateFromFile('Page.html');
   template.userId = targetUserId;
   template.userEmail = targetUser.userEmail;
