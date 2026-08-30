@@ -1934,14 +1934,12 @@
       return (!v || v === 'すべて') ? '' : v;
     }
 
-    // 共有の escapeHtml。未ロード時も最低限のエスケープに落とす。
+    // 共有 escapeHtml への薄い委譲 (null を '' に寄せるだけ)。
+    //   独自のエスケープ表を持たない: 実装が 2 つあると、片方だけ直したときに
+    //   すり抜けが生まれる。SharedUtilities は全ページで page.js より先に読まれる
+    //   (check:gas 項目 1/2 が include 順を機械検証している)。
     __escape(s) {
-      if (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml) {
-        return window.sharedUtilities.security.escapeHtml(String(s == null ? '' : s));
-      }
-      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-      ));
+      return window.sharedUtilities.security.escapeHtml(s == null ? '' : String(s));
     }
 
     destroy() {
@@ -4379,73 +4377,22 @@
      * @param {Object} answerData - 削除対象の回答データ
      * @returns {Promise<boolean>} 削除確認の結果
      */
+    /**
+     * 回答削除の確認。canonical API (modals.confirm) に委譲する。
+     * 旧実装はモーダルを手書きしており、Escape / backdrop / フォーカスの扱いを
+     * 共有コンポーネントと二重に持っていた。本文は whitespace-pre-wrap で
+     * 改行が保たれるので、抜粋と警告文はそのまま伝わる。
+     */
     showDeleteConfirmationModal(answerData) {
-      return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001]';
-        modal.innerHTML = `
-        <div class="modal-card">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="text-theme-status-error">
-              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
-            </div>
-            <h3 class="text-xl font-semibold text-theme">回答を削除しますか？</h3>
-          </div>
-
-          <div class="bg-theme-surface rounded-lg p-4 mb-6">
-            <p class="text-theme-secondary text-sm mb-2">削除対象の回答:</p>
-            <p class="text-theme-accent-cyan font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...': ''}</p> ${answerData.name ? `<p class="text-theme-muted text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
-          </div>
-
-          <div class="bg-theme-status-error-soft border border-theme-status-error-strong rounded-lg p-3 mb-6">
-            <p class="text-theme-status-error text-sm"> この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
-            </p>
-          </div>
-
-          <div class="flex gap-3">
-            <button type="button" class="btn btn-secondary flex-1 cancel-btn"> キャンセル
-            </button>
-            <button type="button" class="btn btn-danger flex-1 confirm-btn"> 削除実行
-            </button>
-          </div>
-        </div> `;
-
-        document.body.appendChild(modal);
-
-        const cancelBtn = modal.querySelector('.cancel-btn');
-        const confirmBtn = modal.querySelector('.confirm-btn');
-
-        const cleanup = () => {
-          modal.remove();
-        };
-
-        cancelBtn.addEventListener('click', () => {
-          cleanup();
-          resolve(false);
-        });
-
-        confirmBtn.addEventListener('click', () => {
-          cleanup();
-          resolve(true);
-        });
-
-        modal.addEventListener('click', (e) => {
-          if (e.target === modal) {
-            cleanup();
-            resolve(false);
-          }
-        });
-
-        const handleKeyDown = (e) => {
-          if (e.key === 'Escape') {
-            cleanup();
-            resolve(false);
-            document.removeEventListener('keydown', handleKeyDown);
-          }
-        };
-        document.addEventListener('keydown', handleKeyDown);
+      const opinion = String(answerData.opinion || '');
+      const excerpt = opinion.length > 100 ? opinion.slice(0, 100) + '…' : opinion;
+      const lines = ['削除対象の回答:', '「' + excerpt + '」'];
+      if (answerData.name) lines.push('回答者: ' + answerData.name);
+      lines.push('', 'この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。');
+      return window.modals.confirm(lines.join('\n'), {
+        title: '回答を削除しますか？',
+        okLabel: '削除実行',
+        variant: 'danger'
       });
     }
 
@@ -4620,64 +4567,17 @@
     /**
      * 管理モード移行確認モーダル
      */
+    /**
+     * 管理モードへの切替確認。
+     * canonical API (modals.confirm) に委譲する。旧実装は同等のモーダルを
+     * 手書きしていたが、Escape 処理・フォーカス・配色を二重管理する理由がない。
+     */
     async showAdminModeConfirmation() {
-      return new Promise((resolve) => {
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        modal.innerHTML = `
-        <div class="bg-theme-surface rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-          <div class="flex items-center mb-4">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-theme-status-warning-soft flex items-center justify-center">
-              <svg class="w-6 h-6 text-theme-status-warning-text-on-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-              </svg>
-            </div>
-            <div class="ml-4">
-              <h3 class="text-lg font-medium text-theme">管理モードに切り替えますか？</h3>
-            </div>
-          </div>
-          <div class="mb-6">
-            <p class="text-sm text-theme-muted"> 管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br> 画面共有時などは十分注意してください。
-            </p>
-          </div>
-          <div class="flex justify-end space-x-3">
-            <button type="button" class="btn btn-secondary cancel-btn"> キャンセル
-            </button>
-            <button type="button" class="btn btn-primary confirm-btn"> 管理モードに切り替え
-            </button>
-          </div>
-        </div> `;
-
-        const cancelBtn = modal.querySelector('.cancel-btn');
-        const confirmBtn = modal.querySelector('.confirm-btn');
-
-        const cleanup = () => {
-          document.body.removeChild(modal);
-        };
-
-        cancelBtn.addEventListener('click', () => {
-          cleanup();
-          resolve(false);
-        });
-
-        confirmBtn.addEventListener('click', () => {
-          cleanup();
-          resolve(true);
-        });
-
-        const handleKeydown = (e) => {
-          if (e.key === 'Escape') {
-            cleanup();
-            document.removeEventListener('keydown', handleKeydown);
-            resolve(false);
-          }
-        };
-        document.addEventListener('keydown', handleKeydown);
-
-        document.body.appendChild(modal);
-
-        requestIdleCallback(() => confirmBtn.focus(), { timeout: 100 });
-      });
+      return window.modals.confirm(
+        '管理モードでは、生徒の名前とリアクション数が表示されます。\n' +
+        '画面共有や投影をしているときは注意してください。',
+        { title: '管理モードに切り替えますか？', okLabel: '管理モードに切り替え' }
+      );
     }
 
     async endPublication() {

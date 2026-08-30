@@ -1481,7 +1481,6 @@
   /* Reset optimization when interaction ends */
 
   /* Disable render optimization when global loading is active to prevent stacking context issues */
-  body.gas-loading .render-optimized,
   .loading-active .render-optimized {
     transform: none;
     will-change: auto;
@@ -2798,9 +2797,6 @@
   }
 
   /* .lesson-hero-card は .card-hero に統合 (v2836)。 旧名は AdminPanel.html migration 済。 */
-
-  /* 個別ボードモードへの divider (二者択一を明示) */
-  .section-group-divider::before,
 
   /* Step number badge: 個別ボード authoring の ① ② ③ を視覚的に番号化。
      セットアップ順序が教師に伝わるようにする (Hick's Law: 選択肢を減らし順番で誘導)。 */

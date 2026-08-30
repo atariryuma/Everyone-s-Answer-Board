@@ -828,9 +828,19 @@
       );
     },
 
-    logout: function () {
-      if (!confirm('ログアウトしますか？')) return;
+    // ユーザー操作としてのログアウト。確認は canonical API (modals.confirm) を使う。
+    //   Why native confirm をやめるか: modals を定義しているこのファイル自身が
+    //   native confirm を使っていると、規約が有名無実になる。見た目もテーマに従わない。
+    logout: async function () {
+      const ok = await window.modals.confirm('ログアウトしますか？',
+        { title: 'ログアウト', okLabel: 'ログアウトする' });
+      if (!ok) return;
+      this._clearSessionAndRedirect();
+    },
 
+    // 確認なしでセッションを捨ててログイン画面へ。セッション切れ等の
+    //   プログラム的な遷移で使う (ユーザーに「ログアウトしますか？」は不適切)。
+    _clearSessionAndRedirect: function () {
       try {
         if (window.sharedUtilities?.cache?.clear) window.sharedUtilities.cache.clear();
         localStorage.removeItem('current_user_info');
@@ -986,7 +996,9 @@
     },
 
     redirectToLogin: function () {
-      window.sharedUtilities.auth.logout();
+      // 確認ダイアログは出さない: これはセッション切れ等の自動遷移で、
+      //   ユーザーがログアウトを選んだわけではない。
+      window.sharedUtilities.auth._clearSessionAndRedirect();
     }
   };
 

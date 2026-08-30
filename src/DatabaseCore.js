@@ -1431,6 +1431,13 @@ function canAccessTargetUser(targetUser, context = {}) {
   }
 
   if (context.allowPublishedRead === true) {
+    // 無効化されたユーザー (isActive=false) のボードは、第三者には未公開として扱う。
+    //   Why: 管理者の「無効化」は公開を強制終了する意図 (main.js の doGet も同じ扱い)。
+    //   ここを抜かすと doGet では止まるのに getPublishedSheetData / getNotificationUpdate /
+    //   リアクション経由では読めてしまい、層ごとに結論が変わっていた。
+    //   admin / 本人は上で return 済みなので、ここに来るのは第三者だけ。
+    //   厳密比較にするのは、isActive 未設定 (undefined/'') の既存行を巻き込まないため。
+    if (targetUser.isActive === false) return false;
     return isUserBoardPublished(targetUser);
   }
 
