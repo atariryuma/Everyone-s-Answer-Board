@@ -1226,7 +1226,7 @@ function __templateToBoardMode_(formTemplate) {
  *
  * @returns {{spreadsheetId:string, sheetName:string}|null}
  */
-function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
+function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName, ownerEmail) {
   // スプレッドシートは授業に 1 つ。既に作ってあれば使い回す (resume 時の二重作成防止)。
   let ssId = lessonJson.nativeSpreadsheetId || '';
   let ss = null;
@@ -1249,6 +1249,18 @@ function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
       applySpreadsheetSharingDefaults(ssId);
     } catch (shareErr) {
       logError_('__ensureNativeAnswerSheet_:share', shareErr);
+    }
+    // ボードの所有者 (教師) を editor に加える。
+    //   Why 必須か: SpreadsheetApp.create は「実行した人」の Drive に作る。管理者が
+    //   教師の代わりに授業を開始すると、教師が所有しない SS がボードの参照先になる。
+    //   owner は自分のボードを openById で直接開く経路を通る (SA を使わない) ので、
+    //   編集権が無いと教師自身のボードが開けなくなる。作成者本人なら no-op。
+    if (ownerEmail) {
+      try {
+        ss.addEditor(ownerEmail);
+      } catch (ownerErr) {
+        logError_('__ensureNativeAnswerSheet_:owner', ownerErr);
+      }
     }
   }
 
@@ -1520,6 +1532,10 @@ function startLesson(userId, lessonId) {
       //     - lowLabel/highLabel/xLow/xHigh/yLow/yHigh: 線形尺度の両端ラベル
       //     - choices: pie/board の選択肢
       const lessonName = (found && found.lesson && found.lesson.name) || '';
+      // 授業モードの回答シートを、ボード所有者 (教師) が必ず開けるようにするため。
+      //   管理者が代理で開始したときも教師のボードが壊れない。
+      const boardOwner = (typeof findUserById === 'function') ? findUserById(userId) : null;
+      const boardOwnerEmail = (boardOwner && boardOwner.userEmail) || '';
       const sharedClasses = (lessonJson && Array.isArray(lessonJson.classes)) ? lessonJson.classes : [];
       // 揺らぎ追跡: lesson レベルの allowResubmit を全 phase に適用 (議論前後の意見変化を取りたい)。
       //   phase 個別に templateOptions.allowResubmit があればそれを優先。
@@ -1534,7 +1550,7 @@ function startLesson(userId, lessonId) {
         if (__isNativePhase_(phase, lessonJson)) {
           if (phase.sheetName) continue; // resume: 既に用意済みは skip
           try {
-            const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName);
+            const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName, boardOwnerEmail);
             phase.spreadsheetId = native.spreadsheetId;
             phase.sheetName = native.sheetName;
             phase.columnMapping = Object.assign({}, LESSON_NATIVE_COLUMN_MAPPING);

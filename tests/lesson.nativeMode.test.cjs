@@ -72,6 +72,7 @@ function loadContext(overrides = {}) {
   // native 回答スプレッドシート (授業に 1 つ、フェーズごとに 1 シート)。
   const nativeSheets = new Map();
   const sharingCalls = [];
+  const editorsAdded = [];
   const cacheBumps = [];
   let uuidCounter = 0;
   let currentEmail = overrides.currentEmail || 'teacher@example.com';
@@ -79,6 +80,7 @@ function loadContext(overrides = {}) {
   const nativeSs = {
     getId: () => 'native_ss_1',
     getSheets: () => Array.from(nativeSheets.values()),
+    addEditor: (email) => { editorsAdded.push(email); },
     getSheetByName: (n) => nativeSheets.get(n) || null,
     insertSheet: (n) => {
       const s = createSheet([], n);
@@ -113,6 +115,7 @@ function loadContext(overrides = {}) {
     isAdministrator: (email) => email === 'admin@example.com',
     findUserByEmail: (email) => (email === 'teacher@example.com')
       ? { userId: 'u1', userEmail: email } : { userId: 'stu', userEmail: email },
+    findUserById: (id) => id === 'u1' ? { userId: 'u1', userEmail: 'teacher@example.com' } : null,
     createTemplateForm: () => ({ success: true, formId: 'f1', formUrl: 'https://forms.example/1', spreadsheetId: 'ss1', sheetName: 'フォームの回答 1' }),
     applyConfigPatch_: () => ({ success: true }),
     getPublishedSheetData: () => ({ success: true, data: [] }),
@@ -135,7 +138,7 @@ function loadContext(overrides = {}) {
   vm.runInContext(LESSON_SOURCE, context, { filename: 'LessonService.js' });
 
   return {
-    context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps,
+    context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps, editorsAdded,
     setEmail: (e) => { currentEmail = e; }
   };
 }
@@ -196,6 +199,14 @@ test('startLesson: native 回答シートに SA pool 共有を当てる (児童�
   const h = loadContext();
   startNativeLesson(h);
   assert.deepEqual(h.sharingCalls, ['native_ss_1']);
+});
+
+test('startLesson: 回答シートにボード所有者を editor として加える', () => {
+  const h = loadContext();
+  startNativeLesson(h);
+  // owner は自分のボードを openById で開く経路を通るので、編集権が無いと
+  //   管理者が代理で開始したときに教師自身のボードが開けなくなる。
+  assert.deepEqual(Array.from(h.editorsAdded), ['teacher@example.com']);
 });
 
 test('startLesson: native シートは Form 回答シートと同じ列構成で作られる', () => {
