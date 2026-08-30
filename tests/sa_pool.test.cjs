@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function createMockCache(initial = {}) {
   const store = new Map(Object.entries(initial));
@@ -32,6 +33,7 @@ function loadCtx(overrides = {}) {
   const propsStore = overrides.propsStore || {};
 
   const context = {
+    ...gasResponseStubs(),
     console: { log: () => {}, warn: () => {}, error: () => {} },
     CacheService: { getScriptCache: () => cache },
     CACHE_DURATION: {

@@ -932,7 +932,7 @@ function getBatchedViewerData(targetUserId, currentEmail) {
 
     const targetUser = findPublishedBoardOwner(targetUserId, currentEmail, { preloadedAuth });
     if (!targetUser) {
-      return { success: false, error: '対象ユーザーが見つかりません' };
+      return createErrorResponse('対象ユーザーが見つかりません');
     }
 
     const config = getConfigOrDefault(targetUserId, targetUser);
@@ -972,7 +972,7 @@ function getBatchedAdminData(targetUserId) {
       preloadedAuth
     });
     if (!targetUser) {
-      return { success: false, error: '指定されたユーザーが見つかりません' };
+      return createErrorResponse('指定されたユーザーが見つかりません');
     }
 
     const isOwnBoard = sameEmail_(currentEmail, targetUser.userEmail);
@@ -985,7 +985,7 @@ function getBatchedAdminData(targetUserId) {
     }
 
     if (!isAdmin && !targetUser.isActive) {
-      return { success: false, error: '対象ユーザーがアクティブではありません' };
+      return createErrorResponse('対象ユーザーがアクティブではありません');
     }
 
     const config = getConfigOrDefault(targetUserId, targetUser);

@@ -609,13 +609,12 @@ function listServiceAccountPool() {
 function addServiceAccountToPool(saJsonString) {
   try {
     const sa = parseServiceAccountCredsSoft_(saJsonString);
-    if (!sa) return { success: false, error: 'INVALID_SA_JSON', message: 'SA JSON の形式が不正です' };
+    if (!sa) return createErrorResponse('SA JSON の形式が不正です', null, { error: 'INVALID_SA_JSON' });
 
     const existing = getAllServiceAccounts_();
     for (let i = 0; i < existing.length; i++) {
       if (existing[i].client_email === sa.client_email) {
-        return { success: false, error: 'ALREADY_REGISTERED',
-          message: `${sa.client_email} は既に pool に登録されています` };
+        return createErrorResponse(`${sa.client_email} は既に pool に登録されています`, null, { error: 'ALREADY_REGISTERED' });
       }
     }
 
@@ -626,8 +625,7 @@ function addServiceAccountToPool(saJsonString) {
       if (!getCachedProperty(key)) { targetSlot = key; targetIndex = n; break; }
     }
     if (!targetSlot) {
-      return { success: false, error: 'POOL_FULL',
-        message: `pool は上限 (${SERVICE_ACCOUNT_POOL_MAX_} 個) に達しています` };
+      return createErrorResponse(`pool は上限 (${SERVICE_ACCOUNT_POOL_MAX_} 個) に達しています`, null, { error: 'POOL_FULL' });
     }
 
     PropertiesService.getScriptProperties().setProperty(targetSlot, String(saJsonString));
@@ -693,7 +691,7 @@ function addServiceAccountToPool(saJsonString) {
     };
   } catch (err) {
     logError_('addServiceAccountToPool', err);
-    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
   }
 }
 
@@ -731,21 +729,26 @@ function reverifyServiceAccountInPool(slotKey) {
   try {
     const key = String(slotKey || '');
     if (!/^SERVICE_ACCOUNT_CREDS(_\d+)?$/.test(key)) {
-      return { success: false, error: 'INVALID_SLOT', message: '不正なスロット: ' + key };
+      return createErrorResponse('不正なスロット: ' + key, null, { error: 'INVALID_SLOT' });
     }
     const raw = getCachedProperty(key);
-    if (!raw) return { success: false, error: 'NOT_FOUND', message: key + ' は登録されていません' };
+    if (!raw) return createErrorResponse(key + ' は登録されていません', null, { error: 'NOT_FOUND' });
     const sa = parseServiceAccountCredsSoft_(raw);
-    if (!sa) return { success: false, error: 'INVALID_SA_JSON', message: 'SA JSON が壊れています' };
+    if (!sa) return createErrorResponse('SA JSON が壊れています', null, { error: 'INVALID_SA_JSON' });
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    // createErrorResponse に寄せない唯一の例外: message が無く error は機械コードだけ。
+    //   ビルダーは message にも同じ文字列を入れるため、コードが人間向け文言に昇格する。
     if (!dbId) return { success: false, error: 'DB_NOT_CONFIGURED' };
     invalidateSaCache_(dbId, sa.client_email);
     const accessToken = getServiceAccountAccessToken_(sa);
-    if (!accessToken) return { success: true, verified: false, error: 'TOKEN_FAILED' };
+    // success:true は「検証処理を実行できた」の意味で、結果は verified が持つ。
+    //   診断コードを error に入れると `if (res.error)` で失敗と誤判定されるため reason を使う。
+    //   error は「このレスポンスは失敗」の意味だけに固定する。
+    if (!accessToken) return { success: true, verified: false, reason: 'TOKEN_FAILED' };
     const verified = verifyServiceAccountAccess_(dbId, accessToken, sa.client_email);
     return { success: true, verified, clientEmail: sa.client_email };
   } catch (err) {
-    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
   }
 }
 
@@ -757,19 +760,18 @@ function removeServiceAccountFromPool(slotKey) {
   try {
     const key = String(slotKey || '');
     if (key === 'SERVICE_ACCOUNT_CREDS') {
-      return { success: false, error: 'PRIMARY_LOCKED',
-        message: 'primary (SERVICE_ACCOUNT_CREDS) は UI から削除できません。 セットアップ画面から差替えてください' };
+      return createErrorResponse('primary (SERVICE_ACCOUNT_CREDS) は UI から削除できません。 セットアップ画面から差替えてください', null, { error: 'PRIMARY_LOCKED' });
     }
     if (!/^SERVICE_ACCOUNT_CREDS_(\d+)$/.test(key)) {
-      return { success: false, error: 'INVALID_SLOT', message: `不正なスロット: ${key}` };
+      return createErrorResponse(`不正なスロット: ${key}`, null, { error: 'INVALID_SLOT' });
     }
     const n = Number(key.split('_').pop());
     if (!(n >= 2 && n <= SERVICE_ACCOUNT_POOL_MAX_)) {
-      return { success: false, error: 'INVALID_SLOT', message: `範囲外スロット: ${key}` };
+      return createErrorResponse(`範囲外スロット: ${key}`, null, { error: 'INVALID_SLOT' });
     }
     const existing = getCachedProperty(key);
     if (!existing) {
-      return { success: false, error: 'NOT_FOUND', message: `${key} は登録されていません` };
+      return createErrorResponse(`${key} は登録されていません`, null, { error: 'NOT_FOUND' });
     }
     const sa = parseServiceAccountCredsSoft_(existing);
     PropertiesService.getScriptProperties().deleteProperty(key);
@@ -781,7 +783,7 @@ function removeServiceAccountFromPool(slotKey) {
     return { success: true, slot: key, removed: true };
   } catch (err) {
     logError_('removeServiceAccountFromPool', err);
-    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
   }
 }
 
@@ -1931,7 +1933,7 @@ function updateUser(userId, updates, context = {}) {
   try {
     if (!lock.tryLock(5000)) { // 5秒待機
       console.warn('updateUser: Lock timeout - concurrent update detected');
-      return { success: false, message: 'Concurrent update in progress. Please retry.' };
+      return createErrorResponse('Concurrent update in progress. Please retry.');
     }
 
     const requestingUser = context.requestingUser || getCurrentEmail();
@@ -1942,19 +1944,19 @@ function updateUser(userId, updates, context = {}) {
 
     if (!targetUser) {
       console.warn('updateUser: Target user not found:', userId);
-      return { success: false, message: 'User not found' };
+      return createErrorResponse('User not found');
     }
 
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('updateUser: Database access failed');
-      return { success: false, message: 'Database access failed' };
+      return createErrorResponse('Database access failed');
     }
 
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('updateUser: Users sheet not found');
-      return { success: false, message: 'Users sheet not found' };
+      return createErrorResponse('Users sheet not found');
     }
 
     const data = sheet.getDataRange().getValues();
@@ -1963,7 +1965,7 @@ function updateUser(userId, updates, context = {}) {
 
     if (userIdColumnIndex === -1) {
       console.warn('updateUser: UserId column not found');
-      return { success: false, message: 'UserId column not found' };
+      return createErrorResponse('UserId column not found');
     }
 
     for (let i = 1; i < data.length; i++) {
@@ -2005,10 +2007,10 @@ function updateUser(userId, updates, context = {}) {
     }
 
     console.warn('updateUser: User not found:', userId);
-    return { success: false, message: 'User not found' };
+    return createErrorResponse('User not found');
   } catch (error) {
     logError_('updateUser', error);
-    return { success: false, message: error.message || 'Unknown error occurred' };
+    return createErrorResponse(error.message || 'Unknown error occurred');
   } finally {
     try {
       lock.releaseLock();
@@ -2123,24 +2125,24 @@ function deleteUser(userId, reason = '', context = {}) {
 
     if (!isAdmin && !context.forceServiceAccount) {
       console.warn('deleteUser: Non-admin user attempting user deletion:', userId);
-      return { success: false, message: 'Insufficient permissions for user deletion' };
+      return createErrorResponse('Insufficient permissions for user deletion');
     }
 
     if (!lock.tryLock(10000)) {
       console.warn('deleteUser: Lock timeout - concurrent user modification detected');
-      return { success: false, message: 'Concurrent modification in progress. Please retry.' };
+      return createErrorResponse('Concurrent modification in progress. Please retry.');
     }
 
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('deleteUser: Database access failed');
-      return { success: false, message: 'Database access failed' };
+      return createErrorResponse('Database access failed');
     }
 
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('deleteUser: Users sheet not found');
-      return { success: false, message: 'Users sheet not found' };
+      return createErrorResponse('Users sheet not found');
     }
 
     const data = sheet.getDataRange().getValues();
@@ -2149,7 +2151,7 @@ function deleteUser(userId, reason = '', context = {}) {
 
     if (userIdColumnIndex === -1) {
       console.warn('deleteUser: UserId column not found');
-      return { success: false, message: 'UserId column not found' };
+      return createErrorResponse('UserId column not found');
     }
 
     const rowsToDelete = [];
@@ -2161,7 +2163,7 @@ function deleteUser(userId, reason = '', context = {}) {
 
     if (rowsToDelete.length === 0) {
       console.warn('deleteUser: User not found:', userId);
-      return { success: false, message: 'User not found' };
+      return createErrorResponse('User not found');
     }
 
     for (let i = rowsToDelete.length - 1; i >= 0; i--) {
@@ -2179,7 +2181,7 @@ function deleteUser(userId, reason = '', context = {}) {
     };
   } catch (error) {
     logError_('deleteUser', error);
-    return { success: false, message: error.message };
+    return createErrorResponse(error.message);
   } finally {
     try {
       lock.releaseLock();

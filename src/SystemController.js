@@ -710,13 +710,13 @@ function publishApp(publishConfig) {
     }
 
     if (!publishConfig || typeof publishConfig !== 'object' || Array.isArray(publishConfig)) {
-      return { success: false, message: '公開設定が必要です' };
+      return createErrorResponse('公開設定が必要です');
     }
 
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       logError_('publishApp', new Error('User not found'), { email });
-      return { success: false, message: 'ユーザーが見つかりません' };
+      return createErrorResponse('ユーザーが見つかりません');
     }
 
     // Why getUserConfig (not getConfigOrDefault): publish は save パス。getConfigOrDefault は
@@ -726,7 +726,7 @@ function publishApp(publishConfig) {
     //   (line 724) もスキップされ二重 publish が race する。
     const cfgRes = getUserConfig(user.userId, user);
     if (!cfgRes || !cfgRes.success) {
-      return { success: false, message: `設定の取得に失敗しました: ${(cfgRes && cfgRes.message) || '詳細不明'}` };
+      return createErrorResponse(`設定の取得に失敗しました: ${(cfgRes && cfgRes.message) || '詳細不明'}`);
     }
     const currentConfig = cfgRes.config;
     const { config: safePublishConfig, ignoredKeys } = sanitizePublishPayload_(publishConfig, currentConfig);
@@ -739,19 +739,19 @@ function publishApp(publishConfig) {
     }
 
     if (!safePublishConfig.spreadsheetId) {
-      return { success: false, message: 'データソース（スプレッドシートID）が設定されていません' };
+      return createErrorResponse('データソース（スプレッドシートID）が設定されていません');
     }
 
     if (!safePublishConfig.sheetName) {
-      return { success: false, message: 'データソース（シート名）が設定されていません' };
+      return createErrorResponse('データソース（シート名）が設定されていません');
     }
 
     if (!safePublishConfig.columnMapping || typeof safePublishConfig.columnMapping !== 'object') {
-      return { success: false, message: '列マッピングが設定されていません' };
+      return createErrorResponse('列マッピングが設定されていません');
     }
 
     if (Object.keys(safePublishConfig.columnMapping).length === 0) {
-      return { success: false, message: '列マッピングが空です。少なくとも回答列または数値列を設定してください' };
+      return createErrorResponse('列マッピングが空です。少なくとも回答列または数値列を設定してください');
     }
 
     // matrix/numberline モードでは answer は numericX を兼ねる (AdminPanel.js.html
@@ -765,12 +765,12 @@ function publishApp(publishConfig) {
     const colMap = safePublishConfig.columnMapping;
     const hasValidIndex = (k) => typeof colMap[k] === 'number' && colMap[k] >= 0;
     if (boardMode === 'matrix') {
-      if (!hasValidIndex('numericX')) return { success: false, message: 'X軸の数値列が設定されていません' };
-      if (!hasValidIndex('numericY')) return { success: false, message: 'Y軸の数値列が設定されていません' };
+      if (!hasValidIndex('numericX')) return createErrorResponse('X軸の数値列が設定されていません');
+      if (!hasValidIndex('numericY')) return createErrorResponse('Y軸の数値列が設定されていません');
     } else if (boardMode === 'numberline') {
-      if (!hasValidIndex('numericX')) return { success: false, message: 'X軸の数値列が設定されていません' };
+      if (!hasValidIndex('numericX')) return createErrorResponse('X軸の数値列が設定されていません');
     } else {
-      if (!hasValidIndex('answer')) return { success: false, message: 'メイン質問列が設定されていません' };
+      if (!hasValidIndex('answer')) return createErrorResponse('メイン質問列が設定されていません');
     }
 
     if (currentConfig.etag && !safePublishConfig.etag) {
@@ -1906,7 +1906,7 @@ function createDatabase() {
     };
   } catch (error) {
     logError_('createDatabase', error);
-    return { success: false, message: `作成に失敗しました: ${error.message}` };
+    return createErrorResponse(`作成に失敗しました: ${error.message}`);
   }
 }
 

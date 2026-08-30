@@ -1624,8 +1624,7 @@ function revokeDomainSharing_(spreadsheetId) {
         muteHttpExceptions: true
       });
       if (listResp.getResponseCode() !== 200) {
-        return { success: false, changed: false,
-          error: `Drive list permissions ${listResp.getResponseCode()}: ${listResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}` };
+        return createErrorResponse(`Drive list permissions ${listResp.getResponseCode()}: ${listResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}`, null, { changed: false });
       }
       const data = JSON.parse(listResp.getContentText());
       const perms = Array.isArray(data.permissions) ? data.permissions : [];
@@ -1642,14 +1641,15 @@ function revokeDomainSharing_(spreadsheetId) {
         const code = delResp.getResponseCode();
         if (code >= 200 && code < 300) { changed = true; }
         else if (code !== 404) {
-          return { success: false, changed,
-            error: `Drive delete permission ${code}: ${delResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}` };
+          return createErrorResponse(
+            `Drive delete permission ${code}: ${delResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}`,
+            null, { changed });
         }
       }
       return { success: true, changed };
     }
   } catch (err) {
-    return { success: false, changed: false, error: err.message || String(err) };
+    return createErrorResponse(err.message || String(err), null, { changed: false });
   }
 }
 

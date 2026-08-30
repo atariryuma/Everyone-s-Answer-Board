@@ -276,7 +276,7 @@ function __buildLessonRow_(record, cols, serialized) {
 function __createLessonRow_(record) {
   // write path: 既存 DB に lessons sheet が無ければ lazy bootstrap で作成。
   const sheet = __getLessonsSheet_({ createIfMissing: true });
-  if (!sheet) return { success: false, message: 'lessons sheet not initialized' };
+  if (!sheet) return createErrorResponse('lessons sheet not initialized');
   const cols = __lessonColumns_(sheet);
   const serialized = __serializeLessonJson_(record.lessonJson);
   sheet.appendRow(__buildLessonRow_(record, cols, serialized));
@@ -293,7 +293,7 @@ function __withLessonLock_(fn) {
   try {
     locked = lock.tryLock(5000);
     if (!locked) {
-      return { success: false, error: 'LOCK_TIMEOUT', message: '別の処理が実行中です。少し待ってから再試行してください。' };
+      return createErrorResponse('別の処理が実行中です。少し待ってから再試行してください。', null, { error: 'LOCK_TIMEOUT' });
     }
     return fn();
   } finally {
@@ -313,7 +313,7 @@ function __withLessonLock_(fn) {
 function __updateLessonRow_(lessonId, patch, expectedEtag) {
   return __withLessonLock_(() => {
     const found = __findLessonById_(lessonId);
-    if (!found) return { success: false, error: 'LESSON_NOT_FOUND', message: 'lesson not found' };
+    if (!found) return createErrorResponse('lesson not found', null, { error: 'LESSON_NOT_FOUND' });
     if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
       // Why lowercase: ConfigService.saveUserConfig / AdminApis.__applyPublishStateChange と
       //   同じ 'etag_mismatch' code に統一。frontend (AdminPanel.js.html) も 1 種類の
@@ -398,19 +398,19 @@ function __deleteLessonRow_(lessonId) {
   return __withLessonLock_(() => {
     try {
       const found = __findLessonById_(lessonId);
-      if (!found) return { success: false, error: 'LESSON_NOT_FOUND' };
+      if (!found) return createErrorResponse('LESSON_NOT_FOUND');
       // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
       //   SpreadsheetApp 経由で直接削除する。
       const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
-      if (!dbId) return { success: false, error: 'DATABASE_NOT_CONFIGURED' };
+      if (!dbId) return createErrorResponse('DATABASE_NOT_CONFIGURED');
       const ss = SpreadsheetApp.openById(dbId);
       const sheet = ss.getSheetByName('lessons');
-      if (!sheet) return { success: false, error: 'LESSONS_SHEET_NOT_FOUND' };
+      if (!sheet) return createErrorResponse('LESSONS_SHEET_NOT_FOUND');
       sheet.deleteRow(found.rowIndex);
       return { success: true };
     } catch (error) {
       logError_('__deleteLessonRow_', error);
-      return { success: false, error: 'DELETE_FAILED', message: error && error.message };
+      return createErrorResponse(error && error.message, null, { error: 'DELETE_FAILED' });
     }
   });
 }

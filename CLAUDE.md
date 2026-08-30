@@ -233,6 +233,18 @@ Google Sheets as database via service account. `users` sheet stores user records
 - **Cache PropertiesService** - use `getCachedProperty()` with 30s TTL (see helpers.js)
 - **Minimize external service calls** - in-script JS operations are faster
 
+### レスポンスの形 (サーバ → クライアント)
+
+- **失敗は必ず `createErrorResponse(message, data?, extraFields?)` で作る**。手書きの
+  `{ success: false, ... }` を新規に書かない。ビルダーは `message` と `error` の両方を
+  立てるので、受け手が「どちらに入っているか」を気にしなくてよくなる。
+  - `data` / `sheetName` / `header` 等の追加フィールドは第 2・第 3 引数で保てる
+  - 機械コードは `extraFields` に入れる: `createErrorResponse('...', null, { error: 'ETAG_MISMATCH' })`
+- **`error` は「このレスポンスは失敗」の意味だけに使う**。`success: true` の応答に
+  診断コードを載せたいときは `reason` を使う (`if (res.error)` の誤判定を防ぐ)。
+- 唯一の例外は `DatabaseCore.js` の `DB_NOT_CONFIGURED` (理由をコード側に明記済)。
+- 読み取り側は `serverMessage(res, fallback)` を使う (上の canonical API 表を参照)。
+
 ### 診断可能性 (不具合の原因を追える状態を保つ)
 
 - **握りつぶし catch は「なぜ黙ってよいか」を必ず書く**。`catch (_) {}` だけだと、

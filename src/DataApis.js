@@ -151,7 +151,7 @@ function getForms() {
     return { success: true, forms };
   } catch (error) {
     logError_('getForms', error);
-    return { success: false, error: error.message, forms: [] };
+    return createErrorResponse(error.message, null, { forms: [] });
   }
 }
 
@@ -427,7 +427,7 @@ function createTemplateForm(templateType, templateOptions) {
 
   } catch (error) {
     logError_('createTemplateForm', error);
-    return { success: false, error: 'フォーム作成に失敗しました: ' + error.message };
+    return createErrorResponse('フォーム作成に失敗しました: ' + error.message);
   }
 }
 
@@ -497,21 +497,21 @@ function setFormAllowResubmit(formIdOrUrl, allowResubmit) {
 function customizeForm(formIdOrUrl, schema) {
   try {
     if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
-      return { success: false, error: 'formId or formUrl is required' };
+      return createErrorResponse('formId or formUrl is required');
     }
     if (!schema || typeof schema !== 'object' || !Array.isArray(schema.questions)) {
-      return { success: false, error: 'schema.questions array is required' };
+      return createErrorResponse('schema.questions array is required');
     }
     if (schema.questions.length > 40) {
       // Why: 過大スキーマで Forms API limit に当たる前にガード（実用上 40 で十分）
-      return { success: false, error: 'too many questions (max 40)' };
+      return createErrorResponse('too many questions (max 40)');
     }
 
     let form;
     try {
       form = __openFormByIdOrUrl_(formIdOrUrl);
     } catch (e) {
-      return { success: false, error: 'Form を開けません: ' + e.message };
+      return createErrorResponse('Form を開けません: ' + e.message);
     }
 
     // 既存項目を削除（後ろから消すと index ずれない）
@@ -681,7 +681,7 @@ function customizeForm(formIdOrUrl, schema) {
     };
   } catch (error) {
     logError_('customizeForm', error);
-    return { success: false, error: error.message };
+    return createErrorResponse(error.message);
   }
 }
 
@@ -695,12 +695,12 @@ function processFormUrlInput(formUrl) {
   try {
     // 1. URL検証
     if (!formUrl || typeof formUrl !== 'string') {
-      return { success: false, error: 'GoogleフォームのURLを入力してください' };
+      return createErrorResponse('GoogleフォームのURLを入力してください');
     }
 
     // フォームURL形式チェック (canonical: isValidFormUrl — protocol/host/path 完全チェック)
     if (!isValidFormUrl(formUrl)) {
-      return { success: false, error: 'GoogleフォームのURLを入力してください' };
+      return createErrorResponse('GoogleフォームのURLを入力してください');
     }
 
     // 2. フォームを開く
@@ -709,7 +709,7 @@ function processFormUrlInput(formUrl) {
       form = FormApp.openByUrl(formUrl);
     } catch (e) {
       logError_('connectDataSource.FormApp.openByUrl', e);
-      return { success: false, error: `フォームにアクセスできません: ${e.message}` };
+      return createErrorResponse(`フォームにアクセスできません: ${e.message}`);
     }
 
     const formTitle = form.getTitle();
@@ -753,7 +753,7 @@ function processFormUrlInput(formUrl) {
         }
       } catch (e) {
         logError_('connectDataSource.SpreadsheetApp.create', e);
-        return { success: false, error: 'スプレッドシートの作成に失敗しました: ' + e.message };
+        return createErrorResponse('スプレッドシートの作成に失敗しました: ' + e.message);
       }
     } else {
       try {
@@ -761,7 +761,7 @@ function processFormUrlInput(formUrl) {
         spreadsheetUrl = ss.getUrl();
       } catch (e) {
         logError_('connectDataSource.SpreadsheetApp.openById', e);
-        return { success: false, error: `回答先スプレッドシートにアクセスできません: ${e.message}` };
+        return createErrorResponse(`回答先スプレッドシートにアクセスできません: ${e.message}`);
       }
       // 既存 SS 取込み時にも SA pool 全員を editor 追加。 これがないと viewer 経路 (SA pool) で
       // 403 になるが、 教師の手作業 Form 取込みは「動いて当然」 期待なので fail-soft で続行。
@@ -799,7 +799,7 @@ function processFormUrlInput(formUrl) {
 
   } catch (error) {
     logError_('processFormUrlInput', error);
-    return { success: false, error: '予期しないエラーが発生しました' };
+    return createErrorResponse('予期しないエラーが発生しました');
   }
 }
 
@@ -1163,9 +1163,9 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       if (!access.ok) {
         if (access.reason === 'not_found') {
           logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewerEmail });
-          return { success: false, error: 'Target user not found', data: [], sheetName: '', header: 'ユーザーエラー' };
+          return createErrorResponse('Target user not found', [], { sheetName: '', header: 'ユーザーエラー' });
         }
-        return { success: false, error: 'このボードは未公開です', data: [], sheetName: '', header: '未公開' };
+        return createErrorResponse('このボードは未公開です', [], { sheetName: '', header: '未公開' });
       }
       const { targetUser, config: targetUserConfig, isOwnBoard } = access;
 
@@ -1272,15 +1272,15 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter, sortOrder) {
   try {
     if (!targetUserId || typeof targetUserId !== 'string') {
-      return { success: false, error: 'targetUserId is required', data: [] };
+      return createErrorResponse('targetUserId is required', []);
     }
     if (!profileName || typeof profileName !== 'string') {
-      return { success: false, error: 'profileName is required', data: [] };
+      return createErrorResponse('profileName is required', []);
     }
 
     const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });
     if (!adminAuth.success || !adminAuth.authenticated) {
-      return { success: false, error: 'Authentication required', data: [] };
+      return createErrorResponse('Authentication required', []);
     }
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
@@ -1306,17 +1306,17 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     const inHistory = history.some(h => h && h.name === profileName);
     const isPrivileged = isSystemAdmin || isOwnBoard;
     if (!isPrivileged && !inHistory) {
-      return { success: false, error: 'このフェーズはまだ公開されていません', data: [] };
+      return createErrorResponse('このフェーズはまだ公開されていません', []);
     }
 
     const p = profiles.find(x => x && x.name === profileName);
     if (!p) {
       // history にはあるが profiles[] から消されているケース（削除済 profile）
-      return { success: false, error: '指定されたフェーズの設定が見つかりません（削除済の可能性）', data: [] };
+      return createErrorResponse('指定されたフェーズの設定が見つかりません（削除済の可能性）', []);
     }
 
     if (!p.spreadsheetId) {
-      return { success: false, error: 'このフェーズはスプレッドシート未設定です', data: [] };
+      return createErrorResponse('このフェーズはスプレッドシート未設定です', []);
     }
 
     // 合成 config: profile snapshot のフィールドを active 形に詰め替える。loadProfileForView と同じ
@@ -1398,7 +1398,7 @@ function saveConfig(config, options = {}) {
   } catch (error) {
     const duration = Date.now() - startTime;
     logError_('saveConfig', error, { durationMs: duration });
-    return { success: false, message: error.message || 'エラーが発生しました' };
+    return createErrorResponse(error.message || 'エラーが発生しました');
   }
 }
 
@@ -1412,14 +1412,14 @@ function getNotificationUpdate(targetUserId, options = {}) {
   try {
     const email = getCurrentEmail();
     if (!email || !targetUserId) {
-      return { success: false, message: 'Invalid request' };
+      return createErrorResponse('Invalid request');
     }
 
     // getPublishedSheetData と同じ認可プリアンブルを共有 (DRY / 分岐差の防止)。
     const isAdmin = isAdministrator(email);
     const access = resolveViewerBoardAccess_(targetUserId, email, isAdmin);
     if (!access.ok) {
-      return { success: false, message: access.reason === 'not_found' ? 'User not found' : 'Access denied' };
+      return createErrorResponse(access.reason === 'not_found' ? 'User not found' : 'Access denied');
     }
     const { targetUser, config: targetConfig, isOwnBoard } = access;
 
@@ -1449,7 +1449,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
 
     if (!userData || !userData.success) {
-      return { success: false, message: 'Data access failed' };
+      return createErrorResponse('Data access failed');
     }
 
     const lastUpdate = new Date(options.lastUpdateTime || 0);
@@ -1482,7 +1482,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
 
   } catch (error) {
     logError_('getNotificationUpdate', error);
-    return { success: false, message: error.message };
+    return createErrorResponse(error.message);
   }
 }
 
@@ -1663,7 +1663,7 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     const sheet = dataAccess.getSheet(sheetName);
 
     if (!sheet) {
-      return { success: false, message: 'Sheet not found' };
+      return createErrorResponse('Sheet not found');
     }
 
     const lastRow = sheet.getLastRow();

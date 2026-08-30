@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function loadSystemControllerContext(overrides = {}) {
   const context = {
@@ -11,6 +12,8 @@ function loadSystemControllerContext(overrides = {}) {
       warn: () => {},
       error: () => {}
     },
+    ...gasResponseStubs(),
+    logError_: () => {},
     getCurrentEmail: () => 'teacher@example.com',
     findUserByEmail: () => ({ userId: 'user-1', userEmail: 'teacher@example.com' }),
     getUserConfig: () => ({

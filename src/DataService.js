@@ -702,7 +702,7 @@ function deleteLinkedFormResponseByTimestamp(sheet, rowTimestamp) {
   try {
     const formUrl = sheet.getFormUrl();
     if (!formUrl) {
-      return { success: false, message: 'no linked form' };
+      return createErrorResponse('no linked form');
     }
 
     // Why instanceof だけだと vm context 跨ぎのテスト用 Date で false 判定されるため duck-typing。
@@ -711,7 +711,7 @@ function deleteLinkedFormResponseByTimestamp(sheet, rowTimestamp) {
       ? rowTimestamp.getTime()
       : NaN;
     if (!Number.isFinite(targetTime)) {
-      return { success: false, message: 'invalid timestamp' };
+      return createErrorResponse('invalid timestamp');
     }
 
     const form = FormApp.openByUrl(formUrl);
@@ -726,11 +726,11 @@ function deleteLinkedFormResponseByTimestamp(sheet, rowTimestamp) {
         return { success: true };
       }
     }
-    return { success: false, message: 'no matching form response' };
+    return createErrorResponse('no matching form response');
   } catch (error) {
     console.warn('deleteLinkedFormResponseByTimestamp: failed', {
       error: error.message
     });
-    return { success: false, message: error.message };
+    return createErrorResponse(error.message);
   }
 }
