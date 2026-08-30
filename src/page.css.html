@@ -972,16 +972,19 @@ button.highlight-badge:hover {
   box-shadow: var(--ring-focus);
 }
 
-/* 軸ラベル付きの格子枠。ラベルが無いと、どちらの向きが何を意味するか分からない。 */
+/* 軸ラベル付きの格子枠。ラベルが無いと、どちらの向きが何を意味するか分からない。
+   既定 (狭い画面) は縦積み: 横軸ラベルは格子の真下に左右へ振り分ける。
+   Why: 左右にラベルを置くと 375px 幅ではラベルが幅を食い、格子が 100px 以下に潰れて
+     児童がタップできなくなる。タップ標的は 44px 以上を確保する。 */
 .lesson-grid-frame {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    ".    top    ."
-    "left grid right"
-    ".    bottom .";
+    "top"
+    "grid"
+    "bottom"
+    "xrow";
   align-items: center;
-  justify-items: center;
   gap: var(--space-2);
 }
 .lesson-axis-label {
@@ -989,18 +992,44 @@ button.highlight-badge:hover {
   font-weight: 700;
   color: var(--theme-text-secondary);
   text-align: center;
-  max-width: 6rem;
 }
 .lesson-axis-top    { grid-area: top; }
 .lesson-axis-bottom { grid-area: bottom; }
-.lesson-axis-left   { grid-area: left; }
-.lesson-axis-right  { grid-area: right; }
+/* 狭い画面では左右ラベルを使わず、格子の下の 1 行 (xrow) で左右を示す */
+.lesson-axis-left,
+.lesson-axis-right  { display: none; }
+.lesson-axis-xrow {
+  grid-area: xrow;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--theme-text-secondary);
+}
+
+/* 十分な幅があれば、横軸ラベルを格子の左右に置く (向きが直感的になる) */
+@media (min-width: 34rem) {
+  .lesson-grid-frame {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      ".    top    ."
+      "left grid right"
+      ".    bottom .";
+  }
+  .lesson-axis-left,
+  .lesson-axis-right { display: block; max-width: 7rem; }
+  .lesson-axis-left  { grid-area: left; }
+  .lesson-axis-right { grid-area: right; }
+  .lesson-axis-xrow  { display: none; }
+}
 
 /* 5×5 のタップ格子。自由座標にしないのは「なぜそこか」を言葉にしやすくするため。 */
 .lesson-grid-wrap {
   grid-area: grid;
   display: flex;
   justify-content: center;
+  width: 100%;   /* grid item が内容幅に縮むと格子が潰れる */
 }
 .lesson-grid {
   display: grid;
@@ -1092,8 +1121,13 @@ button.highlight-badge:hover {
   gap: var(--space-3);
 }
 .lesson-traj-svg {
-  width: min(100%, 14rem);
+  width: min(100%, 15rem);
   align-self: center;
+}
+.lesson-traj-axis {
+  fill: var(--theme-text-secondary);
+  font-size: 10px;   /* theme:exempt - SVG 内の固定座標系 (viewBox 200 幅) に対する寸法 */
+  font-weight: 700;
 }
 .lesson-axis {
   stroke: var(--theme-border-subtle);
