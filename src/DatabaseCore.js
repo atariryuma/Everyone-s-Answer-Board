@@ -293,8 +293,8 @@ function getServiceAccountUsage() {
   const cache = CacheService.getScriptCache();
   const usage = pool.map((sa) => {
     let count = 0; let cooling = false;
-    try { count = Number(cache.get('sa_pick:' + sa.client_email) || 0); } catch (_) {}
-    try { cooling = Boolean(cache.get('sa_cooldown:' + sa.client_email)); } catch (_) {}
+    try { count = Number(cache.get('sa_pick:' + sa.client_email) || 0); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
+    try { cooling = Boolean(cache.get('sa_cooldown:' + sa.client_email)); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     return { clientEmail: sa.client_email, picks: count, cooling };
   });
   return {
@@ -420,7 +420,7 @@ function getServiceAccountAccessToken_(sa) {
     if (scriptCache) {
       try {
         scriptCache.put(scriptCacheKey, JSON.stringify({ t: tokenData.access_token, e: absExpiry }), scriptTtlSec);
-      } catch (_) {}
+      } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     }
     return tokenData.access_token;
   } catch (err) {
@@ -438,13 +438,13 @@ function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
   if (!sheetId || !accessToken) return false;
   const cacheKey = SA_CACHE_KEYS_.ACCESS + sheetId + ':' + (saEmail || 'unknown');
   let cache = null;
-  try { cache = CacheService.getScriptCache(); } catch (_) {}
+  try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
   if (cache) {
     try {
       const cached = cache.get(cacheKey);
       if (cached === 'ok') return true;
       if (cached === 'no') return false;
-    } catch (_) {}
+    } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
   }
   try {
     const resp = UrlFetchApp.fetch(
@@ -458,7 +458,7 @@ function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
       try {
         if (ok) cache.put(cacheKey, 'ok', SA_VERIFY_TTL_OK_SEC_);
         else if (!isTransient) cache.put(cacheKey, 'no', SA_VERIFY_TTL_NO_SEC_);
-      } catch (_) {}
+      } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     }
     if (!ok) {
       console.warn('SA access verify failed for', sheetId.substring(0, 8) + '...',
@@ -828,10 +828,10 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
     // を組み込むことで、 publish 状態変更時に invalidateSaValidationCache_ から bump → 旧 key
     // が全 viewer 分一括 stale 化される。
     let cache = null;
-    try { cache = CacheService.getScriptCache(); } catch (_) {}
+    try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     let validationVer = '0';
     if (cache) {
-      try { validationVer = String(cache.get(SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId) || '0'); } catch (_) {}
+      try { validationVer = String(cache.get(SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId) || '0'); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     }
     const cacheKey = `sa_validation_v${validationVer}_${spreadsheetId}_${currentEmail || 'anon'}`;
     if (cache) {
@@ -859,7 +859,7 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
         try {
           const ttl = result.allowed ? 60 : 5;
           cache.put(cacheKey, JSON.stringify(result), ttl);
-        } catch (_) {}
+        } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
       }
       return result;
     };

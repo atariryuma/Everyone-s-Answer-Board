@@ -195,6 +195,6 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 // ?debug=1 でフロント console.log/warn キャプチャを有効化（OFF 既定）
-try { window.ClientErrorReporter.enableDebugConsoleCapture(); } catch (_) {}
+try { window.ClientErrorReporter.enableDebugConsoleCapture(); } catch (_) { /* debug 収集は best effort。本体のエラー報告には影響しない */ }
 
 </script>

@@ -295,7 +295,7 @@
       // Why: applyConfig が走らない（=保存済み config 無し）新規教師でも、
       //      可視化モードの初期表示状態（auto = 数値マッピング/軸ラベル領域を見せる、
       //      象限ラベルは隠す）を正しく適用するために 1 回呼ぶ。
-      try { updateVisualizationVisibility(); } catch (_) {}
+      try { updateVisualizationVisibility(); } catch (err) { console.warn('updateVisualizationVisibility failed:', err && err.message); }
 
       // プロファイル管理 UI を初期化（一覧表示 + イベントハンドラ）
 
@@ -753,7 +753,7 @@
     // 軸ラベル placeholder を ScaleItem 由来の値で動的に上書き (v2780)。
     //   getCurrentFormInfoSafe() が systemState から最新の formInfo を返すので、
     //   ボード復元時にも plceholder としてフォームの値が見えるようになる。
-    try { applyAxisLabelPlaceholdersFromFormInfo(getCurrentFormInfoSafe()); } catch (_) {}
+    try { applyAxisLabelPlaceholdersFromFormInfo(getCurrentFormInfoSafe()); } catch (err) { console.warn('applyAxisLabelPlaceholdersFromFormInfo failed:', err && err.message); }
 
     // 3) 4象限ラベル
     const q = config.matrixQuadrantLabels || {};
@@ -857,7 +857,7 @@
 
     applyColumnModeLabels(mode);
     if (typeof updateCompletionStatus === 'function') {
-      try { updateCompletionStatus(); } catch (_) {}
+      try { updateCompletionStatus(); } catch (err) { console.warn('updateCompletionStatus failed:', err && err.message); }
     }
 
     const hint = document.getElementById('board-mode-hint');
@@ -1310,7 +1310,7 @@
       const boardModeSelect = document.getElementById('board-mode-select');
       if (boardModeSelect && result.templateType && result.templateType !== 'board') {
         boardModeSelect.value = result.templateType;
-        try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+        try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { /* 合成イベント不可な環境でも設定自体は保存済み */ }
       }
       const detectionInfo = document.getElementById('form-detection-info');
       const detectedFormLink = document.getElementById('detected-form-link');
@@ -1553,7 +1553,7 @@
       });
 
       showSuccess('自動推定完了！設定を確認してください');
-      try { scheduleAutoSave(); } catch (_) {}
+      try { scheduleAutoSave(); } catch (err) { console.warn('scheduleAutoSave failed:', err && err.message); }
     } catch (error) {
       console.error('手動自動推定エラー:', error);
       showError('自動推定に失敗しました。接続を確認して再試行してください');
@@ -1602,7 +1602,7 @@
 
       // 可視化モード関連 UI を boardMode に応じて再表示。
       // mapping が変わると auto モードの効果モードも変わるため、表示状態を更新する。
-      try { updateVisualizationVisibility(); } catch (_) {}
+      try { updateVisualizationVisibility(); } catch (err) { console.warn('updateVisualizationVisibility failed:', err && err.message); }
 
       displayAnalysisQualityReport(analysisResult, qualityCheck);
 
@@ -1843,7 +1843,7 @@
 
           showSuccess('接続と自動推定が完了しました！');
           // programmatic な fillColumnDropdowns では change が発火しないので明示 schedule する
-          try { scheduleAutoSave(); } catch (_) {}
+          try { scheduleAutoSave(); } catch (err) { console.warn('scheduleAutoSave failed:', err && err.message); }
         } else {
           showInfo('自動推定実行中...', 3000);
           try {
@@ -1860,7 +1860,7 @@
             });
 
             showSuccess('自動推定完了！設定を確認してください');
-            try { scheduleAutoSave(); } catch (_) {}
+            try { scheduleAutoSave(); } catch (err) { console.warn('scheduleAutoSave failed:', err && err.message); }
           } catch (analysisError) {
             console.warn('自動推定エラー:', analysisError);
             showWarning('自動推定に失敗しました。手動で設定するか「自動推定」ボタンで再実行してください');
@@ -2606,7 +2606,7 @@
           config.formTitle = formResult.formData.formTitle;
           systemState.config = { ...systemState.config, ...config };
           updateResourceButtons(systemState.config);
-          try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
+          try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (err) { console.warn('autofillAxisLabelsFromFormInfo failed:', err && err.message); }
         }
         next(config);
       }, (error) => {
@@ -2777,8 +2777,8 @@
       fillEmpty('y-max-label', items[1].rightLabel);
     }
     if (filled > 0) {
-      try { showInfo('軸ラベルをフォームから自動取得しました', 4000); } catch (_) {}
-      try { scheduleAutoSave(); } catch (_) {}
+      try { showInfo('軸ラベルをフォームから自動取得しました', 4000); } catch (_) { /* 通知が出せなくても処理は完了している */ }
+      try { scheduleAutoSave(); } catch (err) { console.warn('scheduleAutoSave failed:', err && err.message); }
     }
   }
 

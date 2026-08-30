@@ -323,7 +323,7 @@
 
         this.state.initializationComplete = true;
         this.state.isInitializing = false;
-        this.hideLoadingOverlay();
+        this.resumeRenderOptimization();
 
         if (this.elements.infoModalConfirmBtn) {
           this.elements.infoModalConfirmBtn.disabled = false;
@@ -345,7 +345,7 @@
       } catch (error) {
         console.error('StudyQuestApp: Critical error in init():', error);
         this.handleError(error, 'initialization', true);
-        this.hideLoadingOverlay();
+        this.resumeRenderOptimization();
       }
     }
 
@@ -2515,7 +2515,17 @@
       }
     }
 
-    showLoadingOverlay(message = '') {
+    /**
+     * 読み込み中だけ描画最適化 (transform / will-change) を止める。
+     *
+     * Why 名前を変えたか: 旧名は showLoadingOverlay / hideLoadingOverlay だったが、
+     *   この関数はオーバーレイを一切出さない。実際に切り替えるのは
+     *   .loading-active / .loading-safe で、効果は「transform を外して
+     *   stacking context の事故を防ぐ」ことだけ。読み込み中の視覚表示は
+     *   showLoadingState (スケルトン) が担当する。
+     *   「ローディング表示が出ない」を調べる人がここで迷わないよう、実体に合わせる。
+     */
+    suspendRenderOptimization() {
       document.body.classList.add('loading-active');
       if (this.elements.answersContainer) {
         this.elements.answersContainer.classList.add('loading-active');
@@ -2525,7 +2535,7 @@
       }
     }
 
-    hideLoadingOverlay() {
+    resumeRenderOptimization() {
       document.body.classList.remove('loading-active');
       if (this.elements.answersContainer) {
         this.elements.answersContainer.classList.remove('loading-active');
@@ -2555,7 +2565,7 @@
       try {
         this.state.isLoading = true;
         if (config.showLoading) {
-          this.showLoadingOverlay();
+          this.suspendRenderOptimization();
         }
 
         const oldAnswers = [...this.state.currentAnswers];
@@ -2571,7 +2581,7 @@
         this.handleError(error, 'data_load', true);
       } finally {
         this.state.isLoading = false;
-        this.hideLoadingOverlay();
+        this.resumeRenderOptimization();
 
         if (config.preserveAdminMode) {
           this.state.showAdminFeatures = true;

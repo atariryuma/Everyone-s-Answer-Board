@@ -1445,7 +1445,7 @@ function startLesson(userId, lessonId) {
       return createSuccessResponse('lesson 開始しました', { lesson: finalResult.lesson });
     } finally {
       if (lock && lock.releaseLock) {
-        try { lock.releaseLock(); } catch (_) {}
+        try { lock.releaseLock(); } catch (_) { /* lock は TTL で自動解放される */ }
       }
     }
   } catch (error) {
@@ -2108,7 +2108,15 @@ function submitLessonAnswer(targetUserId, payload) {
 
     // browse フェーズを見ている他の児童の画面に反映されるよう board cache を落とす。
     if (typeof bumpBoardDataVersion_ === 'function') {
-      try { bumpBoardDataVersion_(targetUserId); } catch (_) {}
+      try {
+        bumpBoardDataVersion_(targetUserId);
+      } catch (cacheErr) {
+        // 黙って落とさない: cache version を上げ損ねると、他の児童のボードに
+        //   古い分布が最大 12 秒残る。症状 (反映されない) だけが出て原因が
+        //   追えなくなるので、必ず痕跡を残す。処理自体は続行してよい。
+        console.warn('bumpBoardDataVersion_ failed (board may be stale up to 12s):',
+          cacheErr && cacheErr.message);
+      }
     }
 
     return createSuccessResponse('考えを送りました', {

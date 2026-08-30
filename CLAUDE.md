@@ -233,6 +233,18 @@ Google Sheets as database via service account. `users` sheet stores user records
 - **Cache PropertiesService** - use `getCachedProperty()` with 30s TTL (see helpers.js)
 - **Minimize external service calls** - in-script JS operations are faster
 
+### 診断可能性 (不具合の原因を追える状態を保つ)
+
+- **握りつぶし catch は「なぜ黙ってよいか」を必ず書く**。`catch (_) {}` だけだと、
+  安全な沈黙なのか書き忘れなのかを後から誰も区別できない。
+  例: `catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }`
+- **利用者に見える症状が出るのに痕跡が残らない失敗は、必ず log する**。
+  例: `bumpBoardDataVersion_` の失敗は他の児童のボードが最大 12 秒古いままになるので
+  `console.warn` を残す (処理は続行してよい)。
+- **関数名は実体を表す**。`showLoadingOverlay` はオーバーレイを出さず描画最適化を
+  止めるだけだったため `suspendRenderOptimization` に改名した。名前が嘘をつくと、
+  症状から探した人が必ず遠回りする。
+
 ### Security
 
 - **`Session.getActiveUser()` only** - never `getEffectiveUser()` (privilege escalation risk)

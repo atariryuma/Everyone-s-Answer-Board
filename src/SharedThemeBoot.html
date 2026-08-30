@@ -25,7 +25,7 @@
   (function () {
     try {
       var saved = null;
-      try { saved = localStorage.getItem('app-theme'); } catch (_) {}
+      try { saved = localStorage.getItem('app-theme'); } catch (_) { /* プライベートモード等では読めない。既定テーマで続行 */ }
       var VALID = ['dark', 'light', 'auto'];
       var theme = (saved && VALID.indexOf(saved) >= 0) ? saved : 'auto';
       var resolved = theme;

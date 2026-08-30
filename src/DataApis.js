@@ -1091,7 +1091,7 @@ function boardDataCacheKey_(userId, options) {
 function withBoardDataCache_(userId, options, loader) {
   if (typeof CacheService === 'undefined') return loader();
   let cache = null;
-  try { cache = CacheService.getScriptCache(); } catch (_) {}
+  try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
   if (!cache) return loader();
 
   const key = boardDataCacheKey_(userId, options);

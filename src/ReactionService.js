@@ -613,7 +613,15 @@ function executeBoardRowOperation(options) {
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
       // board data cache を即時 stale 化 (viewer の次 polling で fresh fetch)。
       if (typeof bumpBoardDataVersion_ === 'function') {
-        try { bumpBoardDataVersion_(targetUserId); } catch (_) { /* ignore */ }
+        try {
+          bumpBoardDataVersion_(targetUserId);
+        } catch (cacheErr) {
+          // 黙って落とさない: cache version を上げ損ねると、他の児童のボードに
+          //   古い分布が最大 12 秒残る。症状 (反映されない) だけが出て原因が
+          //   追えなくなるので、必ず痕跡を残す。処理自体は続行してよい。
+          console.warn('bumpBoardDataVersion_ failed (board may be stale up to 12s):',
+            cacheErr && cacheErr.message);
+        }
       }
       return formatSuccess(result);
     } finally {

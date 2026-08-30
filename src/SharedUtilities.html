@@ -616,7 +616,7 @@
     }
 
     function writeStorage(value) {
-      try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+      try { localStorage.setItem(STORAGE_KEY, value); } catch (_) { /* 保存できなくてもセッション内の表示は正しい */ }
     }
 
     function osPrefersDark() {
@@ -641,7 +641,7 @@
       if (html && html.classList) {
         html.classList.remove('dark', 'light', 'theme-dark', 'theme-light');
         html.classList.add(resolved, 'theme-' + resolved);
-        try { html.setAttribute('data-theme', resolved); } catch (_) {}
+        try { html.setAttribute('data-theme', resolved); } catch (_) { /* DOM 未準備時。次の適用機会で反映される */ }
         try { if (html.style) html.style.colorScheme = resolved; } catch (_) {}
       }
 
