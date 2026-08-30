@@ -104,7 +104,14 @@ function loadContext(overrides = {}) {
       create: () => nativeSs
     },
     // 児童は SS 直接権限を持たないので、本番では SA pool 経由で開かれる。
-    openSpreadsheet: overrides.openSpreadsheet || (() => nativeSs),
+    // 本物の openSpreadsheet は { spreadsheet, auth, accessMode, getSheet(name) } を返す。
+    //   偽物が中身を直接返していたため、getSheetByName 誤用が本番まで素通りした。
+    openSpreadsheet: overrides.openSpreadsheet || (() => ({
+      spreadsheet: nativeSs,
+      auth: { isValid: true },
+      accessMode: 'sa',
+      getSheet: (name) => nativeSs.getSheetByName(name)
+    })),
     applySpreadsheetSharingDefaults: (id) => { sharingCalls.push(id); return { saAdded: true }; },
     bumpBoardDataVersion_: (uid) => { cacheBumps.push(uid); },
     LESSONS_SHEET_HEADERS: LESSONS_HEADERS,

@@ -1376,7 +1376,11 @@ function startLesson(userId, lessonId) {
         //   config が指す先が無いと board が「データソース未接続」になってしまう。
         //   フェーズの見え方 (何が描かれるか) は screenRole が決める。
         if (__isNativePhase_(phase, lessonJson)) {
-          if (phase.sheetName) continue; // resume: 既に用意済みは skip
+          // 列マッピングは毎回作り直す (シート作成だけを skip する)。
+          //   resume でここを飛ばすと、規約が変わったときに古い mapping が
+          //   lessonJson に残り、読んだ人を誤解させる。
+          phase.columnMapping = __nativeColumnMapping_(phase.formTemplate);
+          if (phase.sheetName) continue; // resume: シートは作成済み
           try {
             const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName, boardOwnerEmail);
             phase.spreadsheetId = native.spreadsheetId;
@@ -2099,9 +2103,11 @@ function submitLessonAnswer(targetUserId, payload) {
     if (!reason) return createErrorResponse('理由を書いてください');
     const addedInsight = __sanitizeLessonText_(p.addedInsight);
 
-    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_submit' });
-    if (!ss) return createErrorResponse('回答シートを開けませんでした');
-    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    // openSpreadsheet は { spreadsheet, auth, accessMode, getSheet(name) } を返す。
+    //   SA proxy / native のどちらでも getSheet() 経由で取ること。
+    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_submit' });
+    if (!access) return createErrorResponse('回答シートを開けませんでした');
+    const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return createErrorResponse('回答シートが見つかりません');
 
     const row = [
@@ -2149,9 +2155,9 @@ function submitLessonAnswer(targetUserId, payload) {
 function __readOwnLessonAnswer_(phaseDef, actorEmail) {
   try {
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return null;
-    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_trajectory' });
-    if (!ss) return null;
-    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_trajectory' });
+    if (!access) return null;
+    const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return null;
     const rowNum = __findOwnLessonRow_(sheet, actorEmail);
     if (rowNum < 2) return null;
@@ -2263,9 +2269,9 @@ function getLessonReviewGrid(userId, lessonId) {
 function __readAllLessonRows_(phaseDef) {
   try {
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return [];
-    const ss = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_review_grid' });
-    if (!ss) return [];
-    const sheet = ss.getSheetByName(phaseDef.sheetName);
+    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_review_grid' });
+    if (!access) return [];
+    const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return [];
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return [];
