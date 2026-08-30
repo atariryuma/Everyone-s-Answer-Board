@@ -1148,12 +1148,54 @@ function deleteLesson(userId, lessonId) {
 
 // ----- Lifecycle: startLesson / advanceLessonPhase / endLesson -----
 
-// Form の回答受付を on/off。テスト sandbox では FormApp が無いので silently fall through。
-function __setFormAcceptingResponses_(formId, accepting) {
-  if (!formId) return false;
+/**
+ * phase の Form を開く。開けなければ null。
+ *
+ * Why 2 経路あるか: profiles から移行した授業 (meta.importedFromProfiles) は
+ *   formId に**公開 URL 側の ID** (`1FAIpQLS...`) が入っている。これは
+ *   FormApp.openById が受け付けない (編集用 ID とは別物) ため、移行由来の授業では
+ *   フェーズごとの Form 開閉が最初から効いていなかった。
+ *   回答スプレッドシートは編集用 URL を知っている (getFormUrl) ので、そこから復旧する。
+ *
+ * 復旧できたら phase.formId を編集用 ID に**書き直す** (呼び出し元が lessonJson を
+ * 保存すれば次回から 1 発で開く)。
+ */
+function __openLessonForm_(phase) {
+  if (typeof FormApp === 'undefined') return null;
+  const formId = phase && phase.formId;
+  if (formId && FormApp.openById) {
+    try {
+      return FormApp.openById(formId);
+    } catch (_) {
+      // 公開 URL 側の ID だった可能性がある。下の SS 経由へ。
+    }
+  }
+  const ssId = phase && phase.spreadsheetId;
+  if (!ssId || typeof SpreadsheetApp === 'undefined' || !FormApp.openByUrl) return null;
   try {
-    if (typeof FormApp === 'undefined' || !FormApp.openById) return false;
-    FormApp.openById(formId).setAcceptingResponses(Boolean(accepting));
+    const editUrl = SpreadsheetApp.openById(ssId).getFormUrl();
+    if (!editUrl) return null;
+    const form = FormApp.openByUrl(editUrl);
+    // 復旧した編集用 ID を phase に書き戻す (次回以降は 1 発で開く)。
+    if (form && form.getId) phase.formId = form.getId();
+    return form;
+  } catch (error) {
+    logError_('__openLessonForm_', error);
+    return null;
+  }
+}
+
+// Form の回答受付を on/off。テスト sandbox では FormApp が無いので silently fall through。
+//   phase オブジェクトを渡すと、移行由来の授業でも SS 経由で Form を解決する。
+function __setFormAcceptingResponses_(phaseOrFormId, accepting) {
+  const phase = (phaseOrFormId && typeof phaseOrFormId === 'object')
+    ? phaseOrFormId
+    : { formId: phaseOrFormId };
+  if (!phase.formId && !phase.spreadsheetId) return false;
+  try {
+    const form = __openLessonForm_(phase);
+    if (!form) return false;
+    form.setAcceptingResponses(Boolean(accepting));
     return true;
   } catch (error) {
     logError_('__setFormAcceptingResponses_', error);
@@ -1536,7 +1578,7 @@ function startLesson(userId, lessonId) {
         phase.sheetName = formResult.sheetName || 'フォームの回答 1';
 
         // Form を「受付中」にするのは phase 0 のみ。i>0 は close。
-        __setFormAcceptingResponses_(phase.formId, i === 0);
+        __setFormAcceptingResponses_(phase, i === 0);
 
         // 進捗を逐次永続化 (次クリックで resume 可能)。
         //   最後の phase は次の applyConfigPatch_ + state=active の write でまとめて書くので skip。
@@ -1644,8 +1686,8 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     }
 
     // 現フェーズ Form を close、次フェーズ Form を open (冪等)。
-    __setFormAcceptingResponses_(phases[fromIdx].formId, false);
-    __setFormAcceptingResponses_(phases[toIdx].formId, true);
+    __setFormAcceptingResponses_(phases[fromIdx], false);
+    __setFormAcceptingResponses_(phases[toIdx], true);
 
     // user config を次フェーズに切替 (board が即座に新フェーズに対応; 冪等)
     const target = phases[toIdx];
@@ -1700,7 +1742,7 @@ function reopenLesson(userId, lessonId) {
     }
 
     // 再開 phase の Form だけ受付再開 (他 phase は advance が通過時に開閉する)。
-    __setFormAcceptingResponses_(phases[idx].formId, true);
+    __setFormAcceptingResponses_(phases[idx], true);
 
     // config を再開 phase に合わせる + auto-archive の safety net marker を立てる
     //   (通常は publishApp が立てるが、再開はボード公開済みのまま行われうる)。
@@ -1743,7 +1785,7 @@ function endLesson(userId, lessonId) {
     const phases = lessonJson.phases || [];
 
     // 全 phase Form を close (締切)
-    phases.forEach(p => __setFormAcceptingResponses_(p.formId, false));
+    phases.forEach(p => __setFormAcceptingResponses_(p, false));
 
     // 現フェーズの rows を freeze して snapshots に upsert。capture 失敗時は reason 付き空 snapshot
     //   が積まれ、endLesson 自体は成功する (lesson は必ず completed に遷移する原則)。
@@ -1767,6 +1809,63 @@ function endLesson(userId, lessonId) {
     });
   } catch (error) {
     logError_('endLesson', error);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 授業の全 Form の回答受付を締め切る (状態を問わず実行できる)。
+ *
+ * Why endLesson と別に要るか: endLesson は active な授業しか対象にできない。
+ *   すでに completed の授業で Form が開いたままなら、締め切る手段が
+ *   「Google フォームを開いて 1 つずつ」しかなくなる。教師をアプリの外に出さない。
+ *
+ * Why 教師本人が実行する必要があるか: FormApp は Form の所有者の権限で動く。
+ *   API キー経由 (管理者) では他人の Form を開けないので、管理パネルから
+ *   本人が実行する導線として用意する。
+ *
+ * @returns {Object} { closed, failed, repaired, total }
+ */
+function closeLessonForms(userId, lessonId) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const { found } = auth;
+
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    if (phases.length === 0) {
+      return createErrorResponse('フェーズがありません');
+    }
+    if (__isNativePhase_({}, lessonJson)) {
+      return createSuccessResponse('この授業は Google フォームを使っていません', {
+        closed: 0, failed: 0, repaired: 0, total: 0
+      });
+    }
+
+    let closed = 0, failed = 0, repaired = 0;
+    const failedPhases = [];
+    for (let i = 0; i < phases.length; i++) {
+      const before = phases[i].formId;
+      if (__setFormAcceptingResponses_(phases[i], false)) {
+        closed++;
+        // __openLessonForm_ が編集用 ID に直していたら記録する。
+        if (phases[i].formId !== before) repaired++;
+      } else {
+        failed++;
+        failedPhases.push(phases[i].name || ('フェーズ ' + (i + 1)));
+      }
+    }
+
+    // 復旧した formId を永続化する (次回は 1 発で開く)。
+    if (repaired > 0) __updateLessonRow_(lessonId, { lessonJson });
+
+    const msg = failed === 0
+      ? `${closed} 件のフォームを締め切りました`
+      : `${closed} 件を締め切り、${failed} 件は開けませんでした (${failedPhases.join(' / ')})`;
+    return createSuccessResponse(msg, { closed, failed, repaired, total: phases.length });
+  } catch (error) {
+    logError_('closeLessonForms', error);
     return createExceptionResponse(error);
   }
 }

@@ -3201,6 +3201,7 @@
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
             ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-reopen="${safeId}" title="授業を再開して回答受付を再開する">再開</button>` : ''}
+            ${l.state === 'completed' ? `<button class="btn btn-secondary text-xs" data-lesson-close-forms="${safeId}" title="この授業の Google フォームの回答受付を締め切る">フォーム締切</button>` : ''}
             <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="この授業をテンプレートとして複製"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"></use></svg>複製</button>
             <button class="btn btn-secondary text-xs lesson-delete-btn" data-lesson-delete="${safeId}" title="この授業を削除" aria-label="この授業を削除"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg></button>
           </li>`;
@@ -3236,6 +3237,31 @@
           // draft → wizard で続きから編集
           openLessonWizard(lessonId);
         }
+        return;
+      }
+      // 完了した授業の Form を締め切る。教師をアプリの外 (Google フォーム) に出さない。
+      //   FormApp は Form 所有者の権限で動くので、本人がパネルから実行する必要がある。
+      const closeFormsTarget = event.target.closest('[data-lesson-close-forms]');
+      if (closeFormsTarget) {
+        const lessonId = closeFormsTarget.dataset.lessonCloseForms;
+        window.modals.confirm(
+          'この授業の Google フォームの回答受付を締め切りますか？（授業のデータは消えません）',
+          { title: 'フォームを締め切る', okLabel: '締め切る' }
+        ).then((ok) => {
+          if (!ok) return;
+          const task = () => gasRun('lesson.closeForms', { userId, lessonId }).then((res) => {
+            if (res && res.success) {
+              window.notifications.success(res.message || 'フォームを締め切りました');
+            } else {
+              window.showError((res && res.message) || 'フォームを締め切れませんでした');
+            }
+          });
+          if (busyBtns()) {
+            busyBtns().withBusy(closeFormsTarget, task, { busyText: '締切中...' });
+          } else {
+            task();
+          }
+        });
         return;
       }
       const reopenTarget = event.target.closest('[data-lesson-reopen]');

@@ -603,6 +603,112 @@ test('getMyLessonTrajectory: 他人の航跡は返らない (自分の分だけ)
 });
 
 // =====================================================================
+// 移行由来の授業の Form 復旧 (closeLessonForms)
+//
+// profiles から移行した授業は formId に公開 URL 側の ID が入っており、
+// FormApp.openById が通らない = フェーズごとの Form 開閉が効いていなかった。
+// 回答スプレッドシートが編集用 URL を知っているので、そこから復旧する。
+// =====================================================================
+
+// 公開 ID では開けず、編集用 URL 経由でのみ開ける Form を再現する harness。
+function loadFormRepairContext() {
+  const h = loadContext();
+  const opened = [];
+  const acceptingCalls = [];
+  const form = {
+    getId: () => 'EDIT_ID_1',
+    setAcceptingResponses: (b) => { acceptingCalls.push(b); }
+  };
+  h.context.FormApp = {
+    openById: (id) => {
+      opened.push(['byId', id]);
+      if (id !== 'EDIT_ID_1') throw new Error('指定した ID のアイテムは見つかりませんでした');
+      return form;
+    },
+    openByUrl: (url) => {
+      opened.push(['byUrl', url]);
+      if (url !== 'https://docs.google.com/forms/d/EDIT_ID_1/edit') throw new Error('not found');
+      return form;
+    }
+  };
+  // 回答 SS だけを差し替え、それ以外 (native の回答シート等) は元の挙動に委ねる。
+  const originalOpenById = h.context.SpreadsheetApp.openById;
+  h.context.SpreadsheetApp = Object.assign({}, h.context.SpreadsheetApp, {
+    openById: (id) => {
+      if (id === 'resp_ss_1') {
+        return { getFormUrl: () => 'https://docs.google.com/forms/d/EDIT_ID_1/edit' };
+      }
+      if (id === 'missing_ss') return { getFormUrl: () => null };
+      return originalOpenById(id);
+    }
+  });
+  return { h, opened, acceptingCalls };
+}
+
+test('closeLessonForms: 公開 ID しか無くても回答シート経由で Form を締め切る', () => {
+  const { h, acceptingCalls } = loadFormRepairContext();
+  const draft = h.context.createLessonDraft('u1', '移行授業', 'doutoku-3phase');
+  const lessonId = draft.data.lesson.lessonId;
+  // 移行由来を再現: formId は公開 URL 側の ID、回答 SS はある
+  const row = h.lessonsSheet._data[1];
+  const j = JSON.parse(row[10]);
+  j.phases = [{ name: '導入', formTemplate: 'numberline', formId: '1FAIpQLS_public', spreadsheetId: 'resp_ss_1', sheetName: 'フォームの回答 1' }];
+  row[10] = JSON.stringify(j);
+
+  const res = h.context.closeLessonForms('u1', lessonId);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.closed, 1);
+  assert.equal(res.data.failed, 0);
+  assert.equal(res.data.repaired, 1, '編集用 ID への復旧が記録されていない');
+  assert.deepEqual(Array.from(acceptingCalls), [false]);
+});
+
+test('closeLessonForms: 復旧した編集用 ID を保存する (次回は 1 発で開く)', () => {
+  const { h } = loadFormRepairContext();
+  const draft = h.context.createLessonDraft('u1', '移行授業', 'doutoku-3phase');
+  const lessonId = draft.data.lesson.lessonId;
+  const row = h.lessonsSheet._data[1];
+  const j = JSON.parse(row[10]);
+  j.phases = [{ name: '導入', formTemplate: 'numberline', formId: '1FAIpQLS_public', spreadsheetId: 'resp_ss_1', sheetName: 'x' }];
+  row[10] = JSON.stringify(j);
+
+  h.context.closeLessonForms('u1', lessonId);
+  const after = JSON.parse(h.lessonsSheet._data[1][10]);
+  assert.equal(after.phases[0].formId, 'EDIT_ID_1');
+});
+
+test('closeLessonForms: 開けないフェーズは失敗として名前付きで報告する', () => {
+  const { h } = loadFormRepairContext();
+  const draft = h.context.createLessonDraft('u1', '移行授業', 'doutoku-3phase');
+  const lessonId = draft.data.lesson.lessonId;
+  const row = h.lessonsSheet._data[1];
+  const j = JSON.parse(row[10]);
+  j.phases = [{ name: '壊れたフェーズ', formTemplate: 'numberline', formId: '1FAIpQLS_public', spreadsheetId: 'missing_ss' }];
+  row[10] = JSON.stringify(j);
+
+  const res = h.context.closeLessonForms('u1', lessonId);
+  assert.equal(res.data.failed, 1);
+  assert.match(res.message, /壊れたフェーズ/);
+});
+
+test('closeLessonForms: 授業モード (native) は Form を使わないので no-op', () => {
+  const { h } = loadFormRepairContext();
+  const lessonId = startNativeLesson(h);
+  const res = h.context.closeLessonForms('u1', lessonId);
+  assert.equal(res.success, true);
+  assert.equal(res.data.total, 0);
+  assert.match(res.message, /使っていません/);
+});
+
+test('closeLessonForms: 所有者以外は実行できない', () => {
+  const { h } = loadFormRepairContext();
+  const draft = h.context.createLessonDraft('u1', '移行授業', 'doutoku-3phase');
+  h.setEmail('someone@example.com');
+  const res = h.context.closeLessonForms('u1', draft.data.lesson.lessonId);
+  assert.equal(res.success, false);
+});
+
+// =====================================================================
 // 教師の見取りグリッド (getLessonReviewGrid)
 // =====================================================================
 
