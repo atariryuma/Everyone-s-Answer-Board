@@ -332,15 +332,21 @@ function declFor(cls) {
   if (cls === 'border') return { 'border-width': '1px', 'border-style': 'solid' };
   m = cls.match(/^border-(\d)$/);
   if (m) return { 'border-width': `${m[1]}px`, 'border-style': 'solid' };
+  // Why 片側だけに style を当てるか: border-style は 4 辺まとめて効くショートハンド。
+  //   border-t に 'border-style: solid' を付けると、幅を指定していない 3 辺が
+  //   既定値 (medium ≒ 1.5px) で描画され、上線のつもりが箱になる。
+  //   Tailwind は preflight で全要素に border-width:0 を敷いてこれを回避しているが、
+  //   本プロジェクトは CDN 廃止時にその preflight を持たない (下の base 参照)。
+  //   divide-y は元から border-top-style で正しく書かれていた。
   m = cls.match(/^border-([trbl])-(\d)$/);
   if (m) {
     const side = { t: 'top', r: 'right', b: 'bottom', l: 'left' }[m[1]];
-    return { [`border-${side}-width`]: `${m[2]}px`, 'border-style': 'solid' };
+    return { [`border-${side}-width`]: `${m[2]}px`, [`border-${side}-style`]: 'solid' };
   }
   m = cls.match(/^border-([trbl])$/);
   if (m) {
     const side = { t: 'top', r: 'right', b: 'bottom', l: 'left' }[m[1]];
-    return { [`border-${side}-width`]: '1px', 'border-style': 'solid' };
+    return { [`border-${side}-width`]: '1px', [`border-${side}-style`]: 'solid' };
   }
   m = cls.match(/^border-(.+)$/);
   if (m) {
