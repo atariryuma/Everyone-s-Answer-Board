@@ -46,6 +46,8 @@ function loadDoGetContext(overrides = {}) {
     validateDomainAccess: () => ({ allowed: true }),
     getBatchedAdminData: () => ({ success: false, error: 'test error' }),
     getBatchedViewerData: () => ({ success: false, error: 'test error' }),
+    // main.js は DataApis.js の sameEmail_ を参照する (GAS は単一グローバルスコープ)
+    sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     enhanceConfigWithDynamicUrls: (c) => c,
     PropertiesService: {
       getScriptProperties: () => ({

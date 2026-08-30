@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, migrateLessonArchive, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, migrateLessonArchive, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -137,8 +137,19 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   if (!email) return createAuthError();
 
   // 対象ユーザーの特定（指定があればそれ、なければ自分）
-  let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: email }) : null;
-  if (!targetUser) {
+  //
+  // Why 見つからないときに自分へ差し替えないか: findUserById は admin/本人のみ通す strict ACL
+  //   なので、collaborator が他人のボードを指定すると null になる。ここで自分の record に
+  //   フォールバックすると「他人のボードを止めるつもりが自分のボードを止める」事故になる
+  //   (collaborator の緊急停止は下の分岐で許可しているのに、対象がすり替わって無意味だった)。
+  //   公開中のボードは findPublishedBoardOwner で引けるので、そちらで解決する。
+  let targetUser;
+  if (targetUserId) {
+    targetUser = findUserById(targetUserId, { requestingUser: email })
+      || (typeof findPublishedBoardOwner === 'function'
+        ? findPublishedBoardOwner(targetUserId, email)
+        : null);
+  } else {
     targetUser = findUserByEmail(email, { requestingUser: email });
   }
   if (!targetUser) return createUserNotFoundError();

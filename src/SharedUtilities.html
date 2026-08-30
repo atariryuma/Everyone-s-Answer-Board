@@ -1339,6 +1339,10 @@
   window.showSuccess = (message, opts) => window.notifications.success(message, opts);
   window.showError   = (message, opts) => window.notifications.error(message, opts);
   window.showInfo    = (message, opts) => window.notifications.info(message, opts);
+  // showWarning が欠けていたため、AdminPanel の列推定失敗パスが
+  //   ReferenceError で落ちていた (エラー処理そのものが壊れる = 最も気付きにくい)。
+  //   opts に number を渡す旧 API 呼び出しは _normalizeOpts が {duration} に変換する。
+  window.showWarning = (message, opts) => window.notifications.warning(message, opts);
 
 
 

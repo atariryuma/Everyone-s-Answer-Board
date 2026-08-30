@@ -331,3 +331,87 @@ test('dispatch: toggleUserBoard with etag forwards to lifecycle helper', () => {
   const r2 = ctx.dispatchAdminOperation('toggleUserBoard', { targetUserId: 'other1', etag: 'cur' });
   assert.equal(r2.success, true);
 });
+
+// =====================================================================
+// 対象ユーザー解決: 見つからないときに「自分」へすり替えない (v2895)
+//
+// 本番の findUserById は admin/本人のみ通す strict ACL なので、collaborator が
+// 他人の userId を渡すと null になる。旧実装はそこで findUserByEmail(自分) に
+// フォールバックしており、「他人のボードを止めるつもりが自分のボードを止める」
+// 事故が起きうる状態だった (collaborator の緊急停止が無意味になる)。
+// =====================================================================
+
+// 本番の ACL を再現する stub: 呼び出し元が admin/本人でなければ null を返す。
+function strictUserLookup(users, callerEmail, { isAdmin = false } = {}) {
+  return {
+    findUserById: (id, ctx) => {
+      const u = users.find(x => x.userId === id);
+      if (!u) return null;
+      const requester = (ctx && ctx.requestingUser) || callerEmail;
+      if (isAdmin || u.userEmail === requester) return u;
+      return null;   // strict: 他人の record は引けない
+    },
+    findUserByEmail: (email) => users.find(u => u.userEmail === email) || null
+  };
+}
+
+test('unpublishBoard: collaborator の指定が自分のボードにすり替わらない', () => {
+  const users = [
+    { userId: 'owner1', userEmail: 'owner@example.com', configJson: '{}' },
+    { userId: 'collab1', userEmail: 'collab@example.com', configJson: '{}' }
+  ];
+  const ctx = loadAdminContext(Object.assign({
+    users,
+    isAdministrator: () => false,
+    getCurrentEmail: () => 'collab@example.com',
+    isBoardCollaborator: (user, email) => email === 'collab@example.com',
+    // 公開中のボードは published-read 経路で引ける (本番と同じ)
+    findPublishedBoardOwner: (id) => users.find(u => u.userId === id) || null
+  }, strictUserLookup(users, 'collab@example.com')));
+
+  ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
+  ctx.__savedConfigs['collab1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
+
+  const result = ctx.unpublishBoard('owner1');
+
+  assert.equal(result.success, true, result.message);
+  assert.equal(result.userId, 'owner1', '対象が owner1 以外にすり替わっている');
+  assert.equal(ctx.__savedConfigs['owner1'].isPublished, false, '対象ボードが止まっていない');
+  assert.equal(ctx.__savedConfigs['collab1'].isPublished, true, '自分のボードを巻き添えで止めている');
+});
+
+test('unpublishBoard: 引けない userId は「自分」ではなく not found を返す', () => {
+  const users = [
+    { userId: 'owner1', userEmail: 'owner@example.com', configJson: '{}' },
+    { userId: 'stranger1', userEmail: 'stranger@example.com', configJson: '{}' }
+  ];
+  const ctx = loadAdminContext(Object.assign({
+    users,
+    isAdministrator: () => false,
+    getCurrentEmail: () => 'stranger@example.com',
+    isBoardCollaborator: () => false,
+    findPublishedBoardOwner: () => null   // 非公開なので published-read でも引けない
+  }, strictUserLookup(users, 'stranger@example.com')));
+
+  ctx.__savedConfigs['stranger1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
+
+  const result = ctx.unpublishBoard('owner1');
+  assert.equal(result.success, false);
+  assert.equal(ctx.__savedConfigs['stranger1'].isPublished, true, '自分のボードが止められている');
+});
+
+test('unpublishBoard: targetUserId 未指定なら従来どおり自分のボード', () => {
+  const users = [{ userId: 'owner1', userEmail: 'owner@example.com', configJson: '{}' }];
+  const ctx = loadAdminContext(Object.assign({
+    users,
+    isAdministrator: () => false,
+    getCurrentEmail: () => 'owner@example.com',
+    isBoardCollaborator: () => false
+  }, strictUserLookup(users, 'owner@example.com')));
+
+  ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
+
+  const result = ctx.unpublishBoard();
+  assert.equal(result.success, true, result.message);
+  assert.equal(ctx.__savedConfigs['owner1'].isPublished, false);
+});

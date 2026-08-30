@@ -325,21 +325,6 @@
   }
 
   /**
-   * ウェルカムモーダルを既読にする（サーバー側保存）
-   */
-  function markWelcomeSeenOnServer() {
-    runServer('markWelcomeSeen').then((result) => {
-      if (result && result.success) {
-        if (systemState.config) systemState.config.hasSeenWelcome = true;
-      } else {
-        console.warn('Failed to save welcome seen flag:', result && result.message);
-      }
-    }, (error) => {
-      console.error('markWelcomeSeen error:', error);
-    });
-  }
-
-  /**
    * Core panel initialization (no API calls)
    */
   async function initializePanelCore() {

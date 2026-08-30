@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer */
+/* global VALIDATOR_BOARD_MODES, migrateLegacyProfilesToLesson_, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -272,7 +272,7 @@ function handleViewMode_(params, currentEmail) {
   }
 
   const { targetUser, config, isAdminUser } = viewerData;
-  const isOwnBoard = currentEmail === targetUser.userEmail;
+  const isOwnBoard = sameEmail_(currentEmail, targetUser.userEmail);
   const isPublished = Boolean(config.isPublished);
 
   // Why isActive check: 管理者がユーザーを「無効化」(isActive=false) しても、本人の
@@ -975,7 +975,7 @@ function getBatchedAdminData(targetUserId) {
       return { success: false, error: '指定されたユーザーが見つかりません' };
     }
 
-    const isOwnBoard = currentEmail === targetUser.userEmail;
+    const isOwnBoard = sameEmail_(currentEmail, targetUser.userEmail);
 
     if (!isAdmin && !isOwnBoard) {
       return {
