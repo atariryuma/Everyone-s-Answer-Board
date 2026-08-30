@@ -255,6 +255,41 @@ test('入力フェーズは自分のシートを見る', () => {
   assert.equal(h.context.__buildPhaseConfigPatch_(phases[3], lessonJson, 'l1').sheetName, 'phase4');
 });
 
+test('もう一度考えるフェーズは「考える」と同じ軸を使う (● → ★ の比較が成立する条件)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  // 教師は最初の入力フェーズにだけ軸を設定する
+  phases[0].templateOptions = {
+    xLow: '自首を勧める', xHigh: '逃がす', yLow: '迷いあり', yHigh: '迷いなし'
+  };
+  const reinput = h.context.__buildPhaseConfigPatch_(phases[3], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, reinput.xAxisLabels), { min: '自首を勧める', max: '逃がす' });
+  assert.deepEqual(Object.assign({}, reinput.yAxisLabels), { min: '迷いあり', max: '迷いなし' });
+  // データ源は自分のシート (入力フェーズなので)
+  assert.equal(reinput.sheetName, 'phase4');
+});
+
+test('phase 個別に軸を設定すればそちらが優先される', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  phases[0].templateOptions = { xLow: 'A', xHigh: 'B', yLow: 'C', yHigh: 'D' };
+  phases[3].templateOptions = { xLow: 'X', xHigh: 'Y', yLow: 'Z', yHigh: 'W' };
+  const reinput = h.context.__buildPhaseConfigPatch_(phases[3], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, reinput.xAxisLabels), { min: 'X', max: 'Y' });
+});
+
 test('出会うフェーズは「考える」の軸ラベルを引き継ぐ (データと軸の意味を一致させる)', () => {
   const h = loadContext();
   const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');

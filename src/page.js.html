@@ -1671,10 +1671,7 @@
             '<label class="lesson-label" for="lessonName">名前</label>' +
             '<input id="lessonName" class="lesson-input" type="text" maxlength="50" ' +
               'placeholder="名前を入力してください" value="" />') +
-          '<div class="lesson-grid-wrap">' +
-            '<div id="lessonGrid" class="lesson-grid" role="application" ' +
-              'aria-label="考えの位置を選ぶ4象限"></div>' +
-          '</div>' +
+          this.__buildLessonAxisFrame() +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
             'placeholder="そこを選んだ理由を書いてください"></textarea>' +
@@ -1692,6 +1689,30 @@
       if (btn) {
         btn.addEventListener('click', () => this.__submitLessonAnswer());
       }
+    }
+
+    /**
+     * 格子の上下左右に軸ラベルを置いた枠を返す。
+     *
+     * Why 必須か: ラベルのない格子は「どちらが自首を勧めるのか」が分からず、
+     *   児童はタップの意味を持てない。軸ラベルは教師がフェーズに設定したもの
+     *   (config.xAxisLabels / yAxisLabels) をそのまま使う。
+     */
+    __buildLessonAxisFrame() {
+      const esc = this.__escape.bind(this);
+      const axis = this.state.axisConfig || {};
+      const x = axis.xAxisLabels || {};
+      const y = axis.yAxisLabels || {};
+      return '<div class="lesson-grid-frame">' +
+        '<div class="lesson-axis-label lesson-axis-top">' + esc(y.max || '') + '</div>' +
+        '<div class="lesson-axis-label lesson-axis-left">' + esc(x.min || '') + '</div>' +
+        '<div class="lesson-grid-wrap">' +
+          '<div id="lessonGrid" class="lesson-grid" role="application" ' +
+            'aria-label="考えの位置を選ぶ4象限"></div>' +
+        '</div>' +
+        '<div class="lesson-axis-label lesson-axis-right">' + esc(x.max || '') + '</div>' +
+        '<div class="lesson-axis-label lesson-axis-bottom">' + esc(y.min || '') + '</div>' +
+      '</div>';
     }
 
     /**

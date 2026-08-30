@@ -1232,9 +1232,6 @@ function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
  * 投稿を受け付けないフェーズ (出会う / 議論する / ふりかえる) は、直前の入力フェーズの
  * シートを見る。「出会う」で見るのは「考える」で集まった考えだから。
  *
- * 軸ラベルもこの phase のものを使う。表示するデータと軸の意味は一致していなければ
- * ならないので、データ源と軸は必ず同じ phase から取る。
- *
  * @returns {Object|null} 参照先の phase / 自分のシートでよければ null
  */
 function __nativeDataSourcePhase_(phase, lessonJson) {
@@ -1249,16 +1246,34 @@ function __nativeDataSourcePhase_(phase, lessonJson) {
   return null;  // まだ入力フェーズを通っていない (授業の冒頭) = 空でよい
 }
 
+/**
+ * 授業全体の座標系を決める phase (= 最初の入力フェーズ)。
+ *
+ * Why 授業で 1 つに揃えるか: ● 最初 → ★ いま の比較は、両方が同じ軸の上にあって
+ *   初めて意味を持つ。「考える」と「もう一度考える」で軸ラベルが違うと、
+ *   位置の変化が何を表すのか誰にも説明できなくなる。教師が軸を設定するのは 1 回でよい。
+ */
+function __nativeAxisPhase_(lessonJson) {
+  const phases = (lessonJson && Array.isArray(lessonJson.phases)) ? lessonJson.phases : [];
+  for (let i = 0; i < phases.length; i++) {
+    if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0) return phases[i];
+  }
+  return null;
+}
+
 function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   // displaySettings が phase に明示指定されていればそれを優先、
   //   無ければ formTemplate から決定。templateOptions から axis ラベルも反映。
   const baseDisplay = phase.displaySettings || {};
-  // native の非入力フェーズは直前の入力フェーズのデータを表示するので、
-  //   軸ラベルもそのフェーズのものを使う (データと軸の意味を一致させる)。
-  const nativeSource = __isNativePhase_(phase, lessonJson)
-    ? __nativeDataSourcePhase_(phase, lessonJson)
-    : null;
-  const opts = (nativeSource && nativeSource.templateOptions) || phase.templateOptions || {};
+  const isNative = __isNativePhase_(phase, lessonJson);
+  // native の非入力フェーズは直前の入力フェーズのデータを表示する。
+  const nativeSource = isNative ? __nativeDataSourcePhase_(phase, lessonJson) : null;
+  // 軸ラベルは授業を通して 1 つの座標系に揃える (最初の入力フェーズのもの)。
+  //   phase 個別に設定されていればそれを優先する (教師が意図的に変えた場合)。
+  const axisPhase = isNative ? __nativeAxisPhase_(lessonJson) : null;
+  const ownOpts = phase.templateOptions || {};
+  const hasOwnAxis = Boolean(ownOpts.xLow || ownOpts.xHigh || ownOpts.yLow || ownOpts.yHigh);
+  const opts = (!hasOwnAxis && axisPhase && axisPhase.templateOptions) || ownOpts;
   const displaySettings = Object.assign({}, baseDisplay);
   if (!displaySettings.boardMode) {
     displaySettings.boardMode = __templateToBoardMode_(phase.formTemplate);
