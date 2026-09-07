@@ -1157,7 +1157,54 @@ button.highlight-badge:hover {
 .lesson-count-classes strong {
   color: var(--theme-text-primary);
 }
-/* 教師が分布を開いているときの帯。閉じる導線だけを持つ。 */
+/* 授業の操作面 (ピル + 次へ / 終了)。ヘッダ・待機画面・帯で同じ見た目。 */
+.lesson-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.lesson-control .board-phase-btn {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--theme-border-subtle);
+  background: transparent;
+  color: var(--theme-text-secondary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lesson-control .board-phase-btn[aria-current="true"] {
+  background: var(--theme-bg-elevated);
+  border-color: var(--theme-accent-cyan-strong);
+  color: var(--theme-text-primary);
+  font-weight: 700;
+}
+.lesson-control .board-phase-btn:disabled { cursor: default; }
+.lesson-control .board-phase-btn.is-busy { opacity: 0.6; cursor: wait; }
+.lesson-control .lesson-control-primary {
+  margin-left: var(--space-2);
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--theme-bg-base);
+  font-weight: 700;
+}
+.lesson-control .lesson-control-end {
+  background: var(--theme-status-error-soft);
+  border-color: var(--theme-status-error-soft);
+  color: var(--theme-status-error-text-on-soft);
+}
+.lesson-teacher-wait .lesson-control-host {
+  display: flex;
+  justify-content: center;
+}
+.lesson-teacher-wait .lesson-control .board-phase-btn {
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* 教師が分布を開いているときの帯。閉じる導線と操作面を持つ。 */
 .lesson-teacher-bar {
   position: fixed;
   top: 0;
@@ -1167,6 +1214,7 @@ button.highlight-badge:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   font-size: var(--font-size-sm);

@@ -1582,6 +1582,10 @@
         || prev.lessonId !== phase.lessonId;
       this.state.lessonPhase = phase || null;
 
+      // 教師: ヘッダ / 待機画面の操作面を、いま届いたフェーズに合わせる。
+      //   管理パネルで進めた・授業をあとから始めた・終了した、のどれでもボードが追従する。
+      if (this.state.isEditor === true) this.__syncBoardPhaseNav(phase);
+
       if (!phase) {
         // 授業が終わった / 掲示板モードに戻った
         this.__teardownLessonScreen();
@@ -1595,7 +1599,8 @@
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
       this.state.lessonTeacherPeek = false;
-      if (prev) {
+      // 「進みました」は児童向け。教師は自分で進めるので出さない (切替時の success と二重になる)。
+      if (prev && this.state.isEditor !== true) {
         this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
       }
       this.__renderLessonScreen();
@@ -1651,6 +1656,7 @@
         : '';
       host.innerHTML =
         '<div class="lesson-card lesson-teacher-wait">' +
+          '<div class="lesson-control-host" role="group" aria-label="授業のフェーズ切替"></div>' +
           '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
           '<div class="lesson-count" aria-live="polite">' +
@@ -1670,6 +1676,7 @@
           this.__renderLessonScreen();
         });
       }
+      this.__renderBoardPhaseNav();
     }
 
     // 教師が分布を開いているときの小さな帯。閉じる導線だけを持つ。
@@ -1692,8 +1699,12 @@
         this.state.lessonTeacherPeek = false;
         this.__renderLessonScreen();
       });
+      const controls = document.createElement('div');
+      controls.className = 'lesson-control-host';
       bar.appendChild(label);
       bar.appendChild(btn);
+      bar.appendChild(controls);
+      this.__renderBoardPhaseNav();
     }
 
     // データ更新 (polling) のたびに送信済み人数を描き直す。待機画面が出ていないときは何もしない。
@@ -2532,18 +2543,23 @@
       this.__renderBoardPhaseNav();
     }
 
-    __renderBoardPhaseNav() {
-      const host = document.getElementById('boardPhaseNav');
-      if (!host) return;
+    /**
+     * 授業中の教師の操作面。ヘッダのピル / 入力フェーズの待機画面 / 分布を開いている間の帯、
+     *   どこに出ていても中身は同じ 1 つの builder から作る。
+     *   Why: 以前はヘッダのピルだけで、待機画面がそれを覆うと「考える」から先へ進む
+     *   手段が画面上から消えた。操作面が場所ごとに別実装だと、こういう穴が場所の数だけ開く。
+     */
+    __buildLessonControlNode() {
       const nav = this.state.boardPhaseNav;
-      host.textContent = '';
-      if (!nav) { host.classList.add('hidden'); return; }
-      host.classList.remove('hidden');
+      const wrap = document.createElement('div');
+      wrap.className = 'lesson-control';
+      if (!nav) return wrap;
+      const busy = Boolean(this.state.__phaseSwitching);
       nav.phases.forEach((ph) => {
         const current = ph.index === nav.activePhaseIndex;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'board-phase-btn';
+        btn.className = 'board-phase-btn' + (busy ? ' is-busy' : '');
         btn.textContent = ph.name;
         btn.title = current ? '現在のフェーズ' : '「' + ph.name + '」に切替える';
         if (current) {
@@ -2552,8 +2568,105 @@
         } else {
           btn.addEventListener('click', () => this.__switchBoardPhase(ph));
         }
-        host.appendChild(btn);
+        wrap.appendChild(btn);
       });
+      // 主操作は 1 つ: 次のフェーズへ。最後のフェーズでは「授業を終了」。
+      const last = nav.phases.length - 1;
+      const next = nav.phases[nav.activePhaseIndex + 1] || null;
+      const primary = document.createElement('button');
+      primary.type = 'button';
+      primary.className = 'board-phase-btn lesson-control-primary' + (busy ? ' is-busy' : '');
+      if (next) {
+        primary.textContent = '次へ: ' + next.name;
+        primary.addEventListener('click', () => this.__switchBoardPhase(next));
+      } else {
+        primary.textContent = '授業を終了';
+        primary.classList.add('lesson-control-end');
+        primary.addEventListener('click', () => this.__endLessonFromBoard());
+      }
+      if (nav.activePhaseIndex >= last && !next) primary.title = '全 Form の受付を締切り、振り返り用に保存します';
+      wrap.appendChild(primary);
+      return wrap;
+    }
+
+    /**
+     * polling で届いたフェーズと操作面の現在地を揃える。
+     *   nav が無いのに授業中なら読み直す (ボードを開いたあとに授業を始めたケース)。
+     *   授業が無ければ操作面を畳む。
+     */
+    __syncBoardPhaseNav(phase) {
+      const nav = this.state.boardPhaseNav;
+      if (!phase) {
+        if (nav) { this.state.boardPhaseNav = null; this.__renderBoardPhaseNav(); }
+        return;
+      }
+      if (!nav || nav.lessonId !== phase.lessonId) {
+        if (!this.state.__phaseNavLoading) {
+          this.state.__phaseNavLoading = true;
+          Promise.resolve(this.__initBoardPhaseNav())
+            .catch(() => {})
+            .then(() => { this.state.__phaseNavLoading = false; });
+        }
+        return;
+      }
+      if (nav.activePhaseIndex !== phase.phaseIndex) {
+        nav.activePhaseIndex = phase.phaseIndex;
+        this.__renderBoardPhaseNav();
+      }
+    }
+
+    __renderBoardPhaseNav() {
+      const nav = this.state.boardPhaseNav;
+      const header = document.getElementById('boardPhaseNav');
+      if (header) {
+        header.textContent = '';
+        if (nav) {
+          header.classList.remove('hidden');
+          header.appendChild(this.__buildLessonControlNode());
+        } else {
+          header.classList.add('hidden');
+        }
+      }
+      // 待機画面 / 帯の中の操作面も同じ内容で描き直す。
+      const hosts = document.querySelectorAll('.lesson-control-host');
+      for (let i = 0; i < hosts.length; i++) {
+        hosts[i].textContent = '';
+        if (nav) hosts[i].appendChild(this.__buildLessonControlNode());
+      }
+    }
+
+    /**
+     * ボードから授業を終了する (管理パネルの「授業終了」と同じ意味)。
+     */
+    async __endLessonFromBoard() {
+      const nav = this.state.boardPhaseNav;
+      if (!nav || this.state.__phaseSwitching) return;
+      const ok = await window.modals.confirm(
+        '授業を終了して保存しますか？保存後は管理パネルの振り返り画面で再生できます。',
+        { title: '授業を終了', okLabel: '終了して保存', variant: 'danger' }
+      );
+      if (!ok) return;
+      this.state.__phaseSwitching = true;
+      this.__renderBoardPhaseNav();
+      window.setLoading(true, '授業を保存中...');
+      try {
+        const res = await runServer('endLesson', this.state.userId, nav.lessonId);
+        if (!res || !res.success) {
+          window.notifications.error(window.serverMessage(res, '授業の終了に失敗しました'));
+          return;
+        }
+        window.notifications.success('授業を保存しました。管理パネルの授業一覧から振り返りを開けます。');
+        this.state.boardPhaseNav = null;
+        this.__applyLessonPhase(null);
+        this.__renderBoardPhaseNav();
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+      } catch (err) {
+        window.notifications.error((err && err.message) || '授業の終了に失敗しました');
+      } finally {
+        window.setLoading(false);
+        this.state.__phaseSwitching = false;
+        this.__renderBoardPhaseNav();
+      }
     }
 
     async __switchBoardPhase(phase) {
@@ -2574,6 +2687,17 @@
           : phase.index;
         this.__renderBoardPhaseNav();
         window.notifications.success('「' + phase.name + '」に切替えました');
+        // polling (最大 5 秒 + cache 10 秒) を待たず、教師の画面を新フェーズに合わせる。
+        const applied = nav.phases[nav.activePhaseIndex] || phase;
+        this.__applyLessonPhase({
+          lessonId: nav.lessonId,
+          phaseIndex: nav.activePhaseIndex,
+          phaseName: applied.name || '',
+          screenRole: applied.screenRole || '',
+          question: applied.question || '',
+          phaseCount: nav.phases.length,
+          classes: (this.state.lessonPhase && this.state.lessonPhase.classes) || []
+        });
         // 自分が起こした切替なので、生徒向けの「切替わりました」バナーは出さない。
         this.state.__suppressBoardSwitchToast = true;
         if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';

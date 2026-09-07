@@ -799,3 +799,59 @@ test('送信済み人数: 行数とクラス別に集計する', () => {
   assert.equal(stats.total, 4);
   assert.deepEqual(JSON.parse(JSON.stringify(stats.byClass)), { '6年1組': 2, '6年2組': 1, '': 1 });
 });
+
+// =====================================================================
+// 教師の操作面 (フェーズ切替) が polling と同期し、どの画面からも進める
+// =====================================================================
+
+function makeNavInstance() {
+  const { instance, calls, ctx } = makeTeacherInstance();
+  ctx.document.body.classList.contains = () => false;
+  ctx.document.querySelectorAll = () => [];
+  instance.__renderBoardPhaseNav = () => { calls.push('nav:' + (instance.state.boardPhaseNav ? instance.state.boardPhaseNav.activePhaseIndex : 'none')); };
+  instance.__initBoardPhaseNav = () => { calls.push('nav:init'); return Promise.resolve(); };
+  return { instance, calls };
+}
+
+test('操作面: 管理パネルで進めた変更が polling で届くと現在地が追従する', () => {
+  const { instance, calls } = makeNavInstance();
+  instance.state.boardPhaseNav = { lessonId: 'l1', activePhaseIndex: 0, phases: [{ index: 0, name: '考える' }, { index: 1, name: '出会う' }] };
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
+  assert.equal(instance.state.boardPhaseNav.activePhaseIndex, 1);
+  assert.ok(calls.includes('nav:1'));
+});
+
+test('操作面: ボードを開いたあとに授業が始まると操作面を読み直す', () => {
+  const { instance, calls } = makeNavInstance();
+  instance.state.boardPhaseNav = null;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
+  assert.ok(calls.includes('nav:init'));
+});
+
+test('操作面: 授業が終わると操作面を畳む', () => {
+  const { instance, calls } = makeNavInstance();
+  instance.state.boardPhaseNav = { lessonId: 'l1', activePhaseIndex: 4, phases: [] };
+  instance.__applyLessonPhase(null);
+  assert.equal(instance.state.boardPhaseNav, null);
+  assert.ok(calls.includes('nav:none'));
+});
+
+test('操作面: 教師には「進みました」トーストを出さない (切替の success と二重になる)', () => {
+  const { instance } = makeNavInstance();
+  const toasts = [];
+  instance.showToast = (m) => toasts.push(m);
+  instance.state.boardPhaseNav = { lessonId: 'l1', activePhaseIndex: 0, phases: [{ index: 0 }, { index: 1 }] };
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse' });
+  assert.equal(toasts.length, 0);
+});
+
+test('操作面: 児童には「進みました」トーストを出す', () => {
+  const { instance } = makeLessonInstance();
+  instance.state.isEditor = false;
+  const toasts = [];
+  instance.showToast = (m) => toasts.push(m);
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
+  assert.equal(toasts.length, 1);
+});

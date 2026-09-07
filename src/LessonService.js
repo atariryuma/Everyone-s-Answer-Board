@@ -746,7 +746,10 @@ function getActiveLessonNav(targetUserId) {
       phases: phases.map((p, i) => ({
         index: i,
         name: (p && p.name) || ('フェーズ ' + (i + 1)),
-        formTemplate: (p && p.formTemplate) || ''
+        formTemplate: (p && p.formTemplate) || '',
+        // ボード上の切替直後に、polling を待たず教師の画面を新フェーズに合わせるため。
+        screenRole: __phaseScreenRole_(p || {}),
+        question: (p && p.question) || ''
       }))
     });
   } catch (error) {

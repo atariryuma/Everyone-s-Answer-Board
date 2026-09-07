@@ -933,6 +933,8 @@ test('getActiveLessonNav: 実行中の授業の phase 一覧と現在位置を�
   assert.equal(res.data.activePhaseIndex, 1);
   assert.equal(res.data.phases.length, 3);
   assert.equal(res.data.phases[0].index, 0);
+  assert.ok(typeof res.data.phases[0].screenRole === 'string', '切替直後の画面決定に screenRole を使う');
+  assert.ok('question' in res.data.phases[0]);
 });
 
 // ── アーカイブ分離 (lesson_responses) の周辺仕様 ──
