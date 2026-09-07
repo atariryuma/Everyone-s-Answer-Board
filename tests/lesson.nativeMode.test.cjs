@@ -592,6 +592,52 @@ test('__getViewerLessonPhase_: 非公開ボードは児童に授業情報を返�
   assert.equal(h.context.__getViewerLessonPhase_('u1'), null);
 });
 
+test('__getViewerLessonPhase_: 児童の polling は cache から返し、教師がフェーズを進めると invalidate される', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const store = new Map();
+  const ops = [];
+  h.context.CacheService = {
+    getScriptCache: () => ({
+      get: (k) => { ops.push('get:' + k); return store.has(k) ? store.get(k) : null; },
+      put: (k, v) => { ops.push('put:' + k); store.set(k, v); },
+      remove: (k) => { ops.push('remove:' + k); store.delete(k); }
+    })
+  };
+  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => {
+    assert.equal(ttl, 10, '短期 TTL');
+    h.context.CacheService.getScriptCache().put(k, JSON.stringify(v));
+    return true;
+  };
+  const rowReads = { n: 0 };
+  const origGetRange = h.lessonsSheet.getRange;
+  h.lessonsSheet.getRange = function () { rowReads.n++; return origGetRange.apply(this, arguments); };
+
+  const first = h.context.__getViewerLessonPhase_('u1');
+  assert.equal(first.screenRole, 'input');
+  const readsAfterFirst = rowReads.n;
+  const second = h.context.__getViewerLessonPhase_('u1');
+  assert.deepEqual(second, first);
+  assert.equal(rowReads.n, readsAfterFirst, '2 回目は lessons シートを読まない');
+
+  // 教師が進める → cache が消え、次の polling で新フェーズ
+  const adv = h.context.advanceLessonPhase('u1', lessonId, 'next');
+  assert.equal(adv.success, true, adv.message);
+  assert.ok(ops.some(o => o === 'remove:lesson_phase_u1'), 'advance が invalidate する');
+  assert.equal(h.context.__getViewerLessonPhase_('u1').screenRole, 'browse');
+});
+
+test('__getViewerLessonPhase_: fresh 指定は cache を読まない (投稿の権能検証用)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const store = new Map([['lesson_phase_u1', JSON.stringify({ phase: { lessonId, phaseIndex: 4, screenRole: 'reflect' } })]]);
+  h.context.CacheService = { getScriptCache: () => ({ get: (k) => store.get(k) || null, put: () => {}, remove: () => {} }) };
+  assert.equal(h.context.__getViewerLessonPhase_('u1').screenRole, 'reflect', '通常は cache を返す');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).screenRole, 'input', 'fresh は実体を読む');
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

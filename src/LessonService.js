@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels */
+/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -967,6 +967,7 @@ function deleteLesson(userId, lessonId) {
     }
     const result = __deleteLessonRow_(lessonId);
     if (!result.success) return createErrorResponse(result.error || 'delete failed');
+    __invalidateViewerLessonPhase_(userId);
     return createSuccessResponse('deleted', { lessonId });
   } catch (error) {
     logError_('deleteLesson', error);
@@ -1485,6 +1486,7 @@ function startLesson(userId, lessonId) {
       if (!finalResult.success) {
         return createErrorResponse(finalResult.message || finalResult.error);
       }
+      __invalidateViewerLessonPhase_(userId);
       return createSuccessResponse('lesson 開始しました', { lesson: finalResult.lesson });
     } finally {
       if (lock && lock.releaseLock) {
@@ -1555,6 +1557,7 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
       return createErrorResponse(result.message || result.error, null,
         result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
     }
+    __invalidateViewerLessonPhase_(userId);
 
     // 現フェーズ Form を close、次フェーズ Form を open (冪等)。
     __setFormAcceptingResponses_(phases[fromIdx], false);
@@ -1611,6 +1614,7 @@ function reopenLesson(userId, lessonId) {
       return createErrorResponse(result.message || result.error, null,
         result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
     }
+    __invalidateViewerLessonPhase_(userId);
 
     // 再開 phase の Form だけ受付再開 (他 phase は advance が通過時に開閉する)。
     __setFormAcceptingResponses_(phases[idx], true);
@@ -1674,6 +1678,7 @@ function endLesson(userId, lessonId) {
       return createErrorResponse(result.message || result.error, null,
         result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
     }
+    __invalidateViewerLessonPhase_(userId);
     return createSuccessResponse('lesson を終了しました。振り返り画面でいつでも再生できます。', {
       lesson: result.lesson,
       reviewUrl: '?mode=review&lessonId=' + encodeURIComponent(lessonId)
@@ -2027,9 +2032,57 @@ function __viewerBoardConfig_(targetUserId) {
   return getConfigOrDefault(targetUserId);
 }
 
-function __getViewerLessonPhase_(targetUserId) {
+// 児童の polling (5 秒間隔 × 学級人数) が毎回 lessons シートを Sheets API で読むと
+//   (getSheets + getLastRow + TextFinder + header + row = 5 call/poll) 429 quota に当たる。
+//   フェーズは教師が進めたときにしか変わらないので、短期 cache + 変更時の明示 invalidate で足りる。
+const LESSON_PHASE_CACHE_TTL_S = 10;
+function __viewerLessonPhaseCacheKey_(targetUserId) {
+  return 'lesson_phase_' + targetUserId;
+}
+
+// フェーズ / 状態を変えた側 (start / advance / resume / end / delete) が呼ぶ。
+//   これを忘れると児童は最大 10 秒古いフェーズを見る (機能的には次の TTL 切れで直る)。
+function __invalidateViewerLessonPhase_(targetUserId) {
+  if (!targetUserId || typeof CacheService === 'undefined') return;
+  try {
+    CacheService.getScriptCache().remove(__viewerLessonPhaseCacheKey_(targetUserId));
+  } catch (_) { /* cache 不通は機能的に無害 (TTL 10 秒で自然に切れる) */ }
+}
+
+/**
+ * @param {string} targetUserId
+ * @param {Object} [opts]
+ * @param {boolean} [opts.fresh] - true なら cache を読まない (submitLessonAnswer の権能検証用。
+ *   フェーズ切替直後の投稿を、古い cache で受理しないため)
+ */
+function __getViewerLessonPhase_(targetUserId, opts) {
   try {
     if (!targetUserId) return null;
+    const fresh = Boolean(opts && opts.fresh);
+    const cacheKey = __viewerLessonPhaseCacheKey_(targetUserId);
+    if (!fresh && typeof CacheService !== 'undefined') {
+      try {
+        const hit = CacheService.getScriptCache().get(cacheKey);
+        if (hit) {
+          const parsed = JSON.parse(hit);
+          return parsed && parsed.phase ? parsed.phase : null;
+        }
+      } catch (_) { /* cache 不通 / 壊れた値は再計算で回復する */ }
+    }
+    const phase = __computeViewerLessonPhase_(targetUserId);
+    if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
+      // null (授業中でない) も cache する。掲示板モードの polling で毎回 config を読まないため。
+      saveToCacheWithSizeCheck(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
+    }
+    return phase;
+  } catch (error) {
+    logError_('__getViewerLessonPhase_', error);
+    return null;
+  }
+}
+
+function __computeViewerLessonPhase_(targetUserId) {
+  try {
     const config = __viewerBoardConfig_(targetUserId);
     const lessonId = config && config.activeLessonId;
     if (!lessonId) return null;
@@ -2054,7 +2107,7 @@ function __getViewerLessonPhase_(targetUserId) {
       phaseCount: phases.length
     };
   } catch (error) {
-    logError_('__getViewerLessonPhase_', error);
+    logError_('__computeViewerLessonPhase_', error);
     return null;
   }
 }
@@ -2114,7 +2167,7 @@ function submitLessonAnswer(targetUserId, payload) {
     if (!actorEmail) return createAuthError();
 
     const p = payload || {};
-    const phase = __getViewerLessonPhase_(targetUserId);
+    const phase = __getViewerLessonPhase_(targetUserId, { fresh: true });
     if (!phase) return createErrorResponse('この授業はいま投稿を受け付けていません');
 
     // client の lessonId / phaseIndex は「ズレの検出」にのみ使う。真実はサーバの active phase。
