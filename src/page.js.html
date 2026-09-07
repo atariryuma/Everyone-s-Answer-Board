@@ -1727,9 +1727,20 @@
       }
       const draft = this.state.lessonDraft || {};
       const storedName = this.__lessonStoredName();
+      // クラス: 授業に登録されたクラスが複数で、まだ選んでいなければ聞く。1 つなら聞かない。
+      const classes = Array.isArray(phase.classes) ? phase.classes : [];
+      const storedClass = this.__lessonStoredClass();
+      const needClass = classes.length > 1 && classes.indexOf(storedClass) < 0;
       host.innerHTML =
         '<div class="lesson-card">' +
           '<h2 class="lesson-title">' + esc(phase.question || 'いまの考えは？') + '</h2>' +
+          (needClass
+            ? '<label class="lesson-label" for="lessonClass">クラス</label>' +
+              '<select id="lessonClass" class="lesson-input">' +
+                '<option value="">クラスを選んでください</option>' +
+                classes.map((c) => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('') +
+              '</select>'
+            : '') +
           (storedName ? '' :
             '<label class="lesson-label" for="lessonName">名前</label>' +
             '<input id="lessonName" class="lesson-input" type="text" maxlength="50" ' +
@@ -1957,6 +1968,18 @@
         return;
       }
 
+      // クラス欄が出ているのは、複数クラスの授業でまだ選んでいないときだけ。
+      const classEl = document.getElementById('lessonClass');
+      if (classEl) {
+        const picked = String(classEl.value || '').trim();
+        if (!picked) {
+          this.showToast('クラスを選んでください');
+          classEl.focus();
+          return;
+        }
+        this.__saveLessonClass(picked);
+      }
+
       // 名前欄が出ているのは、この端末で初めて送るときだけ。
       const nameEl = document.getElementById('lessonName');
       if (nameEl) {
@@ -2027,9 +2050,28 @@
 
     // クラス。ヘッダのクラスフィルタが選ばれていればそれを使う。
     __lessonClass() {
+      // 授業に登録されたクラスが 1 つならそれ。複数なら児童が選んで端末に覚えたもの。
+      //   どちらも無いときだけ、ボードのクラスフィルタ (教師が試しに送るケース) に頼る。
+      const phase = this.state.lessonPhase;
+      const classes = (phase && Array.isArray(phase.classes)) ? phase.classes : [];
+      if (classes.length === 1) return String(classes[0]);
+      const stored = this.__lessonStoredClass();
+      if (stored && classes.indexOf(stored) >= 0) return stored;
       const el = this.elements && this.elements.classFilter;
       const v = el ? String(el.value || '') : '';
       return (!v || v === 'すべて') ? '' : v;
+    }
+
+    __lessonStoredClass() {
+      try {
+        return localStorage.getItem('lessonClass:' + this.state.userId) || '';
+      } catch (_) { return ''; }
+    }
+
+    __saveLessonClass(cls) {
+      try {
+        localStorage.setItem('lessonClass:' + this.state.userId, String(cls || '').slice(0, 50));
+      } catch (_) { /* プライベートモード等では覚えないだけ */ }
     }
 
     // 共有 escapeHtml への薄い委譲 (null を '' に寄せるだけ)。

@@ -902,6 +902,30 @@ function buildSheetDataErrorResult_(result) {
  *
  * @returns {Object} 元の result、または data を絞った複製
  */
+/**
+ * 授業中はボードの見出しをフェーズの問いにする。
+ *
+ * Why: 見出しは「回答列のヘッダー」から作る (getQuestionText) が、授業モードの回答シートは
+ *   列名が「横軸」「縦軸」なので、ボードの上に「横軸」と出ていた。児童にも教師にも意味がない。
+ *   授業中は問い (phase.question) が見出しの実体。無ければフェーズ名。
+ *   授業中でなければ元の result を返す (掲示板モードに影響しない)。
+ */
+function __applyLessonHeader_(result, targetUserId) {
+  try {
+    if (!result || !result.success) return result;
+    if (typeof __getViewerLessonPhase_ !== 'function') return result;
+    const phase = __getViewerLessonPhase_(targetUserId);
+    if (!phase) return result;
+    const title = String(phase.question || phase.phaseName || '').trim();
+    if (!title) return result;
+    return Object.assign({}, result, { header: title });
+  } catch (error) {
+    // 見出しは装飾なので、判定できなければ元のまま出す。
+    logError_('__applyLessonHeader_', error);
+    return result;
+  }
+}
+
 function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnBoard, isAdmin) {
   try {
     if (isOwnBoard || isAdmin) return result;
@@ -1193,7 +1217,10 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
       return buildSafePublishedDataResult(
-        __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin),
+        __applyLessonHeader_(
+          __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin),
+          targetUser.userId
+        ),
         targetUserConfig,
         { isAdmin: isSystemAdmin, isOwnBoard }
       );

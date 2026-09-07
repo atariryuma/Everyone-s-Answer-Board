@@ -638,6 +638,42 @@ test('__getViewerLessonPhase_: fresh 指定は cache を読まない (投稿の�
   assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).screenRole, 'input', 'fresh は実体を読む');
 });
 
+test('__getViewerLessonPhase_: 児童がクラスを選べるよう、授業のクラス一覧を返す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const info = h.context.__getViewerLessonPhase_('u1');
+  assert.deepEqual(Array.from(info.classes), ['6年1組']);
+});
+
+test('advanceLessonPhase: 同じフェーズへの切替は config を再適用して成功する (切替失敗からの自己修復)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const patches = [];
+  h.context.applyConfigPatch_ = (uid, patch) => { patches.push(patch); return { success: true }; };
+  const res = h.context.advanceLessonPhase('u1', lessonId, null, 0);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.activePhaseIndex, 0);
+  assert.equal(res.data.reapplied, true);
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].sheetName, 'phase1', '現在フェーズの設定が書き直される');
+  // 遷移は増えない (同じフェーズなので)
+  const after = h.context.__findLessonById_(lessonId).lesson.lessonJson.profileTransitions;
+  assert.equal(after.length, 1);
+});
+
+test('advanceLessonPhase: config patch が落ちても授業は進んでおり、再適用の案内を返す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.applyConfigPatch_ = () => ({ success: false, message: 'users シートを読み取れませんでした' });
+  const res = h.context.advanceLessonPhase('u1', lessonId, 'next');
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'PHASE_CONFIG_PATCH_FAILED');
+  assert.equal(res.activePhaseIndex, 1);
+  assert.match(res.message, /もう一度/);
+  assert.equal(h.context.__activePhaseIndex_(h.context.__findLessonById_(lessonId).lesson.lessonJson), 1);
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

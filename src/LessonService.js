@@ -81,13 +81,28 @@ const LESSON_DAILY_TRIGGER_HOUR = 23;                    // 23:00 JST に sweep
 // Why: SA-backed spreadsheet proxy の getSheetByName('lessons') は sheet 不存在でも
 //   proxy オブジェクトを返してしまい、実際に getValues() するまで失敗を検出できない。
 //   getSheets() で実存をチェックしてから handle を返す。
+// 「DB にこのシートがあるか」は一度 true になれば変わらない (削除は運用で起きない)。
+//   getSheets は Sheets API の metadata read 1 回で、児童の polling ごとに払うと quota を食う。
+//   true だけを 10 分 cache し、false は cache しない (作成直後に読めるように)。
+const DB_SHEET_EXISTS_TTL_S = 600;
 function __dbSheetExists_(spreadsheet, name) {
+  const cacheKey = 'db_sheet_exists_' + name;
+  if (typeof CacheService !== 'undefined') {
+    try {
+      if (CacheService.getScriptCache().get(cacheKey) === '1') return true;
+    } catch (_) { /* cache 不通は機能的に無害 (下で実体を読む) */ }
+  }
   try {
     const sheets = (spreadsheet.getSheets ? spreadsheet.getSheets() : []) || [];
-    return sheets.some(s => {
+    const exists = sheets.some(s => {
       try { return s.getName && s.getName() === name; }
       catch (_) { return false; }
     });
+    if (exists && typeof CacheService !== 'undefined') {
+      try { CacheService.getScriptCache().put(cacheKey, '1', DB_SHEET_EXISTS_TTL_S); }
+      catch (_) { /* cache 不通は機能的に無害 (次回また読む) */ }
+    }
+    return exists;
   } catch (_) { return false; }
 }
 
@@ -1527,7 +1542,26 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     if (targetIndex !== undefined && targetIndex !== null && targetIndex !== '') {
       toIdx = Number(targetIndex);
       if (!Number.isInteger(toIdx)) return createErrorResponse('targetIndex が不正です');
-      if (toIdx === fromIdx) return createErrorResponse('既にそのフェーズです');
+      if (toIdx === fromIdx) {
+        // 同じフェーズへの切替 = config の再適用 (自己修復)。
+        //   Why: 切替は「lesson row を先に確定 → config patch」の順で、row 成功後に
+        //   config patch が落ちる (429 で users シートが読めない等) と、授業は次フェーズ、
+        //   ボード config は前フェーズのまま止まる。教師がもう一度同じフェーズを押したとき
+        //   「既にそのフェーズです」で弾くと、直す手段が無くなる。冪等なので再適用でよい。
+        if (toIdx < 0 || toIdx >= phases.length) return createErrorResponse('targetIndex が不正です');
+        const same = phases[toIdx];
+        __setFormAcceptingResponses_(same, true);
+        const reapply = applyConfigPatch_(userId, __buildPhaseConfigPatch_(same, lessonJson, lessonId), { publish: false });
+        if (!reapply.success) {
+          return createErrorResponse(`フェーズ設定の再適用に失敗しました: ${reapply.message || 'unknown'}`);
+        }
+        __invalidateViewerLessonPhase_(userId);
+        return createSuccessResponse(`フェーズ ${toIdx + 1}: ${same.name} の設定を再適用しました`, {
+          lesson: found.lesson,
+          activePhaseIndex: toIdx,
+          reapplied: true
+        });
+      }
     } else {
       toIdx = direction === 'previous' ? fromIdx - 1 : fromIdx + 1;
     }
@@ -1567,7 +1601,12 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     const target = phases[toIdx];
     const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false });
     if (!patchResult.success) {
-      return createErrorResponse(`フェーズ切替に失敗しました: ${patchResult.message || 'unknown'}`);
+      // 授業 (lesson row) は既に次フェーズ。もう一度同じフェーズを押せば config だけ再適用される。
+      return createErrorResponse(
+        `フェーズ切替に失敗しました: ${patchResult.message || 'unknown'}。もう一度「${target.name}」を押すと設定を再適用します`,
+        null,
+        { error: 'PHASE_CONFIG_PATCH_FAILED', activePhaseIndex: toIdx }
+      );
     }
 
     return createSuccessResponse(`フェーズ ${toIdx + 1}: ${target.name} に切替えました`, {
@@ -2104,7 +2143,11 @@ function __computeViewerLessonPhase_(targetUserId) {
       phaseName: phase.name || '',
       screenRole: __phaseScreenRole_(phase),
       question: phase.question || '',
-      phaseCount: phases.length
+      phaseCount: phases.length,
+      // 児童が自分のクラスを選ぶための選択肢。1 つなら画面は聞かずに自動で入れる。
+      //   Why: 児童の画面はボードのクラスフィルタが入力画面の下に隠れていて選べず、
+      //   全員がクラス空欄で記録されていた (教師のクラス絞り込みが効かない)。
+      classes: Array.isArray(lessonJson.classes) ? lessonJson.classes.map(String) : []
     };
   } catch (error) {
     logError_('__computeViewerLessonPhase_', error);

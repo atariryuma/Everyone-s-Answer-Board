@@ -95,3 +95,29 @@ test('元の result を破壊しない (cache に入っている共有オブジ�
   assert.equal(out.data.length, 1);
   assert.equal(original.data.length, 3, 'cache 共有の元 result が書き換わっている');
 });
+
+// =====================================================================
+// 見出し: 授業中はフェーズの問い (回答列ヘッダー「横軸」を出さない)
+// =====================================================================
+
+test('授業中の見出しはフェーズの問いになる (「横軸」ではない)', () => {
+  const ctx = loadContext({ screenRole: 'browse', question: 'あなたならどうする？', phaseName: '出会う' });
+  const out = ctx.__applyLessonHeader_({ success: true, header: '横軸', data: [] }, 'u1');
+  assert.equal(out.header, 'あなたならどうする？');
+});
+
+test('問いが無ければフェーズ名、授業中でなければ元の見出し', () => {
+  const withName = loadContext({ screenRole: 'browse', question: '', phaseName: '出会う' });
+  assert.equal(withName.__applyLessonHeader_({ success: true, header: '横軸' }, 'u1').header, '出会う');
+  const noLesson = loadContext(null);
+  assert.equal(noLesson.__applyLessonHeader_({ success: true, header: '本時の問い' }, 'u1').header, '本時の問い');
+  const noService = loadContext(undefined);
+  assert.equal(noService.__applyLessonHeader_({ success: true, header: '本時の問い' }, 'u1').header, '本時の問い');
+});
+
+test('見出しの上書きは元の result を壊さない (cache 共有オブジェクト)', () => {
+  const ctx = loadContext({ screenRole: 'input', question: 'Q' });
+  const src = { success: true, header: '横軸', data: [] };
+  ctx.__applyLessonHeader_(src, 'u1');
+  assert.equal(src.header, '横軸');
+});

@@ -1737,6 +1737,11 @@ function createUser(email, initialConfig = {}, context = {}) {
     };
 
     const data = sheet.getDataRange().getValues();
+    // Why: SA proxy の getValues は 429 で retry を使い切ると [] を返す。ここで
+    //   headers が undefined のまま進むと TypeError になり、症状 (quota) が消える。
+    if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
+      return createErrorResponse('users シートを読み取れませんでした (Sheets API quota の可能性)。少し待って再試行してください');
+    }
     const [headers] = data;
     const hasCreatedAtColumn = headers.indexOf('createdAt') !== -1;
     const hasGoogleIdColumn = headers.indexOf('googleId') !== -1;
@@ -1960,6 +1965,11 @@ function updateUser(userId, updates, context = {}) {
     }
 
     const data = sheet.getDataRange().getValues();
+    // Why: 429 で retry を使い切った getValues は [] を返す。TypeError ではなく原因を返す。
+    if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
+      console.warn('updateUser: users sheet read returned no rows (quota?)', { userId });
+      return createErrorResponse('users シートを読み取れませんでした (Sheets API quota の可能性)。少し待って再試行してください');
+    }
     const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
 
@@ -2146,6 +2156,10 @@ function deleteUser(userId, reason = '', context = {}) {
     }
 
     const data = sheet.getDataRange().getValues();
+    if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
+      console.warn('deleteUser: users sheet read returned no rows (quota?)', { userId });
+      return createErrorResponse('users シートを読み取れませんでした (Sheets API quota の可能性)。少し待って再試行してください');
+    }
     const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
 

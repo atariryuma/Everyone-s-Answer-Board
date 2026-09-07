@@ -681,7 +681,7 @@ function makeLessonInstance() {
   instance.showToast = () => {};
   instance.loadSheetData = () => {};
   instance.runGas = () => Promise.resolve({ success: true, data: { phases: [] } });
-  return { instance, calls };
+  return { instance, calls, ctx };
 }
 
 test('授業画面: 教師 (isEditor) には入力画面をかぶせず、ボードをそのまま見せる', () => {
@@ -723,4 +723,20 @@ test('授業画面: 同じフェーズの polling では送信済み状態を保
   instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
   assert.equal(calls.length, before, '描き直さない');
   assert.ok(instance.state.lessonSent, '送信済みのまま');
+});
+
+test('授業のクラス: 登録クラスが 1 つなら自動でそれを送る (児童はフィルタを触れない)', () => {
+  const { instance } = makeLessonInstance();
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', classes: ['6年1組'] };
+  instance.elements = { classFilter: { value: 'すべて' } };
+  assert.equal(instance.__lessonClass(), '6年1組');
+});
+
+test('授業のクラス: 複数クラスなら端末に覚えた選択を使い、無ければ空', () => {
+  const { instance, ctx } = makeLessonInstance();
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', classes: ['6年1組', '6年2組'] };
+  instance.elements = { classFilter: { value: 'すべて' } };
+  assert.equal(instance.__lessonClass(), '');
+  ctx.localStorage.getItem = (k) => k === 'lessonClass:u1' ? '6年2組' : null;
+  assert.equal(instance.__lessonClass(), '6年2組');
 });

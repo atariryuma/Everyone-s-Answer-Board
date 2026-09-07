@@ -867,7 +867,9 @@ test('advanceLessonPhase: targetIndex で任意フェーズへ直接ジャンプ
   assert.equal(res.data.activePhaseIndex, 2);
 });
 
-test('advanceLessonPhase: targetIndex が現在と同じなら reject', () => {
+test('advanceLessonPhase: targetIndex が現在と同じなら config を再適用して成功する (遷移は増えない)', () => {
+  // Why reject しないか: 切替は row 確定 → config patch の順で、後者が落ちると授業と
+  //   ボード config がズレる。同じフェーズをもう一度押すのが唯一の復旧手段なので通す。
   const { context } = loadLessonContext();
   const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
   const lessonId = created.data.lesson.lessonId;
@@ -875,8 +877,11 @@ test('advanceLessonPhase: targetIndex が現在と同じなら reject', () => {
   context.startLesson('u1', lessonId);
 
   const res = context.advanceLessonPhase('u1', lessonId, null, 0);
-  assert.equal(res.success, false);
-  assert.match(res.message, /既にそのフェーズ/);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.activePhaseIndex, 0);
+  assert.equal(res.data.reapplied, true);
+  const trans = context.__findLessonById_(lessonId).lesson.lessonJson.profileTransitions;
+  assert.equal(trans.length, 1, '同じフェーズなので遷移は記録しない');
 });
 
 test('advanceLessonPhase: 範囲外の targetIndex は reject', () => {
