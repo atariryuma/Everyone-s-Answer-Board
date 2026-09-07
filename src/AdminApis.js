@@ -1282,7 +1282,6 @@ function dispatchAdminOperation(operation, params) {
         // Why: CLI から profile / formMeta の状態確認をしたいケースが多い。
         //      ペイロードに含めても軽量なので preview にも乗せる。
         formMeta: result.formMeta || null,
-        profiles: result.profiles || null,
         dataCount: Array.isArray(result.data) ? result.data.length : 0,
         // 既定 3 件。 検証等で多めに見たいときは --limit で最大 200 件まで。
         sampleData: Array.isArray(result.data)

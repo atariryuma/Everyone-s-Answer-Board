@@ -45,6 +45,7 @@ function createSheet(headers, name) {
         setValue: (v) => { if (!data[r]) data[r] = []; data[r][c] = v; }
       };
     },
+    getDataRange: () => ({ getValues: () => data.map((r) => r.slice()) }),
     appendRow: (row) => { data.push(row.slice()); },
     deleteRow: (i) => { data.splice(i - 1, 1); },
     createTextFinder: (query) => ({
@@ -710,6 +711,45 @@ test('数直線の授業モード: 最初の入力フェーズの形式が全フ
   h.setEmail('student@example.com');
   const res = h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 4, reason: '理由', class: '6年1組', name: 'A' });
   assert.equal(res.success, true, res.message);
+});
+
+test('lessons シートの読みは 1 回 (getDataRange) で、行ごとの getRange を使わない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const counts = { dataRange: 0, range: 0 };
+  const origDR = h.lessonsSheet.getDataRange, origR = h.lessonsSheet.getRange;
+  h.lessonsSheet.getDataRange = function () { counts.dataRange++; return origDR.apply(this, arguments); };
+  h.lessonsSheet.getRange = function () { counts.range++; return origR.apply(this, arguments); };
+  const found = h.context.__findLessonById_(lessonId);
+  assert.ok(found && found.lesson.lessonId === lessonId);
+  assert.equal(found.rowIndex, 2);
+  assert.equal(counts.dataRange, 1);
+  assert.equal(counts.range, 0, '該当行の個別読みをしない');
+  const list = h.context.listLessons('u1');
+  assert.equal(list.data.lessons.length, 1);
+  assert.equal(counts.dataRange, 2);
+  assert.equal(counts.range, 0);
+});
+
+test('回答シートの読み (航跡) は 10 秒 cache され、送信で捨てられる', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const store = new Map();
+  h.context.CacheService = { getScriptCache: () => ({
+    get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
+  }) };
+  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => { assert.equal(ttl, 10); store.set(k, JSON.stringify(v)); return true; };
+  h.setEmail('student@example.com');
+  assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 2, numericY: 4, reason: 'r', class: '6年1組', name: 'A' }).success, true);
+  const first = h.context.getMyLessonTrajectory('u1');
+  assert.equal(first.data.phases.length, 1);
+  assert.ok([...store.keys()].some(k => k.startsWith('lesson_rows_')), '全行が cache に入る');
+  // 送信すると cache が消え、次の読みで新しい値になる
+  assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 5, numericY: 1, reason: 'r2', class: '6年1組', name: 'A' }).success, true);
+  assert.ok(![...store.keys()].some(k => k.startsWith('lesson_rows_')), '送信で cache を捨てる');
+  const second = h.context.getMyLessonTrajectory('u1');
+  assert.equal(second.data.phases[0].numericX, 5);
 });
 
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {

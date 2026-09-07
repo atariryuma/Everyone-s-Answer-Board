@@ -47,6 +47,7 @@ function createFakeLessonsSheet(headers) {
         }
       };
     },
+    getDataRange: () => ({ getValues: () => data.map((r) => r.slice()) }),
     appendRow: (row) => { data.push(row.slice()); },
     deleteRow: (rowIndex) => { data.splice(rowIndex - 1, 1); },
     createTextFinder: (query) => {

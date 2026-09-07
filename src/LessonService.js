@@ -239,36 +239,36 @@ function __rowToLesson_(row, cols) {
   };
 }
 
-function __findLessonRowIndex_(sheet, lessonId) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return -1;
-  // TextFinder で lessonId 列を exact match (TextFinder 未対応の test sandbox では fallback)。
-  try {
-    const finder = sheet.createTextFinder
-      ? sheet.createTextFinder(lessonId).matchEntireCell(true)
-      : null;
-    if (finder) {
-      const range = finder.findNext();
-      if (range && range.getColumn() === 1) return range.getRow();
-    }
-  } catch (_) { /* fall through to linear scan */ }
-  // Fallback linear scan (test 環境 or TextFinder API 異常時)。
-  const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === lessonId) return i + 2;
-  }
-  return -1;
+/**
+ * lessons シートを 1 回の読みで丸ごと取る (header + 全行)。
+ *
+ * Why 1 回か: 以前は getLastRow (寸法) + TextFinder + header + 該当行 の 4 呼び出しで
+ *   1 件を引いていた。lessons はテナントあたり数十行なので、全行を 1 回で読んで
+ *   メモリ上で探す方が Sheets API の read 回数が 1/4 になる (quota は read 回数で数える)。
+ *   SA proxy の getDataRange は values API の「実データ範囲」を返すので空グリッドは読まない。
+ * @returns {{sheet:Object, cols:Object, rows:Array}|null} rows[i] はシートの i+2 行目
+ */
+function __readLessonsTable_() {
+  const sheet = __getLessonsSheet_();
+  if (!sheet) return null;
+  const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
+  const header = data[0] || [];
+  const cols = {};
+  header.forEach((h, i) => { cols[String(h)] = i; });
+  return { sheet, cols, rows: data.slice(1) };
 }
 
 function __findLessonById_(lessonId) {
   try {
-    const sheet = __getLessonsSheet_();
-    if (!sheet) return null;
-    const rowIndex = __findLessonRowIndex_(sheet, lessonId);
-    if (rowIndex < 0) return null;
-    const cols = __lessonColumns_(sheet);
-    const row = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-    return { rowIndex, lesson: __rowToLesson_(row, cols), cols, sheet };
+    const table = __readLessonsTable_();
+    if (!table || !table.rows.length) return null;
+    const idCol = table.cols.lessonId != null ? table.cols.lessonId : 0;
+    for (let i = 0; i < table.rows.length; i++) {
+      if (table.rows[i][idCol] === lessonId) {
+        return { rowIndex: i + 2, lesson: __rowToLesson_(table.rows[i], table.cols), cols: table.cols, sheet: table.sheet };
+      }
+    }
+    return null;
   } catch (error) {
     logError_('__findLessonById_', error);
     return null;
@@ -382,36 +382,13 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
 function __listLessonsForUser_(userId, options = {}) {
   // Read path は sheet 不存在 / API エラーで silently empty を返す (= まだレッスン無し扱い)。
   try {
-    const sheet = __getLessonsSheet_();
-    if (!sheet) return [];
-    const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return [];
-    const cols = __lessonColumns_(sheet);
+    const table = __readLessonsTable_();
+    if (!table || !table.rows.length) return [];
     const results = [];
-
-    // owner-only list: TextFinder で userId 列だけスキャンして該当行 index を得る。
-    //   全件 getValues() に比べて O(my-lessons) で済む。allUsers 経路は全件読みを維持。
-    if (!options.allUsers && sheet.createTextFinder) {
-      try {
-        const finder = sheet.createTextFinder(userId).matchEntireCell(true);
-        const matches = (finder.findAll ? finder.findAll() : []) || [];
-        matches.forEach((range) => {
-          if (range.getColumn() !== cols.userId + 1) return;
-          const rowIdx = range.getRow();
-          if (rowIdx <= 1) return;
-          const row = sheet.getRange(rowIdx, 1, 1, sheet.getLastColumn()).getValues()[0];
-          results.push(__rowToLesson_(row, cols));
-        });
-        results.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-        return results;
-      } catch (_) { /* fall through to bulk scan */ }
-    }
-
-    // Fallback: 全件読み (test sandbox or TextFinder 異常時)。
-    const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
-    for (let i = 0; i < data.length; i++) {
-      if (!options.allUsers && data[i][cols.userId] !== userId) continue;
-      results.push(__rowToLesson_(data[i], cols));
+    for (let i = 0; i < table.rows.length; i++) {
+      const row = table.rows[i];
+      if (!options.allUsers && row[table.cols.userId] !== userId) continue;
+      results.push(__rowToLesson_(row, table.cols));
     }
     results.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     return results;
@@ -997,15 +974,6 @@ function duplicateLesson(userId, sourceLessonId, options) {
 }
 
 
-// formUrl ('https://docs.google.com/forms/d/e/<published>/viewform') から formId 相当を抽出。
-//   published URL の id は canonical formId と一致しないが、UI で開くリンクとしては十分。
-//   完全な canonical formId が必要なら FormApp.openByUrl が必要だが、import 時には不要。
-function __extractFormPublishedId_(formUrl) {
-  if (!formUrl || typeof formUrl !== 'string') return '';
-  const m = formUrl.match(/\/forms\/d\/e?\/?([^/]+)\//);
-  return m ? m[1] : '';
-}
-
 // ボード行を「実践報告書 / 過去授業 archive 用」の slim row に整形する。
 //   個人特定可能フィールド (name / email / emailHash / reactions / highlight / opinion / id) は除外。
 //   `includeName: true` で名前列も残せる (校内資料用)。
@@ -1024,19 +992,6 @@ function __projectBoardRowForExport_(row, options) {
   if (includeName) out.name = row.name || '';
   return out;
 }
-
-
-function __extractClassesFromSnapshots_(snapshots) {
-  const seen = new Set();
-  (snapshots || []).forEach((s) => {
-    (s.rows || []).forEach((r) => {
-      if (r && r.class) seen.add(String(r.class));
-    });
-  });
-  return Array.from(seen).sort();
-}
-
-
 
 
 function deleteLesson(userId, lessonId) {
@@ -2350,6 +2305,7 @@ function submitLessonAnswer(targetUserId, payload) {
     if (typeof bumpBoardDataVersion_ === 'function') {
       try {
         bumpBoardDataVersion_(targetUserId);
+        __invalidatePhaseRows_(phaseDef);
       } catch (cacheErr) {
         // 黙って落とさない: cache version を上げ損ねると、他の児童のボードに
         //   古い分布が最大 12 秒残る。症状 (反映されない) だけが出て原因が
@@ -2372,21 +2328,17 @@ function submitLessonAnswer(targetUserId, payload) {
 // 1 フェーズ分の自分の回答を読む。無ければ null。
 function __readOwnLessonAnswer_(phaseDef, actorEmail) {
   try {
-    if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return null;
-    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_trajectory' });
-    if (!access) return null;
-    const sheet = access.getSheet(phaseDef.sheetName);
-    if (!sheet) return null;
-    const rowNum = __findOwnLessonRow_(sheet, actorEmail);
-    if (rowNum < 2) return null;
-    const v = sheet.getRange(rowNum, 1, 1, LESSON_NATIVE_SHEET_HEADERS.length).getValues()[0];
-    const x = Number(v[LESSON_NATIVE_COL_X - 1]);
-    const y = Number(v[LESSON_NATIVE_COL_X]);
+    // 全行 (10 秒 cache) から本人の行を抜く。以前は寸法 + email 列 + 該当行の 3 read を
+    //   児童ごと・入力フェーズごとに払っていた。
+    const rows = __readAllLessonRows_(phaseDef);
+    const me = String(actorEmail || '').trim().toLowerCase();
+    const mine = rows.find((r) => r.email === me);
+    if (!mine) return null;
     return {
-      numericX: Number.isFinite(x) ? x : null,
-      numericY: Number.isFinite(y) ? y : null,
-      reason: String(v[LESSON_NATIVE_COL_INSIGHT - 2] || ''),
-      addedInsight: String(v[LESSON_NATIVE_COL_INSIGHT - 1] || '')
+      numericX: mine.numericX,
+      numericY: mine.numericY,
+      reason: mine.reason || '',
+      addedInsight: mine.addedInsight || ''
     };
   } catch (error) {
     logError_('__readOwnLessonAnswer_', error);
@@ -2484,17 +2436,38 @@ function getLessonReviewGrid(userId, lessonId) {
 }
 
 // 1 フェーズ分の全回答を読む (教師の見取り用)。
-function __readAllLessonRows_(phaseDef) {
+// 回答シートの読み (航跡 / 見取り) は 10 秒 cache する。
+//   Why: 「ふりかえる」に入った瞬間、学級全員が同時に自分の航跡を読む (= 入力フェーズの数 ×
+//   人数の read)。行は 1 児童 1 行で 30 行程度なので、全行を 1 回読んで cache し、本人分は
+//   メモリで抜く。送信時に該当シートの cache を捨てるので、送った直後の再読み込みでも古くならない。
+const LESSON_ROWS_CACHE_TTL_S = 10;
+function __phaseRowsCacheKey_(phaseDef) {
+  return 'lesson_rows_' + phaseDef.spreadsheetId + '_' + phaseDef.sheetName;
+}
+function __invalidatePhaseRows_(phaseDef) {
+  if (!phaseDef || !phaseDef.spreadsheetId || typeof CacheService === 'undefined') return;
+  try { CacheService.getScriptCache().remove(__phaseRowsCacheKey_(phaseDef)); }
+  catch (_) { /* cache 不通は機能的に無害 (TTL 10 秒で切れる) */ }
+}
+
+function __readAllLessonRows_(phaseDef, opts) {
   try {
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return [];
-    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_review_grid' });
+    const fresh = Boolean(opts && opts.fresh);
+    const cacheKey = __phaseRowsCacheKey_(phaseDef);
+    if (!fresh && typeof CacheService !== 'undefined') {
+      try {
+        const hit = CacheService.getScriptCache().get(cacheKey);
+        if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
+      } catch (_) { /* 壊れた値は読み直しで回復する */ }
+    }
+    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_rows' });
     if (!access) return [];
     const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return [];
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return [];
-    // 全行を 1 回で読む (行ごとの getValue は 70x 遅い)。
-    const values = sheet.getRange(2, 1, lastRow - 1, LESSON_NATIVE_SHEET_HEADERS.length).getValues();
+    // 全行を 1 回で読む。SA proxy の getDataRange は実データ範囲だけを返す (空グリッドを読まない)。
+    const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
+    const values = data.slice(1);
     const out = [];
     for (let i = 0; i < values.length; i++) {
       const v = values[i];
@@ -2511,6 +2484,9 @@ function __readAllLessonRows_(phaseDef) {
         reason: String(v[6] || ''),
         addedInsight: String(v[7] || '')
       });
+    }
+    if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
+      saveToCacheWithSizeCheck(cacheKey, out, LESSON_ROWS_CACHE_TTL_S);
     }
     return out;
   } catch (error) {
