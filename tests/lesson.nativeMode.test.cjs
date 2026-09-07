@@ -674,6 +674,19 @@ test('advanceLessonPhase: config patch が落ちても授業は進んでおり�
   assert.equal(h.context.__activePhaseIndex_(h.context.__findLessonById_(lessonId).lesson.lessonJson), 1);
 });
 
+test('updateLessonDraft: 授業モードの classes は実行中でも直せて、児童の選択肢に届く', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const res = h.context.updateLessonDraft('u1', lessonId, 'classes', ['6年1組', '6年2組', '6年3組', '6年4組']);
+  assert.equal(res.success, true, res.message);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  assert.deepEqual(Array.from(h.context.__getViewerLessonPhase_('u1').classes), ['6年1組', '6年2組', '6年3組', '6年4組']);
+  // classes 以外は従来どおり draft のみ
+  const other = h.context.updateLessonDraft('u1', lessonId, 'name', '別名');
+  assert.equal(other.success, false);
+  assert.match(other.message, /draft/);
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

@@ -678,7 +678,14 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
     if (auth.error) return auth.error;
     const { found } = auth;
 
-    if (found.lesson.state !== 'draft') {
+    // 実行中でも直してよい項目: 授業モード (native) の classes。
+    //   Why: native の classes は児童がクラスを選ぶための選択肢で、回答シートや Form の
+    //   構造には関わらない (シートは授業ごと、クラス列は文字列)。Form 経由の授業は
+    //   Form 作成時にクラス選択肢を焼き込むので、開始後の変更は Form に届かない = 従来どおり draft のみ。
+    const activeEditable = found.lesson.state === 'active'
+      && fieldPath === 'classes'
+      && __isNativePhase_({}, found.lesson.lessonJson || {});
+    if (found.lesson.state !== 'draft' && !activeEditable) {
       return createErrorResponse('FORBIDDEN_STATE: draft 状態でのみ編集できます');
     }
 
@@ -703,6 +710,8 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
     const patch = isNameField ? { lessonJson, name: newName } : { lessonJson };
     const result = __updateLessonRow_(lessonId, patch, expectedEtag);
     if (!result.success) return createErrorResponse(result.message || result.error, null, { error: result.error });
+    // 実行中の classes 変更は児童の phase 応答 (classes) に載るので、cache を捨てて次の polling で届ける。
+    if (activeEditable) __invalidateViewerLessonPhase_(userId);
     return createSuccessResponse('updated', { lesson: result.lesson });
   } catch (error) {
     logError_('updateLessonDraft', error);
