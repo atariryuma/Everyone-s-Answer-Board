@@ -222,11 +222,23 @@ function getSheetInfo(sheet) {
   return { lastRow, lastCol: headersInfo.lastCol, headers: headersInfo.headers };
 }
 
-// 適応型バッチサイズ (429 対策)。連続エラー時に段階的に縮小。
-function getAdaptiveBatchSize(consecutiveErrors) {
-  if (consecutiveErrors === 0) return 100; // 正常時: 最大効率
-  if (consecutiveErrors === 1) return 70;  // 1回エラー: 30%削減
-  return 50; // 連続エラー: 安全サイズ（50%削減）
+// 1 回の読みで扱う行数の上限。values API は 1 応答で数千行を返せる (100KB の cache 上限は
+//   saveToCacheWithSizeCheck が別途守る)。
+const SINGLE_READ_MAX_ROWS = 2000;
+
+// 読みの分割方針 (429 対策)。
+//   Why 正常時は 1 回で全行か: バッチは「1 バッチ = 1 API 呼び出し」なので、100 行ずつに
+//   分けると読み取り回数が行数 / 100 倍に膨らむ。授業モードの回答シートは作成時の既定
+//   グリッド 1000 行が空のまま残るため、回答 1 件でも 10 回読んでいた (30 人同時で
+//   quota 300 read/分を一撃で超える)。values API は空行を返さないので 1 回で十分。
+//   429 を踏んだときだけ小さく分けて、どこまで読めたかを保てるようにする。
+function getAdaptiveBatchSize(consecutiveErrors, totalDataRows) {
+  if (consecutiveErrors === 0) {
+    const n = Number(totalDataRows);
+    return (Number.isFinite(n) && n > 0) ? Math.min(n, SINGLE_READ_MAX_ROWS) : 100;
+  }
+  if (consecutiveErrors === 1) return 100;
+  return 50;
 }
 
 /**
@@ -276,7 +288,7 @@ function processBatchData(ctx) {
     : null;
 
   for (let startRow = 2; startRow <= lastRow; ) {
-    const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors);
+    const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors, totalDataRows);
     const endRow = Math.min(startRow + currentBatchSize - 1, lastRow);
     const batchSize = endRow - startRow + 1;
 
@@ -304,7 +316,7 @@ function processBatchData(ctx) {
         startRow,
         endRow,
         consecutiveErrors,
-        nextBatchSize: getAdaptiveBatchSize(consecutiveErrors)
+        nextBatchSize: getAdaptiveBatchSize(consecutiveErrors, totalDataRows)
       });
 
       if (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('quota')) {

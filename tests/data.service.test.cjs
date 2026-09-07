@@ -337,21 +337,24 @@ test('getSheetInfo: row count refresh while headers cached (typical after new fo
 // getAdaptiveBatchSize (pure helper)
 // =====================================================================
 
-test('getAdaptiveBatchSize: 0 errors → 100', () => {
+test('getAdaptiveBatchSize: 0 errors → 全行を 1 回で読む (1 バッチ = 1 API 呼び出し)', () => {
   const ctx = loadDataServiceContext();
-  assert.equal(ctx.getAdaptiveBatchSize(0), 100);
+  assert.equal(ctx.getAdaptiveBatchSize(0, 999), 999, '1000 行グリッドの授業シートも 1 回');
+  assert.equal(ctx.getAdaptiveBatchSize(0, 42), 42);
+  assert.equal(ctx.getAdaptiveBatchSize(0, 5000), 2000, '上限で分割');
+  assert.equal(ctx.getAdaptiveBatchSize(0), 100, '行数不明なら従来値');
 });
 
-test('getAdaptiveBatchSize: 1 error → 70', () => {
+test('getAdaptiveBatchSize: 1 error → 100', () => {
   const ctx = loadDataServiceContext();
-  assert.equal(ctx.getAdaptiveBatchSize(1), 70);
+  assert.equal(ctx.getAdaptiveBatchSize(1, 999), 100);
 });
 
 test('getAdaptiveBatchSize: consecutive errors → 50', () => {
   const ctx = loadDataServiceContext();
-  assert.equal(ctx.getAdaptiveBatchSize(2), 50);
-  assert.equal(ctx.getAdaptiveBatchSize(5), 50);
-  assert.equal(ctx.getAdaptiveBatchSize(100), 50);
+  assert.equal(ctx.getAdaptiveBatchSize(2, 999), 50);
+  assert.equal(ctx.getAdaptiveBatchSize(5, 999), 50);
+  assert.equal(ctx.getAdaptiveBatchSize(100, 999), 50);
 });
 
 // =====================================================================
@@ -747,4 +750,28 @@ test('deleteAnswerRow: expectedTimestamp 未指定なら従来通り削除 (後�
   const res = ctx.deleteAnswerRow('u1', 2);
   assert.equal(res.success, true);
   assert.equal(deleted.length, 1);
+});
+
+test('processBatchData: 正常時は 1000 行グリッドでも getRange 1 回で読む (読み取り回数の増幅を止める)', () => {
+  const ctx = loadDataServiceContext({
+    resolveColumnIndex: (headers, type, mapping) => ({
+      index: (mapping && typeof mapping[type] === 'number') ? mapping[type] : -1
+    })
+  });
+  const reads = [];
+  const headers = ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと'];
+  const sheet = {
+    getRange: (row, col, numRows, numCols) => {
+      reads.push({ row, numRows });
+      return { getValues: () => [[new Date().toISOString(), 'a@x', '1', 'A', 3, 4, '理由', '']] };
+    }
+  };
+  const result = ctx.processBatchData({
+    sheet, headers, lastRow: 1000, lastCol: headers.length,
+    config: { columnMapping: { answer: 4, reason: 6, class: 2, name: 3, email: 1, numericX: 4, numericY: 5 } },
+    options: {}, startTime: Date.now()
+  });
+  assert.equal(reads.length, 1, '1 回の getRange で全行');
+  assert.deepEqual(reads[0], { row: 2, numRows: 999 });
+  assert.equal(result.length, 1);
 });
