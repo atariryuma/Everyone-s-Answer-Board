@@ -143,7 +143,13 @@
         //   授業をしていないときは全て null のままで、通常のボード表示に影響しない。
         lessonPhase: null,
         lessonDraft: null,
-        lessonPrevPoint: null
+        lessonPrevPoint: null,
+        // 送信済みの自分の回答 (このフェーズ)。再読み込みしても getMyLessonTrajectory で復元する。
+        lessonSent: null,
+        // 「置き直す」を押して送信済みのまま入力画面に戻っている最中か
+        lessonEditing: false,
+        // 自分の記録をどのフェーズまで読んだか (lessonId:phaseIndex)。二重取得を避ける
+        lessonRecordKey: null
       };
 
       this.lastActivityTime = Date.now();
@@ -1561,6 +1567,9 @@
 
       // フェーズが変わったら、前のフェーズの入力内容は持ち越さない。
       this.state.lessonDraft = null;
+      this.state.lessonSent = null;
+      this.state.lessonEditing = false;
+      this.state.lessonRecordKey = null;
       if (prev) {
         this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
       }
@@ -1588,6 +1597,14 @@
     __renderLessonScreen() {
       const phase = this.state.lessonPhase;
       if (!phase) return this.__teardownLessonScreen();
+
+      // 教師 (編集者) は答える側ではなく、分布を映す側。どのフェーズでも入力画面は
+      //   かぶせず、通常のボード (分布 + 理由) を見せる。児童の権能はサーバが守るので、
+      //   ここで教師を外しても構造は崩れない。
+      if (this.state.isEditor === true) {
+        this.__teardownLessonScreen();
+        return;
+      }
 
       if (phase.screenRole === 'browse') {
         this.__teardownLessonScreen();
@@ -1698,9 +1715,17 @@
     }
 
     // 入力 / 再入力フェーズ。reinput では自分の ● を下敷きに出す。
+    //   送信済みなら「送りました」画面。置き直すときだけ入力画面に戻る。
     __renderLessonInput(host, phase) {
       const esc = this.__escape.bind(this);
       const isReinput = phase.screenRole === 'reinput';
+      const sent = this.state.lessonSent;
+      const sentHere = !!(sent && sent.lessonId === phase.lessonId && sent.phaseIndex === phase.phaseIndex);
+      if (sentHere && !this.state.lessonEditing) {
+        this.__renderLessonSent(host, phase, sent);
+        return;
+      }
+      const draft = this.state.lessonDraft || {};
       const storedName = this.__lessonStoredName();
       host.innerHTML =
         '<div class="lesson-card">' +
@@ -1712,14 +1737,17 @@
           this.__buildLessonAxisFrame() +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
-            'placeholder="そこを選んだ理由を書いてください"></textarea>' +
+            'placeholder="そこを選んだ理由を書いてください">' + esc(draft.reason || '') + '</textarea>' +
           (isReinput
             ? '<label class="lesson-label" for="lessonInsight">友達の考えを聞いて、加わったこと・変わったことは？</label>' +
               '<textarea id="lessonInsight" class="lesson-input" rows="3" maxlength="500" ' +
-                'placeholder="考えが変わらなくても、気づいたことがあれば書いてください"></textarea>'
+                'placeholder="考えが変わらなくても、気づいたことがあれば書いてください">' + esc(draft.addedInsight || '') + '</textarea>'
             : '') +
-          '<button id="lessonSubmit" class="lesson-submit" type="button">考えをおくる</button>' +
-          '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>' +
+          '<button id="lessonSubmit" class="lesson-submit" type="button">' +
+            (sentHere ? '置き直して おくる' : '考えをおくる') + '</button>' +
+          (sentHere
+            ? '<button id="lessonCancelEdit" class="lesson-submit lesson-submit-secondary" type="button">やめる</button>'
+            : '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>') +
         '</div>';
 
       this.__buildLessonGrid(isReinput);
@@ -1727,6 +1755,105 @@
       if (btn) {
         btn.addEventListener('click', () => this.__submitLessonAnswer());
       }
+      const cancel = document.getElementById('lessonCancelEdit');
+      if (cancel) {
+        cancel.addEventListener('click', () => {
+          this.state.lessonEditing = false;
+          this.__renderLessonScreen();
+        });
+      }
+      // 書きかけの言葉は state にも持つ。軸ラベル到着などで画面を描き直しても消えないように。
+      const keep = (id, key) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+          this.state.lessonDraft = Object.assign({}, this.state.lessonDraft || {}, { [key]: el.value });
+        });
+      };
+      keep('lessonReason', 'reason');
+      keep('lessonInsight', 'addedInsight');
+
+      // 再読み込み後も「送った」が分かるように、自分の記録をサーバから 1 度だけ読む。
+      this.__loadMyLessonRecord(phase);
+    }
+
+    /**
+     * 送信済み画面。自分が置いた位置と言葉を見せ、置き直しは明示の操作にする。
+     *
+     * Why 入力画面のままにしないか: 送ったあとも同じ画面だと「送れたのか」「また送るのか」が
+     *   分からず、児童が何度も押す。送ったことを画面の状態で示す。
+     */
+    __renderLessonSent(host, phase, sent) {
+      const esc = this.__escape.bind(this);
+      host.innerHTML =
+        '<div class="lesson-card">' +
+          '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
+          '<p class="lesson-sent-title">' +
+            '<svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg> 考えを送りました' +
+          '</p>' +
+          this.__buildLessonAxisFrame() +
+          '<div class="lesson-quote lesson-quote-now">' +
+            '<span class="lesson-quote-label">あなたのことば</span>' + esc(sent.reason || '') +
+          '</div>' +
+          (sent.addedInsight
+            ? '<div class="lesson-quote lesson-quote-insight">' +
+                '<span class="lesson-quote-label">＋ 加わったこと</span>' + esc(sent.addedInsight) +
+              '</div>'
+            : '') +
+          '<button id="lessonReplace" class="lesson-submit lesson-submit-secondary" type="button">置き直す</button>' +
+          '<p class="lesson-hint">この時間の中なら、置き直せます</p>' +
+        '</div>';
+
+      // 格子は読むだけ。自分の位置を選択状態で見せる。
+      this.state.lessonDraft = {
+        numericX: sent.numericX, numericY: sent.numericY,
+        reason: sent.reason || '', addedInsight: sent.addedInsight || ''
+      };
+      this.__buildLessonGrid(phase.screenRole === 'reinput');
+      const grid = document.getElementById('lessonGrid');
+      if (grid) grid.classList.add('is-readonly');
+      const btn = document.getElementById('lessonReplace');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          this.state.lessonEditing = true;
+          this.__renderLessonScreen();
+        });
+      }
+    }
+
+    /**
+     * 自分の記録 (getMyLessonTrajectory) を、フェーズごとに 1 度だけ読む。
+     *   - 現在フェーズに自分の行があれば「送信済み」として画面を切り替える (再読み込み対策)
+     *   - 再入力フェーズなら最初の ● を下敷きに出す
+     */
+    __loadMyLessonRecord(phase) {
+      const key = phase.lessonId + ':' + phase.phaseIndex;
+      if (this.state.lessonRecordKey === key) return;
+      this.state.lessonRecordKey = key;
+      this.runGas('getMyLessonTrajectory', this.state.userId)
+        .then((res) => {
+          const cur = this.state.lessonPhase;
+          if (!cur || cur.lessonId !== phase.lessonId || cur.phaseIndex !== phase.phaseIndex) return;
+          const phases = (res && res.success && res.data && res.data.phases) || [];
+          if (!phases.length) return;
+          let changed = false;
+          const first = phases[0];
+          if (first.phaseIndex < phase.phaseIndex && !this.state.lessonPrevPoint) {
+            this.state.lessonPrevPoint = { numericX: first.numericX, numericY: first.numericY };
+            changed = true;
+          }
+          const mine = phases.filter((p) => p.phaseIndex === phase.phaseIndex)[0];
+          if (mine && !this.state.lessonSent && !this.state.lessonEditing) {
+            this.state.lessonSent = {
+              lessonId: phase.lessonId, phaseIndex: phase.phaseIndex,
+              numericX: mine.numericX, numericY: mine.numericY,
+              reason: mine.reason || '', addedInsight: mine.addedInsight || ''
+            };
+            changed = true;
+          }
+          if (changed && document.getElementById('lessonScreen')) this.__renderLessonScreen();
+        })
+        .catch(() => { this.state.lessonRecordKey = null; /* 次の描画で読み直す */ });
     }
 
     /**
@@ -1791,32 +1918,24 @@
           grid.appendChild(cell);
         }
       }
+      // 描き直し (軸ラベル到着 / 置き直し) でも選んだ位置を保つ。
+      const draft = this.state.lessonDraft;
+      if (draft && draft.numericX && draft.numericY) {
+        const sel = grid.querySelector('.lesson-cell[data-x="' + draft.numericX + '"][data-y="' + draft.numericY + '"]');
+        if (sel) sel.classList.add('is-selected');
+      }
       grid.addEventListener('click', (ev) => {
         const cell = ev.target.closest ? ev.target.closest('.lesson-cell') : null;
         if (!cell) return;
         const cells = grid.querySelectorAll('.lesson-cell');
         for (let i = 0; i < cells.length; i++) cells[i].classList.remove('is-selected');
         cell.classList.add('is-selected');
-        this.state.lessonDraft = {
+        this.state.lessonDraft = Object.assign({}, this.state.lessonDraft || {}, {
           numericX: Number(cell.getAttribute('data-x')),
           numericY: Number(cell.getAttribute('data-y'))
-        };
+        });
       });
-
-      // 再入力フェーズでは自分の最初の位置を下敷きに出す (まだ取得していなければ読む)。
-      if (isReinput && !prev) {
-        this.runGas('getMyLessonTrajectory', this.state.userId)
-          .then((res) => {
-            const phases = (res && res.success && res.data && res.data.phases) || [];
-            if (!phases.length) return;
-            this.state.lessonPrevPoint = {
-              numericX: phases[0].numericX,
-              numericY: phases[0].numericY
-            };
-            this.__buildLessonGrid(true);
-          })
-          .catch(() => {});
-      }
+      // 再入力フェーズの下敷き (最初の ●) は __loadMyLessonRecord が読んで描き直す。
     }
 
     // 投稿。サーバがフェーズ権能を再検証するので、ここは UX の担当。
@@ -1825,7 +1944,7 @@
       const draft = this.state.lessonDraft;
       const btn = document.getElementById('lessonSubmit');
       if (!phase) return;
-      if (!draft) {
+      if (!draft || !draft.numericX || !draft.numericY) {
         this.showToast('まず、自分の考えの位置をえらんでください');
         return;
       }
@@ -1868,6 +1987,15 @@
           throw new Error((res && res.message) || '送信に失敗しました');
         }
         this.showToast('考えを送りました');
+        // 送った内容を画面の状態にする。以後は「送りました」画面。
+        this.state.lessonSent = {
+          lessonId: phase.lessonId, phaseIndex: phase.phaseIndex,
+          numericX: draft.numericX, numericY: draft.numericY,
+          reason,
+          addedInsight: insightEl ? String(insightEl.value || '').trim() : ''
+        };
+        this.state.lessonEditing = false;
+        this.__renderLessonScreen();
       };
 
       if (window.sharedUtilities && window.sharedUtilities.buttons && btn) {
@@ -2672,6 +2800,10 @@
         //      poll のたびにサーバ側の最新権限状態と整合させる。
         if (result.viewerIsTeacher === true) {
           this.state.isEditor = true;
+          // bootstrap 時に viewer 扱いで入力画面が出ていたら、教師と分かった時点で外す。
+          if (this.state.lessonPhase && document.getElementById('lessonScreen')) {
+            this.__renderLessonScreen();
+          }
         }
         // Why: 授業のフェーズが進む / 教師が formUrl を変えると、生徒のボタンも
         //      次の poll で追従させる必要がある。従来は init で 1 回だけ

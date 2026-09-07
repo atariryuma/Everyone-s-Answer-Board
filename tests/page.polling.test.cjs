@@ -661,3 +661,66 @@ test('updateDisplaySettingsFromAPI: 無効入力は何もしない', () => {
   instance.updateDisplaySettingsFromAPI('not-object');
   assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showNames, false, '不変');
 });
+
+// =====================================================================
+// 授業モードの画面: 教師は答えない / 送信後は「送りました」画面 / フェーズ切替で戻す
+// =====================================================================
+
+function makeLessonInstance() {
+  const { instance, ctx } = makeInstance();
+  const calls = [];
+  const overlay = { parentNode: { removeChild: () => { calls.push('teardown'); } } };
+  let overlayPresent = false;
+  ctx.document.getElementById = (id) => (id === 'lessonScreen' && overlayPresent) ? overlay : null;
+  ctx.document.body.appendChild = () => { overlayPresent = true; calls.push('overlay'); };
+  ctx.document.body.classList = { add: () => {}, remove: () => {}, toggle: () => {} };
+  instance.state = { userId: 'u1', lessonPhase: null, lessonDraft: null, lessonSent: null, lessonEditing: false, lessonRecordKey: null };
+  instance.__renderLessonInput = () => { calls.push('input'); };
+  instance.__renderLessonDiscuss = () => { calls.push('discuss'); };
+  instance.__renderLessonReflect = () => { calls.push('reflect'); };
+  instance.showToast = () => {};
+  instance.loadSheetData = () => {};
+  instance.runGas = () => Promise.resolve({ success: true, data: { phases: [] } });
+  return { instance, calls };
+}
+
+test('授業画面: 教師 (isEditor) には入力画面をかぶせず、ボードをそのまま見せる', () => {
+  const { instance, calls } = makeLessonInstance();
+  instance.state.isEditor = true;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
+  assert.ok(!calls.includes('input'), '教師に入力画面が出ない');
+  assert.ok(!calls.includes('overlay'));
+});
+
+test('授業画面: 児童には入力画面が出る', () => {
+  const { instance, calls } = makeLessonInstance();
+  instance.state.isEditor = false;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
+  assert.ok(calls.includes('input'));
+});
+
+test('授業画面: フェーズが変わると送信済み・下書き・置き直し中の状態を捨てる', () => {
+  const { instance } = makeLessonInstance();
+  instance.state.isEditor = false;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
+  instance.state.lessonSent = { lessonId: 'l1', phaseIndex: 0, numericX: 2, numericY: 4, reason: 'r' };
+  instance.state.lessonDraft = { numericX: 2, numericY: 4, reason: 'r' };
+  instance.state.lessonEditing = true;
+  instance.state.lessonRecordKey = 'l1:0';
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse' });
+  assert.equal(instance.state.lessonSent, null);
+  assert.equal(instance.state.lessonDraft, null);
+  assert.equal(instance.state.lessonEditing, false);
+  assert.equal(instance.state.lessonRecordKey, null);
+});
+
+test('授業画面: 同じフェーズの polling では送信済み状態を保つ (入力画面に戻されない)', () => {
+  const { instance, calls } = makeLessonInstance();
+  instance.state.isEditor = false;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
+  instance.state.lessonSent = { lessonId: 'l1', phaseIndex: 0, numericX: 2, numericY: 4, reason: 'r' };
+  const before = calls.length;
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' });
+  assert.equal(calls.length, before, '描き直さない');
+  assert.ok(instance.state.lessonSent, '送信済みのまま');
+});
