@@ -479,8 +479,17 @@
       this.handlers.onModalReactionClick = (e) => {
         const btn = e.target.closest('.reaction-btn');
         const highlightBtn = e.target.closest('.highlight-btn');
+        const deleteBtn = e.target.closest('.delete-answer-btn');
 
-        if (highlightBtn) {
+        if (deleteBtn) {
+          const id = deleteBtn.dataset.rowIndex;
+          if (!id) return;
+          // 削除できたら (= 一覧から消えていたら) モーダルも閉じる。
+          Promise.resolve(this.confirmDeleteAnswer(id)).then(() => {
+            const still = (this.state.currentAnswers || []).some(r => String(r.rowIndex) === String(id));
+            if (!still) this.hideAnswerModal();
+          });
+        } else if (highlightBtn) {
           const id = highlightBtn.dataset.rowIndex;
           if (id) {
             this.handleHighlight(id);
@@ -3715,7 +3724,7 @@
 
         const card = this.createCardElement(safeData);
         const { nameHtml, containerClass } = this.createNameDisplay(safeData);
-        const reactionButtonsHtml = this.createReactionButtons(safeData);
+        const reactionButtonsHtml = this.__buildAnswerActionsHtml(safeData, { size: 'card' });
 
         this.buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, containerClass);
         this.finalizeCard(card, safeData, cacheKey);
@@ -3796,25 +3805,7 @@
       return card;
     }
 
-    createHighlightButton(safeData) {
-      if (!this.state.isEditor) return '';
 
-      const cls = safeData.highlight ? 'reacted': '';
-      const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する': 'ハイライトする';
-      return `<button type="button" class="highlight-btn like-btn text-theme-status-warning ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
-    }
-
-    createHighlightToggle(safeData) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'highlight-badge highlight-btn';
-      btn.dataset.rowIndex = safeData.rowIndex;
-      btn.setAttribute('aria-label', safeData.highlight ? 'ハイライトを解除する': 'ハイライトする');
-      btn.setAttribute('aria-pressed', String(safeData.highlight));
-      btn.innerHTML = this.getIcon('star', '', safeData.highlight);
-      if (safeData.highlight) btn.classList.add('active');
-      return btn;
-    }
 
     createHighlightBadge() {
       const badge = document.createElement('span');
@@ -3850,44 +3841,61 @@
       return { nameHtml, containerClass };
     }
 
-    createReactionButtons(safeData) {
-      return this.reactionTypes.map(rt => {
-        try {
-          const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
-          const cls = info.reacted ? 'reacted': '';
-          const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
-          const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-theme" aria-hidden="true">${info.count || 0}</span>` : '';
-          const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-          const reactionName = reactionNames[rt.key] || rt.key;
-          const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す': 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
-
-          return `<button type="button" class="reaction-btn like-btn flex items-center gap-1 ${colorClass} ${cls}" data-row-index="${safeData.rowIndex}" data-reaction="${rt.key}" aria-label="${ariaLabel}" aria-pressed="${info.reacted}">${this.getIcon(rt.icon, 'w-5 h-5', info.reacted)}${countSpan}</button>`;
-        } catch (reactionError) {
-          console.warn('createAnswerCard: Reaction button creation error:', reactionError);
-          return '';
-        }
+    /**
+     * 回答への操作を 1 つの部品で作る。カード / 詳細モーダル / 分布の意見一覧、どこでも同じ。
+     *   左: リアクション (全員)。右: ハイライト (編集者)、削除 (管理モード)。
+     *   Why 1 か所か: 以前はカード・モーダル・一覧で 3 通りの生成があり、大きさも並びも
+     *   違っていた (モーダルの星だけ小さい、削除はカードの隅にしか無い、など)。
+     * @param {Object} safeData - { rowIndex, reactions, highlight }
+     * @param {Object} [opts] - { size: 'card' | 'modal', reactionsOnly?: boolean }
+     */
+    __buildAnswerActionsHtml(safeData, opts) {
+      const size = (opts && opts.size) || 'card';
+      const reactionsOnly = Boolean(opts && opts.reactionsOnly);
+      const iconCls = size === 'modal' ? 'w-6 h-6' : 'w-5 h-5';
+      const countCls = size === 'modal' ? 'text-2xl' : 'text-lg';
+      const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+      const reactions = this.reactionTypes.map(rt => {
+        const info = (safeData.reactions && safeData.reactions[rt.key]) || { count: 0, reacted: false };
+        const cls = info.reacted ? ' reacted' : '';
+        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+        const count = this.state.showCounts
+          ? '<span class="reaction-count font-bold ' + countCls + ' text-theme" aria-hidden="true">' + (info.count || 0) + '</span>'
+          : '';
+        const name = reactionNames[rt.key] || rt.key;
+        const aria = name + (info.reacted ? 'を取り消す' : 'する') + (this.state.showCounts ? ' (現在' + (info.count || 0) + '件)' : '');
+        return '<button type="button" class="answer-action-btn reaction-btn like-btn ' + colorClass + cls + '" ' +
+          'data-row-index="' + safeData.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + aria + '" aria-pressed="' + Boolean(info.reacted) + '">' +
+          this.getIcon(rt.icon, iconCls, info.reacted) + count + '</button>';
       }).join('');
+      let editor = '';
+      if (!reactionsOnly && this.state.isEditor) {
+        const on = Boolean(safeData.highlight);
+        editor += '<button type="button" class="answer-action-btn highlight-btn like-btn text-theme-status-warning' + (on ? ' reacted' : '') + '" ' +
+          'aria-label="' + (on ? 'ハイライトを解除する' : 'ハイライトする') + '" aria-pressed="' + on + '" title="' + (on ? 'ハイライトを解除' : 'ハイライト') + '" ' +
+          'data-row-index="' + safeData.rowIndex + '">' + this.getIcon('star', iconCls, on) + '</button>';
+        if (this.state.showAdminFeatures) {
+          editor += '<button type="button" class="answer-action-btn delete-answer-btn text-theme-status-error" ' +
+            'aria-label="この回答を削除" title="この回答を削除" data-row-index="' + safeData.rowIndex + '">' +
+            '<svg class="icon ' + iconCls + '" aria-hidden="true"><use href="#i-trash"></use></svg></button>';
+        }
+      }
+      return '<div class="answer-actions' + (size === 'modal' ? ' answer-actions--lg' : '') + '">' +
+        '<div class="answer-actions-group" role="group" aria-label="回答への反応">' + reactions + '</div>' +
+        (editor ? '<div class="answer-actions-group answer-actions-editor" role="group" aria-label="編集者の操作">' + editor + '</div>' : '') +
+      '</div>';
+    }
+
+    // 分布の意見一覧 (page.viz.js) 用: リアクションだけ。
+    createReactionButtons(safeData) {
+      return this.__buildAnswerActionsHtml(safeData, { size: 'card', reactionsOnly: true });
     }
 
     buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, containerClass) {
       const fragment = document.createDocumentFragment();
 
       const contentDiv = document.createElement('div');
-      // has-admin-actions: 右上に削除ボタンが乗るので、見出しに逃げを作るための目印。
-      contentDiv.className = 'relative flex-grow mb-3 answer-preview'
-        + (this.state.showAdminFeatures ? ' has-admin-actions' : '');
-
-      if (this.state.showAdminFeatures) {
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'absolute top-2 right-2 text-theme-status-error hover:bg-theme-status-error-soft rounded-full p-2 transition-all duration-200 z-10 delete-answer-btn';
-        deleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-      </svg>`;
-        deleteBtn.setAttribute('aria-label', '回答を削除');
-        deleteBtn.setAttribute('title', '回答を削除');
-        deleteBtn.dataset.rowIndex = safeData.rowIndex;
-        contentDiv.appendChild(deleteBtn);
-      }
+      contentDiv.className = 'relative flex-grow mb-3 answer-preview';
 
       // h2: ボードの問い (h1 #headingLabel) の直下にあたる。サイズは .opinion-text と
       //   明示クラスで決まるため、タグを変えても見え方は変わらない。
@@ -3916,12 +3924,10 @@
         footerDiv.appendChild(nameContainer);
       }
 
-      const reactionsDiv = document.createElement('div');
-      reactionsDiv.className = 'reaction-container flex items-center gap-1 flex-shrink-0';
-      reactionsDiv.setAttribute('role', 'group');
-      reactionsDiv.setAttribute('aria-label', '回答への反応');
-      reactionsDiv.innerHTML = reactionButtonsHtml; // lint-disable-line no-inner-html-assignment-with-variable -- 全補間が数値 (rowIndex/count) と enum (rt.key) のみ。security audit 確認済
-      footerDiv.appendChild(reactionsDiv);
+      const actions = document.createElement('div');
+      actions.className = 'flex-shrink-0';
+      actions.innerHTML = reactionButtonsHtml; // lint-disable-line no-inner-html-assignment-with-variable -- __buildAnswerActionsHtml: 補間は数値 (rowIndex/count) と enum (rt.key) と固定文言のみ
+      footerDiv.appendChild(actions);
 
       fragment.appendChild(contentDiv);
       fragment.appendChild(footerDiv);
@@ -3929,11 +3935,8 @@
     }
 
     finalizeCard(card, safeData, cacheKey) {
-      if (this.state.isEditor) {
-        card.appendChild(this.createHighlightToggle(safeData));
-      } else if (safeData.highlight) {
-        card.appendChild(this.createHighlightBadge());
-      }
+      // 隅の星は「ハイライトされている」の印 (全員向け)。切替は下の操作列で行う。
+      if (safeData.highlight) card.appendChild(this.createHighlightBadge());
 
       this.applyReactionStyles(card, safeData);
 
@@ -5170,7 +5173,7 @@
             highlightBtn.setAttribute('aria-label', label);
             highlightBtn.innerHTML = this.getIcon('star', '', item.highlight);
           }
-          if (!this.state.isEditor) {
+          {
             let badge = card.querySelector('.highlight-badge');
             if (item.highlight && !badge) {
               card.appendChild(this.createHighlightBadge());
@@ -5292,17 +5295,8 @@
       }
 
       this.elements.modalStudentName.textContent = modalDisplayName;
-      const footerBase = 'text-xs text-theme-muted pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
-      this.elements.modalFooter.className = footerBase + (showName ? 'justify-between items-center' : 'justify-end items-center');
-      const reactionButtonsHtml = this.reactionTypes.map(rt => {
-        const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-        const cls = info.reacted ? 'reacted': '';
-        const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">'+ info.count + '</span>': '';
-        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 '+ colorClass + ' '+ cls + '" '+ 'data-row-index="'+ rowIndex + '" data-reaction="'+ rt.key + '" aria-label="'+ rt.key + '">'+ this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
-      }).join('');
-
-      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
+      this.elements.modalFooter.classList.toggle('has-name', Boolean(modalDisplayName));
+      this.elements.modalReactionContainer.innerHTML = this.__buildAnswerActionsHtml(data, { size: 'modal' }); // lint-disable-line no-inner-html-assignment-with-variable -- 補間は数値と enum と固定文言のみ
 
       this.applyReactionStyles(this.elements.answerModalCard, data);
 
@@ -5315,15 +5309,7 @@
     updateModalContent(data) {
       if (!data) return;
 
-      const reactionButtonsHtml = this.reactionTypes.map(rt => {
-        const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-        const cls = info.reacted ? 'reacted': '';
-        const colorClass = rt.key === 'LIKE'? 'text-red-500': rt.key === 'UNDERSTAND'? 'text-yellow-500': 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-theme">'+ info.count + '</span>': '';
-        return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 '+ colorClass + ' '+ cls + '" '+ 'data-row-index="'+ data.rowIndex + '" data-reaction="'+ rt.key + '" aria-label="'+ rt.key + '">'+ this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
-      }).join('');
-
-      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
+      this.elements.modalReactionContainer.innerHTML = this.__buildAnswerActionsHtml(data, { size: 'modal' }); // lint-disable-line no-inner-html-assignment-with-variable -- 補間は数値と enum と固定文言のみ
       this.applyReactionStyles(this.elements.answerModalCard, data);
     }
     hideAnswerModal() {

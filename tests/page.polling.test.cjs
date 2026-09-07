@@ -887,3 +887,38 @@ test('フェーズ切替: 押した瞬間に「切り替えています」、応
   assert.equal(instance.state.lessonPhase.screenRole, 'browse', '出会う = 分布そのもの');
   assert.ok(!stages.includes('toast'), '完了のトーストは出さない');
 });
+
+// =====================================================================
+// 回答への操作列: 1 つの部品で、権限に応じて リアクション / ハイライト / 削除 を並べる
+// =====================================================================
+
+function makeActionsInstance(isEditor, showAdminFeatures) {
+  const { instance } = makeInstance();
+  instance.state = { userId: 'u1', isEditor, showAdminFeatures, showCounts: true };
+  instance.reactionTypes = [{ key: 'LIKE', icon: 'like' }, { key: 'UNDERSTAND', icon: 'understand' }, { key: 'CURIOUS', icon: 'curious' }];
+  instance.getIcon = (name) => '<i data-icon="' + name + '"></i>';
+  return instance;
+}
+
+test('操作列: 児童はリアクション 3 つだけ', () => {
+  const html = makeActionsInstance(false, false).__buildAnswerActionsHtml({ rowIndex: 5, reactions: {}, highlight: false });
+  assert.equal((html.match(/reaction-btn/g) || []).length, 3);
+  assert.ok(!html.includes('highlight-btn'));
+  assert.ok(!html.includes('delete-answer-btn'));
+});
+
+test('操作列: 編集者にはハイライト、管理モードでは削除も同じ列に出る', () => {
+  const editor = makeActionsInstance(true, false).__buildAnswerActionsHtml({ rowIndex: 5, reactions: {}, highlight: true });
+  assert.ok(editor.includes('highlight-btn'));
+  assert.ok(editor.includes('aria-pressed="true"'));
+  assert.ok(!editor.includes('delete-answer-btn'));
+  const admin = makeActionsInstance(true, true).__buildAnswerActionsHtml({ rowIndex: 5, reactions: {}, highlight: false }, { size: 'modal' });
+  assert.ok(admin.includes('delete-answer-btn'));
+  assert.ok(admin.includes('answer-actions--lg'), 'モーダルは大きいサイズ');
+  assert.ok(admin.includes('data-row-index="5"'));
+});
+
+test('操作列: 分布の意見一覧はリアクションだけ (編集者でも)', () => {
+  const html = makeActionsInstance(true, true).createReactionButtons({ rowIndex: 5, reactions: {} });
+  assert.ok(!html.includes('highlight-btn') && !html.includes('delete-answer-btn'));
+});
