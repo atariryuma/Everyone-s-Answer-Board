@@ -149,7 +149,9 @@
         // 「置き直す」を押して送信済みのまま入力画面に戻っている最中か
         lessonEditing: false,
         // 自分の記録をどのフェーズまで読んだか (lessonId:phaseIndex)。二重取得を避ける
-        lessonRecordKey: null
+        lessonRecordKey: null,
+        // 教師が入力フェーズ中に明示的に分布を開いたか (フェーズが変わると閉じる)
+        lessonTeacherPeek: false
       };
 
       this.lastActivityTime = Date.now();
@@ -1592,6 +1594,7 @@
       this.state.lessonSent = null;
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
+      this.state.lessonTeacherPeek = false;
       if (prev) {
         this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
       }
@@ -1607,7 +1610,99 @@
     __teardownLessonScreen() {
       const el = document.getElementById('lessonScreen');
       if (el && el.parentNode) el.parentNode.removeChild(el);
+      const bar = document.getElementById('lessonTeacherBar');
+      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
       document.body.classList.remove('lesson-active');
+    }
+
+    // 現在フェーズの送信状況 (全体人数とクラス別)。教師のボードデータは入力フェーズの
+    //   シートを指しているので、行数がそのまま送信済み人数になる。
+    __lessonSubmissionStats() {
+      const rows = Array.isArray(this.state.currentAnswers) ? this.state.currentAnswers : [];
+      const byClass = {};
+      for (const r of rows) {
+        const c = (r && r.class && String(r.class).trim()) || '';
+        byClass[c] = (byClass[c] || 0) + 1;
+      }
+      return { total: rows.length, byClass };
+    }
+
+    /**
+     * 教師向け: 入力フェーズ中の待機画面 (問い + 送信済み人数)。分布は出さない。
+     */
+    __renderLessonTeacherWait(phase) {
+      const esc = this.__escape.bind(this);
+      const bar = document.getElementById('lessonTeacherBar');
+      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      let host = document.getElementById('lessonScreen');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'lessonScreen';
+        host.className = 'lesson-screen';
+        document.body.appendChild(host);
+      }
+      document.body.classList.add('lesson-active');
+      const isProjector = document.body.classList.contains('projector-mode');
+      const stats = this.__lessonSubmissionStats();
+      const classes = Object.keys(stats.byClass).sort();
+      const classHtml = classes.length
+        ? '<ul class="lesson-count-classes">' + classes.map((c) =>
+            '<li><span>' + esc(c || 'クラス未設定') + '</span><strong>' + stats.byClass[c] + '</strong></li>').join('') + '</ul>'
+        : '';
+      host.innerHTML =
+        '<div class="lesson-card lesson-teacher-wait">' +
+          '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
+          '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
+          '<div class="lesson-count" aria-live="polite">' +
+            '<span class="lesson-count-num">' + stats.total + '</span>' +
+            '<span class="lesson-count-unit">人が送りました</span>' +
+          '</div>' +
+          classHtml +
+          '<p class="lesson-hint">この時間は分布を見せません。みんなが送ったら「出会う」に進めてください。</p>' +
+          (isProjector ? '' :
+            '<button id="lessonTeacherPeek" class="lesson-submit lesson-submit-secondary" type="button">' +
+              '分布を見る（投影中は押さない）</button>') +
+        '</div>';
+      const btn = document.getElementById('lessonTeacherPeek');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          this.state.lessonTeacherPeek = true;
+          this.__renderLessonScreen();
+        });
+      }
+    }
+
+    // 教師が分布を開いているときの小さな帯。閉じる導線だけを持つ。
+    __renderLessonTeacherBar(phase) {
+      let bar = document.getElementById('lessonTeacherBar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'lessonTeacherBar';
+        bar.className = 'lesson-teacher-bar';
+        document.body.appendChild(bar);
+      }
+      bar.textContent = '';
+      const label = document.createElement('span');
+      label.textContent = '「' + (phase.phaseName || '') + '」の分布を表示中 (児童には見えていません)';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lesson-teacher-bar-btn';
+      btn.textContent = '分布を隠す';
+      btn.addEventListener('click', () => {
+        this.state.lessonTeacherPeek = false;
+        this.__renderLessonScreen();
+      });
+      bar.appendChild(label);
+      bar.appendChild(btn);
+    }
+
+    // データ更新 (polling) のたびに送信済み人数を描き直す。待機画面が出ていないときは何もしない。
+    __refreshLessonTeacherWait() {
+      const phase = this.state.lessonPhase;
+      if (!phase || this.state.isEditor !== true || this.state.lessonTeacherPeek) return;
+      if (['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
+      if (!document.getElementById('lessonScreen')) return;
+      this.__renderLessonTeacherWait(phase);
     }
 
     /**
@@ -1620,11 +1715,20 @@
       const phase = this.state.lessonPhase;
       if (!phase) return this.__teardownLessonScreen();
 
-      // 教師 (編集者) は答える側ではなく、分布を映す側。どのフェーズでも入力画面は
-      //   かぶせず、通常のボード (分布 + 理由) を見せる。児童の権能はサーバが守るので、
-      //   ここで教師を外しても構造は崩れない。
+      // 教師 (編集者) は答える側ではなく、分布を映す側。入力画面はかぶせない。
+      //   ただし入力フェーズ (考える / もう一度考える) の間は分布も出さない。
+      //   Why: 「先入観より先に自分の考えを持つ」を児童にはサーバで保証しているのに、
+      //   教師の画面が電子黒板に映っていれば分布が教室全体に見えて同じことが起きる。
+      //   教師に要るのは「何人送ったか」だけなので、問いと送信済み人数を出す。
+      //   手元で分布を見たいときは明示のボタンで開ける (投影モードでは出さない)。
       if (this.state.isEditor === true) {
+        const inputRoles = ['input', 'reinput'];
+        if (inputRoles.indexOf(phase.screenRole) >= 0 && !this.state.lessonTeacherPeek) {
+          this.__renderLessonTeacherWait(phase);
+          return;
+        }
         this.__teardownLessonScreen();
+        if (inputRoles.indexOf(phase.screenRole) >= 0) this.__renderLessonTeacherBar(phase);
         return;
       }
 
@@ -2899,6 +3003,7 @@
         }
 
         await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
+        this.__refreshLessonTeacherWait();
 
         // Why: 毎回 classFilter を再構築する。refreshContent 経由でデータ更新されたとき、
         //      新しく現れたクラス（生徒が初めて投稿した）を選択肢に加えるため。

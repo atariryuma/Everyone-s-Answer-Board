@@ -684,12 +684,16 @@ function makeLessonInstance() {
   return { instance, calls, ctx };
 }
 
-test('授業画面: 教師 (isEditor) には入力画面をかぶせず、ボードをそのまま見せる', () => {
-  const { instance, calls } = makeLessonInstance();
+test('授業画面: 教師 (isEditor) には児童の入力画面を出さない', () => {
+  const { instance, calls, ctx } = makeLessonInstance();
+  ctx.document.body.classList.contains = () => false;
   instance.state.isEditor = true;
+  instance.state.currentAnswers = [];
   instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
-  assert.ok(!calls.includes('input'), '教師に入力画面が出ない');
-  assert.ok(!calls.includes('overlay'));
+  assert.ok(!calls.includes('input'), '教師に児童の入力画面が出ない');
+  // 出会う: 待機画面も外れて分布そのもの
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
+  assert.ok(calls.includes('teardown'));
 });
 
 test('授業画面: 児童には入力画面が出る', () => {
@@ -739,4 +743,59 @@ test('授業のクラス: 複数クラスなら端末に覚えた選択を使い
   assert.equal(instance.__lessonClass(), '');
   ctx.localStorage.getItem = (k) => k === 'lessonClass:u1' ? '6年2組' : null;
   assert.equal(instance.__lessonClass(), '6年2組');
+});
+
+// =====================================================================
+// 教師の入力フェーズ: 分布を出さず、問い + 送信済み人数 (明示のボタンでだけ開く)
+// =====================================================================
+
+function makeTeacherInstance() {
+  const { instance, calls, ctx } = makeLessonInstance();
+  instance.state.isEditor = true;
+  instance.state.currentAnswers = [];
+  instance.state.lessonTeacherPeek = false;
+  instance.__renderLessonTeacherWait = (phase) => { calls.push('teacherWait:' + phase.screenRole); };
+  instance.__renderLessonTeacherBar = (phase) => { calls.push('teacherBar:' + phase.screenRole); };
+  return { instance, calls, ctx };
+}
+
+test('教師: 考える (input) では分布ではなく待機画面 (問い + 送信済み人数) を出す', () => {
+  const { instance, calls } = makeTeacherInstance();
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
+  assert.ok(calls.includes('teacherWait:input'));
+  assert.ok(!calls.includes('teardown'), '待機画面は分布の上にかぶせる');
+});
+
+test('教師: もう一度考える (reinput) も同じく待機画面', () => {
+  const { instance, calls } = makeTeacherInstance();
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 3, screenRole: 'reinput', phaseName: 'もう一度考える' });
+  assert.ok(calls.includes('teacherWait:reinput'));
+});
+
+test('教師: 出会う (browse) では待機画面を外して分布を見せる', () => {
+  const { instance, calls } = makeTeacherInstance();
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
+  assert.ok(!calls.some(c => c.startsWith('teacherWait')));
+  assert.ok(!calls.some(c => c.startsWith('teacherBar')));
+});
+
+test('教師: 「分布を見る」を押すと分布 + 帯になり、フェーズが変わると自動で閉じる', () => {
+  const { instance, calls } = makeTeacherInstance();
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
+  instance.state.lessonTeacherPeek = true;
+  instance.__renderLessonScreen();
+  assert.ok(calls.includes('teacherBar:input'));
+  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 3, screenRole: 'reinput', phaseName: 'もう一度考える' });
+  assert.equal(instance.state.lessonTeacherPeek, false, 'フェーズ切替で peek を捨てる');
+  assert.ok(calls.includes('teacherWait:reinput'));
+});
+
+test('送信済み人数: 行数とクラス別に集計する', () => {
+  const { instance } = makeTeacherInstance();
+  instance.state.currentAnswers = [
+    { class: '6年1組' }, { class: '6年1組' }, { class: '6年2組' }, { class: '' }
+  ];
+  const stats = instance.__lessonSubmissionStats();
+  assert.equal(stats.total, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(stats.byClass)), { '6年1組': 2, '6年2組': 1, '': 1 });
 });
