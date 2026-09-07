@@ -3621,8 +3621,8 @@
 
     updateCardReactions(card, data) {
 
-      const reactionContainer = card.querySelector('.reaction-container');
-      if (!reactionContainer) {
+      // 操作列 (.answer-actions) が無いカードは更新対象外 (エラーカード等)。
+      if (!card.querySelector('.answer-actions')) {
         return;
       }
 

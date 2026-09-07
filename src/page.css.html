@@ -42,7 +42,6 @@
    フィルタと操作アイコンの間に 879px の空白ができていた。列を固定すれば
    どれが欠けても「左: 識別 / 中: フェーズ / 右: フィルタ + 操作」が保たれる。 */
 .eab-row-meta > .eab-identity-pill { grid-column: 1; }
-.eab-row-meta > .eab-phase-host    { grid-column: 2; }
 .eab-row-meta > .eab-filters       { grid-column: 3; }
 .eab-row-meta > .eab-actions       { grid-column: 4; }
 
@@ -230,10 +229,9 @@
 
 /* Editor-only visibility via body class:
  *   設計: setupEditorState() で body.classList.toggle('is-editor', isEditor)。
- *   editor-only / editor-only-row クラスを CSS で hidden 制御することで
+ *   editor-only クラスを CSS で hidden 制御することで
  *   従来の .hidden JS トグルを排除し、保守性向上。 */
-body:not(.is-editor) .editor-only,
-body:not(.is-editor) .editor-only-row {
+body:not(.is-editor) .editor-only {
   display: none !important;
 }
 /* Admin-mode-only visibility:
@@ -253,13 +251,11 @@ body:not(.admin-mode) .admin-mode-only {
   /* 縦積みに戻すので列の固定 (desktop 用) を解除する。
      残すと grid が暗黙の 3・4 列目を作り、1fr の指定が効かなくなる。 */
   .eab-row-meta > .eab-identity-pill,
-  .eab-row-meta > .eab-phase-host,
   .eab-row-meta > .eab-filters,
   .eab-row-meta > .eab-actions { grid-column: auto; }
   .eab-actions { justify-content: flex-end; }
   .eab-filters { flex-wrap: wrap; }
 }
-
 
 
 /* =============================================================================
@@ -422,7 +418,6 @@ html, body {
 }
 /* リアクションは押せることが一目でわかる chip 型に。以前は境界の無いアイコンが
    隙間なく並び、押下領域も 1 つの帯に見えていた。 */
-.reaction-btn { position: relative; overflow: hidden; }
 .reaction-count {
   font-variant-numeric: tabular-nums;
 }
@@ -447,7 +442,6 @@ html, body {
   /* fill property は JavaScript の SVG 置き換えで直接設定 */
 }
 
-/* ✅ Removed conflicting CSS rules that override SVG replacement logic */
 .reaction-btn.loading,
 .like-btn.loading {
   opacity: 0.6;
@@ -663,7 +657,7 @@ html, body {
   line-height: 1.6;
   color: var(--theme-text-secondary);
 }
-/* ✅ 共通スピナーベーススタイル - DRY原則適用 */
+/* 処理中スピナー (リアクション / ハイライト共通)。色はアイコン色に合わせる。 */
 .like-btn.loading::after,
 .highlight-btn.loading::after {
   content: "";
@@ -718,6 +712,8 @@ html, body {
   border-left: 1px solid var(--theme-border-subtle);
 }
 .answer-action-btn {
+  position: relative;      /* 処理中スピナー (::after) の基準 */
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -764,10 +760,6 @@ html, body {
   /* Removed animated shimmer effect - using simple static appearance */
 }
 /* Range Slider Styles - cyan ベース (theme-spinner と同系統) */
-
-
-
-
 
 
 .modal-close-btn {

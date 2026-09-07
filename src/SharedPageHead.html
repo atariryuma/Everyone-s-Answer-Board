@@ -877,12 +877,6 @@
 
   /* CTA Button with Shimmer Effect */
 
-  /* Status Indicators */
-
-  .status-error {
-    background-color: var(--status-error);
-  }
-
   /* Answer Card System (from Page.html) */
   .answer-card {
     /* 面 (背景 / 枠 / 角丸 / 影 / transition) は上の Surface 共通定義が与える。
@@ -3035,10 +3029,8 @@
    *   token を変更したいときは `--theme-status-*` の値を 1 箇所変えるだけで全箇所に反映。
    * ============================================================================= */
   .bg-theme-status-error-soft       { background: var(--theme-status-error-soft); }
-  .bg-theme-status-warning-soft     { background: var(--theme-status-warning-soft); }
 
   .border-theme-status-error-strong     { border-color: var(--theme-status-error-strong); }
-  .border-theme-status-warning-strong   { border-color: var(--theme-status-warning-strong); }
 
   .text-theme-status-error-text-on-soft   { color: var(--theme-status-error-text-on-soft); }
   .text-theme-status-warning-text-on-soft { color: var(--theme-status-warning-text-on-soft); }
@@ -3052,7 +3044,6 @@
   .text-theme-status-highlight   { color: var(--theme-status-highlight-text); }
 
   /* お題見出し用 pink accent も同様に defensive fallback */
-  .text-theme-accent-pink        { color: var(--theme-accent-pink); }
 </style>
 <!-- ── UtilityStyles.css ── -->
 <!-- =====================================================================
