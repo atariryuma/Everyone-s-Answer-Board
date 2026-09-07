@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
+/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -1222,6 +1222,17 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
   if (yAxisLabels) patch.yAxisLabels = yAxisLabels;
+  // 象限ラベルは phase が持つものだけを使い、無ければ config から消す (null = deepMerge_ の削除シグナル)。
+  //   Why: これを触らないと、同じボードで前に使った授業の象限ラベル (「真実と思いやり」等) が
+  //   別の教材の授業にそのまま出る。軸ラベルは phase が上書きするのに象限だけ残るのは矛盾。
+  //   授業の作成 UI に象限ラベルの入力は無いので、通常は削除になる。
+  const quadrantSource = (ownOpts.quadrantLabels && typeof ownOpts.quadrantLabels === 'object')
+    ? ownOpts.quadrantLabels
+    : (opts.quadrantLabels && typeof opts.quadrantLabels === 'object' ? opts.quadrantLabels : null);
+  const quadrantLabels = quadrantSource
+    ? (typeof sanitizeQuadrantLabels === 'function' ? sanitizeQuadrantLabels(quadrantSource) : quadrantSource)
+    : null;
+  patch.matrixQuadrantLabels = quadrantLabels || null;
   return patch;
 }
 

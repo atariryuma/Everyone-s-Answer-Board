@@ -342,6 +342,40 @@ test('軸ラベルは native phase でも config に載る (ロレンゾの軸�
   assert.equal(patch.displaySettings.boardMode, 'matrix');
 });
 
+test('象限ラベルは phase に無ければ config から消す (前の授業のラベルが別の教材に漏れない)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  phases[0].spreadsheetId = 'native_ss_1';
+  phases[0].sheetName = 'phase1';
+  phases[0].templateOptions = { xLow: '自首を勧める', xHigh: '逃がす', yLow: '迷いあり', yHigh: '迷いなし' };
+  const patch = h.context.__buildPhaseConfigPatch_(phases[0], lessonJson, 'l1');
+  // null は applyConfigPatch_ (deepMerge_) の「キー削除」シグナル
+  assert.equal(patch.matrixQuadrantLabels, null);
+  assert.ok('matrixQuadrantLabels' in patch);
+});
+
+test('象限ラベルは phase の templateOptions.quadrantLabels があればそれを使う', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phases = lessonJson.phases;
+  for (let i = 0; i < phases.length; i++) {
+    phases[i].spreadsheetId = 'native_ss_1';
+    phases[i].sheetName = 'phase' + (i + 1);
+  }
+  phases[0].templateOptions = {
+    xLow: 'A', xHigh: 'B', yLow: 'C', yHigh: 'D',
+    quadrantLabels: { hh: '甲', hl: '乙', lh: '丙', ll: '丁' }
+  };
+  const first = h.context.__buildPhaseConfigPatch_(phases[0], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, first.matrixQuadrantLabels), { hh: '甲', hl: '乙', lh: '丙', ll: '丁' });
+  // 軸と同じく、後続フェーズは最初の入力フェーズの象限を引き継ぐ
+  const browse = h.context.__buildPhaseConfigPatch_(phases[1], lessonJson, 'l1');
+  assert.deepEqual(Object.assign({}, browse.matrixQuadrantLabels), { hh: '甲', hl: '乙', lh: '丙', ll: '丁' });
+});
+
 // =====================================================================
 // フェーズの権能 (submitLessonAnswer)
 // =====================================================================
