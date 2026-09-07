@@ -75,8 +75,7 @@
       <!-- バックエンド同期用 hidden field (autosave 経路を共有) -->
       <input type="hidden" id="lesson-classes" data-autosave data-lesson-field="classes" value="" />
 
-      <p class="text-xs text-theme-muted mt-2"> 1 つの Form を全クラスで共有し、生徒は所属クラスを Form 内で選びます。
-      </p>
+      <p class="text-xs text-theme-muted mt-2" id="lesson-class-hint"> 1 つの Form を全クラスで共有し、生徒は所属クラスを Form 内で選びます。</p>
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
@@ -87,7 +86,7 @@
 
   <!-- Step 2: フェーズ設計 -->
   <div class="lesson-step" data-step="2" hidden>
-    <p class="text-sm text-theme-secondary mb-3"> 各フェーズの <strong class="text-theme-accent-cyan">名前 / 形式 / 質問</strong> を編集できます。フェーズは <strong>追加・削除</strong> も可能です (1〜5 個)。
+    <p class="text-sm text-theme-secondary mb-3" id="lesson-phase-intro"> 各フェーズの <strong class="text-theme-accent-cyan">名前 / 形式 / 質問</strong> を編集できます。フェーズは <strong>追加・削除</strong> も可能です (1〜5 個)。
     </p>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="lesson-phase-cards">
@@ -105,9 +104,9 @@
     <div class="bg-theme-surface rounded-lg p-4 mb-4">
       <h3 class="text-sm font-semibold text-theme-accent-cyan mb-2">この内容で授業を開始します</h3>
       <ul class="text-sm text-theme-secondary space-y-1 mb-3">
-        <li> <span id="lesson-summary-phase-count">3</span> 個の Google Form を自動生成 (各フェーズ用)</li>
+        <li id="lesson-summary-forms-line"> <span id="lesson-summary-phase-count">3</span> 個の Google Form を自動生成 (各フェーズ用)</li>
         <li> 対象クラス: <span id="lesson-summary-classes" class="text-theme-accent-cyan">-</span></li>
-        <li> Spreadsheet 連携 + 共有設定も自動で完了</li>
+        <li id="lesson-summary-share-line"> Spreadsheet 連携 + 共有設定も自動で完了</li>
       </ul>
       <h4 class="text-xs font-semibold text-theme-muted mt-3 mb-2">フェーズ詳細</h4>
       <ol id="lesson-summary-phase-list" class="confirm-phase-list"></ol>
@@ -144,12 +143,28 @@
       title="閲覧用URLをコピー（生徒への共有用）">
       <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
     </button>
+    <button type="button" id="lesson-runner-open-projector" class="btn btn-secondary"
+      title="投影用に開く（分布を隠す入力フェーズ画面 + 大きな文字）">
+      <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> 投影用に開く
+    </button>
     <button type="button" id="lesson-runner-open-board" class="btn btn-primary"
       title="回答ボードを開く（投影用）">
       <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
     </button>
   </header>
 
+  <!-- 対象クラス: 実行中でも直せる (児童の選択肢にしか使わないので授業の構造を壊さない)。 -->
+  <div id="lesson-runner-classes" class="lesson-runner-classes mb-3">
+    <span class="text-xs text-theme-muted">対象クラス:</span>
+    <span id="lesson-runner-classes-text" class="text-sm text-theme">-</span>
+    <button type="button" id="lesson-runner-classes-edit" class="btn btn-secondary text-xs">編集</button>
+    <div id="lesson-runner-classes-editor" class="lesson-runner-classes-editor" hidden>
+      <input type="text" id="lesson-runner-classes-input" class="modern-input text-sm flex-1"
+        placeholder="例: 6年1組, 6年2組, 6年3組, 6年4組" aria-label="対象クラス (カンマ区切り)" />
+      <button type="button" id="lesson-runner-classes-save" class="btn btn-primary text-xs">保存</button>
+      <button type="button" id="lesson-runner-classes-cancel" class="btn btn-secondary text-xs">やめる</button>
+    </div>
+  </div>
   <!-- フェーズカード横並び -->
   <div class="flex items-center gap-3 mb-4 overflow-x-auto" id="lesson-runner-phases">
     <!-- JS が動的生成 -->
@@ -165,8 +180,7 @@
       onclick="lessonEnd()"><svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg> 授業終了</button>
   </div>
 
-  <p class="text-xs text-theme-muted mt-3">「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。
-  </p>
+  <p class="text-xs text-theme-muted mt-3" id="lesson-runner-end-note">「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。</p>
 
   <!-- 見取りグリッド: 授業「後」に読むもの。授業中は児童の顔を見る時間なので、
        既定で畳んでおき、開いたときにだけ読み込む。 -->

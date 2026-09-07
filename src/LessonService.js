@@ -783,6 +783,14 @@ function listLessons(userId) {
       endedAt: l.endedAt,
       classes: (l.lessonJson && l.lessonJson.classes) || [],
       phaseCount: (l.lessonJson && Array.isArray(l.lessonJson.phases)) ? l.lessonJson.phases.length : 0,
+      // 一覧で「実行中 · 考える」と現在地を出すため。授業モードかどうかも一覧の文言で使う。
+      inputMode: (l.lessonJson && l.lessonJson.inputMode) || 'form',
+      activePhaseIndex: __activePhaseIndex_(l.lessonJson || {}),
+      currentPhaseName: (() => {
+        const ph = (l.lessonJson && Array.isArray(l.lessonJson.phases)) ? l.lessonJson.phases : [];
+        const cur = ph[__activePhaseIndex_(l.lessonJson || {})];
+        return (cur && cur.name) || '';
+      })(),
       etag: l.etag
     }));
     return createSuccessResponse('listed', { lessons: summaries });

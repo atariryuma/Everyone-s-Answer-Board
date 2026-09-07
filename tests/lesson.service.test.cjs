@@ -910,6 +910,20 @@ test('advanceLessonPhase: targetIndex 指定でも移行前フェーズの snaps
   assert.ok(snaps.some(s => s.phaseIndex === 0));
 });
 
+test('listLessons: 一覧に現在フェーズ名と入力モードを載せる (実行中 · 考える の表示用)', () => {
+  const { context } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+  context.advanceLessonPhase('u1', lessonId, 'next');
+  const row = context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId);
+  assert.equal(row.activePhaseIndex, 1);
+  assert.equal(typeof row.currentPhaseName, 'string');
+  assert.ok(row.currentPhaseName.length > 0);
+  assert.equal(row.inputMode, 'form');
+});
+
 test('getActiveLessonNav: 実行中の授業が無ければ data を付けない (正常系)', () => {
   const { context } = loadLessonContext();
   const res = context.getActiveLessonNav('u1');

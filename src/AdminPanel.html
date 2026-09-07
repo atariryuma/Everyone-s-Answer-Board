@@ -291,7 +291,35 @@
       background: var(--theme-accent-cyan-soft);
       border: 1px dashed var(--theme-accent-cyan);
     }
-  </style>
+  
+    /* 授業ロック (ボード設定タブ) */
+    .board-tab-lock {
+      display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-4); margin-bottom: var(--space-4);
+      border-radius: var(--radius-lg);
+      background: var(--theme-status-warning-soft);
+      color: var(--theme-status-warning-text-on-soft);
+      border: 1px solid var(--theme-border-subtle);
+    }
+    .board-tab-lock.hidden { display: none; }
+    .board-tab-lock-title { margin: 0; font-weight: 700; display: inline-flex; align-items: center; gap: var(--space-2); }
+    .board-tab-lock-note { margin: 0; font-size: var(--font-size-sm); }
+    .board-tab-lock button { align-self: flex-start; }
+    #tab-board.is-locked > .card { opacity: 0.5; pointer-events: none; }
+    /* フェーズカードの役割バッジ (授業モード) */
+    .phase-role-badge {
+      display: inline-block; margin-left: var(--space-2);
+      padding: 0 var(--space-2); border-radius: var(--radius-full);
+      font-size: var(--font-size-xs); font-weight: 700;
+      background: var(--theme-bg-elevated); color: var(--theme-text-secondary);
+      border: 1px solid var(--theme-border-subtle);
+    }
+    .phase-fixed-value { font-size: var(--font-size-sm); color: var(--theme-text-secondary); }
+    .phase-axis-note { font-size: var(--font-size-xs); color: var(--theme-text-muted); margin: var(--space-1) 0 0; }
+    .lesson-runner-classes { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+    .lesson-runner-classes-editor { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 100%; }
+    .lesson-runner-classes-editor[hidden] { display: none; }
+</style>
 </head>
 
 <body class="app-body">
@@ -413,8 +441,8 @@
         <div id="first-time-hint" class="hidden mt-4 p-4 rounded-lg first-time-hint-box">
           <p class="text-sm text-theme mb-1">
             <strong>はじめての方へ。</strong>
-            「新しい授業をつくる」を押すと、導入 → 議論 → 振り返りの Google フォームが
-            まとめて用意されます。3 分で始められます。
+            「新しい授業をつくる」でテンプレートを選ぶと、フェーズごとの画面
+            (授業モード) か Google フォームがまとめて用意されます。3 分で始められます。
           </p>
           <p class="text-xs text-theme-muted">
             すでに Google フォームをお持ちなら、下の「詳細設定」で URL を貼るだけでも使えます。
@@ -430,6 +458,14 @@
       </div><!-- /#tab-lessons -->
 
       <div id="tab-board" data-tab-panel role="tabpanel" aria-labelledby="tab-btn-board" hidden>
+      <!-- 授業ロック: 実行中の授業がこのボードの設定 (データソース / 列 / 軸) を管理している間は、
+           ここでの編集を受け付けない。上書きすると授業が壊れる。 -->
+      <div id="board-tab-lock" class="board-tab-lock hidden" role="status">
+        <p class="board-tab-lock-title"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+          授業「<span id="board-tab-lock-name"></span>」が実行中です</p>
+        <p class="board-tab-lock-note">授業中はボードのデータソース・列・軸・公開状態を授業が管理します。ここでの変更は保存されません。</p>
+        <button type="button" id="board-tab-lock-open" class="btn btn-primary text-sm">授業の画面を開く</button>
+      </div>
       <div class="card">
         <p class="text-xs text-theme-muted mb-4">Google フォームをつないでボードの中身と見せ方を決めます。授業を使う場合は自動で設定されるので、通常はここを触る必要はありません。</p>
 

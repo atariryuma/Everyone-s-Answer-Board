@@ -361,13 +361,17 @@
                 ? '<span class="admin-badge admin-badge-on">アクティブ</span>'                : '<span class="admin-badge admin-badge-off">停止</span>';
 
               let boardPublished = false;
+              let lessonActive = false;
               try {
                 const config = JSON.parse(user.configJson || '{}');
                 boardPublished = config.isPublished === true;
+                // 授業中 = activeLessonId と開始時刻が両方ある (終了時に両方消える)。
+                lessonActive = Boolean(config.activeLessonId && config.currentLessonStartedAt);
               } catch (_) { /* config 破損時は未公開扱い (fail-closed) */ }
 
-              const boardBadge = boardPublished
-                ? '<span class="admin-badge admin-badge-on">公開中</span>'                : '<span class="admin-badge admin-badge-off">非公開</span>';
+              const boardBadge = (boardPublished
+                ? '<span class="admin-badge admin-badge-on">公開中</span>'                : '<span class="admin-badge admin-badge-off">非公開</span>')
+                + (lessonActive ? ' <span class="admin-badge admin-badge-on" title="授業が実行中です。非公開にすると児童の画面が「準備中」になります">授業中</span>' : '');
 
               const registrationDate = user.createdAt
                 ? new Date(user.createdAt).toLocaleDateString('ja-JP')
@@ -394,7 +398,8 @@
                                     </button>
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
-                                        onclick="toggleUserBoard(this.dataset.userId)"
+                                        data-lesson-active="${lessonActive ? '1' : ''}"
+                                        onclick="toggleUserBoard(this.dataset.userId, this.dataset.lessonActive === '1')"
                                         class="btn ${boardPublished ? 'btn-secondary' : 'btn-primary'} text-xs"
                                         title="${boardPublished ? 'ボードを非公開に': 'ボードを公開に'}"> ${boardPublished ? '非公開': '公開'}
                                     </button>
@@ -613,7 +618,16 @@
         }
       }
 
-      async function toggleUserBoard(userId) {
+      async function toggleUserBoard(userId, lessonActive) {
+        // 授業中のボードを非公開にすると児童の画面が「準備中」になり、授業が止まる。
+        //   管理者の誤操作を防ぐため、確認を 1 段挟む (unpublish 側は自動アーカイブも走る)。
+        if (lessonActive && window.modals && typeof window.modals.confirm === 'function') {
+          const ok = await window.modals.confirm(
+            'このボードでは授業が実行中です。公開状態を変えると児童の画面が「準備中」になり、授業が止まります。続けますか？',
+            { title: '授業が実行中です', okLabel: '続ける', variant: 'danger' }
+          );
+          if (!ok) return;
+        }
         const ok = await window.modals.confirm('このユーザーのボード公開状態を切り替えますか？', { title: 'ボード公開状態' });
         if (!ok) return;
         try {

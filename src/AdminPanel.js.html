@@ -2478,6 +2478,10 @@
     }
 
     function autoSaveDraft() {
+      if (window.__isBoardTabLocked && window.__isBoardTabLocked()) {
+        setAutoSaveStatus('授業中は保存しません', 'warning');
+        return;
+      }
       const sid = getCurrentSpreadsheetId();
       const sn = getCurrentSheetName();
       if (!sid || !sn) {
@@ -2549,6 +2553,11 @@
       if (onComplete) onComplete(ok);
     }
 
+    if (window.__isBoardTabLocked && window.__isBoardTabLocked()) {
+      if (!silent) showInfo('授業が実行中のため、ボード設定は保存できません。授業の画面から操作してください。');
+      if (onComplete) onComplete(false);
+      return;
+    }
     if (!ClientMutex.acquire('saveDraft')) {
       if (!silent) showInfo('保存処理を実行中です…');
       if (onComplete) onComplete(false);
@@ -2620,6 +2629,10 @@
   }
 
   function publishApp() {
+    if (window.__isBoardTabLocked && window.__isBoardTabLocked()) {
+      showInfo('授業が実行中のため、ここからは公開設定を変えられません。授業の画面から操作してください。');
+      return;
+    }
     if (!ClientMutex.acquire('publishApp')) {
       showInfo('公開処理を実行中です…');
       return;
@@ -3147,6 +3160,34 @@
     }
 
     // ---------- Lesson list (常時表示の一覧) ----------
+    // ---------- 授業ロック (ボード設定タブ) ----------
+    //   実行中の授業はフェーズごとにデータソース / 列 / 軸 / 公開状態を書き換える。
+    //   その間にボード設定タブの自動保存や公開が走ると、授業が書いた設定を上書きして壊す。
+    let boardTabLockedBy = null;
+    function setBoardTabLock(activeLesson) {
+      boardTabLockedBy = activeLesson || null;
+      const box = document.getElementById('board-tab-lock');
+      const tab = document.getElementById('tab-board');
+      const nameEl = document.getElementById('board-tab-lock-name');
+      if (!box || !tab) return;
+      if (!activeLesson) {
+        box.classList.add('hidden');
+        tab.classList.remove('is-locked');
+        return;
+      }
+      if (nameEl) nameEl.textContent = activeLesson.name || '';
+      box.classList.remove('hidden');
+      tab.classList.add('is-locked');
+      const openBtn = document.getElementById('board-tab-lock-open');
+      if (openBtn && !openBtn.__bound) {
+        openBtn.__bound = true;
+        openBtn.addEventListener('click', () => {
+          if (boardTabLockedBy) openLessonRunner(boardTabLockedBy.lessonId);
+        });
+      }
+    }
+    window.__isBoardTabLocked = () => Boolean(boardTabLockedBy);
+
     function loadLessonList() {
       const listEl = document.getElementById('lesson-list');
       const countEl = document.getElementById('lesson-list-count');
@@ -3172,12 +3213,16 @@
         if (hintEl) {
           hintEl.classList.toggle('hidden', lessons.length !== 0);
         }
+        // 実行中の授業があれば、ボード設定タブをロックする (授業が config を管理している)。
+        try { setBoardTabLock(lessons.find(l => l && l.state === 'active') || null); } catch (_) { /* ロック表示は best-effort */ }
         if (lessons.length === 0) {
           listEl.innerHTML = '<li class="text-theme-muted italic">まだ授業がありません。「新しい授業をつくる」から始めましょう。</li>';
           return;
         }
         listEl.innerHTML = lessons.map(l => {
-          const stateLabel = l.state === 'draft'? '下書き': l.state === 'active'? '実行中': '完了';
+          const stateLabel = l.state === 'draft'? '下書き'
+            : l.state === 'active'? ('実行中' + (l.currentPhaseName ? ' · ' + window.sharedUtilities.security.escapeHtml(l.currentPhaseName) : ''))
+            : '完了';
           const dateStr = l.createdAt ? l.createdAt.slice(0, 10) : '';
           const safeName = window.sharedUtilities.security.escapeHtml(l.name || '無題');
           const safeId = window.sharedUtilities.security.escapeHtml(l.lessonId);
@@ -3633,20 +3678,70 @@
     const PHASE_MIN = 1;
     const PHASE_MAX = 5;
     let currentPhases = [];
+    // 授業モード (native): Form を作らず、フェーズの役割 (screenRole) が児童画面を決める。
+    //   wizard / runner の文言と編集可否はこのフラグで切り替える。
+    let currentLessonNative = false;
+    const ROLE_LABELS = {
+      input: '考えを送る',
+      browse: '分布を見る',
+      discuss: '画面を閉じて話す',
+      reinput: 'もう一度送る',
+      reflect: '自分の変化を見る'
+    };
+    function roleLabel(role) { return ROLE_LABELS[role] || '見るだけ'; }
+    function firstInputPhaseIndex() {
+      for (let i = 0; i < currentPhases.length; i++) {
+        if (currentPhases[i].screenRole === 'input' || currentPhases[i].screenRole === 'reinput') return i;
+      }
+      return -1;
+    }
 
     function renderPhaseCards(lessonJson) {
       const container = document.getElementById('lesson-phase-cards');
       if (!container) return;
+      currentLessonNative = Boolean(lessonJson && lessonJson.inputMode === 'native');
       currentPhases = ((lessonJson && lessonJson.phases) || []).map((p) => ({
         name: p.name || '',
         formTemplate: p.formTemplate || 'numberline',
         question: p.question || '',
         templateOptions: normalizeTemplateOptions(p.templateOptions, p.formTemplate),
+        screenRole: p.screenRole || '',
         formId: p.formId,
         sheetName: p.sheetName,
-        formUrl: p.formUrl
+        formUrl: p.formUrl,
+        // 編集しない項目 (screenRole / inputMode / spreadsheetId 等) を保存時に落とさないための原本。
+        //   以前は name/形式/質問/templateOptions だけを書き戻していたため、授業モードの
+        //   フェーズを 1 文字直しただけで screenRole が消え、全フェーズが「見るだけ」に倒れた。
+        __orig: p
       }));
+      applyLessonModeCopy();
       renderPhaseCardsInner();
+    }
+
+    // 授業モードかどうかで wizard の説明文を切り替える。
+    function applyLessonModeCopy() {
+      const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+      if (currentLessonNative) {
+        set('lesson-class-hint', '児童は回答ボードの画面から直接送ります。クラスが 1 つなら自動で入り、複数なら最初に選びます。');
+        set('lesson-phase-intro', '各フェーズの 名前 / 質問 を編集できます。役割 (考えを送る・分布を見る・話す・もう一度送る・変化を見る) と順序はテンプレートで決まっています。軸と象限の名前は最初の「考えを送る」フェーズで決めます。');
+        set('lesson-summary-share-line', 'フェーズごとの回答シートを作成 (Google フォームは作りません)');
+      } else {
+        set('lesson-class-hint', '1 つの Form を全クラスで共有し、生徒は所属クラスを Form 内で選びます。');
+        set('lesson-phase-intro', '各フェーズの 名前 / 形式 / 質問 を編集できます。フェーズは 追加・削除 も可能です (1〜5 個)。');
+        set('lesson-summary-share-line', 'Spreadsheet 連携 + 共有設定も自動で完了');
+      }
+      const formsLine = document.getElementById('lesson-summary-forms-line');
+      if (formsLine) {
+        const n = document.getElementById('lesson-summary-phase-count');
+        const count = n ? n.textContent : String(currentPhases.length);
+        formsLine.innerHTML = '';
+        const span = document.createElement('span'); span.id = 'lesson-summary-phase-count'; span.textContent = count;
+        formsLine.appendChild(document.createTextNode(' '));
+        formsLine.appendChild(span);
+        formsLine.appendChild(document.createTextNode(currentLessonNative
+          ? ' 個のフェーズを画面として用意 (児童はボードから直接送ります)'
+          : ' 個の Google Form を自動生成 (各フェーズ用)'));
+      }
     }
 
     // formTemplate ごとの templateOptions 既定値。renderPhaseCards / 形式変更時に呼ぶ。
@@ -3680,7 +3775,9 @@
       const container = document.getElementById('lesson-phase-cards');
       if (!container) return;
       const esc = window.sharedUtilities.security.escapeHtml;
-      const canDelete = currentPhases.length > PHASE_MIN;
+      const native = currentLessonNative;
+      const canDelete = !native && currentPhases.length > PHASE_MIN;
+      const axisIdx = native ? firstInputPhaseIndex() : -1;
       const cards = currentPhases.map((p, i) => {
         const options = PHASE_TEMPLATE_OPTIONS.map((opt) => {
           const sel = opt.value === p.formTemplate ? 'selected' : '';
@@ -3688,10 +3785,40 @@
         }).join('');
         const deleteBtn = canDelete
           ? '<button type="button" class="phase-delete-btn" data-phase-action="delete" data-phase-index="'+ i + '" title="このフェーズを削除">×</button>'          : '';
+        const roleBadge = native
+          ? '<span class="phase-role-badge">' + esc(roleLabel(p.screenRole)) + '</span>'
+          : '';
+        // 授業モード: 形式はテンプレートで固定 (4 象限を画面から直接送る)。select を出さない。
+        const formatField = native
+          ? '<div class="phase-field"><label class="phase-label">形式:</label>' +
+              '<span class="phase-fixed-value">4 象限 (児童はボードの画面から直接送る)</span></div>'
+          : '<div class="phase-field">' +
+              '<label class="phase-label">形式:</label>' +
+              '<select class="modern-input text-sm" data-phase-field="formTemplate" data-phase-index="'+ i + '">' +
+                options +
+              '</select>' +
+            '</div>';
+        // 授業モードの軸・象限は「最初の考えを送るフェーズ」で 1 度だけ決める (授業を通して同じ座標系)。
+        let detail = '';
+        let preview = '';
+        if (!native) {
+          detail = renderPhaseDetailFields(p, i);
+          preview = '<div class="phase-preview-label"> 生徒に見える形:</div>' + renderPhasePreview(p);
+        } else if (i === axisIdx) {
+          detail = renderPhaseDetailFields(p, i) + renderQuadrantFields(p, i);
+          preview = '<div class="phase-preview-label"> 児童に見える形:</div>' + renderPhasePreview(p);
+        } else if (p.screenRole === 'input' || p.screenRole === 'reinput' || p.screenRole === 'browse') {
+          const axisName = axisIdx >= 0 ? (currentPhases[axisIdx].name || '最初のフェーズ') : '最初のフェーズ';
+          detail = '<p class="phase-axis-note">軸と象限は「' + esc(axisName) + '」と同じ (授業を通して 1 つの座標系)</p>';
+        } else if (p.screenRole === 'discuss') {
+          detail = '<p class="phase-axis-note">児童の画面には「画面をとじて、話そう」と問いだけが出ます</p>';
+        } else if (p.screenRole === 'reflect') {
+          detail = '<p class="phase-axis-note">児童には自分の ● 最初 → ★ いま と、自分のことばだけが出ます</p>';
+        }
         return (
           '<div class="lesson-phase-card">' +
             '<div class="phase-card-header">' +
-              '<span class="phase-number">フェーズ '+ (i + 1) + '</span>' +
+              '<span class="phase-number">フェーズ '+ (i + 1) + roleBadge + '</span>' +
               deleteBtn +
             '</div>' +
             '<div class="phase-field">' +
@@ -3699,26 +3826,21 @@
               '<input type="text" class="modern-input text-sm" data-phase-field="name" data-phase-index="' + i +
                 '" value="'+ esc(p.name) + '" maxlength="40" placeholder="例: 導入" />' +
             '</div>' +
+            formatField +
             '<div class="phase-field">' +
-              '<label class="phase-label">形式:</label>' +
-              '<select class="modern-input text-sm" data-phase-field="formTemplate" data-phase-index="'+ i + '">' +
-                options +
-              '</select>' +
-            '</div>' +
-            '<div class="phase-field">' +
-              '<label class="phase-label">質問:</label>' +
+              '<label class="phase-label">' + (native ? '問い:' : '質問:') + '</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-field="question" data-phase-index="' + i +
-                '" value="'+ esc(p.question) + '" maxlength="200" placeholder="生徒に問いかける文" />' +
+                '" value="'+ esc(p.question) + '" maxlength="200" placeholder="' + (native ? '児童に問いかける文 (画面の見出しになります)' : '生徒に問いかける文') + '" />' +
             '</div>' +
-            renderPhaseDetailFields(p, i) +
-            // プレビューは「設定の結果として何が見えるか」を示すので、設定 UI の後に置く
-            '<div class="phase-preview-label"> 生徒に見える形:</div>' +
-            renderPhasePreview(p) +
-            renderPhaseCommonOptions(p, i) +
+            detail +
+            preview +
+            (native ? '' : renderPhaseCommonOptions(p, i)) +
           '</div>'
         );
       }).join('');
-      const addBtn = currentPhases.length < PHASE_MAX
+      const addBtn = native
+        ? '<p class="text-xs text-theme-muted text-center">このテンプレートのフェーズ構成 (役割と順序) は固定です</p>'
+        : currentPhases.length < PHASE_MAX
         ? (
           '<details class="phase-add-picker">' +
             '<summary class="phase-add-btn">＋ フェーズを追加 ▾</summary>' +
@@ -3971,6 +4093,26 @@
       return '';
     }
 
+    // 4 象限の名前 (任意)。軸ラベルと同じく最初の入力フェーズで決め、授業を通して同じ。
+    function renderQuadrantFields(p, i) {
+      const esc = window.sharedUtilities.security.escapeHtml;
+      const q = (p.templateOptions && p.templateOptions.quadrantLabels) || {};
+      const cell = (key, label) => (
+        '<div class="phase-detail-row">' +
+          '<label class="phase-detail-tag">' + label + ':</label>' +
+          '<input type="text" class="modern-input text-sm" data-phase-quad="' + key + '" data-phase-index="' + i +
+            '" value="' + esc(q[key] || '') + '" maxlength="40" placeholder="空なら出さない" />' +
+        '</div>'
+      );
+      return (
+        '<details class="phase-detail">' +
+          '<summary>4 象限の名前 (任意)</summary>' +
+          cell('hh', '右上') + cell('hl', '右下') + cell('lh', '左上') + cell('ll', '左下') +
+          '<p class="phase-axis-note">象限の名前は立場の解釈を先に与えます。児童の考えを縛らないよう、付けるなら中立な言葉にしてください。</p>' +
+        '</details>'
+      );
+    }
+
     // 保存時に config に残してはいけない巨大プレビューデータ。
     //   imageDataUrl は base64 (最大 ~6.7MB) でローカル preview 用のみ。fileId が真値。
     //   lessonJson の 45000 char 上限を一発で吹き飛ばすので必ず strip する。
@@ -3995,7 +4137,7 @@
         document.body.appendChild(hidden);
       }
       hidden.value = '';
-      hidden.__phasesValue = currentPhases.map((p) => ({
+      hidden.__phasesValue = currentPhases.map((p) => Object.assign({}, p.__orig || {}, {
         name: p.name,
         formTemplate: p.formTemplate,
         question: p.question,
@@ -4036,6 +4178,14 @@
         savePhasesNow();
         return;
       }
+      // 1.5) 4 象限の名前
+      if (el.dataset.phaseQuad) {
+        const o = currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
+        o.quadrantLabels = Object.assign({}, o.quadrantLabels || {});
+        o.quadrantLabels[el.dataset.phaseQuad] = el.value;
+        savePhasesNow();
+        return;
+      }
       // 2) templateOptions (lowLabel / highLabel / xLow / xHigh / yLow / yHigh)
       if (el.dataset.phaseOpt) {
         currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
@@ -4062,6 +4212,7 @@
       if (el.dataset.phaseField === 'formTemplate') {
         const idx = Number(el.dataset.phaseIndex);
         if (!currentPhases[idx]) return;
+        if (currentLessonNative) return;   // 授業モードは形式固定 (select 自体を出していない)
         currentPhases[idx].formTemplate = el.value;
         currentPhases[idx].templateOptions = normalizeTemplateOptions(currentPhases[idx].templateOptions, el.value);
         renderPhaseCardsInner();
@@ -4120,7 +4271,7 @@
       const action = btn.dataset.phaseAction;
       const idx = Number(btn.dataset.phaseIndex);
       if (action === 'add') {
-        if (currentPhases.length >= PHASE_MAX) return;
+        if (currentLessonNative || currentPhases.length >= PHASE_MAX) return;
         const tpl = btn.dataset.phaseAddTemplate || 'numberline';
         const defaultName = ({ numberline: '新しい数直線', matrix: '新しいマトリクス', pie: '新しい円グラフ', board: '新しい掲示板'})[tpl] || '新しいフェーズ';
         currentPhases.push({
@@ -4131,7 +4282,7 @@
         renderPhaseCardsInner();
         savePhasesNow();
       } else if (action === 'delete') {
-        if (currentPhases.length <= PHASE_MIN) return;
+        if (currentLessonNative || currentPhases.length <= PHASE_MIN) return;
         currentPhases.splice(idx, 1);
         renderPhaseCardsInner();
         savePhasesNow();
@@ -4270,6 +4421,7 @@
       const phaseCountEl = document.getElementById('lesson-summary-phase-count');
       if (classesEl) classesEl.textContent = classes.length ? classes.join(', ') : '(未設定)';
       if (phaseCountEl) phaseCountEl.textContent = phases.length;
+      applyLessonModeCopy();
       if (step3Hidden) return;
       const phaseListEl = document.getElementById('lesson-summary-phase-list');
       const warningsEl = document.getElementById('lesson-summary-warnings');
@@ -4277,8 +4429,20 @@
       // 各フェーズの内容を一覧表示 (設定漏れに気づかせる)。
       if (phaseListEl) {
         const esc = window.sharedUtilities.security.escapeHtml;
-        const detailFor = (p) => {
+        const native = Boolean(lessonJson && lessonJson.inputMode === 'native');
+        let firstInput = -1;
+        phases.forEach((p, i) => { if (firstInput < 0 && (p.screenRole === 'input' || p.screenRole === 'reinput')) firstInput = i; });
+        const detailFor = (p, i) => {
           const o = p.templateOptions || {};
+          if (native) {
+            if (i !== firstInput) return '役割: ' + esc(roleLabel(p.screenRole));
+            const q = o.quadrantLabels || {};
+            const quad = ['hh', 'hl', 'lh', 'll'].map(k => q[k]).filter(Boolean);
+            return '役割: ' + esc(roleLabel(p.screenRole)) +
+              ' / X: ' + esc(o.xLow || '?') + '↔' + esc(o.xHigh || '?') +
+              ' / Y: ' + esc(o.yLow || '?') + '↔' + esc(o.yHigh || '?') +
+              (quad.length ? ' / 象限: ' + quad.map(v => esc(v)).join('・') : '');
+          }
           if (p.formTemplate === 'numberline') {
             return esc(o.lowLabel || '?') + '↔ ' + esc(o.highLabel || '?');
           }
@@ -4300,9 +4464,9 @@
           '<li class="confirm-phase-row">' +
             '<span class="confirm-phase-idx">フェーズ '+ (i + 1) + '</span>' +
             '<span class="confirm-phase-body">' +
-              '<strong>'+ esc(p.name || '(無題)') + '</strong> · '+ labelFor(p.formTemplate) + '<br>' +
+              '<strong>'+ esc(p.name || '(無題)') + '</strong> · '+ (native ? '4 象限 (画面から直接送る)' : labelFor(p.formTemplate)) + '<br>' +
               '<span class="confirm-phase-q">Q: '+ esc(p.question || '(質問未設定)') + '</span><br>' +
-              '<span class="confirm-phase-detail">'+ detailFor(p) + '</span>' +
+              '<span class="confirm-phase-detail">'+ detailFor(p, i) + '</span>' +
             '</span>' +
           '</li>'        )).join('');
       }
@@ -4468,7 +4632,16 @@
     function renderRunner(lesson) {
       const nameEl = document.getElementById('lesson-runner-name');
       if (nameEl) nameEl.textContent = lesson.name || '授業中';
+      const native = Boolean(lesson.lessonJson && lesson.lessonJson.inputMode === 'native');
+      currentLessonNative = native;
       const phases = (lesson.lessonJson && lesson.lessonJson.phases) || [];
+      renderRunnerClasses(lesson);
+      const endNote = document.getElementById('lesson-runner-end-note');
+      if (endNote) {
+        endNote.textContent = native
+          ? '「授業終了」で回答の受付を締め切り、振り返り用に保存します。児童の画面は通常のボードに戻ります。'
+          : '「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。';
+      }
       const trans = (lesson.lessonJson && lesson.lessonJson.profileTransitions) || [];
       const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
       const container = document.getElementById('lesson-runner-phases');
@@ -4484,7 +4657,7 @@
             title="${current ? '現在のフェーズ' : 'このフェーズに切替える'}">
             <div class="phase-number">${marker} フェーズ ${i + 1}</div>
             <div class="phase-name">${window.sharedUtilities.security.escapeHtml(p.name || '')}</div>
-            <div class="phase-meta"> ${p.formTemplate}</div>
+            <div class="phase-meta">${window.sharedUtilities.security.escapeHtml(native ? roleLabel(p.screenRole) : ((PHASE_TEMPLATE_OPTIONS.find(o => o.value === p.formTemplate) || {}).label || p.formTemplate))}</div>
           </button>`;
         }).join('');
         container.querySelectorAll('[data-phase-jump]').forEach((card) => {
@@ -4496,6 +4669,47 @@
       if (prevBtn) prevBtn.disabled = activeIdx === 0;
       if (nextBtn) nextBtn.disabled = activeIdx >= phases.length - 1;
     }
+
+    // ---------- 対象クラス (実行中でも直せる) ----------
+    function renderRunnerClasses(lesson) {
+      const classes = (lesson.lessonJson && Array.isArray(lesson.lessonJson.classes)) ? lesson.lessonJson.classes : [];
+      const text = document.getElementById('lesson-runner-classes-text');
+      if (text) text.textContent = classes.length ? classes.join(', ') : '(未設定)';
+      const input = document.getElementById('lesson-runner-classes-input');
+      if (input) input.value = classes.join(', ');
+      const editBtn = document.getElementById('lesson-runner-classes-edit');
+      // 授業モードだけ実行中の編集を許す (Form 経由は Form に焼き込み済みで変えられない)。
+      if (editBtn) editBtn.hidden = !currentLessonNative;
+    }
+
+    (function initRunnerClassEditor() {
+      const editor = document.getElementById('lesson-runner-classes-editor');
+      const editBtn = document.getElementById('lesson-runner-classes-edit');
+      const saveBtn = document.getElementById('lesson-runner-classes-save');
+      const cancelBtn = document.getElementById('lesson-runner-classes-cancel');
+      const input = document.getElementById('lesson-runner-classes-input');
+      if (!editor || !editBtn || !saveBtn || !cancelBtn || !input) return;
+      editBtn.addEventListener('click', () => { editor.hidden = false; input.focus(); });
+      cancelBtn.addEventListener('click', () => { editor.hidden = true; });
+      saveBtn.addEventListener('click', () => {
+        if (!currentLessonId) return;
+        const classes = String(input.value || '').split(/[,、\n]/).map(s => s.trim()).filter(Boolean);
+        if (!classes.length) { window.showError('クラスを 1 つ以上入力してください'); return; }
+        const task = () => gasRun('lesson.updateDraft', {
+          userId, lessonId: currentLessonId, fieldPath: 'classes', value: classes
+        }).then((res) => {
+          if (res && res.success) {
+            currentLessonEtag = res.data.lesson.etag;
+            renderRunnerClasses(res.data.lesson);
+            editor.hidden = true;
+            window.showSuccess('対象クラスを更新しました。児童の画面には次の更新で届きます。');
+          } else {
+            window.showError(window.serverMessage(res, 'クラスを更新できませんでした'));
+          }
+        });
+        window.sharedUtilities.buttons.withBusy(saveBtn, task, { busyText: '保存中…' });
+      });
+    })();
 
     /**
      * 見取りグリッド: 児童ごとの ● 最初 → ★ いま を読む (授業後用)。
@@ -4583,7 +4797,14 @@
     // Runner ヘッダーのボード導線。URL は決定的 (mode=view&userId) なので都度組み立てる。
     (function initRunnerBoardActions() {
       const openBtn = document.getElementById('lesson-runner-open-board');
+      const projBtn = document.getElementById('lesson-runner-open-projector');
       const copyBtn = document.getElementById('lesson-runner-copy-url');
+      // 投影用: 入力フェーズで分布を開く導線を出さず、文字を大きくする (?display=projector)。
+      if (projBtn) projBtn.addEventListener('click', () => {
+        if (!window.sharedUtilities?.buttons?.navOnce(projBtn)) return;
+        buildWebAppUrl('view', { userId, display: 'projector' }, (url) => window.open(url, '_blank'),
+          () => window.showError && window.showError('ボードの URL を取得できませんでした'));
+      });
       if (openBtn) openBtn.addEventListener('click', () => {
         if (!window.sharedUtilities?.buttons?.navOnce(openBtn)) return;
         buildWebAppUrl('view', { userId }, (url) => window.open(url, '_blank'),
