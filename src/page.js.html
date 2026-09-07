@@ -149,9 +149,7 @@
         // 「置き直す」を押して送信済みのまま入力画面に戻っている最中か
         lessonEditing: false,
         // 自分の記録をどのフェーズまで読んだか (lessonId:phaseIndex)。二重取得を避ける
-        lessonRecordKey: null,
-        // 教師が入力フェーズ中に明示的に分布を開いたか (フェーズが変わると閉じる)
-        lessonTeacherPeek: false
+        lessonRecordKey: null
       };
 
       this.lastActivityTime = Date.now();
@@ -1598,7 +1596,6 @@
       this.state.lessonSent = null;
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
-      this.state.lessonTeacherPeek = false;
       // 「進みました」は児童向け。教師は自分で進めるので出さない (切替時の success と二重になる)。
       if (prev && this.state.isEditor !== true) {
         this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
@@ -1615,8 +1612,6 @@
     __teardownLessonScreen() {
       const el = document.getElementById('lessonScreen');
       if (el && el.parentNode) el.parentNode.removeChild(el);
-      const bar = document.getElementById('lessonTeacherBar');
-      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
       document.body.classList.remove('lesson-active');
     }
 
@@ -1637,8 +1632,6 @@
      */
     __renderLessonTeacherWait(phase) {
       const esc = this.__escape.bind(this);
-      const bar = document.getElementById('lessonTeacherBar');
-      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
       let host = document.getElementById('lessonScreen');
       if (!host) {
         host = document.createElement('div');
@@ -1647,16 +1640,15 @@
         document.body.appendChild(host);
       }
       document.body.classList.add('lesson-active');
-      const isProjector = document.body.classList.contains('projector-mode');
       const stats = this.__lessonSubmissionStats();
-      const classes = Object.keys(stats.byClass).sort();
-      const classHtml = classes.length
+      // クラス別の内訳は、クラスが 2 つ以上あるときだけ意味を持つ。
+      const classes = Object.keys(stats.byClass).filter((c) => c).sort();
+      const classHtml = classes.length >= 2
         ? '<ul class="lesson-count-classes">' + classes.map((c) =>
-            '<li><span>' + esc(c || 'クラス未設定') + '</span><strong>' + stats.byClass[c] + '</strong></li>').join('') + '</ul>'
+            '<li><span>' + esc(c) + '</span><strong>' + stats.byClass[c] + '</strong></li>').join('') + '</ul>'
         : '';
       host.innerHTML =
         '<div class="lesson-card lesson-teacher-wait">' +
-          '<div class="lesson-control-host" role="group" aria-label="授業のフェーズ切替"></div>' +
           '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
           '<div class="lesson-count" aria-live="polite">' +
@@ -1664,53 +1656,15 @@
             '<span class="lesson-count-unit">人が送りました</span>' +
           '</div>' +
           classHtml +
-          '<p class="lesson-hint">この時間は分布を見せません。みんなが送ったら「出会う」に進めてください。</p>' +
-          (isProjector ? '' :
-            '<button id="lessonTeacherPeek" class="lesson-submit lesson-submit-secondary" type="button">' +
-              '分布を見る（投影中は押さない）</button>') +
+          '<div class="lesson-control-host" role="group" aria-label="授業のフェーズ切替"></div>' +
         '</div>';
-      const btn = document.getElementById('lessonTeacherPeek');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          this.state.lessonTeacherPeek = true;
-          this.__renderLessonScreen();
-        });
-      }
-      this.__renderBoardPhaseNav();
-    }
-
-    // 教師が分布を開いているときの小さな帯。閉じる導線だけを持つ。
-    __renderLessonTeacherBar(phase) {
-      let bar = document.getElementById('lessonTeacherBar');
-      if (!bar) {
-        bar = document.createElement('div');
-        bar.id = 'lessonTeacherBar';
-        bar.className = 'lesson-teacher-bar';
-        document.body.appendChild(bar);
-      }
-      bar.textContent = '';
-      const label = document.createElement('span');
-      label.textContent = '「' + (phase.phaseName || '') + '」の分布を表示中 (児童には見えていません)';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'lesson-teacher-bar-btn';
-      btn.textContent = '分布を隠す';
-      btn.addEventListener('click', () => {
-        this.state.lessonTeacherPeek = false;
-        this.__renderLessonScreen();
-      });
-      const controls = document.createElement('div');
-      controls.className = 'lesson-control-host';
-      bar.appendChild(label);
-      bar.appendChild(btn);
-      bar.appendChild(controls);
       this.__renderBoardPhaseNav();
     }
 
     // データ更新 (polling) のたびに送信済み人数を描き直す。待機画面が出ていないときは何もしない。
     __refreshLessonTeacherWait() {
       const phase = this.state.lessonPhase;
-      if (!phase || this.state.isEditor !== true || this.state.lessonTeacherPeek) return;
+      if (!phase || this.state.isEditor !== true) return;
       if (['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
       if (!document.getElementById('lessonScreen')) return;
       this.__renderLessonTeacherWait(phase);
@@ -1731,15 +1685,14 @@
       //   Why: 「先入観より先に自分の考えを持つ」を児童にはサーバで保証しているのに、
       //   教師の画面が電子黒板に映っていれば分布が教室全体に見えて同じことが起きる。
       //   教師に要るのは「何人送ったか」だけなので、問いと送信済み人数を出す。
-      //   手元で分布を見たいときは明示のボタンで開ける (投影モードでは出さない)。
+      //   手元で分布を見たいときは管理パネル (ランナー) の「児童ごとの回答」を使う。
+      //   ボードは投影される前提の画面なので、投影してはいけない導線を置かない。
       if (this.state.isEditor === true) {
-        const inputRoles = ['input', 'reinput'];
-        if (inputRoles.indexOf(phase.screenRole) >= 0 && !this.state.lessonTeacherPeek) {
+        if (phase.screenRole === 'input' || phase.screenRole === 'reinput') {
           this.__renderLessonTeacherWait(phase);
           return;
         }
         this.__teardownLessonScreen();
-        if (inputRoles.indexOf(phase.screenRole) >= 0) this.__renderLessonTeacherBar(phase);
         return;
       }
 
@@ -2644,24 +2597,13 @@
       wrap.className = 'lesson-control';
       if (!nav) return wrap;
       const busy = Boolean(this.state.__phaseSwitching);
-      nav.phases.forEach((ph) => {
-        const current = ph.index === nav.activePhaseIndex;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'board-phase-btn' + (busy ? ' is-busy' : '');
-        btn.textContent = ph.name;
-        btn.title = current ? '現在のフェーズ' : '「' + ph.name + '」に切替える';
-        if (current) {
-          btn.setAttribute('aria-current', 'true');
-          btn.disabled = true;   // 現在地なので押す意味がない
-        } else {
-          btn.addEventListener('click', () => this.__switchBoardPhase(ph));
-        }
-        wrap.appendChild(btn);
-      });
-      // 主操作は 1 つ: 次のフェーズへ。最後のフェーズでは出さない (終了は管理パネルのランナーで行う。
-      //   投影中の画面に赤い終了ボタンを置く必要はなく、終了は授業後の操作)。
+      const cur = nav.phases[nav.activePhaseIndex] || null;
       const next = nav.phases[nav.activePhaseIndex + 1] || null;
+      // 現在地 (押せない) と「次へ」だけ。任意のフェーズへの移動・終了は管理パネルで行う。
+      const current = document.createElement('span');
+      current.className = 'lesson-control-current';
+      current.textContent = (nav.activePhaseIndex + 1) + ' / ' + nav.phases.length + (cur ? '  ' + cur.name : '');
+      wrap.appendChild(current);
       if (next) {
         const primary = document.createElement('button');
         primary.type = 'button';
@@ -2670,32 +2612,7 @@
         primary.addEventListener('click', () => this.__switchBoardPhase(next));
         wrap.appendChild(primary);
       }
-      // 投影の切替。投影しているかは開いた本人にしか分からないので、ボード側に置く。
-      //   投影中: 入力フェーズで分布を開く導線を出さず、文字を大きくする。URL に残るので再読み込みしても保たれる。
-      const projector = document.createElement('button');
-      projector.type = 'button';
-      projector.className = 'board-phase-btn lesson-control-projector';
-      const isProjector = document.body.classList.contains('projector-mode');
-      projector.textContent = isProjector ? '投影をやめる' : '投影する';
-      projector.title = isProjector ? '通常表示に戻す' : '電子黒板に映すときに押す (入力中は分布を開けなくなる)';
-      projector.setAttribute('aria-pressed', isProjector ? 'true' : 'false');
-      projector.addEventListener('click', () => this.__toggleProjectorMode());
-      wrap.appendChild(projector);
       return wrap;
-    }
-
-    __toggleProjectorMode() {
-      const on = !document.body.classList.contains('projector-mode');
-      document.body.classList.toggle('projector-mode', on);
-      try {
-        const url = new URL(window.location.href);
-        if (on) url.searchParams.set('display', 'projector'); else url.searchParams.delete('display');
-        history.replaceState(history.state, '', url.toString());
-      } catch (_) { /* URL を書けなくても表示は切り替わる (再読み込みで戻るだけ) */ }
-      // 待機画面の「分布を見る」導線や帯の内容が投影状態で変わるので描き直す。
-      this.state.lessonTeacherPeek = false;
-      this.__renderLessonScreen();
-      this.__renderBoardPhaseNav();
     }
 
     /**

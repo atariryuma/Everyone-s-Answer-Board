@@ -173,15 +173,14 @@
       onclick="lessonEnd()"><svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg> 授業終了</button>
   </div>
 
-  <!-- 見取りグリッド: 授業「後」に読むもの。授業中は児童の顔を見る時間なので、
-       既定で畳んでおき、開いたときにだけ読み込む。 -->
+  <!-- 児童ごとの回答: 授業中に教師が手元で確かめる用 (ボードには置かない = 投影に乗らない)。
+       授業後の見取りも同じ表。開いたときにだけ読む。 -->
   <details id="lesson-review-grid-wrap" class="mt-4">
     <summary class="cursor-pointer text-sm font-bold text-theme-secondary">
-      <svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg> 見取り（授業後に読む）
+      <svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg> 児童ごとの回答（● 最初 → ★ いま）
     </summary>
     <p class="text-xs text-theme-muted mt-2">
-      位置が動かなかった児童から順に並びます。移動の大小は学びの深さではないので、
-      評価や順位づけはしません。
+      この画面は児童には見えません。位置が動かなかった児童から順に並びます。移動の大小は学びの深さではないので、評価や順位づけはしません。
     </p>
     <div id="lesson-review-grid" class="mt-3"></div>
   </details>

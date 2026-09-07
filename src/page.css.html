@@ -1213,6 +1213,11 @@ button.highlight-badge:hover {
 }
 .lesson-control .board-phase-btn:disabled { cursor: default; }
 .lesson-control .board-phase-btn.is-busy { opacity: 0.6; cursor: wait; }
+.lesson-control .lesson-control-current {
+  font-size: var(--font-size-sm);
+  color: var(--theme-text-secondary);
+  white-space: nowrap;
+}
 .lesson-control .lesson-control-primary {
   margin-left: var(--space-2);
   background: var(--brand-accent);
@@ -1220,55 +1225,16 @@ button.highlight-badge:hover {
   color: var(--theme-bg-base);
   font-weight: 700;
 }
-.lesson-control .lesson-control-projector {
-  margin-left: var(--space-2);
-}
-/* 投影中は教室の後ろから読める大きさに (操作面は教師だけが押す) */
-body.projector-mode .lesson-control .board-phase-btn {
-  font-size: var(--font-size-base);
-  padding: var(--space-2) var(--space-3);
-}
-.lesson-control .lesson-control-projector[aria-pressed="true"] {
-  background: var(--theme-bg-elevated);
-  border-color: var(--theme-accent-cyan-strong);
-  color: var(--theme-text-primary);
-}
 .lesson-teacher-wait .lesson-control-host {
   display: flex;
   justify-content: center;
+  margin-top: var(--space-2);
 }
 .lesson-teacher-wait .lesson-control .board-phase-btn {
   font-size: var(--font-size-sm);
   padding: var(--space-2) var(--space-3);
 }
 
-/* 教師が分布を開いているときの帯。閉じる導線と操作面を持つ。 */
-.lesson-teacher-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--font-size-sm);
-  color: var(--theme-status-warning-text-on-soft);
-  background: var(--theme-status-warning-soft);
-  border-bottom: 1px solid var(--theme-border-subtle);
-}
-.lesson-teacher-bar-btn {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--theme-border-subtle);
-  background: var(--theme-bg-surface);
-  color: var(--theme-text-primary);
-  font-weight: 700;
-  cursor: pointer;
-}
 
 /* 議論フェーズ: 端末に用事がないことを画面自身が伝える。 */
 .lesson-quiet {

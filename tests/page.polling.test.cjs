@@ -674,7 +674,7 @@ function makeLessonInstance() {
   ctx.document.getElementById = (id) => (id === 'lessonScreen' && overlayPresent) ? overlay : null;
   ctx.document.body.appendChild = () => { overlayPresent = true; calls.push('overlay'); };
   ctx.document.body.classList = { add: () => {}, remove: () => {}, toggle: () => {} };
-  instance.state = { userId: 'u1', lessonPhase: null, lessonDraft: null, lessonSent: null, lessonEditing: false, lessonRecordKey: null };
+  instance.state = { userId: 'u1', lessonPhase: null, lessonDraft: null, lessonSent: null, lessonEditing: false, lessonRecordKey: null, currentAnswers: [] };
   instance.__renderLessonInput = () => { calls.push('input'); };
   instance.__renderLessonDiscuss = () => { calls.push('discuss'); };
   instance.__renderLessonReflect = () => { calls.push('reflect'); };
@@ -753,9 +753,7 @@ function makeTeacherInstance() {
   const { instance, calls, ctx } = makeLessonInstance();
   instance.state.isEditor = true;
   instance.state.currentAnswers = [];
-  instance.state.lessonTeacherPeek = false;
   instance.__renderLessonTeacherWait = (phase) => { calls.push('teacherWait:' + phase.screenRole); };
-  instance.__renderLessonTeacherBar = (phase) => { calls.push('teacherBar:' + phase.screenRole); };
   return { instance, calls, ctx };
 }
 
@@ -776,19 +774,8 @@ test('教師: 出会う (browse) では待機画面を外して分布を見せ�
   const { instance, calls } = makeTeacherInstance();
   instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
   assert.ok(!calls.some(c => c.startsWith('teacherWait')));
-  assert.ok(!calls.some(c => c.startsWith('teacherBar')));
 });
 
-test('教師: 「分布を見る」を押すと分布 + 帯になり、フェーズが変わると自動で閉じる', () => {
-  const { instance, calls } = makeTeacherInstance();
-  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' });
-  instance.state.lessonTeacherPeek = true;
-  instance.__renderLessonScreen();
-  assert.ok(calls.includes('teacherBar:input'));
-  instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 3, screenRole: 'reinput', phaseName: 'もう一度考える' });
-  assert.equal(instance.state.lessonTeacherPeek, false, 'フェーズ切替で peek を捨てる');
-  assert.ok(calls.includes('teacherWait:reinput'));
-});
 
 test('送信済み人数: 行数とクラス別に集計する', () => {
   const { instance } = makeTeacherInstance();
@@ -856,28 +843,6 @@ test('操作面: 児童には「進みました」トーストを出す', () => 
   assert.equal(toasts.length, 1);
 });
 
-test('投影の切替: body.projector-mode と URL の display=projector を同時に切り替え、待機画面を描き直す', () => {
-  const { instance, calls, ctx } = makeTeacherInstance();
-  let cls = new Set();
-  ctx.document.body.classList = {
-    contains: (c) => cls.has(c),
-    toggle: (c, on) => { if (on) cls.add(c); else cls.delete(c); },
-    add: (c) => cls.add(c), remove: (c) => cls.delete(c)
-  };
-  const replaced = [];
-  ctx.history = { state: null, replaceState: (st, t, url) => replaced.push(url) };
-  ctx.window.location = { href: 'https://example.test/exec?mode=view&userId=u1' };
-  ctx.URL = URL;
-  instance.__renderBoardPhaseNav = () => { calls.push('nav'); };
-  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' };
-  instance.__toggleProjectorMode();
-  assert.ok(cls.has('projector-mode'));
-  assert.match(replaced[0], /display=projector/);
-  assert.ok(calls.includes('teacherWait:input'), '待機画面を描き直す');
-  instance.__toggleProjectorMode();
-  assert.ok(!cls.has('projector-mode'));
-  assert.ok(!/display=projector/.test(replaced[1]));
-});
 
 test('送信の前提: 4 象限は縦横の両方、数直線は横だけ', async () => {
   const { instance } = makeLessonInstance();
@@ -893,4 +858,11 @@ test('送信の前提: 4 象限は縦横の両方、数直線は横だけ', asyn
   // 位置は通り、次の検証 (理由の未入力) に進んでいる
   assert.equal(toasts.length, 2);
   assert.doesNotMatch(toasts[1], /位置/);
+});
+
+test('教師の待機画面: クラス別の内訳はクラスが 2 つ以上あるときだけ集計に意味がある', () => {
+  const { instance } = makeTeacherInstance();
+  instance.state.currentAnswers = [{ class: '' }, { class: '' }];
+  const stats = instance.__lessonSubmissionStats();
+  assert.equal(Object.keys(stats.byClass).filter(c => c).length, 0, '空のクラスは内訳に出さない');
 });

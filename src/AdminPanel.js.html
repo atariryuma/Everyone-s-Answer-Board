@@ -4800,7 +4800,7 @@
       box.textContent = '読み込み中...';
       gasRun('lesson.reviewGrid', { userId, lessonId: currentLessonId }).then((res) => {
         if (!res || !res.success) {
-          box.textContent = (res && res.message) || '見取りを読み込めませんでした';
+          box.textContent = (res && res.message) || '回答を読み込めませんでした';
           return;
         }
         const students = res.data.students || [];
@@ -4834,7 +4834,7 @@
           )).join('') +
           '</tbody></table></div>';
       }).catch((err) => {
-        box.textContent = (err && err.message) || '見取りの読み込みに失敗しました';
+        box.textContent = (err && err.message) || '回答の読み込みに失敗しました';
       });
     }
 
