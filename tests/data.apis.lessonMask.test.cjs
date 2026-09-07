@@ -121,3 +121,14 @@ test('見出しの上書きは元の result を壊さない (cache 共有オブ�
   ctx.__applyLessonHeader_(src, 'u1');
   assert.equal(src.header, '横軸');
 });
+
+test('応答に lessonPhase を同梱する (授業中はフェーズ、授業中でなければ null)', () => {
+  const ctx = loadContext({ screenRole: 'input', question: 'Q', phaseName: '考える', phaseIndex: 0, lessonId: 'l1' });
+  const out = ctx.__applyLessonHeader_({ success: true, header: '横軸', data: [] }, 'u1');
+  assert.equal(out.lessonPhase.phaseIndex, 0);
+  const none = loadContext(null);
+  assert.equal(none.__applyLessonHeader_({ success: true, header: 'h' }, 'u1').lessonPhase, null);
+  // buildSafePublishedDataResult は lessonPhase を落とさない
+  const built = ctx.buildSafePublishedDataResult(out, { displaySettings: { showNames: false } }, { isAdmin: false, isOwnBoard: false });
+  assert.equal(built.lessonPhase.phaseIndex, 0);
+});

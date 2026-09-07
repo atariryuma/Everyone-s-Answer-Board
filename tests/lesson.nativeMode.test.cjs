@@ -752,6 +752,17 @@ test('回答シートの読み (航跡) は 10 秒 cache され、送信で捨�
   assert.equal(second.data.phases[0].numericX, 5);
 });
 
+test('授業モードの snapshot は入力フェーズだけ (出会う / 議論する では同じ行を重複して積まない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getPublishedSheetData = () => ({ success: true, data: [{ rowIndex: 2, class: '6年1組', answer: 3, reason: 'r', numericX: 3, numericY: 4 }] });
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 考える → 出会う (考えるを capture)
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 出会う → 議論する (capture しない)
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 議論する → もう一度考える (capture しない)
+  const snaps = h.context.__findLessonById_(lessonId).lesson.lessonJson.snapshots || [];
+  assert.deepEqual(Array.from(snaps.map(s => s.phaseIndex)), [0]);
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

@@ -1331,6 +1331,17 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx, lessonId) {
 
 // snapshots[] への upsert: 同 phaseIndex があれば replace、なければ append。
 //   phaseIndex 昇順を維持 (replay の slider が時系列で歩けるように)。
+// 授業モードでは、投稿を持つのは入力フェーズ (考える / もう一度考える) だけ。
+//   出会う / 議論する / ふりかえる の config は直前の入力フェーズのシートを指しているので、
+//   そこで capture すると同じ行がもう一度アーカイブに積まれ (重複)、切替のたびに
+//   ボード全体の読みと archive の書きを余分に払う (切替が遅くなる主因の 1 つ)。
+//   Form 経由の授業はフェーズごとに Form とシートが違うので従来どおり全フェーズを capture する。
+function __shouldSnapshotPhase_(lessonJson, phaseIdx) {
+  if (!__isNativePhase_({}, lessonJson)) return true;
+  const phases = (lessonJson && lessonJson.phases) || [];
+  return LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[phaseIdx])) >= 0;
+}
+
 function __upsertSnapshot_(lessonJson, snapshot) {
   // 失敗 capture (reason 付き・中身なし) で、データを持つ既存 snapshot を上書きしない。
   //   Why: 再開した授業のフェーズ切替中に一時的な read 失敗があっても、過去の正常な
@@ -1603,7 +1614,9 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     // Why: 移行 *前* に outgoing phase の rows を freeze する。順序を逆にすると
     //   user config が次 phase の columnMapping を指した状態で capture することになり、
     //   replay が破綻する。capture は config 切替より前 (= 現状 fromIdx) で行う。
-    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx, lessonId));
+    if (__shouldSnapshotPhase_(lessonJson, fromIdx)) {
+      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx, lessonId));
+    }
 
     lessonJson.profileTransitions = lessonJson.profileTransitions || [];
     lessonJson.profileTransitions.push({ ts: new Date().toISOString(), from: fromIdx, to: toIdx });
@@ -1735,7 +1748,9 @@ function endLesson(userId, lessonId) {
     // 現フェーズの rows を freeze して snapshots に upsert。capture 失敗時は reason 付き空 snapshot
     //   が積まれ、endLesson 自体は成功する (lesson は必ず completed に遷移する原則)。
     const currentIdx = __activePhaseIndex_(lessonJson);
-    __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx, lessonId));
+    if (__shouldSnapshotPhase_(lessonJson, currentIdx)) {
+      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx, lessonId));
+    }
 
     const endedAt = new Date().toISOString();
     const result = __updateLessonRow_(lessonId, {

@@ -313,14 +313,13 @@
           // board data are independent, so there's no reason to add the
           // getActiveFormInfo round trip to the critical path before
           // loadSheetData starts.
+          // 初回表示のサーバ往復は 2 つ。授業のフェーズと回答フォームの情報は
+          //   getPublishedSheetData の応答 (lessonPhase / formMeta) に同梱されるので、
+          //   別に取りに行かない (以前は 4 往復で、フェーズと軸ラベルの到着順で描き直しが要った)。
           await Promise.all([
-            this.initializeFormButton(),
             this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false }),
             // 授業中のフェーズ切替 (教師のみ)。失敗しても board 本体は動くので待たせない。
-            this.__initBoardPhaseNav(),
-            // 授業モード: 最初の polling (最大 5 秒後) を待たずにフェーズを反映する。
-            //   途中から参加した児童が、議論中なのに入力画面を見る、といったズレを防ぐ。
-            this.__initLessonPhase()
+            this.__initBoardPhaseNav()
           ]);
         } catch (error) {
           console.error('Data loading failed during initialization:', error);
@@ -355,19 +354,6 @@
       }
     }
 
-    /**
-     *  Restore form button display functionality
-     * Initialize form button display in the UI
-     */
-    async initializeFormButton() {
-      try {
-        await loadFormLink();
-      } catch (err) {
-        // 黙って落とさない: 失敗すると「回答フォーム」ボタンが出ないまま
-        //   児童がフォームに辿り着けない。症状だけ出て原因が追えなくなる。
-        console.warn('loadFormLink failed (form button hidden):', err && err.message);
-      }
-    }
 
     /**
      *  CLAUDE.md準拠: Simplified editor state setup
@@ -1551,23 +1537,6 @@
       });
     }
 
-    /**
-     * 初期表示時に一度だけフェーズを取りに行く。
-     * polling と同じ getNotificationUpdate を使う (専用 API を増やさない)。
-     */
-    async __initLessonPhase() {
-      if (this.state.isReviewMode) return;   // 振り返り画面は凍結された過去を見ている
-      try {
-        const res = await this.runGas('getNotificationUpdate', this.state.userId, {
-          lastUpdateTime: this.state.lastSeenTimestamp
-        });
-        if (res && res.success && res.lessonPhase !== undefined) {
-          this.__applyLessonPhase(res.lessonPhase);
-        }
-      } catch (_) {
-        // 取れなくても polling が数秒後に拾う。board 本体の表示は妨げない。
-      }
-    }
 
     /**
      * polling で受け取った現在フェーズを画面に適用する。
@@ -3078,10 +3047,11 @@
         } catch (_) { /* テレメトリのみ。描画には影響しない */ }
         const hadAxisConfig = Boolean(this.state.axisConfig);
         this.state.axisConfig = result.axisConfig || null;
-        // 授業モードの入力画面は軸ラベルを axisConfig から描く。init では
-        //   loadSheetData と __initLessonPhase が並走するので、先にフェーズが
-        //   適用されると軸ラベルが空のまま出てしまう。軸が届いた時点で描き直す。
-        if (!hadAxisConfig && this.state.axisConfig && this.state.lessonPhase) {
+        // 授業のフェーズは同じ応答で届く (undefined = 判定なし。振り返り画面など)。
+        if (result.lessonPhase !== undefined && !this.state.isReviewMode) {
+          this.__applyLessonPhase(result.lessonPhase);
+        } else if (!hadAxisConfig && this.state.axisConfig && this.state.lessonPhase) {
+          // polling 側で先にフェーズが付いていた場合、軸ラベルが届いた時点で描き直す。
           this.__renderLessonScreen();
         }
         // Why: server が判定した teacher フラグ (isOwnBoard || isAdmin) を尊重。
@@ -5869,7 +5839,7 @@
     /**
      *  API応答からdisplaySettingsを動的更新
      *
-     * Why: 管理モード OFF パスと loadFormLink 等が
+     * Why: 管理モード OFF パス等が
      *   `UNIFIED_CONFIG.displaySettings` を「現在の設定」として参照する。
      *   admin mode ON 中も含めて毎回 server 値で同期しておかないと、bootstrap 時の値が
      *   stale なまま残り、フェーズ切替後の管理モード OFF で「最初のフェーズの設定」に
@@ -5922,46 +5892,6 @@
 
   }
 
-  /**
-   * フォームリンクを取得して表示する関数
-   */
-  async function loadFormLink() {
-    try {
-      let formInfo = null;
-      try {
-        formInfo = await runServer('getActiveFormInfo', window.UNIFIED_CONFIG?.userId);
-      } catch (error) {
-        console.warn('getActiveFormInfo failed:', error);
-      }
-
-      const formLinkBtn = document.getElementById('form-link-btn');
-      if (formLinkBtn) {
-        // Why gate on https:// : formInfo.formUrl originates from the
-        //      admin-editable board config. escapeHtml / DOM assignment
-        //      doesn't neutralize javascript: URLs — setting .href with
-        //      such a value would still fire on click.
-        const isSafeFormUrl = formInfo && typeof formInfo.formUrl === 'string'
-          && /^https:\/\//i.test(formInfo.formUrl);
-        if (formInfo && formInfo.shouldShow && isSafeFormUrl) {
-          formLinkBtn.href = formInfo.formUrl;
-          formLinkBtn.classList.remove('hidden');
-
-          const formTitleSpan = formLinkBtn.querySelector('span');
-          if (formTitleSpan) {
-            formTitleSpan.textContent = ` ${formInfo.formTitle}`;
-          }
-        } else {
-          formLinkBtn.classList.add('hidden');
-        }
-      }
-    } catch (error) {
-      console.warn('フォーム情報の取得に失敗しました:', error);
-      const formLinkBtn = document.getElementById('form-link-btn');
-      if (formLinkBtn) {
-        formLinkBtn.classList.add('hidden');
-      }
-    }
-  }
 
   // Why: ES6 の class 宣言は <script> トップレベルでも window に自動公開されない。
   //      page.viz.js は window.StudyQuestApp.prototype に method を追加する設計なので、
@@ -5971,7 +5901,6 @@
   // page.viz.js からフェーズ切替後に form ボタンを強制リフレッシュするため公開。
   // 通常は loadSheetData の formMeta 経由で更新されるが、ある種のキャッシュ
   // パスで取りこぼすので、明示的に getActiveFormInfo を再呼出して同期する。
-  window.loadFormLink = loadFormLink;
 
   try {
     if (!window.studyQuestApp) {

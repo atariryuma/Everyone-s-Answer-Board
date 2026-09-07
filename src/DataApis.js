@@ -910,15 +910,18 @@ function buildSheetDataErrorResult_(result) {
  *   授業中は問い (phase.question) が見出しの実体。無ければフェーズ名。
  *   授業中でなければ元の result を返す (掲示板モードに影響しない)。
  */
-function __applyLessonHeader_(result, targetUserId) {
+function __applyLessonHeader_(result, targetUserId, phaseArg) {
   try {
     if (!result || !result.success) return result;
     if (typeof __getViewerLessonPhase_ !== 'function') return result;
-    const phase = __getViewerLessonPhase_(targetUserId);
-    if (!phase) return result;
+    const phase = (phaseArg !== undefined) ? phaseArg : __getViewerLessonPhase_(targetUserId);
+    // lessonPhase を応答に載せる (null = 授業中でない)。
+    //   Why: 初回表示で getNotificationUpdate を別に呼んでフェーズを取っていたが、
+    //   同じ判定をここで既にしている。1 往復減り、軸ラベルとフェーズが同じ応答で届くので
+    //   「フェーズが先に来て軸ラベルが空のまま描く」順序問題も消える。
+    if (!phase) return Object.assign({}, result, { lessonPhase: null });
     const title = String(phase.question || phase.phaseName || '').trim();
-    if (!title) return result;
-    return Object.assign({}, result, { header: title });
+    return Object.assign({}, result, { lessonPhase: phase }, title ? { header: title } : {});
   } catch (error) {
     // 見出しは装飾なので、判定できなければ元のまま出す。
     logError_('__applyLessonHeader_', error);
@@ -926,11 +929,11 @@ function __applyLessonHeader_(result, targetUserId) {
   }
 }
 
-function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnBoard, isAdmin) {
+function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnBoard, isAdmin, phaseArg) {
   try {
     if (isOwnBoard || isAdmin) return result;
     if (typeof __getViewerLessonPhase_ !== 'function') return result;
-    const phase = __getViewerLessonPhase_(targetUserId);
+    const phase = (phaseArg !== undefined) ? phaseArg : __getViewerLessonPhase_(targetUserId);
     if (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput')) return result;
 
     const rows = Array.isArray(result.data) ? result.data : [];
@@ -1023,7 +1026,9 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
     axisConfig,
     formMeta,
-    viewerIsTeacher
+    viewerIsTeacher,
+    // 授業中の現在フェーズ (null = 授業中でない)。undefined は「判定していない」(review 等)。
+    ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {})
   };
 }
 
@@ -1216,10 +1221,15 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
+      // 授業のフェーズ判定は 1 回だけ (mask / 見出し / 応答の lessonPhase で共有)。
+      const lessonPhase = (typeof __getViewerLessonPhase_ === 'function')
+        ? __getViewerLessonPhase_(targetUser.userId)
+        : null;
       return buildSafePublishedDataResult(
         __applyLessonHeader_(
-          __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin),
-          targetUser.userId
+          __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
+          targetUser.userId,
+          lessonPhase
         ),
         targetUserConfig,
         { isAdmin: isSystemAdmin, isOwnBoard }
