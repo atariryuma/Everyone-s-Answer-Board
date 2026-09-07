@@ -503,49 +503,13 @@ function __requireLessonOwner_(userId, lessonId, options) {
 // 出典: 田村学「カリキュラム・マネジメント」(探究3段階) / 光村図書 道徳 Q&A「めあてと振り返り」/
 //       沖縄県教委 R4「めあて・振り返り」資料 / 文科省 特別の教科 道徳編。
 const LESSON_TEMPLATES = {
-  'doutoku-3phase': {  // 旧名残置 (= "standard-3phase" 相当)。tests / 既存 lessonJson との互換のため。
-    label: '授業の定番（3段階）',
-    description: 'めあて → みんなで考える → ふりかえり',
-    phases: [
-      { name: 'めあて', formTemplate: 'numberline', question: 'いまの自分の考えは？' },
-      { name: 'みんなで考える', formTemplate: 'matrix', question: 'なぜそう思った？' },
-      { name: 'ふりかえり', formTemplate: 'numberline', question: '話し合って、いまの考えは？' }
-    ]
-  },
-  'kid-3phase': {
-    label: '低学年向け',
-    description: 'いまの考え → みんなで話す → これからの考え',
-    phases: [
-      { name: 'いまの考え', formTemplate: 'numberline', question: 'いまの考えは？' },
-      { name: 'みんなで話す', formTemplate: 'matrix', question: 'どうしてそう思った？' },
-      { name: 'これからの考え', formTemplate: 'numberline', question: 'はなしあって、いまの考えは？' }
-    ]
-  },
-  'inquiry-3phase': {
-    label: '探究（田村モデル）',
-    description: '出会う → ふかめる → つなげる',
-    phases: [
-      { name: '出会う', formTemplate: 'pie', question: 'まずどっちだと思う？' },
-      { name: 'ふかめる', formTemplate: 'matrix', question: '理由と確信度を教えて' },
-      { name: 'つなげる', formTemplate: 'numberline', question: '自分の答えはどこに着地した？' }
-    ]
-  },
-  'before-after-2phase': {
-    label: '議論前後（2段階）',
-    description: '議論のまえ → 議論のあと',
-    phases: [
-      { name: '議論のまえ', formTemplate: 'numberline', question: 'いまのあなたの立場は？' },
-      { name: '議論のあと', formTemplate: 'numberline', question: '議論をしたあと、いまの立場は？' }
-    ]
-  },
-  // 「考え、議論する道徳」向け。他のテンプレと違い Form を作らず、画面から直接投稿する
-  //   (inputMode: 'native')。フェーズが児童画面の権能を切り替えるのがこのテンプレの本体。
+  // ---------- 授業モード (画面から直接送る。Form を作らない) ----------
   //
-  // Why 5 段階か: 「自分の考えをもつ → 他者の考えに出会う → 議論する → 問い直す → 言語化する」
-  //   が道徳科の学習過程 (文科省 特別の教科 道徳編) だから。可視化はこの過程を支える手段であり、
-  //   意見を集めること自体は目的にしない。
-  // Why 縦軸が「迷い」か: 立場の正誤を軸にすると多数派が正解に見える。確信度を縦に取ると
-  //   「立場は同じだが迷いが増えた」という深まりも位置として現れ、かつ優劣がつかない。
+  // Why 4 象限で固定か: 授業を通して 1 つの座標系に揃えると、● 最初 → ★ いま の比較が
+  //   位置として成立する。フェーズごとに可視化を変えると変化が追えない。
+  // Why 縦軸の既定が「迷い」か: 立場の正誤を軸にすると多数派が正解に見える。確信度を縦に
+  //   取ると「立場は同じだが迷いが増えた」という深まりも位置として現れ、かつ優劣がつかない。
+  //   横軸は教材で決まるので空欄 (教師が書く)。
   'dialogue-reconsider-5phase': {
     label: '考え、議論する道徳（5段階）',
     description: '考える → 出会う → 議論する → もう一度考える → ふりかえる',
@@ -553,15 +517,16 @@ const LESSON_TEMPLATES = {
     phases: [
       {
         name: '考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.INPUT,
-        question: 'いまのあなたの考えは、どこにありますか？'
+        question: 'いまのあなたの考えは、どこにありますか？',
+        templateOptions: { xLow: '', xHigh: '', yLow: '迷いあり', yHigh: '迷いなし' }
       },
       {
         name: '出会う', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.BROWSE,
-        question: '友達はどう考えた？ 理由を読んでみよう'
+        question: '友達はどこに、なぜ置いたのだろう。自分とちがう考えを読んでみよう'
       },
       {
         name: '議論する', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.DISCUSS,
-        question: '画面をとじて、話し合おう'
+        question: '考えがちがう友達と、理由をくらべて話そう'
       },
       {
         name: 'もう一度考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REINPUT,
@@ -571,6 +536,83 @@ const LESSON_TEMPLATES = {
         name: 'ふりかえる', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REFLECT,
         question: '自分の考えは、どう変わった／変わらなかった？'
       }
+    ]
+  },
+  // 短時間版。議論は画面の外で行う前提で「出会う」の中に含める。
+  'dialogue-3phase': {
+    label: '考え、議論する道徳（3段階・短時間）',
+    description: '考える → 出会う → もう一度考える',
+    inputMode: 'native',
+    phases: [
+      {
+        name: '考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.INPUT,
+        question: 'いまのあなたの考えは、どこにありますか？',
+        templateOptions: { xLow: '', xHigh: '', yLow: '迷いあり', yHigh: '迷いなし' }
+      },
+      {
+        name: '出会う', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.BROWSE,
+        question: '友達はどこに、なぜ置いたのだろう。理由を読んで、話してみよう'
+      },
+      {
+        name: 'もう一度考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REINPUT,
+        question: '話し合ったいま、あなたはどこに立ちますか？'
+      }
+    ]
+  },
+  // 前後比較だけを取る最小構成。出会う時間は教師が口頭で進める (分布は教師の投影で見せる)。
+  'dialogue-2phase': {
+    label: '考えの変化（2段階）',
+    description: '考える → もう一度考える',
+    inputMode: 'native',
+    phases: [
+      {
+        name: '考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.INPUT,
+        question: 'いまのあなたの考えは、どこにありますか？',
+        templateOptions: { xLow: '', xHigh: '', yLow: '迷いあり', yHigh: '迷いなし' }
+      },
+      {
+        name: 'もう一度考える', formTemplate: 'matrix', screenRole: LESSON_SCREEN_ROLES.REINPUT,
+        question: '話し合ったいま、あなたはどこに立ちますか？'
+      }
+    ]
+  },
+
+  // ---------- Google フォーム経由 (集計向け) ----------
+  //
+  // Why 残すか: 数直線 (1 次元) の立場や、円グラフ / 掲示板の集計は授業モードの 4 象限では
+  //   扱えない。フォームは児童の手数が多いので、変化を追う授業は上の授業モードを使う。
+  //   フォーム系は各テンプレ内で可視化を 1 種類に揃える (フェーズ間で比較できるように)。
+  'before-after-2phase': {
+    label: '立場の変化（数直線・2段階）',
+    description: '議論のまえ → 議論のあと',
+    phases: [
+      { name: '議論のまえ', formTemplate: 'numberline', question: 'いまのあなたの立場は？' },
+      { name: '議論のあと', formTemplate: 'numberline', question: '議論をしたあと、いまの立場は？' }
+    ]
+  },
+  // 旧名 (doutoku-3phase) を残置。tests と既存 lessonJson の template 参照との互換のため。
+  //   実体は「数直線で 3 回立場を取る」構成に揃えた (旧: 数直線 → 4 象限 → 数直線 で比較不能)。
+  'doutoku-3phase': {
+    label: '立場の変化（数直線・3段階）',
+    description: 'はじめの考え → 話し合いのあと → ふりかえり',
+    phases: [
+      { name: 'はじめの考え', formTemplate: 'numberline', question: 'いまの自分の考えは？' },
+      { name: '話し合いのあと', formTemplate: 'numberline', question: '話し合って、いまの考えは？' },
+      { name: 'ふりかえり', formTemplate: 'numberline', question: '授業を終えて、いまの考えは？' }
+    ]
+  },
+  'survey-pie': {
+    label: 'アンケート（円グラフ）',
+    description: '選択肢を 1 回集めて割合を見る',
+    phases: [
+      { name: 'アンケート', formTemplate: 'pie', question: 'あなたはどれ？' }
+    ]
+  },
+  'survey-board': {
+    label: '意見を集める（掲示板）',
+    description: '自由記述を 1 回集めて一覧にする',
+    phases: [
+      { name: '意見', formTemplate: 'board', question: '今日のテーマについて、あなたの考えは？' }
     ]
   }
 };
@@ -597,7 +639,10 @@ function listLessonTemplates() {
       key,
       label: LESSON_TEMPLATES[key].label,
       description: LESSON_TEMPLATES[key].description,
-      phaseCount: LESSON_TEMPLATES[key].phases.length
+      phaseCount: LESSON_TEMPLATES[key].phases.length,
+      // 選ぶ画面で「画面から直接送る」か「Google フォーム経由」かを見せるため。
+      inputMode: LESSON_TEMPLATES[key].inputMode || 'form',
+      group: LESSON_TEMPLATES[key].inputMode === 'native' ? 'native' : 'form'
     }))
   });
 }
@@ -626,6 +671,8 @@ function createLessonDraft(userId, name, template) {
         question: p.question,
         // 画面の権能 (input/browse/discuss/reinput/reflect)。native テンプレのみ持つ。
         screenRole: p.screenRole || '',
+        // テンプレートが持つ既定の軸ラベル等 (授業モードの縦軸「迷い」など)。
+        templateOptions: p.templateOptions ? deepClone(p.templateOptions) : undefined,
         // Form 生成は startLesson で行うので、draft 時点では空。
         formId: '',
         formUrl: '',

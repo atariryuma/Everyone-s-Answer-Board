@@ -3420,7 +3420,7 @@
     // ---------- Wizard (作成 / 編集) ----------
     // 任意で template を指定して draft 作成。dropdown 経由 / 旧 fallback の両方から呼ばれる。
     function enterLessonCreateMode(templateKey, sourceBtn) {
-      const template = templateKey || 'doutoku-3phase';
+      const template = templateKey || 'dialogue-reconsider-5phase';
       const tpl = (lessonTemplatesCache || []).find(t => t.key === template);
       const baseName = (tpl && tpl.label) ? '新しい授業 ('+ tpl.label + ')': '新しい授業';
       const task = () => gasRun('lesson.create', { userId, name: baseName, template }).then((res) => {
@@ -3467,12 +3467,29 @@
         }
         lessonTemplatesCache = res.data.templates || [];
         const esc = window.sharedUtilities.security.escapeHtml;
-        menu.innerHTML = lessonTemplatesCache.map(t => (
-          '<button type="button" class="lesson-template-item" data-lesson-template="'+ esc(t.key) + '">' +
-            '<span class="lesson-template-label">'+ esc(t.label) + '</span>' +
-            '<span class="lesson-template-desc">'+ esc(t.description || '') +
-              '<span class="lesson-template-phase-count">(' + t.phaseCount + 'フェーズ)</span></span>' +
-          '</button>'        )).join('');
+        // 「画面から直接送る (授業モード)」と「Google フォーム経由 (集計向け)」に分けて出す。
+        //   どちらの経路かは児童の手数と授業の構造を決めるので、名前より先に見せる。
+        const groups = [
+          { key: 'native', title: '授業モード', note: '児童はボードの画面から直接送ります。フォームは作りません。' },
+          { key: 'form', title: 'Google フォーム経由', note: '集計向け。児童はフォームで答えます。' }
+        ];
+        menu.innerHTML = groups.map((g) => {
+          const items = lessonTemplatesCache.filter(t => (t.group || 'form') === g.key);
+          if (!items.length) return '';
+          return (
+            '<div class="lesson-template-group">' +
+              '<div class="lesson-template-group-title">' + esc(g.title) + '</div>' +
+              '<div class="lesson-template-group-note">' + esc(g.note) + '</div>' +
+              items.map(t => (
+                '<button type="button" class="lesson-template-item" data-lesson-template="'+ esc(t.key) + '">' +
+                  '<span class="lesson-template-label">'+ esc(t.label) + '</span>' +
+                  '<span class="lesson-template-desc">'+ esc(t.description || '') +
+                    '<span class="lesson-template-phase-count">(' + t.phaseCount + 'フェーズ)</span></span>' +
+                '</button>'
+              )).join('') +
+            '</div>'
+          );
+        }).join('');
       }).catch((err) => {
         menu.innerHTML = '<p class="lesson-template-loading text-theme-status-error">' +
           window.sharedUtilities.security.escapeHtml((err && err.message) || String(err)) + '</p>';

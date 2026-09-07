@@ -412,29 +412,39 @@ test('listLessons: owner は自分の lesson のみ取得', () => {
   assert.equal(res.data.lessons.every(l => l.name.startsWith('mine')), true);
 });
 
-test('listLessonTemplates: 全テンプレート (5 種) が返る', () => {
+test('listLessonTemplates: 授業モード 3 種が先、Google フォーム経由 4 種が後に並ぶ', () => {
   const { context } = loadLessonContext();
   const res = context.listLessonTemplates();
   assert.equal(res.success, true);
-  const keys = Array.from(res.data.templates).map(t => t.key).sort();
-  assert.deepEqual(keys, [
-    'before-after-2phase', 'dialogue-reconsider-5phase',
-    'doutoku-3phase', 'inquiry-3phase', 'kid-3phase'
+  const list = Array.from(res.data.templates);
+  assert.deepEqual(list.map(t => t.key), [
+    'dialogue-reconsider-5phase', 'dialogue-3phase', 'dialogue-2phase',
+    'before-after-2phase', 'doutoku-3phase', 'survey-pie', 'survey-board'
   ]);
-  const kid = Array.from(res.data.templates).find(t => t.key === 'kid-3phase');
-  // 2026-05-16: ラベルを「低学年向け」に変更 (旧「児童向け」)。教科ニュートラル化と整合。
-  assert.ok(kid && kid.label.includes('低学年'));
-  assert.equal(kid.phaseCount, 3);
+  assert.deepEqual(list.map(t => t.group), ['native', 'native', 'native', 'form', 'form', 'form', 'form']);
+  assert.equal(list.find(t => t.key === 'dialogue-3phase').phaseCount, 3);
+  assert.equal(list.find(t => t.key === 'survey-pie').phaseCount, 1);
 });
 
-test('createLessonDraft: kid-3phase テンプレで作成すると低学年向けフェーズ名になる', () => {
+test('createLessonDraft: 授業モードの短い構成 (3 段階 / 2 段階) は役割と既定の縦軸 (迷い) を持つ', () => {
   const { context } = loadLessonContext();
-  const res = context.createLessonDraft('u1', 'k1', 'kid-3phase');
-  assert.equal(res.success, true);
-  const names = Array.from(res.data.lesson.lessonJson.phases).map(p => p.name);
-  // 2026-05-16: 児童向けphase名を「いまの考え→みんなで話す→これからの考え」に変更
-  //   (「考えがどう変わったか」が伝わる表現)。
-  assert.deepEqual(names, ['いまの考え', 'みんなで話す', 'これからの考え']);
+  const three = context.createLessonDraft('u1', 'd3', 'dialogue-3phase');
+  assert.equal(three.success, true);
+  const phases = Array.from(three.data.lesson.lessonJson.phases);
+  assert.deepEqual(phases.map(p => p.screenRole), ['input', 'browse', 'reinput']);
+  assert.equal(three.data.lesson.lessonJson.inputMode, 'native');
+  assert.deepEqual(Object.assign({}, phases[0].templateOptions), { xLow: '', xHigh: '', yLow: '迷いあり', yHigh: '迷いなし' });
+  assert.equal(phases[1].templateOptions, undefined, '軸は最初の入力フェーズだけが持つ');
+  const two = context.createLessonDraft('u1', 'd2', 'dialogue-2phase');
+  assert.deepEqual(Array.from(two.data.lesson.lessonJson.phases).map(p => p.screenRole), ['input', 'reinput']);
+});
+
+test('createLessonDraft: Google フォーム経由のテンプレは各フェーズの可視化を 1 種類に揃える (比較できる)', () => {
+  const { context } = loadLessonContext();
+  const res = context.createLessonDraft('u1', 'f3', 'doutoku-3phase');
+  const kinds = new Set(Array.from(res.data.lesson.lessonJson.phases).map(p => p.formTemplate));
+  assert.equal(kinds.size, 1);
+  assert.equal(res.data.lesson.lessonJson.inputMode, 'form');
 });
 
 test('duplicateLesson: 完了レッスンを複製すると draft 状態 + Form 情報は空 + (コピー) suffix', () => {
@@ -523,7 +533,7 @@ test('startLesson: 3 phase の Form を生成し state=active', () => {
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.data.lesson.state, 'active');
   assert.equal(formCreations.length, 3);
-  assert.deepEqual(formCreations.map(f => f.templateType), ['numberline', 'matrix', 'numberline']);
+  assert.deepEqual(formCreations.map(f => f.templateType), ['numberline', 'numberline', 'numberline'], 'フォーム系テンプレは可視化を 1 種類に揃える');
   // phase 0 だけ activate されている
   assert.equal(configPatches.length, 1);
   assert.equal(configPatches[0].patch.formUrl, 'https://forms.example/1');

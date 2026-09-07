@@ -46,14 +46,18 @@ npm run api -- lesson.delete        --userId <uuid> --lessonId <id>
 
 | templateKey | ラベル | フェーズ | 入力経路 |
 | ----------- | ------ | -------- | -------- |
-| `doutoku-3phase` | 授業の定番（3段階） | めあて → みんなで考える → ふりかえり | Google Form |
-| `kid-3phase` | 低学年向け | いまの考え → みんなで話す → これからの考え | Google Form |
-| `inquiry-3phase` | 探究（田村モデル） | 出会う → ふかめる → つなげる | Google Form |
-| `before-after-2phase` | 議論前後（2段階） | 議論のまえ → 議論のあと | Google Form |
 | `dialogue-reconsider-5phase` | 考え、議論する道徳（5段階） | 考える → 出会う → 議論する → もう一度考える → ふりかえる | **native** |
+| `dialogue-3phase` | 考え、議論する道徳（3段階・短時間） | 考える → 出会う → もう一度考える | **native** |
+| `dialogue-2phase` | 考えの変化（2段階） | 考える → もう一度考える | **native** |
+| `before-after-2phase` | 立場の変化（数直線・2段階） | 議論のまえ → 議論のあと | Google Form |
+| `doutoku-3phase` | 立場の変化（数直線・3段階） | はじめの考え → 話し合いのあと → ふりかえり | Google Form |
+| `survey-pie` | アンケート（円グラフ） | アンケート | Google Form |
+| `survey-board` | 意見を集める（掲示板） | 意見 | Google Form |
 
-`doutoku-3phase` は旧名の残置（実体は「授業の定番」）。tests と既存 lessonJson との互換のため
-key は変えていない。
+`doutoku-3phase` は旧名の残置 (tests と既存 lessonJson の `template` 参照との互換のため key は変えていない)。
+実体は 2026-09-07 に「数直線で 3 回」に揃えた (旧: 数直線 → 4 象限 → 数直線 で、フェーズ間の比較が
+成立しなかった)。`kid-3phase` / `inquiry-3phase` は同日に廃止 (可視化がフェーズごとに変わり、変化を
+追えない)。native の既定の縦軸は「迷いあり ↔ 迷いなし」(横軸は教材依存なので空)。
 
 **native テンプレ (`inputMode: 'native'`) は経路が違う**: Google Form を作らず、児童が
 アプリ内で直接入力する（`submitLessonAnswer`）。したがって `lesson.start` しても Form は
