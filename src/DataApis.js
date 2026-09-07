@@ -1470,7 +1470,17 @@ function getNotificationUpdate(targetUserId, options = {}) {
     //   ボード全体を再読し、 getPublishedSheetData の board-data cache を相殺して 700 viewer 環境
     //   で 429 storm の主因になっていた。 owner/admin は編集中の即時反映が要るため非キャッシュ。
     const isViewerOnly = !isAdmin && !isOwnBoard;
-    const userData = isViewerOnly
+    // 授業モード (native 入力) 中は、教師の polling も cache を使う。
+    //   Why: 通常ボードで owner を非 cache にしているのは、Form 経由の投稿が
+    //   アプリを通らず version を bump できないため。授業モードの投稿は
+    //   submitLessonAnswer がアプリ内で bump するので、cache でも新着は即時に見える。
+    //   教師のボードは電子黒板で開きっぱなし = 5 秒ごとに 3 read を払い続け、
+    //   30 人の送信集中と重なると quota (300 read/分) を圧迫していた。
+    const lessonPhase = (typeof __getViewerLessonPhase_ === 'function')
+      ? __getViewerLessonPhase_(targetUserId)
+      : null;
+    const useCache = isViewerOnly || Boolean(lessonPhase);
+    const userData = useCache
       ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
           getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig))
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
@@ -1502,9 +1512,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       //   Why formUrl 変化に頼らないか: native 入力の授業は Form を持たないので
       //   formUrl が常に空のまま = フェーズ切替が検知できない。
       //   授業中でなければ null (掲示板モードは何も変わらない)。
-      lessonPhase: (typeof __getViewerLessonPhase_ === 'function')
-        ? __getViewerLessonPhase_(targetUserId)
-        : null
+      lessonPhase
     };
 
   } catch (error) {

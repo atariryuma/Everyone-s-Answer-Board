@@ -1116,3 +1116,42 @@ test('setupReactionAndHighlightColumns: detects lowercase/whitespace-padded head
   );
   assert.equal(result.columnsAdded.length, 0);
 });
+
+// =====================================================================
+// getNotificationUpdate: 授業モード中は教師 (owner) の polling も board cache を使う
+// =====================================================================
+
+function makePollingCtx(overrides) {
+  const store = new Map();
+  const loads = { n: 0 };
+  const ctx = loadDataApisContext(Object.assign({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => { loads.n++; return { success: true, data: [] }; },
+    CacheService: { getScriptCache: () => ({
+      get: (k) => store.has(k) ? store.get(k) : null,
+      put: (k, v) => { store.set(k, v); },
+      remove: (k) => { store.delete(k); }
+    }) },
+    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    safeJsonParse_: (s, f) => { try { return JSON.parse(s); } catch (_) { return f; } }
+  }, overrides || {}));
+  return { ctx, loads };
+}
+
+test('getNotificationUpdate: 授業中の教師は polling で board cache を使う (5 秒ごとの実読みを止める)', () => {
+  const { ctx, loads } = makePollingCtx({
+    __getViewerLessonPhase_: () => ({ lessonId: 'l1', phaseIndex: 0, screenRole: 'input' })
+  });
+  assert.equal(ctx.getNotificationUpdate('u1', {}).success, true);
+  assert.equal(ctx.getNotificationUpdate('u1', {}).success, true);
+  assert.equal(loads.n, 1, '2 回目は cache から');
+});
+
+test('getNotificationUpdate: 授業中でなければ教師の polling は従来どおり実読み (Form 投稿は version を bump できない)', () => {
+  const { ctx, loads } = makePollingCtx({ __getViewerLessonPhase_: () => null });
+  ctx.getNotificationUpdate('u1', {});
+  ctx.getNotificationUpdate('u1', {});
+  assert.equal(loads.n, 2);
+});

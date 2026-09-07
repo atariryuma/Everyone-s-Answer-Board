@@ -577,6 +577,12 @@
       document.addEventListener('keydown', this.handlers.onDocumentKeydown);
       this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
       window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
+      // 可視化モード (matrix / numberline / pie / wordcloud) は SVG の高さを描画時の
+      //   画面高から決めるので、全画面切替やウィンドウ変更のあとに描き直す必要がある。
+      //   adjustLayout はフッター余白を直すだけで散布図には触らない。
+      this.handlers.onViewportChange = this.debounce(() => this.__redrawVizForViewport(), 250);
+      window.addEventListener('resize', this.handlers.onViewportChange, { passive: true });
+      document.addEventListener('fullscreenchange', this.handlers.onViewportChange, { passive: true });
       this.handlers.onVisibilityChange = () => {
         if (document.hidden) {
           this.stopSimplePolling();
@@ -888,6 +894,22 @@
         default:
           console.warn('runContainerAction: unknown action', action);
       }
+    }
+
+    /**
+     * 画面サイズが変わったとき、可視化モードのボードを現在の画面高で描き直す。
+     *   カード型ボードは CSS だけでレスポンシブなので何もしない。
+     */
+    __redrawVizForViewport() {
+      const mode = this.state && this.state.boardMode;
+      if (!mode || mode === 'board') return;
+      if (this.state.isInitializing || !this.state.initializationComplete) return;
+      if (document.getElementById('lessonScreen')) return;   // 児童の授業画面がかぶさっている
+      const rows = Array.isArray(this.state.currentAnswers) ? this.state.currentAnswers : [];
+      // oldRows に現在の行を渡す = 「新着」扱いの登場アニメーションを起こさず位置だけ直す。
+      Promise.resolve(this.renderBoard(true, false, rows)).catch((err) => {
+        console.warn('viz redraw on viewport change failed:', err && err.message);
+      });
     }
 
     adjustLayout() {
@@ -2117,6 +2139,10 @@
       }
       if (this.handlers.onWindowResize) {
         window.removeEventListener('resize', this.handlers.onWindowResize);
+      }
+      if (this.handlers.onViewportChange) {
+        window.removeEventListener('resize', this.handlers.onViewportChange);
+        document.removeEventListener('fullscreenchange', this.handlers.onViewportChange);
       }
       if (this.handlers.onVisibilityChange) {
         document.removeEventListener('visibilitychange', this.handlers.onVisibilityChange);

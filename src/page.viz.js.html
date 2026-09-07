@@ -544,8 +544,10 @@
   function fitSvgToViewport(svgEl, minWidth) {
     const bounds = svgEl.getBoundingClientRect();
     const width = Math.max(minWidth, bounds.width || 800);
-    const targetH = Math.max(420, Math.round(window.innerHeight * 0.78));
-    const height = Math.max(targetH, bounds.height || targetH);
+    // 高さは「いまの画面高」だけから決める。以前は前回描画時の SVG 高さも max に
+    //   含めていたため、全画面から戻しても縮まず、全画面にしても再描画されるまで
+    //   古い高さのままだった (再描画は resize で走る: page.js の onWindowResize)。
+    const height = Math.max(420, Math.round(window.innerHeight * 0.78));
     svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svgEl.style.height = height + 'px';
     return { width, height };
