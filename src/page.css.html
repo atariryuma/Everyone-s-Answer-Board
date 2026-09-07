@@ -1190,10 +1190,18 @@ button.highlight-badge:hover {
   color: var(--theme-bg-base);
   font-weight: 700;
 }
-.lesson-control .lesson-control-end {
-  background: var(--theme-status-error-soft);
-  border-color: var(--theme-status-error-soft);
-  color: var(--theme-status-error-text-on-soft);
+.lesson-control .lesson-control-projector {
+  margin-left: var(--space-2);
+}
+/* 投影中は教室の後ろから読める大きさに (操作面は教師だけが押す) */
+body.projector-mode .lesson-control .board-phase-btn {
+  font-size: var(--font-size-base);
+  padding: var(--space-2) var(--space-3);
+}
+.lesson-control .lesson-control-projector[aria-pressed="true"] {
+  background: var(--theme-bg-elevated);
+  border-color: var(--theme-accent-cyan-strong);
+  color: var(--theme-text-primary);
 }
 .lesson-teacher-wait .lesson-control-host {
   display: flex;

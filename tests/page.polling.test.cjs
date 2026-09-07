@@ -855,3 +855,26 @@ test('操作面: 児童には「進みました」トーストを出す', () => 
   instance.__applyLessonPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', phaseName: '出会う' });
   assert.equal(toasts.length, 1);
 });
+
+test('投影の切替: body.projector-mode と URL の display=projector を同時に切り替え、待機画面を描き直す', () => {
+  const { instance, calls, ctx } = makeTeacherInstance();
+  let cls = new Set();
+  ctx.document.body.classList = {
+    contains: (c) => cls.has(c),
+    toggle: (c, on) => { if (on) cls.add(c); else cls.delete(c); },
+    add: (c) => cls.add(c), remove: (c) => cls.delete(c)
+  };
+  const replaced = [];
+  ctx.history = { state: null, replaceState: (st, t, url) => replaced.push(url) };
+  ctx.window.location = { href: 'https://example.test/exec?mode=view&userId=u1' };
+  ctx.URL = URL;
+  instance.__renderBoardPhaseNav = () => { calls.push('nav'); };
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' };
+  instance.__toggleProjectorMode();
+  assert.ok(cls.has('projector-mode'));
+  assert.match(replaced[0], /display=projector/);
+  assert.ok(calls.includes('teacherWait:input'), '待機画面を描き直す');
+  instance.__toggleProjectorMode();
+  assert.ok(!cls.has('projector-mode'));
+  assert.ok(!/display=projector/.test(replaced[1]));
+});

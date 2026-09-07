@@ -143,10 +143,6 @@
       title="閲覧用URLをコピー（生徒への共有用）">
       <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> URLコピー
     </button>
-    <button type="button" id="lesson-runner-open-projector" class="btn btn-secondary"
-      title="投影用に開く（分布を隠す入力フェーズ画面 + 大きな文字）">
-      <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> 投影用に開く
-    </button>
     <button type="button" id="lesson-runner-open-board" class="btn btn-primary"
       title="回答ボードを開く（投影用）">
       <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> ボードを開く
@@ -170,17 +166,12 @@
     <!-- JS が動的生成 -->
   </div>
 
-  <div class="flex items-center gap-2">
-    <button type="button" id="lesson-prev-btn" class="btn btn-secondary"
-      onclick="lessonAdvance('previous')"><svg class="icon" aria-hidden="true"><use href="#i-skip-back"></use></svg> 戻す</button>
-    <button type="button" id="lesson-next-btn" class="btn btn-primary"
-      onclick="lessonAdvance('next')"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> 次のフェーズへ</button>
-    <span class="ml-auto"></span>
+  <!-- 切替はフェーズカードを押す (唯一の手段)。ここに残す操作は「授業終了」だけ。
+       終了の意味 (受付を締め切って保存) は確認ダイアログが伝える。 -->
+  <div class="flex items-center justify-end">
     <button type="button" class="btn btn-danger"
       onclick="lessonEnd()"><svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg> 授業終了</button>
   </div>
-
-  <p class="text-xs text-theme-muted mt-3" id="lesson-runner-end-note">「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。</p>
 
   <!-- 見取りグリッド: 授業「後」に読むもの。授業中は児童の顔を見る時間なので、
        既定で畳んでおき、開いたときにだけ読み込む。 -->

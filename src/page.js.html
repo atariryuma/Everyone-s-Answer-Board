@@ -2570,23 +2570,43 @@
         }
         wrap.appendChild(btn);
       });
-      // 主操作は 1 つ: 次のフェーズへ。最後のフェーズでは「授業を終了」。
-      const last = nav.phases.length - 1;
+      // 主操作は 1 つ: 次のフェーズへ。最後のフェーズでは出さない (終了は管理パネルのランナーで行う。
+      //   投影中の画面に赤い終了ボタンを置く必要はなく、終了は授業後の操作)。
       const next = nav.phases[nav.activePhaseIndex + 1] || null;
-      const primary = document.createElement('button');
-      primary.type = 'button';
-      primary.className = 'board-phase-btn lesson-control-primary' + (busy ? ' is-busy' : '');
       if (next) {
+        const primary = document.createElement('button');
+        primary.type = 'button';
+        primary.className = 'board-phase-btn lesson-control-primary' + (busy ? ' is-busy' : '');
         primary.textContent = '次へ: ' + next.name;
         primary.addEventListener('click', () => this.__switchBoardPhase(next));
-      } else {
-        primary.textContent = '授業を終了';
-        primary.classList.add('lesson-control-end');
-        primary.addEventListener('click', () => this.__endLessonFromBoard());
+        wrap.appendChild(primary);
       }
-      if (nav.activePhaseIndex >= last && !next) primary.title = '全 Form の受付を締切り、振り返り用に保存します';
-      wrap.appendChild(primary);
+      // 投影の切替。投影しているかは開いた本人にしか分からないので、ボード側に置く。
+      //   投影中: 入力フェーズで分布を開く導線を出さず、文字を大きくする。URL に残るので再読み込みしても保たれる。
+      const projector = document.createElement('button');
+      projector.type = 'button';
+      projector.className = 'board-phase-btn lesson-control-projector';
+      const isProjector = document.body.classList.contains('projector-mode');
+      projector.textContent = isProjector ? '投影をやめる' : '投影する';
+      projector.title = isProjector ? '通常表示に戻す' : '電子黒板に映すときに押す (入力中は分布を開けなくなる)';
+      projector.setAttribute('aria-pressed', isProjector ? 'true' : 'false');
+      projector.addEventListener('click', () => this.__toggleProjectorMode());
+      wrap.appendChild(projector);
       return wrap;
+    }
+
+    __toggleProjectorMode() {
+      const on = !document.body.classList.contains('projector-mode');
+      document.body.classList.toggle('projector-mode', on);
+      try {
+        const url = new URL(window.location.href);
+        if (on) url.searchParams.set('display', 'projector'); else url.searchParams.delete('display');
+        history.replaceState(history.state, '', url.toString());
+      } catch (_) { /* URL を書けなくても表示は切り替わる (再読み込みで戻るだけ) */ }
+      // 待機画面の「分布を見る」導線や帯の内容が投影状態で変わるので描き直す。
+      this.state.lessonTeacherPeek = false;
+      this.__renderLessonScreen();
+      this.__renderBoardPhaseNav();
     }
 
     /**
@@ -2635,39 +2655,6 @@
       }
     }
 
-    /**
-     * ボードから授業を終了する (管理パネルの「授業終了」と同じ意味)。
-     */
-    async __endLessonFromBoard() {
-      const nav = this.state.boardPhaseNav;
-      if (!nav || this.state.__phaseSwitching) return;
-      const ok = await window.modals.confirm(
-        '授業を終了して保存しますか？保存後は管理パネルの振り返り画面で再生できます。',
-        { title: '授業を終了', okLabel: '終了して保存', variant: 'danger' }
-      );
-      if (!ok) return;
-      this.state.__phaseSwitching = true;
-      this.__renderBoardPhaseNav();
-      window.setLoading(true, '授業を保存中...');
-      try {
-        const res = await runServer('endLesson', this.state.userId, nav.lessonId);
-        if (!res || !res.success) {
-          window.notifications.error(window.serverMessage(res, '授業の終了に失敗しました'));
-          return;
-        }
-        window.notifications.success('授業を保存しました。管理パネルの授業一覧から振り返りを開けます。');
-        this.state.boardPhaseNav = null;
-        this.__applyLessonPhase(null);
-        this.__renderBoardPhaseNav();
-        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-      } catch (err) {
-        window.notifications.error((err && err.message) || '授業の終了に失敗しました');
-      } finally {
-        window.setLoading(false);
-        this.state.__phaseSwitching = false;
-        this.__renderBoardPhaseNav();
-      }
-    }
 
     async __switchBoardPhase(phase) {
       const nav = this.state.boardPhaseNav;

@@ -3021,6 +3021,18 @@
   }
 
   let currentBoardInfo = null;
+  // 授業ロック側 (lesson IIFE) から、実行中の授業が分かった時点でステータスバーを描き直す。
+  window.__refreshFooterStatus = () => { if (currentBoardInfo) updateFooterDisplay(currentBoardInfo); };
+
+  // ISO → 日本時間の短い表記 (例: 9/7 18:48)。生の ISO を教師に見せない。
+  function formatJstShort(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    try {
+      return d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (_) { return d.toLocaleString(); }
+  }
 
   // ステータスバー: 公開状態と主要操作の唯一の表示先。
   //   Why 非公開でも隠さない: 管理画面で一番知りたいのは「今公開されているか」。
@@ -3035,13 +3047,21 @@
     if (!badge) return;
 
     const isPublished = Boolean(boardInfo?.isPublished);
-    badge.textContent = isPublished ? '公開中' : '非公開';
-    badge.classList.toggle('published', isPublished);
-    badge.classList.toggle('unpublished', !isPublished);
+    // 実行中の授業があれば、ステータスバーは授業の状態を出す (見出し「横軸」等の
+    //   回答列ヘッダー由来の表示や、授業を止めてしまう「公開を終了」を出さない)。
+    const lesson = (typeof window.__activeLessonSummary === 'function') ? window.__activeLessonSummary() : null;
+    badge.textContent = lesson ? '授業中' : (isPublished ? '公開中' : '非公開');
+    badge.classList.toggle('published', isPublished || Boolean(lesson));
+    badge.classList.toggle('unpublished', !isPublished && !lesson);
 
-    if (isPublished) {
+    if (lesson) {
+      questionText.textContent = (lesson.name || '授業') + (lesson.currentPhaseName ? ' · ' + lesson.currentPhaseName : '');
+      if (statusText) statusText.textContent = isPublished
+        ? '児童はボードで「' + (lesson.currentPhaseName || '現在のフェーズ') + '」の画面を見ています'
+        : 'ボードが非公開のため、児童にはまだ見えていません';
+    } else if (isPublished) {
       questionText.textContent = boardInfo.questionText || '(設問なし)';
-      if (statusText) statusText.textContent = '最終更新: ' + (boardInfo.lastUpdated || '不明');
+      if (statusText) statusText.textContent = '最終更新: ' + (formatJstShort(boardInfo.lastUpdated) || '不明');
     } else {
       questionText.textContent = (boardInfo && boardInfo.questionText) || 'ボードは非公開です';
       if (statusText) statusText.textContent = '「ボード設定」タブの公開スイッチ、または授業の開始で公開されます';
@@ -3050,7 +3070,9 @@
     const showActions = isPublished && boardInfo.urls;
     openBtn.style.display = showActions ? '' : 'none';
     copyBtn.style.display = showActions ? '' : 'none';
-    if (unpublishBtn) unpublishBtn.style.display = showActions ? '' : 'none';
+    // 授業中の「公開を終了」は授業の自動アーカイブも走る = 授業そのものを止める操作。
+    //   終了はランナーの「授業終了」に一本化し、ここには出さない。
+    if (unpublishBtn) unpublishBtn.style.display = (showActions && !lesson) ? '' : 'none';
     if (showActions) {
       openBtn.onclick = () => {
         // 連打で新タブが複数開かないよう 800ms 内の重複 click を抑制。
@@ -3164,11 +3186,15 @@
     //   実行中の授業はフェーズごとにデータソース / 列 / 軸 / 公開状態を書き換える。
     //   その間にボード設定タブの自動保存や公開が走ると、授業が書いた設定を上書きして壊す。
     let boardTabLockedBy = null;
+    window.__activeLessonSummary = () => boardTabLockedBy;
     function setBoardTabLock(activeLesson) {
       boardTabLockedBy = activeLesson || null;
+      if (typeof window.__refreshFooterStatus === 'function') window.__refreshFooterStatus();
       const box = document.getElementById('board-tab-lock');
       const tab = document.getElementById('tab-board');
       const nameEl = document.getElementById('board-tab-lock-name');
+      const phaseEl = document.getElementById('board-tab-lock-phase');
+      const detection = document.getElementById('form-detection-info');
       if (!box || !tab) return;
       if (!activeLesson) {
         box.classList.add('hidden');
@@ -3176,6 +3202,9 @@
         return;
       }
       if (nameEl) nameEl.textContent = activeLesson.name || '';
+      if (phaseEl) phaseEl.textContent = activeLesson.currentPhaseName ? ' (フェーズ: ' + activeLesson.currentPhaseName + ')' : '';
+      // 授業モードには Form が無い。「フォーム: 考える」のような実体の無いリンクを出さない。
+      if (detection && activeLesson.inputMode === 'native') detection.classList.add('hidden');
       box.classList.remove('hidden');
       tab.classList.add('is-locked');
       const openBtn = document.getElementById('board-tab-lock-open');
@@ -4636,12 +4665,7 @@
       currentLessonNative = native;
       const phases = (lesson.lessonJson && lesson.lessonJson.phases) || [];
       renderRunnerClasses(lesson);
-      const endNote = document.getElementById('lesson-runner-end-note');
-      if (endNote) {
-        endNote.textContent = native
-          ? '「授業終了」で回答の受付を締め切り、振り返り用に保存します。児童の画面は通常のボードに戻ります。'
-          : '「授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。';
-      }
+
       const trans = (lesson.lessonJson && lesson.lessonJson.profileTransitions) || [];
       const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
       const container = document.getElementById('lesson-runner-phases');
@@ -4661,13 +4685,9 @@
           </button>`;
         }).join('');
         container.querySelectorAll('[data-phase-jump]').forEach((card) => {
-          card.addEventListener('click', () => lessonAdvance('next', Number(card.dataset.phaseJump)));
+          card.addEventListener('click', () => lessonAdvance('next', Number(card.dataset.phaseJump), card));
         });
       }
-      const prevBtn = document.getElementById('lesson-prev-btn');
-      const nextBtn = document.getElementById('lesson-next-btn');
-      if (prevBtn) prevBtn.disabled = activeIdx === 0;
-      if (nextBtn) nextBtn.disabled = activeIdx >= phases.length - 1;
     }
 
     // ---------- 対象クラス (実行中でも直せる) ----------
@@ -4770,12 +4790,11 @@
       });
     })();
 
-    function lessonAdvance(direction, targetIndex) {
+    function lessonAdvance(direction, targetIndex, sourceBtn) {
       if (!currentLessonId) return;
-      // Why: onclick="lessonAdvance(...)" の inline 呼出から this を渡す代わりに、
-      //   既知の DOM id で button を引いて withBusy にかける (連打抑制 + spinner)。
-      const btn = document.getElementById(direction === 'next'? 'lesson-next-btn': 'lesson-prev-btn');
-      const busyText = direction === 'next'? '切替中...': '戻し中...';
+      // 切替の起点はフェーズカード (押した card を busy にして連打を止める)。
+      const btn = sourceBtn || null;
+      const busyText = '切替中...';
       const params = { userId, lessonId: currentLessonId, direction };
       if (Number.isInteger(targetIndex)) params.targetIndex = targetIndex;
       const task = () => gasRun('lesson.advance', params).then((res) => {
@@ -4797,14 +4816,7 @@
     // Runner ヘッダーのボード導線。URL は決定的 (mode=view&userId) なので都度組み立てる。
     (function initRunnerBoardActions() {
       const openBtn = document.getElementById('lesson-runner-open-board');
-      const projBtn = document.getElementById('lesson-runner-open-projector');
       const copyBtn = document.getElementById('lesson-runner-copy-url');
-      // 投影用: 入力フェーズで分布を開く導線を出さず、文字を大きくする (?display=projector)。
-      if (projBtn) projBtn.addEventListener('click', () => {
-        if (!window.sharedUtilities?.buttons?.navOnce(projBtn)) return;
-        buildWebAppUrl('view', { userId, display: 'projector' }, (url) => window.open(url, '_blank'),
-          () => window.showError && window.showError('ボードの URL を取得できませんでした'));
-      });
       if (openBtn) openBtn.addEventListener('click', () => {
         if (!window.sharedUtilities?.buttons?.navOnce(openBtn)) return;
         buildWebAppUrl('view', { userId }, (url) => window.open(url, '_blank'),
