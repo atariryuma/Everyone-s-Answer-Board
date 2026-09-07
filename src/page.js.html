@@ -149,7 +149,10 @@
         // 「置き直す」を押して送信済みのまま入力画面に戻っている最中か
         lessonEditing: false,
         // 自分の記録をどのフェーズまで読んだか (lessonId:phaseIndex)。二重取得を避ける
-        lessonRecordKey: null
+        lessonRecordKey: null,
+        // 教師がフェーズを切り替えている最中 ({ to, stage: 'switching' | 'loading' })。
+        //   押した瞬間から次の画面が描けるまで、画面が「何も起きていない」ように見える区間を無くす。
+        lessonTransition: null
       };
 
       this.lastActivityTime = Date.now();
@@ -1571,8 +1574,8 @@
       }
       this.__renderLessonScreen();
 
-      // 出会うフェーズに入った瞬間は、最新の分布を読み直す。
-      if (phase.screenRole === 'browse' && typeof this.loadSheetData === 'function') {
+      // 出会うフェーズに入った瞬間は、最新の分布を読み直す (教師の切替中は切替側が読むので二重にしない)。
+      if (phase.screenRole === 'browse' && !this.state.lessonTransition && typeof this.loadSheetData === 'function') {
         this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
       }
     }
@@ -1599,6 +1602,30 @@
     /**
      * 教師向け: 入力フェーズ中の待機画面 (問い + 送信済み人数)。分布は出さない。
      */
+    /**
+     * 切替中の画面。押した瞬間 (switching) と、サーバ応答後にデータを読み直す間 (loading) の
+     *   2 段を同じ見た目で出す。完了の合図は次の画面そのもの (トーストは使わない)。
+     */
+    __renderLessonTransition(transition) {
+      const esc = this.__escape.bind(this);
+      let host = document.getElementById('lessonScreen');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'lessonScreen';
+        host.className = 'lesson-screen';
+        document.body.appendChild(host);
+      }
+      document.body.classList.add('lesson-active');
+      const to = transition.to || {};
+      const stageText = transition.stage === 'loading' ? '読み込んでいます' : '切り替えています';
+      host.innerHTML =
+        '<div class="lesson-card lesson-transition" aria-busy="true" aria-live="polite">' +
+          '<p class="lesson-teacher-phase">' + esc(stageText) + '</p>' +
+          '<h2 class="lesson-title">' + esc(to.name || '') + '</h2>' +
+          '<div class="lesson-progress" aria-hidden="true"><span></span></div>' +
+        '</div>';
+    }
+
     __renderLessonTeacherWait(phase) {
       const esc = this.__escape.bind(this);
       let host = document.getElementById('lessonScreen');
@@ -1657,6 +1684,10 @@
       //   手元で分布を見たいときは管理パネル (ランナー) の「児童ごとの回答」を使う。
       //   ボードは投影される前提の画面なので、投影してはいけない導線を置かない。
       if (this.state.isEditor === true) {
+        if (this.state.lessonTransition) {
+          this.__renderLessonTransition(this.state.lessonTransition);
+          return;
+        }
         if (phase.screenRole === 'input' || phase.screenRole === 'reinput') {
           this.__renderLessonTeacherWait(phase);
           return;
@@ -2636,8 +2667,10 @@
       if (!nav || this.state.__phaseSwitching) return;
       // 切替は Form の開閉と config 書き換えを伴う。連打で二重遷移させない。
       this.state.__phaseSwitching = true;
-      const host = document.getElementById('boardPhaseNav');
-      if (host) host.querySelectorAll('.board-phase-btn').forEach(b => b.classList.add('is-busy'));
+      // 押した瞬間に画面を「切り替えています」にする。サーバは 3〜5 秒かかる。
+      this.state.lessonTransition = { to: phase, stage: 'switching' };
+      this.__renderLessonScreen();
+      this.__renderBoardPhaseNav();
       try {
         const res = await runServer('advanceLessonPhase', this.state.userId, nav.lessonId, null, phase.index);
         if (!res || !res.success) {
@@ -2647,9 +2680,9 @@
         nav.activePhaseIndex = (res.data && typeof res.data.activePhaseIndex === 'number')
           ? res.data.activePhaseIndex
           : phase.index;
-        this.__renderBoardPhaseNav();
-        window.notifications.success('「' + phase.name + '」に切替えました');
         // polling (最大 5 秒 + cache 10 秒) を待たず、教師の画面を新フェーズに合わせる。
+        //   データを読み直すまでは「読み込んでいます」のまま (切替中の画面が続く)。
+        this.state.lessonTransition = { to: phase, stage: 'loading' };
         const applied = nav.phases[nav.activePhaseIndex] || phase;
         this.__applyLessonPhase({
           lessonId: nav.lessonId,
@@ -2663,13 +2696,16 @@
         // 自分が起こした切替なので、生徒向けの「切替わりました」バナーは出さない。
         this.state.__suppressBoardSwitchToast = true;
         if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';
-        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
       } catch (err) {
         console.error('phase switch failed:', err);
         window.notifications.error('フェーズ切替に失敗しました');
       } finally {
         this.state.__phaseSwitching = false;
-        if (host) host.querySelectorAll('.board-phase-btn').forEach(b => b.classList.remove('is-busy'));
+        this.state.lessonTransition = null;
+        // 完了の合図は次の画面そのもの。待機画面ならそれを、分布ならボードを描く。
+        this.__renderLessonScreen();
+        this.__renderBoardPhaseNav();
       }
     }
 

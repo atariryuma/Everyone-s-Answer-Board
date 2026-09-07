@@ -1187,6 +1187,35 @@ button.highlight-badge:hover {
 .lesson-count-classes strong {
   color: var(--theme-text-primary);
 }
+/* 切替中の画面。動きが 1 つだけある (進行バー) ので「止まっていない」ことが伝わる。 */
+.lesson-transition {
+  max-width: 44rem;
+  text-align: center;
+  gap: var(--space-4);
+}
+.lesson-progress {
+  position: relative;
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--theme-bg-elevated);
+  overflow: hidden;
+}
+.lesson-progress span {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 40%;
+  border-radius: var(--radius-full);
+  background: var(--brand-accent);
+  animation: lesson-progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes lesson-progress-slide {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson-progress span { animation: none; left: 0; width: 100%; opacity: 0.5; }
+}
+
 /* 授業の操作面 (ピル + 次へ / 終了)。ヘッダ・待機画面・帯で同じ見た目。 */
 .lesson-control {
   display: flex;

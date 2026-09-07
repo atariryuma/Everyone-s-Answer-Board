@@ -866,3 +866,24 @@ test('教師の待機画面: クラス別の内訳はクラスが 2 つ以上あ
   const stats = instance.__lessonSubmissionStats();
   assert.equal(Object.keys(stats.byClass).filter(c => c).length, 0, '空のクラスは内訳に出さない');
 });
+
+test('フェーズ切替: 押した瞬間に「切り替えています」、応答後は「読み込んでいます」、データが来たら次の画面', async () => {
+  const { instance, calls, ctx } = makeTeacherInstance();
+  const stages = [];
+  instance.__renderLessonTransition = (t) => { stages.push(t.stage + ':' + t.to.name); };
+  instance.__renderBoardPhaseNav = () => {};
+  instance.loadSheetData = () => { stages.push('load'); return Promise.resolve(); };
+  instance.elements = {};
+  instance.state.boardPhaseNav = { lessonId: 'l1', activePhaseIndex: 0, phases: [
+    { index: 0, name: '考える', screenRole: 'input' }, { index: 1, name: '出会う', screenRole: 'browse' }
+  ] };
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', phaseName: '考える' };
+  ctx.runServer = () => { stages.push('server'); return Promise.resolve({ success: true, data: { activePhaseIndex: 1 } }); };
+  ctx.window.notifications = { error: () => {}, success: () => { stages.push('toast'); } };
+  await instance.__switchBoardPhase(instance.state.boardPhaseNav.phases[1]);
+  assert.deepEqual(stages, ['switching:出会う', 'server', 'loading:出会う', 'load']);
+  assert.equal(instance.state.lessonTransition, null);
+  assert.equal(instance.state.lessonPhase.phaseIndex, 1);
+  assert.equal(instance.state.lessonPhase.screenRole, 'browse', '出会う = 分布そのもの');
+  assert.ok(!stages.includes('toast'), '完了のトーストは出さない');
+});
