@@ -878,3 +878,19 @@ test('投影の切替: body.projector-mode と URL の display=projector を同�
   assert.ok(!cls.has('projector-mode'));
   assert.ok(!/display=projector/.test(replaced[1]));
 });
+
+test('送信の前提: 4 象限は縦横の両方、数直線は横だけ', async () => {
+  const { instance } = makeLessonInstance();
+  const toasts = [];
+  instance.showToast = (m) => toasts.push(m);
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', formTemplate: 'matrix' };
+  instance.state.lessonDraft = { numericX: 3, numericY: null };
+  await instance.__submitLessonAnswer();
+  assert.match(toasts[0], /位置/, '4 象限で縦が無ければ位置の選択を求める');
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', formTemplate: 'numberline' };
+  instance.state.lessonDraft = { numericX: 3, numericY: null };
+  await instance.__submitLessonAnswer();
+  // 位置は通り、次の検証 (理由の未入力) に進んでいる
+  assert.equal(toasts.length, 2);
+  assert.doesNotMatch(toasts[1], /位置/);
+});

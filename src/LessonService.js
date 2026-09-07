@@ -1474,6 +1474,15 @@ function startLesson(userId, lessonId) {
       // 揺らぎ追跡: lesson レベルの allowResubmit を全 phase に適用 (議論前後の意見変化を取りたい)。
       //   phase 個別に templateOptions.allowResubmit があればそれを優先。
       const lessonAllowResubmit = Boolean(lessonJson && lessonJson.allowResubmit);
+      // 授業モードは授業を通して 1 つの座標系。最初の入力フェーズの形式 (4 象限 / 数直線) を
+      //   全フェーズに揃える。wizard も揃えて保存するが、API 経由の編集漏れをここで吸収する。
+      if (__isNativePhase_({}, lessonJson)) {
+        const axisPhase = __nativeAxisPhase_(lessonJson);
+        const unified = (axisPhase && axisPhase.formTemplate === 'numberline') ? 'numberline' : 'matrix';
+        for (let i = 0; i < phases.length; i++) {
+          if (phases[i] && phases[i].formTemplate !== unified) phases[i].formTemplate = unified;
+        }
+      }
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i];
 
@@ -2211,6 +2220,8 @@ function __computeViewerLessonPhase_(targetUserId) {
       screenRole: __phaseScreenRole_(phase),
       question: phase.question || '',
       phaseCount: phases.length,
+      // 座標系: 'matrix' (4 象限) か 'numberline' (数直線)。児童画面の入力 UI を決める。
+      formTemplate: phase.formTemplate || 'matrix',
       // 児童が自分のクラスを選ぶための選択肢。1 つなら画面は聞かずに自動で入れる。
       //   Why: 児童の画面はボードのクラスフィルタが入力画面の下に隠れていて選べず、
       //   全員がクラス空欄で記録されていた (教師のクラス絞り込みが効かない)。

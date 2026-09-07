@@ -687,6 +687,31 @@ test('updateLessonDraft: 授業モードの classes は実行中でも直せて�
   assert.match(other.message, /draft/);
 });
 
+test('数直線の授業モード: 最初の入力フェーズの形式が全フェーズに揃い、児童は横の値だけで送れる', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ (数直線)', 'dialogue-2phase');
+  const lessonId = draft.data.lesson.lessonId;
+  h.context.updateLessonDraft('u1', lessonId, 'classes', ['6年1組']);
+  h.context.updateLessonDraft('u1', lessonId, 'phases.0.formTemplate', 'numberline');
+  h.context.updateLessonDraft('u1', lessonId, 'phases.0.templateOptions', { lowLabel: '自首を勧める', highLabel: '逃がす' });
+  const patches = [];
+  h.context.applyConfigPatch_ = (uid, patch) => { patches.push(patch); return { success: true }; };
+  const started = h.context.startLesson('u1', lessonId);
+  assert.equal(started.success, true, started.message);
+  const phases = Array.from(started.data.lesson.lessonJson.phases);
+  assert.deepEqual(phases.map(p => p.formTemplate), ['numberline', 'numberline'], '座標系は授業を通して 1 つ');
+  assert.equal(patches[0].displaySettings.boardMode, 'numberline');
+  assert.deepEqual(Object.assign({}, patches[0].xAxisLabels), { min: '自首を勧める', max: '逃がす' });
+  assert.equal(patches[0].columnMapping.numericY, undefined, '数直線に縦の列は無い');
+
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const info = h.context.__getViewerLessonPhase_('u1');
+  assert.equal(info.formTemplate, 'numberline');
+  h.setEmail('student@example.com');
+  const res = h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 4, reason: '理由', class: '6年1組', name: 'A' });
+  assert.equal(res.success, true, res.message);
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

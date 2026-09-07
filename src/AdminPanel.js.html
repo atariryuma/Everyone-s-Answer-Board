@@ -3834,10 +3834,20 @@
         const roleBadge = native
           ? '<span class="phase-role-badge">' + esc(roleLabel(p.screenRole)) + '</span>'
           : '';
-        // 授業モード: 形式はテンプレートで固定 (4 象限を画面から直接送る)。select を出さない。
+        // 授業モード: 座標系は授業を通して 1 つ。最初の「考えを送る」フェーズでだけ
+        //   4 象限 / 数直線 を選び、他のフェーズには同じ形式を表示する。
+        const nativeLabel = p.formTemplate === 'numberline' ? '数直線 (1〜5 の立場)' : '4 象限 (立場 × 迷い)';
         const formatField = native
-          ? '<div class="phase-field"><label class="phase-label">形式:</label>' +
-              '<span class="phase-fixed-value">4 象限 (児童はボードの画面から直接送る)</span></div>'
+          ? (i === axisIdx
+              ? '<div class="phase-field"><label class="phase-label">座標系:</label>' +
+                  '<select class="modern-input text-sm" data-phase-native-template="1" data-phase-index="' + i + '">' +
+                    '<option value="matrix"' + (p.formTemplate !== 'numberline' ? ' selected' : '') + '>4 象限 (立場 × 迷い)</option>' +
+                    '<option value="numberline"' + (p.formTemplate === 'numberline' ? ' selected' : '') + '>数直線 (1〜5 の立場)</option>' +
+                  '</select>' +
+                  '<p class="phase-axis-note">児童はボードの画面から直接送ります。授業を通して同じ座標系を使います。</p>' +
+                '</div>'
+              : '<div class="phase-field"><label class="phase-label">座標系:</label>' +
+                  '<span class="phase-fixed-value">' + esc(nativeLabel) + ' (最初のフェーズと同じ)</span></div>')
           : '<div class="phase-field">' +
               '<label class="phase-label">形式:</label>' +
               '<select class="modern-input text-sm" data-phase-field="formTemplate" data-phase-index="'+ i + '">' +
@@ -3851,7 +3861,7 @@
           detail = renderPhaseDetailFields(p, i);
           preview = '<div class="phase-preview-label"> 生徒に見える形:</div>' + renderPhasePreview(p);
         } else if (i === axisIdx) {
-          detail = renderPhaseDetailFields(p, i) + renderQuadrantFields(p, i);
+          detail = renderPhaseDetailFields(p, i) + (p.formTemplate === 'matrix' ? renderQuadrantFields(p, i) : '');
           preview = '<div class="phase-preview-label"> 児童に見える形:</div>' + renderPhasePreview(p);
         } else if (p.screenRole === 'input' || p.screenRole === 'reinput' || p.screenRole === 'browse') {
           const axisName = axisIdx >= 0 ? (currentPhases[axisIdx].name || '最初のフェーズ') : '最初のフェーズ';
@@ -4254,6 +4264,25 @@
     document.addEventListener('change', (e) => {
       const el = e.target;
       if (!el || !el.dataset) return;
+      // 0) 授業モードの座標系 (最初の入力フェーズで選ぶ → 全フェーズに揃える)
+      if (el.dataset.phaseNativeTemplate) {
+        const next = el.value === 'numberline' ? 'numberline' : 'matrix';
+        const axisIdx = firstInputPhaseIndex();
+        currentPhases.forEach((ph, i) => {
+          ph.formTemplate = next;
+          if (i === axisIdx) {
+            // 既定の軸: 4 象限は縦に「迷い」、数直線は両端とも教材依存なので空。
+            ph.templateOptions = next === 'matrix'
+              ? Object.assign({ xLow: '', xHigh: '', yLow: '迷いあり', yHigh: '迷いなし' }, ph.templateOptions || {}, { lowLabel: undefined, highLabel: undefined })
+              : Object.assign({ lowLabel: '', highLabel: '' }, ph.templateOptions || {}, { xLow: undefined, xHigh: undefined, yLow: undefined, yHigh: undefined, quadrantLabels: undefined });
+            Object.keys(ph.templateOptions).forEach((k) => { if (ph.templateOptions[k] === undefined) delete ph.templateOptions[k]; });
+            ph.templateOptions = normalizeTemplateOptions(ph.templateOptions, next);
+          }
+        });
+        renderPhaseCardsInner();
+        savePhasesNow();
+        return;
+      }
       // 1) 形式変更
       if (el.dataset.phaseField === 'formTemplate') {
         const idx = Number(el.dataset.phaseIndex);
@@ -4482,6 +4511,9 @@
           const o = p.templateOptions || {};
           if (native) {
             if (i !== firstInput) return '役割: ' + esc(roleLabel(p.screenRole));
+            if (p.formTemplate === 'numberline') {
+              return '役割: ' + esc(roleLabel(p.screenRole)) + ' / 数直線: ' + esc(o.lowLabel || '?') + '↔' + esc(o.highLabel || '?');
+            }
             const q = o.quadrantLabels || {};
             const quad = ['hh', 'hl', 'lh', 'll'].map(k => q[k]).filter(Boolean);
             return '役割: ' + esc(roleLabel(p.screenRole)) +
@@ -4510,7 +4542,7 @@
           '<li class="confirm-phase-row">' +
             '<span class="confirm-phase-idx">フェーズ '+ (i + 1) + '</span>' +
             '<span class="confirm-phase-body">' +
-              '<strong>'+ esc(p.name || '(無題)') + '</strong> · '+ (native ? '4 象限 (画面から直接送る)' : labelFor(p.formTemplate)) + '<br>' +
+              '<strong>'+ esc(p.name || '(無題)') + '</strong> · '+ (native ? (p.formTemplate === 'numberline' ? '数直線 (画面から直接送る)' : '4 象限 (画面から直接送る)') : labelFor(p.formTemplate)) + '<br>' +
               '<span class="confirm-phase-q">Q: '+ esc(p.question || '(質問未設定)') + '</span><br>' +
               '<span class="confirm-phase-detail">'+ detailFor(p, i) + '</span>' +
             '</span>' +
@@ -4524,6 +4556,13 @@
         phases.forEach((p, i) => {
           if (!p.name) warnings.push('フェーズ '+ (i + 1) + ' の名前が空です');
           if (!p.question) warnings.push('フェーズ '+ (i + 1) + ' の質問が空です');
+          if (native && i === firstInput) {
+            const o2 = p.templateOptions || {};
+            const missing = p.formTemplate === 'numberline'
+              ? (!o2.lowLabel || !o2.highLabel)
+              : (!o2.xLow || !o2.xHigh || !o2.yLow || !o2.yHigh);
+            if (missing) warnings.push('「' + (p.name || 'フェーズ ' + (i + 1)) + '」の軸の両端が空です (児童はどちらが何かを読めません)');
+          }
           const o = p.templateOptions || {};
           if ((p.formTemplate === 'pie'|| p.formTemplate === 'board') && (!Array.isArray(o.choices) || o.choices.length < 2)) {
             warnings.push('フェーズ '+ (i + 1) + ' の選択肢が 2 つ未満です');

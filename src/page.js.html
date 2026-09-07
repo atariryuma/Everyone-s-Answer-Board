@@ -1808,7 +1808,9 @@
       const last = phases[phases.length - 1];
       let html = '';
       if (phases.length > 1) {
-        html += this.__buildTrajectorySvg(first, last);
+        const oneD = (this.state.lessonPhase && this.state.lessonPhase.formTemplate === 'numberline')
+          || (first.numericY === null || first.numericY === undefined);
+        html += oneD ? this.__buildTrajectoryLine(first, last) : this.__buildTrajectorySvg(first, last);
       }
       html += '<div class="lesson-quote lesson-quote-first">' +
         '<span class="lesson-quote-label">● 最初のことば</span>' +
@@ -1851,6 +1853,27 @@
         '</svg>';
     }
 
+    /**
+     * 数直線版の航跡。● 最初 → ★ いま を 1 本の線の上に置く。
+     */
+    __buildTrajectoryLine(first, last) {
+      const esc = this.__escape.bind(this);
+      const axis = this.state.axisConfig || {};
+      const x = axis.xAxisLabels || {};
+      const pos = (v) => 20 + ((Number(v) || 3) - 1) / 4 * 160;   // 1-5 → 20-180
+      const x1 = pos(first.numericX), x2 = pos(last.numericX);
+      return '<svg class="lesson-traj-svg lesson-traj-line-svg" viewBox="0 0 200 70" role="img" ' +
+        'aria-label="最初の考えといまの考えの位置">' +
+        '<line class="lesson-axis" x1="20" y1="30" x2="180" y2="30" />' +
+        [1, 2, 3, 4, 5].map((v) => '<line class="lesson-axis" x1="' + pos(v) + '" y1="26" x2="' + pos(v) + '" y2="34" />').join('') +
+        '<line class="lesson-traj-line" x1="' + x1 + '" y1="30" x2="' + x2 + '" y2="30" />' +
+        '<circle class="lesson-dot-first" cx="' + x1 + '" cy="30" r="6" />' +
+        '<text class="lesson-dot-now" x="' + x2 + '" y="36" text-anchor="middle">★</text>' +
+        '<text class="lesson-traj-axis" x="2" y="62">' + esc(x.min || '') + '</text>' +
+        '<text class="lesson-traj-axis" x="198" y="62" text-anchor="end">' + esc(x.max || '') + '</text>' +
+        '</svg>';
+    }
+
     // 入力 / 再入力フェーズ。reinput では自分の ● を下敷きに出す。
     //   送信済みなら「送りました」画面。置き直すときだけ入力画面に戻る。
     __renderLessonInput(host, phase) {
@@ -1882,7 +1905,7 @@
             '<label class="lesson-label" for="lessonName">名前</label>' +
             '<input id="lessonName" class="lesson-input" type="text" maxlength="50" ' +
               'placeholder="名前を入力してください" value="" />') +
-          this.__buildLessonAxisFrame() +
+          (phase.formTemplate === 'numberline' ? this.__buildLessonScaleFrame() : this.__buildLessonAxisFrame()) +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
             'placeholder="そこを選んだ理由を書いてください">' + esc(draft.reason || '') + '</textarea>' +
@@ -1898,7 +1921,8 @@
             : '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>') +
         '</div>';
 
-      this.__buildLessonGrid(isReinput);
+      if (phase.formTemplate === 'numberline') this.__buildLessonScale(isReinput);
+      else this.__buildLessonGrid(isReinput);
       const btn = document.getElementById('lessonSubmit');
       if (btn) {
         btn.addEventListener('click', () => this.__submitLessonAnswer());
@@ -1939,7 +1963,7 @@
           '<p class="lesson-sent-title">' +
             '<svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg> 考えを送りました' +
           '</p>' +
-          this.__buildLessonAxisFrame() +
+          (phase.formTemplate === 'numberline' ? this.__buildLessonScaleFrame() : this.__buildLessonAxisFrame()) +
           '<div class="lesson-quote lesson-quote-now">' +
             '<span class="lesson-quote-label">あなたのことば</span>' + esc(sent.reason || '') +
           '</div>' +
@@ -1957,8 +1981,9 @@
         numericX: sent.numericX, numericY: sent.numericY,
         reason: sent.reason || '', addedInsight: sent.addedInsight || ''
       };
-      this.__buildLessonGrid(phase.screenRole === 'reinput');
-      const grid = document.getElementById('lessonGrid');
+      if (phase.formTemplate === 'numberline') this.__buildLessonScale(phase.screenRole === 'reinput');
+      else this.__buildLessonGrid(phase.screenRole === 'reinput');
+      const grid = document.getElementById('lessonGrid') || document.getElementById('lessonScale');
       if (grid) grid.classList.add('is-readonly');
       const btn = document.getElementById('lessonReplace');
       if (btn) {
@@ -2086,13 +2111,77 @@
       // 再入力フェーズの下敷き (最初の ●) は __loadMyLessonRecord が読んで描き直す。
     }
 
+    /**
+     * 数直線 (1 次元) の枠。両端のラベルは config.xAxisLabels から (4 象限の横軸と同じ置き場)。
+     */
+    __buildLessonScaleFrame() {
+      const esc = this.__escape.bind(this);
+      const axis = this.state.axisConfig || {};
+      const x = axis.xAxisLabels || {};
+      return '<div class="lesson-scale-frame">' +
+        '<div id="lessonScale" class="lesson-scale" role="application" aria-label="考えの位置を選ぶ数直線"></div>' +
+        '<div class="lesson-scale-labels" aria-hidden="true">' +
+          '<span>' + esc(x.min || '') + '</span><span>' + esc(x.max || '') + '</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    /**
+     * 1〜5 の 5 段階。4 象限の格子と同じ規約 (明示の段階、reinput では最初の ● を下敷き)。
+     *   縦の値は持たない (numericY は null で送る)。
+     */
+    __buildLessonScale(isReinput) {
+      const scale = document.getElementById('lessonScale');
+      if (!scale) return;
+      const prev = (isReinput && this.state.lessonPrevPoint) || null;
+      scale.textContent = '';
+      for (let x = 1; x <= 5; x++) {
+        const isPrev = !!(prev && prev.numericX === x);
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'lesson-cell lesson-scale-cell' + (isPrev ? ' is-prev' : '');
+        cell.setAttribute('data-x', String(x));
+        cell.setAttribute('aria-label', String(x) + (isPrev ? '（最初に選んだところ）' : ''));
+        const num = document.createElement('span');
+        num.className = 'lesson-scale-num';
+        num.textContent = String(x);
+        cell.appendChild(num);
+        if (isPrev) {
+          const mark = document.createElement('span');
+          mark.className = 'lesson-cell-prev';
+          mark.setAttribute('aria-hidden', 'true');
+          mark.textContent = '●';
+          cell.appendChild(mark);
+        }
+        scale.appendChild(cell);
+      }
+      const draft = this.state.lessonDraft;
+      if (draft && draft.numericX) {
+        const sel = scale.querySelector('.lesson-cell[data-x="' + draft.numericX + '"]');
+        if (sel) sel.classList.add('is-selected');
+      }
+      scale.addEventListener('click', (ev) => {
+        const cell = ev.target.closest ? ev.target.closest('.lesson-cell') : null;
+        if (!cell) return;
+        const cells = scale.querySelectorAll('.lesson-cell');
+        for (let i = 0; i < cells.length; i++) cells[i].classList.remove('is-selected');
+        cell.classList.add('is-selected');
+        this.state.lessonDraft = Object.assign({}, this.state.lessonDraft || {}, {
+          numericX: Number(cell.getAttribute('data-x')),
+          numericY: null
+        });
+      });
+    }
+
     // 投稿。サーバがフェーズ権能を再検証するので、ここは UX の担当。
     async __submitLessonAnswer() {
       const phase = this.state.lessonPhase;
       const draft = this.state.lessonDraft;
       const btn = document.getElementById('lessonSubmit');
       if (!phase) return;
-      if (!draft || !draft.numericX || !draft.numericY) {
+      // 4 象限は縦横の両方、数直線は横だけが必要。
+      const needY = phase.formTemplate !== 'numberline';
+      if (!draft || !draft.numericX || (needY && !draft.numericY)) {
         this.showToast('まず、自分の考えの位置をえらんでください');
         return;
       }

@@ -1057,6 +1057,36 @@ button.highlight-badge:hover {
   background: var(--theme-bg-elevated-hover);
   border-color: var(--brand-accent);
 }
+/* 数直線 (1 次元) の入力: 5 段階を横一列に。格子と同じ .lesson-cell の見た目を使う。 */
+.lesson-scale-frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.lesson-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+}
+.lesson-scale-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--theme-text-secondary);
+}
+.lesson-scale-cell.is-selected .lesson-scale-num { color: var(--theme-text-primary); }
+.lesson-scale.is-readonly { pointer-events: none; }
+.lesson-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  color: var(--theme-text-secondary);
+}
+.lesson-traj-line-svg { max-width: 22rem; }
 /* 最初に置いた位置 (再入力フェーズの下敷き)。選択中の点とは別の記号で示す。 */
 .lesson-cell-prev {
   position: absolute;
