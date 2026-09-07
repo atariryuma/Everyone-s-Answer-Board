@@ -562,6 +562,36 @@ test('__getViewerLessonPhase_: 児童には現在フェーズだけを返す (�
   assert.equal(info.phases, undefined);
 });
 
+test('__getViewerLessonPhase_: 児童は公開ボード経路 (findPublishedBoardOwner) で config を読む', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const calls = [];
+  // 厳格 ACL の経路 (preloaded user なし) は児童には Access denied = 空 config を返す
+  h.context.getConfigOrDefault = (uid, user) => {
+    calls.push({ uid, hasUser: Boolean(user) });
+    return user ? { activeLessonId: lessonId } : {};
+  };
+  h.context.findPublishedBoardOwner = (uid, viewerEmail) => {
+    calls.push({ published: uid, viewerEmail });
+    return { userId: uid, userEmail: 'teacher@example.com' };
+  };
+  h.setEmail('student@example.com');
+  const info = h.context.__getViewerLessonPhase_('u1');
+  assert.ok(info, '児童にも現在フェーズが返る');
+  assert.equal(info.screenRole, 'input');
+  assert.deepEqual(calls[0], { published: 'u1', viewerEmail: 'student@example.com' });
+  assert.equal(calls[1].hasUser, true, '所有者レコードを preloaded で渡し、厳格 ACL を通らない');
+});
+
+test('__getViewerLessonPhase_: 非公開ボードは児童に授業情報を返さない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId });
+  h.context.findPublishedBoardOwner = () => null;
+  h.setEmail('student@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1'), null);
+});
+
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

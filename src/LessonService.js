@@ -2006,10 +2006,31 @@ function recaptureLessonArchive(userId, lessonId, phaseIndex) {
  * @param {string} targetUserId - ボード所有者 (教師) の userId
  * @returns {Object|null} 授業中でなければ null
  */
+/**
+ * 児童 (viewer) 視点でボード所有者の config を読む。
+ *
+ * Why getConfigOrDefault(targetUserId) を直接呼ばないか: 中の findUserById は
+ *   owner/admin 専用の厳格 ACL で、児童が他人のボードを見ると Access denied → 空 config
+ *   になる。すると activeLessonId が消え、「授業なし」= 通常ボード (4 象限) が児童に出て
+ *   入力画面が出ない・入力フェーズの他者マスクも効かない・投稿も拒否される、が同時に起きた
+ *   (教師には正しく見えるので気付きにくい)。公開ボードは findPublishedBoardOwner で引く。
+ *   併せて、拒否経路は cache に乗らず polling ごとに users シートを読んでいたので、
+ *   429 の誘発源でもあった。
+ */
+function __viewerBoardConfig_(targetUserId) {
+  if (!targetUserId) return {};
+  if (typeof findPublishedBoardOwner === 'function') {
+    const owner = findPublishedBoardOwner(targetUserId, getCurrentEmail());
+    if (!owner) return {};
+    return getConfigOrDefault(owner.userId, owner);
+  }
+  return getConfigOrDefault(targetUserId);
+}
+
 function __getViewerLessonPhase_(targetUserId) {
   try {
     if (!targetUserId) return null;
-    const config = getConfigOrDefault(targetUserId);
+    const config = __viewerBoardConfig_(targetUserId);
     const lessonId = config && config.activeLessonId;
     if (!lessonId) return null;
 
@@ -2335,7 +2356,7 @@ function getMyLessonTrajectory(targetUserId) {
     const actorEmail = getCurrentEmail();
     if (!actorEmail) return createAuthError();
 
-    const config = getConfigOrDefault(targetUserId);
+    const config = __viewerBoardConfig_(targetUserId);
     const lessonId = config && config.activeLessonId;
     if (!lessonId) return createSuccessResponse('授業なし', { phases: [] });
 
