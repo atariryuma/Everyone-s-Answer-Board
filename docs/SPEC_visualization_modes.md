@@ -1,7 +1,21 @@
 # 可視化モード仕様書 — M1 ポジショニング / M2 マトリクス
 
-**版**: 0.1（ドラフト）
-**対象スコープ**: M1（1D 数直線）と M2（2×2 散布図）のみ。M3〜M5（ワードクラウド、ランキング、Q&A板）は本書の対象外。
+**版**: 0.1（2026-05 の初期設計書 / 実装前に書いたもの）
+**状態**: **M1 / M2 は実装・本番稼働済み**。本書は「なぜこう作ったか」を残す設計記録であり、
+現在の仕様書ではない。**実装の現状と食い違う場合はコードが正**:
+
+- 表示モードの許可値・ラベル・必須列 → `src/validators.js` の `BOARD_MODES`（唯一の定義）
+- 列役割の推定 → `src/ColumnMappingService.js` の `inferColumnRoles()`（ヘッダー + データ形状 + boardMode の 3 層スコアに統合済み）
+- 授業進行そのもの → `src/LessonService.js` + CLAUDE.md「授業モード (native 入力)」
+
+**本書執筆後に増えた（＝ここに書かれていない）もの**:
+
+- 表示モード `wordcloud`（ワードランキング）と `pie`（円グラフ） — 本書 §1 は「追加しないもの」に
+  ワードクラウドを挙げているが、その後追加された
+- 授業モード（`lessonJson` / フェーズ進行 / native 入力）と、回答アーカイブの `lesson_responses` 分離
+- テーマ token 化（本書のモック中の生 hex は現在の実装方針ではない → `docs/THEME.md`）
+
+**対象スコープ**: M1（1D 数直線）と M2（2×2 散布図）。
 **前提読者**: 本リポジトリのアーキテクチャ（`CLAUDE.md`）を理解している実装者。
 
 ---
@@ -633,4 +647,4 @@ CSS で：
 - [d3-beeswarm](https://github.com/Kcnarf/d3-beeswarm)
 - [Mentimeter vs Slido 比較](https://www.classpoint.io/blog/slido-vs-mentimeter-vs-classpoint)
 - 本プロジェクトの `CLAUDE.md` および `src/` 配下の既存実装
-- `docs/AGENT_explorer_2026-05-12.md`（実装把握の生ログ。本書の §5–§9 はこの調査結果に基づく）
+- `docs/AGENT_explorer_2026-05-12.md`（実装把握の生ログ。本書の §5–§9 はこの調査結果に基づく。**このファイルは現存しない**）

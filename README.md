@@ -13,6 +13,10 @@ Everyone's Answer Boardは、Googleフォームの回答をリアルタイムで
 
 - Googleフォームとの自動連携
 - リアルタイム回答表示
+- 表示モードの切替: 掲示板 / 数直線 / マトリクス（2軸散布図） / ワードランキング / 円グラフ
+  （`config.displaySettings.boardMode`。定義は `src/validators.js` の `BOARD_MODES`）
+- 授業モード: フェーズ（考える→出会う→議論する→もう一度考える→ふりかえる）で
+  児童画面の権能を切り替える。Google フォームを介さない native 入力にも対応
 - リアクション機能（いいね、なるほど等）
 - ハイライト機能
 - 管理者ダッシュボード
@@ -139,7 +143,7 @@ Everyone-s-Answer-Board/
 │   ├── *Service.js          # ビジネスロジック
 │   ├── *Apis.js             # API エンドポイント
 │   └── *.html               # フロントエンド
-├── tests/                    # ユニットテスト（604件、node:test）
+├── tests/                    # ユニットテスト（1075件、node:test）
 ├── scripts/                  # CLIツール
 │   ├── admin-api.js         # 本番API操作
 │   ├── deploy-prod.js       # URL維持デプロイ

@@ -61,8 +61,6 @@ const OPERATIONS = [
   // Form operations (v3)
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm', 'customizeForm',
   'setFormAllowResubmit', 'uploadLessonImage',
-  // Multi-board profiles (v4)
-  'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用
   'appendRows', 'clearDataRows', 'setSheetHeader',
   // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
@@ -74,11 +72,13 @@ const OPERATIONS = [
   'addServiceAccountToPool', 'addServiceAccountsToPoolBatch',
   'reverifyServiceAccountInPool', 'removeServiceAccountFromPool',
   'migrateBoardSharing',
-  // Lesson workspace (Phase 1+2) — wizard / runner / replay / archive
+  // Lesson workspace — wizard / runner / replay / archive
+  // (唯一の定義は src/AdminApis.js の dispatchAdminOperation。ここはその --help ミラー)
   'lesson.create', 'lesson.updateDraft', 'lesson.start',
-  'lesson.advance', 'lesson.end',
-  'lesson.list', 'lesson.review', 'lesson.delete',
+  'lesson.advance', 'lesson.end', 'lesson.reopen',
+  'lesson.list', 'lesson.review', 'lesson.reviewGrid', 'lesson.delete',
   'lesson.duplicate', 'lesson.templates', 'lesson.knownClasses',
+  'lesson.closeForms', 'lesson.reorderPhases', 'lesson.recaptureArchive',
 ];
 
 /**

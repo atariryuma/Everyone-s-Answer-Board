@@ -1,7 +1,7 @@
 # Lesson Workspace — CLI 検証手順
 
-Phase 1+2 で実装した lesson archive 機能を、ブラウザ操作せずに `npm run api` 経由で
-end-to-end に検証する手順。
+授業ワークスペース（lesson の作成・進行・アーカイブ）を、ブラウザ操作せずに `npm run api`
+経由で end-to-end に検証する手順。
 
 ## 前提
 
@@ -11,16 +11,54 @@ end-to-end に検証する手順。
 
 ## 全 lesson 操作一覧
 
+唯一の定義は `src/AdminApis.js` の `dispatchAdminOperation()` (`case 'lesson.*'`)。
+`scripts/admin-api.js` の `OPERATIONS` は `--help` 表示用のミラー。
+
 ```bash
-npm run api -- lesson.list          --userId <uuid>
-npm run api -- lesson.create        --userId <uuid> --name '<名前>' --template doutoku-3phase
+# 作成・編集 (draft のみ)
+npm run api -- lesson.templates                            # 利用可能テンプレ一覧 (userId 不要)
+npm run api -- lesson.create        --userId <uuid> --name '<名前>' --template <templateKey>
 npm run api -- lesson.updateDraft   --userId <uuid> --lessonId <id> --fieldPath <path> --value <json|string>
+npm run api -- lesson.duplicate     --userId <uuid> --lessonId <id> [--options '{"copyClasses":true}']
+npm run api -- lesson.knownClasses  --userId <uuid>        # 過去授業から使用クラス候補
+npm run api -- lesson.reorderPhases --userId <uuid> --lessonId <id> --order '[0,2,1]'
+
+# 進行
 npm run api -- lesson.start         --userId <uuid> --lessonId <id>
-npm run api -- lesson.advance       --userId <uuid> --lessonId <id> --direction next|previous
+npm run api -- lesson.advance       --userId <uuid> --lessonId <id> --direction next|previous [--targetIndex <n>]
 npm run api -- lesson.end           --userId <uuid> --lessonId <id>
+npm run api -- lesson.reopen        --userId <uuid> --lessonId <id>   # completed → active の逆遷移
+
+# 参照・後処理
+npm run api -- lesson.list          --userId <uuid>        # snapshots は除外された軽量一覧
 npm run api -- lesson.review        --userId <uuid> --lessonId <id>
+npm run api -- lesson.reviewGrid    --userId <uuid> --lessonId <id>   # 児童ごとの移動を授業後に読む
+npm run api -- lesson.closeForms    --userId <uuid> --lessonId <id>   # 状態を問わず全 Form の受付を締切
+npm run api -- lesson.recaptureArchive --userId <uuid> --lessonId <id> --phaseIndex <n>
 npm run api -- lesson.delete        --userId <uuid> --lessonId <id>
 ```
+
+`lesson.closeForms` は **教師本人のブラウザ経由でしか成功しない**（FormApp は Form 所有者の
+権限で動くため、API キー = 管理者経路では他人の Form を開けない）。CLI からは
+「権限で落ちること」の確認にしかならない。
+
+## テンプレート (`LESSON_TEMPLATES`, src/LessonService.js)
+
+| templateKey | ラベル | フェーズ | 入力経路 |
+| ----------- | ------ | -------- | -------- |
+| `doutoku-3phase` | 授業の定番（3段階） | めあて → みんなで考える → ふりかえり | Google Form |
+| `kid-3phase` | 低学年向け | いまの考え → みんなで話す → これからの考え | Google Form |
+| `inquiry-3phase` | 探究（田村モデル） | 出会う → ふかめる → つなげる | Google Form |
+| `before-after-2phase` | 議論前後（2段階） | 議論のまえ → 議論のあと | Google Form |
+| `dialogue-reconsider-5phase` | 考え、議論する道徳（5段階） | 考える → 出会う → 議論する → もう一度考える → ふりかえる | **native** |
+
+`doutoku-3phase` は旧名の残置（実体は「授業の定番」）。tests と既存 lessonJson との互換のため
+key は変えていない。
+
+**native テンプレ (`inputMode: 'native'`) は経路が違う**: Google Form を作らず、児童が
+アプリ内で直接入力する（`submitLessonAnswer`）。したがって `lesson.start` しても Form は
+生成されず、以下の smoke の「Form が 3 つできる」前提は当てはまらない。CLI で Form 生成まで
+含めて検証したいときは Form 系テンプレ（例 `doutoku-3phase`）を使う。
 
 ## end-to-end smoke (約 5 分)
 
@@ -38,7 +76,7 @@ node scripts/admin-api.js lesson.list --userId $USER_ID
 node scripts/admin-api.js lesson.create \
   --userId $USER_ID \
   --name "CLI smoke $(date +%Y-%m-%d)" \
-  --template doutoku-3phase
+  --template doutoku-3phase   # Form 経路。native 検証なら dialogue-reconsider-5phase
 # → lessonId を控える
 LESSON_ID="lesson_xxx"
 ```
@@ -90,21 +128,25 @@ node scripts/admin-api.js lesson.end --userId $USER_ID --lessonId $LESSON_ID
 
 ```bash
 node scripts/admin-api.js lesson.review --userId $USER_ID --lessonId $LESSON_ID
-# lessonJson.snapshots[] に各 phase の rows が freeze されているはず
+# snapshots[] には各 phase の {sheet, startRow, rowCount} ポインタが入り、
+# 回答本文は DB の lesson_responses シートに 1 回答 = 1 行で積まれている。
+# lesson.review はそのポインタから rows を読み戻して返す (hydrate)。
+# → lessons シートの lessonJson に rows 本体を書き戻してはいけない (セル上限に当たる)。
 ```
 
 ### 9. 削除
 
 ```bash
 node scripts/admin-api.js lesson.delete --userId $USER_ID --lessonId $LESSON_ID
-# 注意: 生成済みの Google Form / Spreadsheet は Drive に残る (Phase 1 仕様)
+# 注意: 生成済みの Google Form / Spreadsheet は Drive に残る (意図的。原本データを消さない)
 ```
 
 ## トラブルシュート
 
 ### `"Cannot read properties of undefined (reading 'forEach')"`
 
-→ lessons シートが DB に未作成。`lesson.create` を最初に 1 回叩くと lazy bootstrap される。
+→ lessons シートが DB に未作成。`lesson.create` を最初に 1 回叩くと lazy bootstrap される
+(`lesson_responses` シートも初回アーカイブ時に同様に lazy 作成される)。
 
 ### `"LESSON_BUSY"`
 
@@ -140,7 +182,11 @@ npm run logs:cloud -- --hours 1 --limit 30  # WARN 以上 (デフォルト)
 
 ## 関連ファイル
 
-- `src/LessonService.js` — backend implementation
+- `src/LessonService.js` — backend implementation (テンプレ定義 `LESSON_TEMPLATES` もここ)
+- `src/LessonWorkspace.html` — 教師の授業ワークスペース UI
 - `src/AdminApis.js` — dispatchAdminOperation cases (`lesson.*`)
 - `scripts/admin-api.js` — CLI wrapper
-- `tests/lesson.service.test.cjs` — 24 unit tests
+- `tests/lesson.service.test.cjs` — lesson サービス本体のユニットテスト
+- `tests/lesson.nativeMode.test.cjs` — native 入力経路 (フェーズ権能・匿名性)
+- `tests/data.apis.lessonMask.test.cjs` — 「考える」フェーズで他者を返さない mask
+- CLAUDE.md 「授業モード (native 入力)」 — 設計上の不変条件

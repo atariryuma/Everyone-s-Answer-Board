@@ -97,7 +97,7 @@ pre-commit hook は `npm install` 時に自動有効化される（`postinstall`
 
 ### Request Flow
 
-- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Modes: `login`, `setup`, `appSetup`, `manual`, `view`, `admin`
+- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Handler table `DO_GET_HANDLERS` (main.js) is the single source of truth: `login` / `admin` / `setup` / `appSetup` / `view` / `review` / `main` (既定・未知の mode も `main` にフォールバック)
 - **`doPost(e)`** (main.js): Routes JSON `action` field to handler functions. Actions are allowlist-managed; each must have input validation.
 - Both entry points authenticate via `Session.getActiveUser().getEmail()`
 
@@ -212,16 +212,27 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 
 Google Sheets as database via service account. `users` sheet stores user records; each user's board config is in a JSON `configJson` column (see `src/SystemController.js` `USERS_SHEET_HEADERS`).
 
-### Visualization Modes (M1 / M2)
+### Visualization Modes
 
-`config.displaySettings.boardMode` で表示モードを切替:
+`config.displaySettings.boardMode` で表示モードを切替。**許可値・ラベル・必須列の唯一の定義は
+`src/validators.js` の `BOARD_MODES` 配列**（select の option / クライアント allowlist / ラベル表は
+すべてここから導出される。増やすときは配列に 1 行足す）:
 
-- `auto` (既定): numericX/Y の有無から自動判定
-- `board`: 従来の掲示板（カード一覧）— columnMapping に `answer` / `reason` 必須
-- `numberline` (M1): d3 ビーズワーム数直線 — `numericX` 必須
-- `matrix` (M2): 2軸散布図 — `numericX` + `numericY` 必須
+| key | ラベル | 必須マッピング | テンプレ生成 |
+| --- | ------ | -------------- | ------------ |
+| `auto` | 自動判定（推奨・既定） | — (サーバが解決) | — |
+| `board` | 掲示板（カード一覧） | `answer` | ✓ |
+| `numberline` | 数直線（d3 ビーズワーム） | `numericX` | ✓ |
+| `matrix` | マトリクス（2軸散布図） | `numericX` + `numericY` | ✓ |
+| `wordcloud` | ワードランキング | `answer` | — |
+| `pie` | 円グラフ | `answer` | ✓ |
 
-管理パネル「📝 Googleフォーム選択」の種別 select から、各モード用の Forms 構造を1クリックで生成可能（`createTemplateForm(templateType)`）。`numberline`/`matrix` 選択時は `boardMode` も自動セット。詳細仕様: [docs/SPEC_visualization_modes.md](docs/SPEC_visualization_modes.md)。
+管理パネル「📝 Googleフォーム選択」の種別 select から、テンプレ生成対応モード
+(`TEMPLATE_BOARD_MODES`) の Forms 構造を 1 クリックで生成可能（`createTemplateForm(templateType)`）。
+生成時は `boardMode` も自動セットされる。
+
+M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md](docs/SPEC_visualization_modes.md)
+（2026-05 の初期設計書。wordcloud / pie はその後の追加なので同書には載っていない）。
 
 ### 授業モード (native 入力) — 掲示板モードとは独立した縦の経路
 
@@ -354,7 +365,7 @@ SA pool のセキュリティモデル・アクセス経路の詳細は [docs/AR
 「みんなの回答ボード」 = 集合可視化の場、 一方「[StudyQuest](file:///Users/ryuma/slide_generator)」 (= slide_generator) は個別マイプラン学習 (3 touch 構造) の場。 両者は **データだけで疎結合に連携**:
 
 - 連携責任: **StudyQuest 側に Answer Board Bridge 機能を実装** (回答ボード側はゼロ変更)
-- 設計詳細: [StudyQuest docs/answerboard-bridge.md](file:///Users/ryuma/slide_generator/docs/answerboard-bridge.md)
+- 状態: **構想のみ（未実装）**。StudyQuest 側に bridge 実装も設計書もまだ無い（`docs/answerboard-bridge.md` は不在）。着手するときは [StudyQuest docs/](file:///Users/ryuma/slide_generator/docs/) に設計書を置いてここからリンクし直す
 - 動作: StudyQuest タッチ 3 (ふりかえり) → prefilled Google Form URL 生成 → 回答ボード Form に submit → matrix/wordcloud で集合可視化
 - 文献的根拠: 個別最適な学びの継続困難 5 大要因 (教師負担集中・実践知の継承困難・進度差対応・学力低下・標準化テンション) → アプリは「1 単元 8 時間中 7-10% だけ介入」 の minimum viable 個別最適を堅持
 - 回答ボード側で新規 API / OAuth scope 追加なし。 Google Form の prefilled URL (`?usp=pp_url&entry.XXX=...`) が連携プロトコル
