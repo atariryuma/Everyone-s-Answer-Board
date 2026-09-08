@@ -4906,14 +4906,17 @@
           }
         }
 
+        // 必ずサーバから読み直す (カードの除去は先に済ませて体感を保つ)。
+        //   Why: 行を消すと下の回答は行番号が 1 つ繰り上がるが、手元の rowIndex は古いまま。
+        //   そのまま 2 個目を消すとサーバの照合 (timestamp) が別の回答を指すと判定して止まる
+        //   「2 個目でエラー」になっていた。行番号はシートから取り直すのが唯一の正解で、
+        //   手元で 1 ずつ詰めるのは リアクション / ハイライト / 分布の各所に散った rowIndex を
+        //   全部追う必要があり、取り漏れがまた同じ症状を生む。
         const finalCount = this.state.currentAnswers?.length || 0;
         const isDataConsistent = (initialCount - finalCount) === 1;
-
-        if (!isDataConsistent) {
-          setTimeout(() => {
-            this.loadSheetData({ preserveAdminMode: true, bypassCache: true });
-          }, 500);
-        }
+        setTimeout(() => {
+          this.loadSheetData({ preserveAdminMode: true, bypassCache: true, showLoading: !isDataConsistent });
+        }, isDataConsistent ? 350 : 500);
 
       } catch (error) {
         console.error('削除後更新エラー:', error);

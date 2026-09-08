@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_ */
+/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -177,6 +177,23 @@ function invalidateSheetHeadersCache(spreadsheetId, sheetName) {
   }
 }
 
+function sheetRowCountCacheKey_(spreadsheetId, sheetName) {
+  return `sheet_rows_${spreadsheetId}_${sheetName}`;
+}
+
+/**
+ * 行数キャッシュを明示的に無効化 (行を削除した直後に呼ぶ)。
+ * Why: 30 秒の行数 cache が残ると、削除直後の再読込が消えた行まで読みにいく。
+ */
+function invalidateSheetRowCountCache(spreadsheetId, sheetName) {
+  if (!spreadsheetId || !sheetName) return;
+  try {
+    CacheService.getScriptCache().remove(sheetRowCountCacheKey_(spreadsheetId, sheetName));
+  } catch (error) {
+    console.warn('invalidateSheetRowCountCache: Cache remove failed:', error.message);
+  }
+}
+
 /**
  * シート行数取得（30秒キャッシュ — 新規フォーム投稿を即時反映するため短期）。
  * @param {Sheet} sheet
@@ -185,7 +202,7 @@ function invalidateSheetHeadersCache(spreadsheetId, sheetName) {
 function getSheetRowCount(sheet) {
   const spreadsheetId = sheet.getParent ? sheet.getParent().getId() : 'unknown';
   const sheetName = sheet.getName();
-  const cacheKey = `sheet_rows_${spreadsheetId}_${sheetName}`;
+  const cacheKey = sheetRowCountCacheKey_(spreadsheetId, sheetName);
   const cache = CacheService.getScriptCache();
 
   const cached = cache.get(cacheKey);
@@ -682,6 +699,19 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     }
 
     sheet.deleteRows(rowIndex, 1);
+
+    // 削除で下の行が 1 つ繰り上がる。cache に古い行が残ると、次の読込が消えた行の番号で
+    //   回答を持ち続け、2 個目の削除が「対象の回答が変更されています」で止まる (2026-09-08)。
+    //   行数 cache (30 秒) とボード data cache (version) の両方を捨てる。
+    invalidateSheetRowCountCache(spreadsheetId, sheetName);
+    if (typeof bumpBoardDataVersion_ === 'function') {
+      try { bumpBoardDataVersion_(userId); }
+      catch (cacheErr) {
+        // 黙って落とさない: 落とし損ねると閲覧者のボードに消した回答が最大 12 秒残る。
+        console.warn('bumpBoardDataVersion_ failed after delete (board may be stale up to 12s):',
+          cacheErr && cacheErr.message);
+      }
+    }
 
     // Why: sheet.deleteRows だけでは Google Forms のレスポンスストアには残り、
     //      フォームの集計・再送信防止・回答編集 URL が実在する回答として扱われる。

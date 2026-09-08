@@ -969,3 +969,29 @@ test('操作列: 分布の意見一覧はリアクションだけ (編集者で�
   const html = makeActionsInstance(true, true).createReactionButtons({ rowIndex: 5, reactions: {} });
   assert.ok(!html.includes('highlight-btn') && !html.includes('delete-answer-btn'));
 });
+
+// =====================================================================
+// refreshAfterDelete — 削除後は必ずサーバから読み直す (2 個目の削除が古い行番号で止まらない)
+// =====================================================================
+
+test('refreshAfterDelete: 手元の一覧から消したあと、必ず bypassCache で loadSheetData を予約する', async () => {
+  const { instance, timers } = makeInstance();
+  instance.state.currentAnswers = [{ rowIndex: 2 }, { rowIndex: 3 }, { rowIndex: 4 }];
+  instance.state.allAnswers = [{ rowIndex: 2 }, { rowIndex: 3 }, { rowIndex: 4 }];
+  instance.state.showAdminFeatures = true;
+  instance.updateAnswerCount = () => {};
+  instance.updateAdminButtonUI = () => {};
+  const loads = [];
+  instance.loadSheetData = (opts) => { loads.push(opts); return Promise.resolve(); };
+
+  await instance.refreshAfterDelete(3);
+
+  assert.deepEqual(instance.state.currentAnswers.map((a) => a.rowIndex), [2, 4], '消した行は手元からも消える');
+  const scheduled = Array.from(timers.values());
+  assert.ok(scheduled.length >= 1, '再読込が予約される');
+  scheduled.forEach((t) => t.fn());
+  assert.equal(loads.length, 1);
+  assert.equal(loads[0].bypassCache, true, 'サーバの行番号で取り直す');
+  assert.equal(loads[0].preserveAdminMode, true, '管理モードは維持する');
+  assert.equal(loads[0].showLoading, false, '一致しているときは静かに読み直す');
+});

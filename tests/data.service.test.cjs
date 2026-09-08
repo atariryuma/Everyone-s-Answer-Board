@@ -775,3 +775,39 @@ test('processBatchData: 正常時は 1000 行グリッドでも getRange 1 回�
   assert.deepEqual(reads[0], { row: 2, numRows: 999 });
   assert.equal(result.length, 1);
 });
+
+test('deleteAnswerRow: 削除後にボード cache の version を上げ、行数 cache を捨てる (2 個目の削除が古い行番号で止まらない)', () => {
+  const removed = [];
+  const cache = {
+    store: new Map([['sheet_rows_ss-1_Sheet1', '3']]),
+    get(k) { return this.store.has(k) ? this.store.get(k) : null; },
+    put(k, v) { this.store.set(k, v); },
+    remove(k) { removed.push(k); this.store.delete(k); }
+  };
+  const bumps = [];
+  const data = [['Timestamp', 'Q1'], [new Date('2026-05-01T00:00:00Z'), 'a'], [new Date('2026-05-02T00:00:00Z'), 'b']];
+  const sheet = {
+    getName: () => 'Sheet1',
+    getParent: () => ({ getId: () => 'ss-1' }),
+    getLastRow: () => data.length,
+    getLastColumn: () => 2,
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      getValues: () => data.slice(row - 1, row - 1 + numRows).map((r) => r.slice(col - 1, col - 1 + numCols))
+    }),
+    deleteRows: (start, count) => { data.splice(start - 1, count); }
+  };
+  const ctx = loadDataServiceContext({
+    cache,
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    isAdministrator: () => false,
+    getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1', sheetName: 'Sheet1' } }),
+    openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
+    bumpBoardDataVersion_: (uid) => { bumps.push(uid); }
+  });
+  const res = ctx.deleteAnswerRow('u1', 2, '2026-05-01T00:00:00.000Z');
+  assert.equal(res.success, true, res.message);
+  assert.deepEqual(bumps, ['u1'], '閲覧者 / 教師の board cache を落とす');
+  assert.ok(removed.includes('sheet_rows_ss-1_Sheet1'), '行数 cache を捨てる');
+  assert.equal(cache.store.has('sheet_rows_ss-1_Sheet1'), false);
+});
