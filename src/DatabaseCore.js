@@ -1593,6 +1593,13 @@ function findUserByField(fieldName, fieldValue, context = {}) {
           }
           return allowedUser;
         }
+        // 一覧 (users シート全体、activeOnly=false) が取れているのに居ないなら、居ない。
+        //   Why: 以前はここから users シートを直接読み直していた (寸法 + ヘッダ + TextFinder +
+        //   該当行 = 数 read)。users に居ない児童の findUserByEmail (checkUserAuthentication /
+        //   getActiveFormInfo / validateHeaderIntegrity) が毎回それを払い、授業中の 30 人分が
+        //   users シートの 429 の一因だった (2026-09-08)。一覧は USER_CACHE_VERSION 付きの
+        //   cache なので、作成直後のユーザーも clearDatabaseUserCache の bump で次の読みから見える。
+        return null;
       }
     } catch (cacheError) {
       logError_(label + '.cacheSearch', cacheError);
@@ -2030,14 +2037,21 @@ function updateUser(userId, updates, context = {}) {
           const maxCol = Math.max(...cols);
           const colSpan = maxCol - minCol + 1;
 
-          const rangeToUpdate = sheet.getRange(i + 1, minCol, 1, colSpan);
-          const [currentRowData] = rangeToUpdate.getValues();
+          // 既に読んだ行 (data[i]) を下敷きにする。以前はここで同じ行をもう 1 回 API で
+          //   読んでいたが、429 で [] が返ると TypeError で落ち、フェーズ切替の config patch
+          //   が失敗した (2026-09-08)。values API は末尾の空セルを省くので長さを揃える。
+          const base = Array.isArray(data[i]) ? data[i] : [];
+          const currentRowData = [];
+          for (let c = 0; c < colSpan; c++) {
+            const v = base[minCol - 1 + c];
+            currentRowData.push(v === undefined || v === null ? '' : v);
+          }
 
           updateCells.forEach(({ col, value }) => {
             currentRowData[col - minCol] = value;
           });
 
-          rangeToUpdate.setValues([currentRowData]);
+          sheet.getRange(i + 1, minCol, 1, colSpan).setValues([currentRowData]);
         }
 
         clearDatabaseUserCache();
@@ -2092,7 +2106,14 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
-    const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, preloadedAuth: context.preloadedAuth });
+    // skipCache は「SS → user の対応 (user_by_sheet, 10 分)」だけを飛ばす。users 一覧そのものは
+    //   USER_CACHE_VERSION 付き cache (config 保存で bump) を使う。
+    //   Why: 以前は skipCache が getAllUsers にも伝わり、validateServiceAccountUsage の
+    //   cache miss (児童 × SS ごとに 60 秒) のたびに users シートを読んでいた。30 人の授業で
+    //   毎分 30 read、しかもフェーズ切替で同時に切れるので burst になっていた (2026-09-08)。
+    const allUsers = getAllUsers({ activeOnly: false }, {
+      ...context, skipCache: false, forceServiceAccount: true, preloadedAuth: context.preloadedAuth
+    });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
       return null;

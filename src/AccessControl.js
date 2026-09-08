@@ -52,7 +52,12 @@ function isBoardCollaborator(targetUser, viewerEmail) {
 
   let res;
   try {
-    res = (typeof getUserConfig === 'function') ? getUserConfig(targetUser.userId) : null;
+    // targetUser (users シートの行) を preloaded で渡す。
+    //   Why: 渡さないと getUserConfig が findUserById を viewer (児童) の権限で引き直し、
+    //   allowPublishedRead 無しなので必ず "findUserById: Access denied" を WARN に出しつつ
+    //   default config を返していた。児童のページ表示ごとに 1 件、授業中は数十件の偽警告が
+    //   本物の異常を埋めていた (2026-09-08)。行はもう手元にあるので引き直す理由がない。
+    res = (typeof getUserConfig === 'function') ? getUserConfig(targetUser.userId, targetUser) : null;
   } catch (e) {
     if (typeof logError_ === 'function') logError_('isBoardCollaborator/config', e);
     return false;

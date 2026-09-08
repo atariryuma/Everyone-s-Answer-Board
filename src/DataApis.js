@@ -1124,8 +1124,18 @@ function boardDataCacheKey_(userId, options) {
   return `${BOARD_CACHE_KEYS_.DATA}${userId}:${ver}:${filter}:${sort}`;
 }
 
-function withBoardDataCache_(userId, options, loader) {
+/**
+ * @param {string} userId
+ * @param {Object} options - classFilter / sortBy (cache key の一部)
+ * @param {Function} loader
+ * @param {Object} [guardOpts]
+ * @param {boolean} [guardOpts.allowStale=true] - 他が読んでいる間に直前の結果を返してよいか。
+ *   教師 (owner / admin) は false: 授業のフェーズ切替はこの応答を snapshot として凍結するので、
+ *   投稿の直後に古い分布を掴んではいけない。児童の polling は true でよい。
+ */
+function withBoardDataCache_(userId, options, loader, guardOpts) {
   if (typeof CacheService === 'undefined') return loader();
+  const allowStale = !(guardOpts && guardOpts.allowStale === false);
   const key = boardDataCacheKey_(userId, options);
   const filter = options.classFilter || '_';
   const sort = options.sortBy || 'newest';
@@ -1158,7 +1168,7 @@ function withBoardDataCache_(userId, options, loader) {
     flightTtl: BOARD_DATA_FLIGHT_TTL_SEC,
     latestKey: `${BOARD_CACHE_KEYS_.LATEST}${userId}:${filter}:${sort}`,
     latestTtl: BOARD_DATA_LATEST_TTL_SEC,
-    allowStale: true,
+    allowStale,
     waitMs: 400,
     waitTries: 3
   });
@@ -1247,7 +1257,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       const useCache = isViewerOnly || Boolean(lessonPhase);
       const cacheableResult = useCache
         ? withBoardDataCache_(targetUser.userId, options, () =>
-            getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig))
+            getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig),
+            { allowStale: isViewerOnly })
         : getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
 
       const result = cacheableResult;
@@ -1552,7 +1563,8 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const useCache = isViewerOnly || Boolean(lessonPhase);
     const userData = useCache
       ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
-          getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig))
+          getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig),
+          { allowStale: isViewerOnly })
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
 
     if (!userData || !userData.success) {
