@@ -335,10 +335,12 @@ test('fetchSheetsAPIWithRetry: 初回呼び出し時 (cache 未設定) はデフ
 });
 
 // =====================================================================
-// 429 後の backoff: ms 値は Math.min(15000 + 15000*retry, 60000)
+// 429 後の backoff: ms 値は Math.min(5000 + 5000*retry, 15000)。最終試行では sleep しない。
+//   Why 短いか: retry は cooling でない別 SA に切り替わるので、同じ SA の分単位 quota 回復を
+//   待つ必要がない。旧値 (15/30/45s) は 1 request を 90 秒以上吊るし、児童の画面を固めていた。
 // =====================================================================
 
-test('fetchSheetsAPIWithRetry: 429 時の Utilities.sleep は 15s 〜 60s の範囲で adaptive', () => {
+test('fetchSheetsAPIWithRetry: 429 時の Utilities.sleep は 5s 〜 15s の範囲で adaptive', () => {
   const cache = makeCache();
   const ctx = loadCtx({
     cache,
@@ -347,7 +349,25 @@ test('fetchSheetsAPIWithRetry: 429 時の Utilities.sleep は 15s 〜 60s の範
   });
   assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op'), /Quota exceeded/);
 
-  // 初回の sleep は 15000ms (retry=0)
+  // 初回の sleep は 5000ms (retry=0)
   assert.equal(ctx.__sleeps.length, 1);
-  assert.equal(ctx.__sleeps[0], 15000);
+  assert.equal(ctx.__sleeps[0], 5000);
+});
+
+test('fetchSheetsAPIWithRetry: 429 が 3 回続いても sleep は 2 回 (5s, 10s)。投げ直さない最終試行では待たない', () => {
+  const cache = makeCache();
+  const ctx = loadCtx({
+    cache,
+    fetchSequence: [makeResponse(429), makeResponse(429), makeResponse(429)],
+    // 本物の executeWithRetry と同じく 3 回まで呼ぶ (inner が backoff 済なので outer は待たない)
+    executeWithRetry: (fn) => {
+      let last;
+      for (let i = 0; i < 3; i++) {
+        try { return fn(); } catch (e) { last = e; }
+      }
+      throw last;
+    }
+  });
+  assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op'), /Quota exceeded/);
+  assert.deepEqual(ctx.__sleeps, [5000, 10000]);
 });

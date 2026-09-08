@@ -1172,3 +1172,105 @@ test('掲示板モード (Form 経由) の授業は既存の設定を尊重す�
   // native ではないので showNames に手を出さない (config 側の設定が生きる)
   assert.equal(patch.displaySettings.showNames, undefined);
 });
+
+// =====================================================================
+// lesson 行の短期 cache (__findLessonByIdCached_) — 2026-09-08 の 429 storm 対策
+// =====================================================================
+// Why: 投稿 1 件 = lessons シート 2 read、ふりかえりで全員が 1 read ずつ、が quota を焼いた。
+//   cache しても「教師が進めた直後に古いフェーズで受理しない」が守られることをここで固定する。
+
+// helpers.js (withStampedeGuard_ / saveToCacheWithSizeCheck) を本物で載せ、CacheService を
+//   実際に値を保持する store にする。
+function withRealCache(h) {
+  const store = new Map();
+  const ops = [];
+  h.context.CacheService = {
+    getScriptCache: () => ({
+      get: (k) => { ops.push('get:' + k); return store.has(k) ? store.get(k) : null; },
+      put: (k, v) => { ops.push('put:' + k); store.set(k, v); },
+      remove: (k) => { ops.push('remove:' + k); store.delete(k); }
+    })
+  };
+  h.context.PropertiesService = { getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {} }) };
+  h.context.Utilities.sleep = () => {};
+  // helpers.js は getConfigOrDefault / getCachedProperty も本物で定義し直すので、テストの stub を戻す。
+  const keep = { getConfigOrDefault: h.context.getConfigOrDefault, getCachedProperty: h.context.getCachedProperty };
+  vm.runInContext(HELPERS_SOURCE, h.context, { filename: 'helpers.js' });
+  Object.assign(h.context, keep);
+  const reads = { lessons: 0 };
+  const origGetDataRange = h.lessonsSheet.getDataRange;
+  h.lessonsSheet.getDataRange = function () { reads.lessons++; return origGetDataRange.apply(this, arguments); };
+  return { store, ops, reads };
+}
+
+test('lesson 行 cache: 児童の投稿は lessons シートを 1 回も余分に読まず、2 人目以降は cache から引く', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const { reads } = withRealCache(h);
+
+  const r1 = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
+  assert.equal(r1.success, true, r1.message);
+  const afterFirst = reads.lessons;
+  assert.ok(afterFirst <= 1, `1 人目の投稿で lessons を読むのは高々 1 回 (実際 ${afterFirst})`);
+
+  const r2 = submitAs(h, 'child2@example.com', { lessonId, phaseIndex: 0, numericX: 2, numericY: 4, reason: 'b' });
+  assert.equal(r2.success, true, r2.message);
+  assert.equal(reads.lessons, afterFirst, '2 人目は lessons を読まない (cache)');
+});
+
+test('lesson 行 cache: 教師がフェーズを進めると cache が捨てられ、古いフェーズへの投稿は拒否される', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const { ops } = withRealCache(h);
+
+  // 児童の polling が cache を温める
+  assert.equal(h.context.__getViewerLessonPhase_('u1').screenRole, 'input');
+
+  // 教師が「出会う」へ
+  advanceAsTeacher(h, lessonId, 1);
+  assert.ok(ops.includes('remove:lesson_rec_' + lessonId), '__updateLessonRow_ が lesson 行 cache を捨てる');
+
+  // 古い画面 (phaseIndex 0) からの投稿はサーバが拒否する
+  const stale = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'late' });
+  assert.equal(stale.success, false);
+  assert.match(stale.message, /PHASE_CHANGED|いまは考えを送る時間ではありません/);
+});
+
+test('lesson 行 cache: 他が読んでいる間 (flight 中) の polling は直前の値を返し、投稿の判定は返さない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const { store, reads } = withRealCache(h);
+
+  // 1 回読んで latest を作る
+  assert.ok(h.context.__findLessonByIdCached_(lessonId).lesson);
+  const key = 'lesson_rec_' + lessonId;
+  assert.ok(store.has(key + ':latest'));
+  // version が上がった (key は消え、latest だけ残り、誰かが読んでいる) 状況を作る
+  store.delete(key);
+  store.set(key + ':flight', '1');
+  const before = reads.lessons;
+
+  const polled = h.context.__findLessonByIdCached_(lessonId);
+  assert.ok(polled && polled.lesson, 'polling は直前の値で足りる');
+  assert.equal(reads.lessons, before, 'polling は読まない');
+
+  const strict = h.context.__findLessonByIdCached_(lessonId, { noStale: true });
+  assert.ok(strict && strict.lesson);
+  assert.equal(reads.lessons, before + 1, '投稿の判定は待って自分で読む (stale を受けない)');
+});
+
+test('__findOwnLessonRow_: 全行 1 回読みで自分の行を見つける (寸法 + email 列の 2 read をやめた)', () => {
+  const h = loadContext();
+  const sheet = createSheet(['ts', 'email', 'class', 'name', 'x', 'y', 'reason', 'insight'], 'phase1');
+  sheet.appendRow(['t1', 'A@Example.com', '', '', 1, 1, 'r', '']);
+  sheet.appendRow(['t2', 'b@example.com', '', '', 2, 2, 'r', '']);
+  let dims = 0;
+  sheet.getLastRow = () => { dims++; return sheet._data.length; };
+  assert.equal(h.context.__findOwnLessonRow_(sheet, 'a@example.com'), 2);
+  assert.equal(h.context.__findOwnLessonRow_(sheet, 'b@example.com'), 3);
+  assert.equal(h.context.__findOwnLessonRow_(sheet, 'zzz@example.com'), -1);
+  assert.equal(dims, 0, 'getLastRow (metadata read) を使わない');
+});

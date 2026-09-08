@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -1049,11 +1049,18 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
 // するよう設計。 viewer reaction の bumpBoardDataVersion_ で即時 invalidate されるので、
 // 自分のリアクションが「TTL 待ち」 で消えない。
 const BOARD_DATA_CACHE_TTL_SEC = 12;
+// stampede 防止 (withStampedeGuard_): version が上がった瞬間の同時 miss で 1 件だけが読み、
+//   残りは直前の結果 (LATEST, 60 秒) を返す。授業モードでは児童の投稿ごとに version が
+//   上がるので、これが無いと投稿 1 件ごとに全員分の read が走る。
+const BOARD_DATA_LATEST_TTL_SEC = 60;
+const BOARD_DATA_FLIGHT_TTL_SEC = 5;
 
 // Board cache key prefixes (集約。 hardcoded string を排除して typo 防止)。
 const BOARD_CACHE_KEYS_ = {
   DATA: 'board_data:',       // viewer ごとの board read 結果 (key: ssId + version + filter + sort)
-  DATA_VERSION: 'board_data_ver:'  // ボード単位の cache invalidator (key: userId)
+  DATA_VERSION: 'board_data_ver:',  // ボード単位の cache invalidator (key: userId)
+  LATEST: 'board_data_latest:',     // version に依らない直前の結果 (stampede 中の stale 応答用)
+  FLIGHT: 'board_data_flight:'      // 「いま誰かが読んでいる」フラグ
 };
 
 function getBoardDataVersion_(userId) {
@@ -1119,25 +1126,42 @@ function boardDataCacheKey_(userId, options) {
 
 function withBoardDataCache_(userId, options, loader) {
   if (typeof CacheService === 'undefined') return loader();
-  let cache = null;
-  try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-  if (!cache) return loader();
-
   const key = boardDataCacheKey_(userId, options);
-  try {
-    const cached = cache.get(key);
-    if (cached) {
-      const parsed = safeJsonParse_(cached, null);
-      if (parsed) return parsed;
-    }
-  } catch (_) { /* ignore */ }
+  const filter = options.classFilter || '_';
+  const sort = options.sortBy || 'newest';
+  // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck に集約。
+  const isCacheable = (res) => Boolean(res && res.success);
 
-  const fresh = loader();
-  if (fresh && fresh.success) {
-    // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck に集約。
-    saveToCacheWithSizeCheck(key, fresh, BOARD_DATA_CACHE_TTL_SEC);
+  if (typeof withStampedeGuard_ !== 'function') {
+    // test 単独 load (helpers.js 不在) のための素朴な経路。本番は必ず guard を通る。
+    let cache = null;
+    try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
+    if (!cache) return loader();
+    try {
+      const parsed = safeJsonParse_(cache.get(key), null);
+      if (parsed) return parsed;
+    } catch (_) { /* 壊れた値は読み直しで回復する */ }
+    const fresh = loader();
+    if (isCacheable(fresh)) saveToCacheWithSizeCheck(key, fresh, BOARD_DATA_CACHE_TTL_SEC);
+    return fresh;
   }
-  return fresh;
+
+  // Why stale を許すか: viewer の polling は「新着があるか」を見るだけで、数秒古い分布を
+  //   1 周期だけ見ても授業は壊れない。逆に 30 人が同時に実体を読むと quota が焼けて
+  //   全員が止まる。待つ (waitMs) のは stale すら無い初回だけ。
+  return withStampedeGuard_({
+    key,
+    ttl: BOARD_DATA_CACHE_TTL_SEC,
+    loader,
+    isCacheable,
+    flightKey: `${BOARD_CACHE_KEYS_.FLIGHT}${userId}:${filter}:${sort}`,
+    flightTtl: BOARD_DATA_FLIGHT_TTL_SEC,
+    latestKey: `${BOARD_CACHE_KEYS_.LATEST}${userId}:${filter}:${sort}`,
+    latestTtl: BOARD_DATA_LATEST_TTL_SEC,
+    allowStale: true,
+    waitMs: 400,
+    waitTries: 3
+  });
 }
 
 /**
@@ -1207,12 +1231,21 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       };
 
+      // 授業のフェーズ判定は 1 回だけ (cache 可否 / mask / 見出し / 応答の lessonPhase で共有)。
+      const lessonPhase = (typeof __getViewerLessonPhase_ === 'function')
+        ? __getViewerLessonPhase_(targetUser.userId)
+        : null;
+
       // viewer (= 非 admin かつ 非 owner) のみ board data を 10s 短期 cache。
       // 700 viewer × 5s polling = 8400 req/min を ~700-800 req/min まで圧縮する。
       // owner/admin はキャッシュせず (編集中の即時反映が必要)。 reaction/highlight write 後は
       // bumpBoardDataVersion_ で version が増え、 旧 cache key は自動 stale。
+      // 授業モード (native 入力) 中は教師も cache を使う (getNotificationUpdate と同じ理由:
+      //   投稿は submitLessonAnswer がアプリ内で version を上げるので、cache でも新着は即時に見える。
+      //   電子黒板の教師画面が 5 秒ごとに実体を読み続けると、児童 30 人の送信集中と重なって焼ける)。
       const isViewerOnly = !isSystemAdmin && !isOwnBoard;
-      const cacheableResult = isViewerOnly
+      const useCache = isViewerOnly || Boolean(lessonPhase);
+      const cacheableResult = useCache
         ? withBoardDataCache_(targetUser.userId, options, () =>
             getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig))
         : getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
@@ -1221,10 +1254,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
-      // 授業のフェーズ判定は 1 回だけ (mask / 見出し / 応答の lessonPhase で共有)。
-      const lessonPhase = (typeof __getViewerLessonPhase_ === 'function')
-        ? __getViewerLessonPhase_(targetUser.userId)
-        : null;
       return buildSafePublishedDataResult(
         __applyLessonHeader_(
           __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
@@ -1489,6 +1518,37 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const lessonPhase = (typeof __getViewerLessonPhase_ === 'function')
       ? __getViewerLessonPhase_(targetUserId)
       : null;
+
+    // Why: 教師の profile 切替を生徒側 5 秒 polling で即時検知できるよう、
+    //   formMeta (formUrl + formTitle) と activeProfile を載せる。生徒は前回値と
+    //   比較して URL 変更を検知 → トースト + 自動データ再読込が走る。
+    //   これがないと polling は「新着投稿」しか拾えず、profile 切替は気付かれない。
+    const envelope = {
+      success: true,
+      hasNewContent: false,
+      newItemsCount: 0,
+      formMeta: {
+        formUrl: (targetConfig && typeof targetConfig.formUrl === 'string') ? targetConfig.formUrl : '',
+        formTitle: (targetConfig && typeof targetConfig.formTitle === 'string') ? targetConfig.formTitle : ''
+      },
+      activeProfile: (targetConfig && targetConfig.activeProfile) || null,
+      // 授業モード: 教師のフェーズ送りを児童の polling で検知する。
+      //   Why formUrl 変化に頼らないか: native 入力の授業は Form を持たないので
+      //   formUrl が常に空のまま = フェーズ切替が検知できない。
+      //   授業中でなければ null (掲示板モードは何も変わらない)。
+      lessonPhase
+    };
+
+    // 児童の画面が分布を映していないフェーズ (考える / 議論する / もう一度考える / ふりかえる)
+    //   では、ボードのデータを読まない。児童はフェーズ専用の画面をかぶせていて、新着の有無を
+    //   使わない (出会うフェーズに入った瞬間は __applyLessonPhase が自分で読み直す)。
+    //   Why: 30 人 × 5 秒の polling が「考える」の間ずっと回答シートを読み、投稿ごとの
+    //   version bump で全員が同時に cache miss → Sheets API の read quota が焼けて、
+    //   投稿もフェーズ切替も通らなくなった (2026-09-08)。児童に要るのは lessonPhase だけ。
+    if (isViewerOnly && lessonPhase && lessonPhase.screenRole !== 'browse') {
+      return Object.assign(envelope, { boardReadSkipped: true });
+    }
+
     const useCache = isViewerOnly || Boolean(lessonPhase);
     const userData = useCache
       ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
@@ -1505,25 +1565,10 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return itemTime > lastUpdate;
     });
 
-    // Why: 教師の profile 切替を生徒側 5 秒 polling で即時検知できるよう、
-    //   formMeta (formUrl + formTitle) と activeProfile を載せる。生徒は前回値と
-    //   比較して URL 変更を検知 → トースト + 自動データ再読込が走る。
-    //   これがないと polling は「新着投稿」しか拾えず、profile 切替は気付かれない。
-    return {
-      success: true,
+    return Object.assign(envelope, {
       hasNewContent: newItems.length > 0,
-      newItemsCount: newItems.length,
-      formMeta: {
-        formUrl: (targetConfig && typeof targetConfig.formUrl === 'string') ? targetConfig.formUrl : '',
-        formTitle: (targetConfig && typeof targetConfig.formTitle === 'string') ? targetConfig.formTitle : ''
-      },
-      activeProfile: (targetConfig && targetConfig.activeProfile) || null,
-      // 授業モード: 教師のフェーズ送りを児童の polling で検知する。
-      //   Why formUrl 変化に頼らないか: native 入力の授業は Form を持たないので
-      //   formUrl が常に空のまま = フェーズ切替が検知できない。
-      //   授業中でなければ null (掲示板モードは何も変わらない)。
-      lessonPhase
-    };
+      newItemsCount: newItems.length
+    });
 
   } catch (error) {
     logError_('getNotificationUpdate', error);

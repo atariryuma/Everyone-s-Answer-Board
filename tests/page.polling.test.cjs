@@ -114,59 +114,106 @@ function makeInstance(overrides = {}) {
 // getPollingInterval — activity-based + error backoff
 // =====================================================================
 
-test('getPollingInterval: <1min of activity → 5s (授業中)', () => {
+test('__basePollingInterval: <1min of activity → 5s (授業中)', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() });
-  assert.equal(instance.getPollingInterval(), 5000);
+  assert.equal(instance.__basePollingInterval(), 5000);
 });
 
-test('getPollingInterval: 1-5min → 15s', () => {
+test('__basePollingInterval: 1-5min → 15s', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() - 120000 });
-  assert.equal(instance.getPollingInterval(), 15000);
+  assert.equal(instance.__basePollingInterval(), 15000);
 });
 
-test('getPollingInterval: 5-15min → 1min', () => {
+test('__basePollingInterval: 5-15min → 1min', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() - 600000 });
-  assert.equal(instance.getPollingInterval(), 60000);
+  assert.equal(instance.__basePollingInterval(), 60000);
 });
 
-test('getPollingInterval: >15min → 5min', () => {
+test('__basePollingInterval: >15min → 5min', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() - 3600000 });
-  assert.equal(instance.getPollingInterval(), 300000);
+  assert.equal(instance.__basePollingInterval(), 300000);
 });
 
-test('getPollingInterval: errorCount=1 → 30s (exponential backoff kicks in)', () => {
+test('__basePollingInterval: errorCount=1 → 30s (exponential backoff kicks in)', () => {
   const { instance } = makeInstance();
   instance.polling.errorCount = 1;
   // Even if user is currently active, error backoff takes precedence
-  assert.equal(instance.getPollingInterval(), 30000);
+  assert.equal(instance.__basePollingInterval(), 30000);
 });
 
-test('getPollingInterval: errorCount=2 → 60s (exponential doubles)', () => {
+test('__basePollingInterval: errorCount=2 → 60s (exponential doubles)', () => {
   const { instance } = makeInstance();
   instance.polling.errorCount = 2;
-  assert.equal(instance.getPollingInterval(), 60000);
+  assert.equal(instance.__basePollingInterval(), 60000);
 });
 
-test('getPollingInterval: errorCount=3 → 120s (capped)', () => {
+test('__basePollingInterval: errorCount=3 → 120s (capped)', () => {
   const { instance } = makeInstance();
   instance.polling.errorCount = 3;
-  assert.equal(instance.getPollingInterval(), 120000);
+  assert.equal(instance.__basePollingInterval(), 120000);
 });
 
-test('getPollingInterval: errorCount=10 → 120s (cap holds)', () => {
+test('__basePollingInterval: errorCount=10 → 120s (cap holds)', () => {
   const { instance } = makeInstance();
   instance.polling.errorCount = 10;
-  assert.equal(instance.getPollingInterval(), 120000);
+  assert.equal(instance.__basePollingInterval(), 120000);
 });
 
-test('getPollingInterval: errorCount overrides activity-based rules', () => {
+test('__basePollingInterval: errorCount overrides activity-based rules', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() - 3600000 });
   instance.polling.errorCount = 1;
   // Activity rule would say 5min (300000), error backoff says 30s — error wins
-  assert.equal(instance.getPollingInterval(), 30000);
+  assert.equal(instance.__basePollingInterval(), 30000);
 });
 
 // =====================================================================
+
+// =====================================================================
+// jitter + 授業中の backoff + 止めない — 2026-09-08 の 429 storm 対策
+// =====================================================================
+
+test('getPollingInterval: 基準値の ±20% にばらける (30 台の位相を揃えない)', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() });
+  for (let i = 0; i < 50; i++) {
+    const v = instance.getPollingInterval();
+    assert.ok(v >= 4000 && v <= 6000, `5000 の ±20% 内: ${v}`);
+  }
+});
+
+test('__basePollingInterval: 授業中の失敗は 8s → 16s → 20s 上限 (フェーズ検知を 20 秒以上遅らせない)', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() });
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input' };
+  instance.polling.errorCount = 1;
+  assert.equal(instance.__basePollingInterval(), 8000);
+  instance.polling.errorCount = 2;
+  assert.equal(instance.__basePollingInterval(), 16000);
+  instance.polling.errorCount = 3;
+  assert.equal(instance.__basePollingInterval(), 20000);
+  instance.polling.errorCount = 10;
+  assert.equal(instance.__basePollingInterval(), 20000);
+});
+
+test('schedulePollingCheck: 3 回連続で失敗しても polling を止めない (以前は 5 分停止して授業が止まった)', async () => {
+  const { instance, timers } = makeInstance({ lastActivityTime: Date.now() });
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input' };
+  instance.state.lastSeenTimestamp = 0;
+  instance.runGas = async () => { throw new Error('Quota exceeded (429)'); };
+  instance.polling.isActive = true;
+  instance.polling.errorCount = 2;
+
+  instance.schedulePollingCheck();
+  const scheduled = Array.from(timers.values()).pop();
+  assert.ok(scheduled, 'polling timer が登録される');
+  await scheduled.fn();
+
+  assert.equal(instance.polling.errorCount, 3);
+  assert.equal(instance.polling.isActive, true, '止めない');
+  assert.equal(instance.polling.resumeTimerId, null, '5 分後の再開 timer は作らない');
+  const next = Array.from(timers.values()).pop();
+  assert.ok(next && next !== scheduled, '次の polling が予約される');
+  assert.ok(next.delay >= 16000 && next.delay <= 24000, `授業中の backoff (20s ±20%): ${next.delay}`);
+});
+
 // stopSimplePolling — both regular and cooldown timers cleared
 // =====================================================================
 

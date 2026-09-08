@@ -94,6 +94,95 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
   }
 }
 
+/**
+ * cache stampede (thundering herd) を防ぐ cache 読み。
+ *
+ * Why: version 付き key (board data / users 一覧 / lesson 行) は、書き込み側が version を
+ *   上げた瞬間に全 viewer の次の read が同時に miss する。30 人が 5 秒間隔で polling する
+ *   教室では 1 回の invalidate が「30 件の同時 Sheets API read」になり、per-minute quota
+ *   (60 read / SA、300 read / project) を数秒で焼き切った (2026-09-08 の 429 storm)。
+ *   miss した N 件のうち 1 件だけが実体を読み (flight flag)、残りは
+ *     (a) 直前の結果 (latestKey; allowStale のとき) を返す、または
+ *     (b) 短く待って key が埋まるのを待つ (waitMs × waitTries)、
+ *   それでも無ければ自分で読む (止まるより読むほうがマシ)。
+ *
+ * flight flag の get→put は非アトミックなので、同一瞬間の衝突は数件 claim しうる。
+ *   目的は「30 → 数件」であって「厳密に 1 件」ではない。
+ *
+ * @param {Object} opts
+ * @param {string} opts.key - 実体の cache key (version 付き)
+ * @param {number} opts.ttl - key の TTL (秒)
+ * @param {Function} opts.loader - miss 時に実体を読む。戻り値をそのまま返す
+ * @param {Function} [opts.isCacheable] - loader 結果を cache してよいか (default: truthy)
+ * @param {string} [opts.flightKey] - 「いま誰かが読んでいる」フラグの key (default: key + ':flight')
+ * @param {number} [opts.flightTtl=5] - フラグの TTL (秒)。loader が落ちても自然に解ける
+ * @param {string} [opts.latestKey] - version に依らない「直前の結果」の key
+ * @param {number} [opts.latestTtl=60] - latestKey の TTL (秒)
+ * @param {boolean} [opts.allowStale=false] - flight 中に latestKey を返してよいか
+ * @param {number} [opts.waitMs=0] - flight 中に key が埋まるのを待つ 1 回の長さ (ms)。0 なら待たない
+ * @param {number} [opts.waitTries=3] - 待つ回数
+ * @returns {*} cache hit / 直前の結果 / loader の結果
+ */
+function withStampedeGuard_(opts) {
+  const loader = opts.loader;
+  if (typeof CacheService === 'undefined') return loader();
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (loader で読む) */ }
+  if (!cache) return loader();
+
+  const key = opts.key;
+  const flightKey = opts.flightKey || (key + ':flight');
+  const flightTtl = Number(opts.flightTtl) || 5;
+  const latestKey = opts.latestKey || null;
+  const latestTtl = Number(opts.latestTtl) || 60;
+  const isCacheable = typeof opts.isCacheable === 'function' ? opts.isCacheable : (v) => Boolean(v);
+  const read = (k) => {
+    try { return safeJsonParse_(cache.get(k), null); }
+    catch (_) { return null; /* 壊れた値は読み直しで回復する */ }
+  };
+
+  const hit = read(key);
+  if (hit !== null) return hit;
+
+  let claimed = false;
+  try {
+    if (!cache.get(flightKey)) {
+      cache.put(flightKey, '1', flightTtl);
+      claimed = true;
+    }
+  } catch (_) { claimed = true; /* フラグが使えなければ guard なしで読む */ }
+
+  if (!claimed) {
+    if (opts.allowStale && latestKey) {
+      const stale = read(latestKey);
+      if (stale !== null) return stale;
+    }
+    const waitMs = Number(opts.waitMs) || 0;
+    const tries = Number(opts.waitTries) || 3;
+    if (waitMs > 0 && typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function') {
+      for (let i = 0; i < tries; i++) {
+        Utilities.sleep(waitMs);
+        const filled = read(key);
+        if (filled !== null) return filled;
+      }
+    }
+  }
+
+  let fresh;
+  try {
+    fresh = loader();
+  } finally {
+    if (claimed) {
+      try { cache.remove(flightKey); } catch (_) { /* TTL で自然に解ける */ }
+    }
+  }
+  if (isCacheable(fresh)) {
+    saveToCacheWithSizeCheck(key, fresh, opts.ttl);
+    if (latestKey) saveToCacheWithSizeCheck(latestKey, fresh, latestTtl);
+  }
+  return fresh;
+}
+
 // オブジェクトを `key:value|key:value` 形式に変換 (JSON.stringify より約 50% 速い、cache key 用)。
 function simpleHash(obj) {
   if (!obj || typeof obj !== 'object') return '';

@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck */
+/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -275,6 +275,59 @@ function __findLessonById_(lessonId) {
   }
 }
 
+// viewer (児童) の読み経路が使う lesson 行の短期 cache。
+//   Why: 「考える」で 30 人が投稿し、「出会う」「ふりかえる」で 30 人が自分の記録を読むたびに
+//   lessons シート全体を Sheets API で読んでいた (投稿 1 件 = lessons 2 read)。フェーズは
+//   教師が進めたときにしか変わらないので、短期 cache + 書き込み側の明示 invalidate で足りる。
+//   write 経路 (__updateLessonRow_ / __deleteLessonRow_) は rowIndex が要るので常に実読み。
+const LESSON_RECORD_CACHE_TTL_S = 15;
+const LESSON_RECORD_LATEST_TTL_S = 120;
+function __lessonRecordCacheKey_(lessonId) {
+  return 'lesson_rec_' + lessonId;
+}
+
+// lesson 行を書いた側が呼ぶ (__updateLessonRow_ / __deleteLessonRow_ に集約済)。
+function __invalidateLessonRecord_(lessonId) {
+  if (!lessonId || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove(__lessonRecordCacheKey_(lessonId));
+    cache.remove(__lessonRecordCacheKey_(lessonId) + ':latest');
+  } catch (_) { /* cache 不通は機能的に無害 (TTL 15 秒で切れる) */ }
+}
+
+/**
+ * 読み経路用: lesson 行を短期 cache 越しに引く。戻り値は { lesson } だけ
+ * (sheet / rowIndex / cols は write の関心事で、cache すると古い rowIndex に書く事故になる)。
+ * 同時 miss は withStampedeGuard_ が 1 件に絞る (フェーズ切替直後の 30 人同時読みが対象)。
+ *
+ * @param {string} lessonId
+ * @param {Object} [opts]
+ * @param {boolean} [opts.noStale] - flight 中でも直前の結果を返さない (投稿の権能検証用)
+ * @returns {{lesson:Object}|null}
+ */
+function __findLessonByIdCached_(lessonId, opts) {
+  if (!lessonId) return null;
+  const load = () => {
+    const found = __findLessonById_(lessonId);
+    return found && found.lesson ? { lesson: found.lesson } : null;
+  };
+  if (typeof withStampedeGuard_ !== 'function') return load();
+  const key = __lessonRecordCacheKey_(lessonId);
+  return withStampedeGuard_({
+    key,
+    ttl: LESSON_RECORD_CACHE_TTL_S,
+    loader: load,
+    // parse に失敗した行は cache しない (壊れた lessonJson を 15 秒固定しない)。
+    isCacheable: (v) => Boolean(v && v.lesson && !v.lesson.parseError),
+    latestKey: key + ':latest',
+    latestTtl: LESSON_RECORD_LATEST_TTL_S,
+    allowStale: !(opts && opts.noStale),
+    waitMs: 300,
+    waitTries: 3
+  });
+}
+
 // lessonJson を 1 回 stringify して json / sizeBytes / etag を返す。
 //   sizeBytes は char-based (Sheets cell 上限 50000 char に対する defensive cap)。
 //   etag は ConfigService と同じ ISO+uuid 形式 (時刻ベース optimistic lock)。
@@ -371,6 +424,8 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
     };
     const row = __buildLessonRow_(merged, cols, serialized);
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+    // 児童の読み経路 (__findLessonByIdCached_) が古いフェーズを返さないよう、書いた直後に捨てる。
+    __invalidateLessonRecord_(lessonId);
 
     return {
       success: true,
@@ -415,6 +470,7 @@ function __deleteLessonRow_(lessonId) {
       const sheet = ss.getSheetByName('lessons');
       if (!sheet) return createErrorResponse('LESSONS_SHEET_NOT_FOUND');
       sheet.deleteRow(found.rowIndex);
+      __invalidateLessonRecord_(lessonId);
       return { success: true };
     } catch (error) {
       logError_('__deleteLessonRow_', error);
@@ -2154,7 +2210,7 @@ function __getViewerLessonPhase_(targetUserId, opts) {
         }
       } catch (_) { /* cache 不通 / 壊れた値は再計算で回復する */ }
     }
-    const phase = __computeViewerLessonPhase_(targetUserId);
+    const phase = __computeViewerLessonPhase_(targetUserId, { fresh });
     if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
       // null (授業中でない) も cache する。掲示板モードの polling で毎回 config を読まないため。
       saveToCacheWithSizeCheck(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
@@ -2166,13 +2222,18 @@ function __getViewerLessonPhase_(targetUserId, opts) {
   }
 }
 
-function __computeViewerLessonPhase_(targetUserId) {
+/**
+ * @param {string} targetUserId
+ * @param {Object} [opts]
+ * @param {boolean} [opts.fresh] - true なら lesson 行の stale 応答 (stampede 中の直前値) を受けない
+ */
+function __computeViewerLessonPhase_(targetUserId, opts) {
   try {
     const config = __viewerBoardConfig_(targetUserId);
     const lessonId = config && config.activeLessonId;
     if (!lessonId) return null;
 
-    const found = __findLessonById_(lessonId);
+    const found = __findLessonByIdCached_(lessonId, { noStale: Boolean(opts && opts.fresh) });
     if (!found || !found.lesson || found.lesson.state !== 'active') return null;
 
     const lessonJson = found.lesson.lessonJson || {};
@@ -2223,15 +2284,15 @@ function __sanitizeLessonText_(value, maxLen) {
 }
 
 // 同一フェーズ内の自分の行番号 (1-based) を返す。無ければ -1。
-//   email 列だけを読む (全列読みは 30 人 × 投稿で無駄が大きい)。
+//   全行を 1 回で読む。以前は寸法 (getLastRow) + email 列の 2 read だったが、SA proxy の
+//   getLastRow は metadata read を 1 回払う。行は 1 児童 1 行 (数十行) なので全列読みのほうが安い。
 function __findOwnLessonRow_(sheet, actorEmail) {
   try {
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return -1;
-    const emails = sheet.getRange(2, LESSON_NATIVE_COL_EMAIL, lastRow - 1, 1).getValues();
+    const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     const target = String(actorEmail || '').trim().toLowerCase();
-    for (let i = 0; i < emails.length; i++) {
-      if (String(emails[i][0] || '').trim().toLowerCase() === target) return i + 2;
+    for (let i = 1; i < data.length; i++) {
+      const email = (data[i] || [])[LESSON_NATIVE_COL_EMAIL - 1];
+      if (String(email || '').trim().toLowerCase() === target) return i + 1;
     }
     return -1;
   } catch (error) {
@@ -2273,7 +2334,8 @@ function submitLessonAnswer(targetUserId, payload) {
       return createErrorResponse('いまは考えを送る時間ではありません');
     }
 
-    const found = __findLessonById_(phase.lessonId);
+    // 直前の fresh 判定が埋めた cache を読む (以前はここで lessons シートをもう 1 回読んでいた)。
+    const found = __findLessonByIdCached_(phase.lessonId, { noStale: true });
     if (!found || !found.lesson) return createErrorResponse('授業が見つかりません');
     const lessonJson = found.lesson.lessonJson || {};
     const phaseDef = (lessonJson.phases || [])[phase.phaseIndex];
@@ -2525,7 +2587,8 @@ function getMyLessonTrajectory(targetUserId) {
     const lessonId = config && config.activeLessonId;
     if (!lessonId) return createSuccessResponse('授業なし', { phases: [] });
 
-    const found = __findLessonById_(lessonId);
+    // 学級全員が同時に自分の記録を読む場面 (ふりかえり) なので、lesson 行は cache 越しに引く。
+    const found = __findLessonByIdCached_(lessonId);
     if (!found || !found.lesson) return createSuccessResponse('授業なし', { phases: [] });
     const lessonJson = found.lesson.lessonJson || {};
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];

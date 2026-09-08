@@ -1250,18 +1250,10 @@
             timestamp: new Date().toISOString()
           });
 
-          if (this.polling.errorCount >= 3) {
-            console.error('通知ポーリング: 連続エラー上限に達したため5分間停止');
-            this.stopSimplePolling();
-            // Capture the resume timer on polling state so stopSimplePolling
-            // during the cooldown can cancel it (otherwise a user navigating
-            // away or signing out would see polling resume 5 minutes later).
-            this.polling.resumeTimerId = setTimeout(() => {
-              this.polling.resumeTimerId = null;
-              this.startSimplePolling();
-            }, 300000);
-            return;
-          }
+          // 止めない。以前は 3 回連続で失敗すると 5 分停止していたが、授業中に quota (429) で
+          //   3 回落ちると児童の画面が 5 分間フェーズ切替を検知できず、授業が止まった
+          //   (2026-09-08)。失敗が続く間は getPollingInterval が間隔を伸ばす (授業中は最大
+          //   20 秒、それ以外は最大 2 分) ので、叩き続けても負荷にはならない。
         }
 
         this.schedulePollingCheck();
@@ -1281,12 +1273,27 @@
     }
 
     getPollingInterval() {
-      // On consecutive errors, apply exponential backoff before the
-      // 3-error hard stop in schedulePollingCheck takes over. 30s → 60s
-      // keeps us from hammering getNotificationUpdate when the server is
-      // returning 429 or transient 500s.
+      return this.__withPollJitter(this.__basePollingInterval());
+    }
+
+    // 間隔を ±20% ばらけさせる。
+    //   Why: 30 台が同じページを同じ号令で開くと polling の位相が揃い、教師がフェーズを
+    //   進めた直後の「全員同時 miss」が毎周期繰り返される。位相をずらすとサーバの
+    //   短期 cache (10 秒) が効く。
+    __withPollJitter(ms) {
+      return Math.round(ms * (0.8 + Math.random() * 0.4));
+    }
+
+    __basePollingInterval() {
+      const inLesson = Boolean(this.state.lessonPhase);
+
+      // 失敗が続く間は間隔を伸ばす (止めはしない)。
+      //   授業中: 8 → 16 → 20 秒。フェーズ切替の検知が 20 秒以上遅れると授業がもたつく。
+      //   それ以外: 30 → 60 → 120 秒。アクセス拒否のような恒久的な失敗を叩き続けない。
       if (this.polling.errorCount > 0) {
-        return Math.min(30000 * Math.pow(2, this.polling.errorCount - 1), 120000);
+        return inLesson
+          ? Math.min(8000 * this.polling.errorCount, 20000)
+          : Math.min(30000 * Math.pow(2, this.polling.errorCount - 1), 120000);
       }
 
       const timeSinceActivity = Date.now() - this.lastActivityTime;
@@ -1749,17 +1756,22 @@
           '<p class="lesson-final-q">' + esc(phase.question || '') + '</p>' +
         '</div>';
 
-      this.runGas('getMyLessonTrajectory', this.state.userId)
-        .then((res) => {
-          const box = document.getElementById('lessonTrajectory');
-          if (!box) return;
-          const phases = (res && res.success && res.data && res.data.phases) || [];
-          box.innerHTML = this.__buildTrajectoryHtml(phases);
-        })
-        .catch(() => {
-          const box = document.getElementById('lessonTrajectory');
-          if (box) box.textContent = '読み込めませんでした。';
-        });
+      // 「ふりかえる」に入った瞬間に学級全員が同時に読みに来るので、0〜2 秒ばらけさせる
+      //   (__loadMyLessonRecord と同じ理由)。「読み込み中...」は出ているので体感は変わらない。
+      setTimeout(() => {
+        if (!document.getElementById('lessonTrajectory')) return;
+        this.runGas('getMyLessonTrajectory', this.state.userId)
+          .then((res) => {
+            const box = document.getElementById('lessonTrajectory');
+            if (!box) return;
+            const phases = (res && res.success && res.data && res.data.phases) || [];
+            box.innerHTML = this.__buildTrajectoryHtml(phases);
+          })
+          .catch(() => {
+            const box = document.getElementById('lessonTrajectory');
+            if (box) box.textContent = '読み込めませんでした。';
+          });
+      }, Math.random() * 2000);
     }
 
     // 航跡の HTML。● 最初 → ★ いま を、移動量ではなく「ことば」の並びとして見せる。
@@ -1965,6 +1977,16 @@
       const key = phase.lessonId + ':' + phase.phaseIndex;
       if (this.state.lessonRecordKey === key) return;
       this.state.lessonRecordKey = key;
+      // 30 人が同じ polling で新フェーズを知り、同じ瞬間に自分の記録を読みに来る。
+      //   0〜2.5 秒ばらけさせ、先頭の 1 件がサーバの cache を埋めてから残りが読むようにする。
+      //   待つ間にフェーズがさらに進んでいたら読まない (キーが変わっている)。
+      setTimeout(() => {
+        if (this.state.lessonRecordKey !== key) return;
+        this.__fetchMyLessonRecord(phase);
+      }, Math.random() * 2500);
+    }
+
+    __fetchMyLessonRecord(phase) {
       this.runGas('getMyLessonTrajectory', this.state.userId)
         .then((res) => {
           const cur = this.state.lessonPhase;

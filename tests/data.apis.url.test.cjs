@@ -1155,3 +1155,66 @@ test('getNotificationUpdate: 授業中でなければ教師の polling は従来
   ctx.getNotificationUpdate('u1', {});
   assert.equal(loads.n, 2);
 });
+
+// =====================================================================
+// getNotificationUpdate × 授業モード: 児童の画面が分布を映さないフェーズではボードを読まない
+// =====================================================================
+// Why: 「考える」の間、30 人 × 5 秒の polling が回答シートを読み続け、投稿ごとの version
+//   bump で全員が同時に cache miss → read quota が焼けて投稿もフェーズ切替も通らなくなった
+//   (2026-09-08)。児童に要るのは lessonPhase だけなので、browse 以外では読まない。
+
+function notificationContextWithPhase(phase, overrides = {}) {
+  const calls = { sheetData: 0 };
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'child@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true, formUrl: 'https://forms.example/f' }),
+    getUserSheetData: () => { calls.sheetData++; return { success: true, data: [{ timestamp: '2026-09-08T05:00:00Z' }] }; },
+    __getViewerLessonPhase_: () => phase,
+    ...overrides
+  });
+  return { ctx, calls };
+}
+
+for (const role of ['input', 'reinput', 'discuss', 'reflect']) {
+  test(`getNotificationUpdate: 児童は ${role} フェーズでボードを読まず、lessonPhase だけ返す`, () => {
+    const phase = { lessonId: 'l1', phaseIndex: 0, screenRole: role };
+    const { ctx, calls } = notificationContextWithPhase(phase);
+    const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
+    assert.equal(res.success, true);
+    assert.equal(calls.sheetData, 0, 'getUserSheetData を呼ばない');
+    assert.equal(res.hasNewContent, false);
+    assert.equal(res.newItemsCount, 0);
+    assert.equal(res.boardReadSkipped, true);
+    assert.equal(res.lessonPhase.screenRole, role);
+    assert.equal(res.formMeta.formUrl, 'https://forms.example/f', 'formMeta は変わらず載る');
+  });
+}
+
+test('getNotificationUpdate: 児童でも browse フェーズ (出会う) は読む (新着で分布を更新する)', () => {
+  const { ctx, calls } = notificationContextWithPhase({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse' });
+  const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
+  assert.equal(res.success, true);
+  assert.equal(calls.sheetData, 1);
+  assert.equal(res.hasNewContent, true);
+  assert.equal(res.boardReadSkipped, undefined);
+});
+
+test('getNotificationUpdate: 教師 (owner) は input フェーズでも読む (送信済み人数を映す)', () => {
+  const { ctx, calls } = notificationContextWithPhase(
+    { lessonId: 'l1', phaseIndex: 0, screenRole: 'input' },
+    { getCurrentEmail: () => 'owner@example.com' }
+  );
+  const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
+  assert.equal(res.success, true);
+  assert.equal(calls.sheetData, 1);
+  assert.equal(res.hasNewContent, true);
+});
+
+test('getNotificationUpdate: 授業中でなければ (lessonPhase=null) 従来どおり読む', () => {
+  const { ctx, calls } = notificationContextWithPhase(null);
+  const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
+  assert.equal(res.success, true);
+  assert.equal(calls.sheetData, 1);
+  assert.equal(res.lessonPhase, null);
+});

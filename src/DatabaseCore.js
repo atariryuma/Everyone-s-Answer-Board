@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -18,6 +18,9 @@
  * @param {string} [saEmail] - 初回 SA の client_email (cooldown 登録 + failover trigger)
  * @param {Function} [authResolver] - retry 時に新 SA を解決する closure
  */
+// 1 API call あたりの試行回数 (executeWithRetry の maxRetries と 429 sleep の判定で共有)。
+const SHEETS_API_MAX_ATTEMPTS_ = 3;
+
 function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver, fetchOpts) {
   let retryCount = 0;
   let currentOptions = options;
@@ -83,10 +86,15 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
       const code = response.getResponseCode();
 
       if (code === 429) {
-        // GAS 6 分制限内に収めるため inner sleep は 15/30/45/60s で cap。 当該 SA を 30s cooldown
-        // に入れて後続 request は別 SA に逃がす (auto failover)。
+        // 当該 SA を 30s cooldown に入れて後続 request は別 SA に逃がす (auto failover)。
+        // inner sleep は 5/10/15s。retry は cooling でない別 SA に切り替わるので、同じ SA の
+        //   分単位 quota 回復を待つ必要はない。旧値 (15/30/45s) は 1 request を 90 秒以上
+        //   吊るし、児童の画面では「送信中」のまま固まる + 同時実行 3 本の枠を塞いで polling
+        //   まで止めていた (2026-09-08)。全 SA が焼けた場合は circuit breaker が短く止める。
+        //   最終試行 (この後 retry しない) では sleep しない: 待っても投げ直さないので無駄。
         if (currentSaEmail) markServiceAccountCoolingDown_(currentSaEmail);
-        const backoffTime = Math.min(15000 + (retryCount * 15000), 60000);
+        const willRetry = retryCount + 1 < SHEETS_API_MAX_ATTEMPTS_;
+        const backoffTime = willRetry ? Math.min(5000 + (retryCount * 5000), 15000) : 0;
         console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount})`);
 
         circuitState.consecutiveErrors++;
@@ -102,7 +110,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         }
         cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 120);
 
-        Utilities.sleep(backoffTime);
+        if (backoffTime > 0) Utilities.sleep(backoffTime);
         retryCount++;
         throw new Error('Quota exceeded (429), retry with adaptive backoff');
       }
@@ -128,7 +136,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
       return response;
     },
     {
-      maxRetries: 3,
+      maxRetries: SHEETS_API_MAX_ATTEMPTS_,
       initialDelay: 2000,
       maxDelay: 20000,
       operationName: operationName || 'Sheets API call'
@@ -1817,57 +1825,79 @@ function getAllUsers(options = {}, context = {}) {
     }
 
     const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
-    const cacheKey = `all_users_v${cacheVersion}_${simpleHash(options)}_${context.forceServiceAccount ? 'sa' : 'norm'}`;
+    const cacheSuffix = `${simpleHash(options)}_${context.forceServiceAccount ? 'sa' : 'norm'}`;
+    const cacheKey = `all_users_v${cacheVersion}_${cacheSuffix}`;
     const skipCache = context.skipCache || false;
 
-    if (!skipCache) {
-      try {
-        const cached = CacheService.getScriptCache().get(cacheKey);
-        if (cached) {
-          return JSON.parse(cached);
+    // users シートを実際に読む。空 ([]) は cache しない: 429 で読めなかった結果を
+    //   10 分固定すると全員が "Target user not found" になる。
+    const loadUsersFromSheet = () => {
+      const spreadsheet = openDatabase();
+      if (!spreadsheet) {
+        console.warn('getAllUsers: Database access failed');
+        return [];
+      }
+
+      const sheet = spreadsheet.getSheetByName('users');
+      if (!sheet) {
+        console.warn('getAllUsers: Users sheet not found');
+        return [];
+      }
+
+      const data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return []; // No data or header only
+
+      const [headers] = data;
+      const users = [];
+
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const user = createUserObjectFromRow(row, headers);
+
+        if (options.activeOnly && !user.isActive) continue;
+        if (options.publishedOnly) {
+          const config = safeJsonParse_(user.configJson, null);
+          if (!config || !config.isPublished) continue;
         }
-      } catch (cacheError) {
-        logError_('getAllUsers.cacheRead', cacheError);
+
+        users.push(user);
       }
+      return users;
+    };
+
+    if (skipCache) return loadUsersFromSheet();
+
+    // Why: 100+ユーザでJSONが100KB超えるとCacheService.putが黙って失敗する。
+    //      saveToCacheWithSizeCheckでサイズ超過を検出しログに残す。
+    const isCacheable = (users) => Array.isArray(users) && users.length > 0;
+
+    // stampede 防止: config 保存 (USER_CACHE_VERSION bump) の直後は全 viewer の個別 cache も
+    //   同時に miss し、30 人分の polling が一斉に users シートを読んでいた。1 件だけが読み、
+    //   残りは最大 1.2 秒待って埋まった cache を読む。stale (直前の一覧) は返さない:
+    //   findUserByField が古い configJson を個別 cache (15 分) に固定してしまうため。
+    if (typeof withStampedeGuard_ === 'function') {
+      return withStampedeGuard_({
+        key: cacheKey,
+        ttl: CACHE_DURATION.DATABASE_LONG,
+        loader: loadUsersFromSheet,
+        isCacheable,
+        flightKey: `all_users_flight_${cacheSuffix}`,
+        flightTtl: 5,
+        allowStale: false,
+        waitMs: 400,
+        waitTries: 3
+      });
     }
 
-    const spreadsheet = openDatabase();
-    if (!spreadsheet) {
-      console.warn('getAllUsers: Database access failed');
-      return [];
+    // test 単独 load (helpers.js 不在) のための素朴な経路。本番は必ず guard を通る。
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (cacheError) {
+      logError_('getAllUsers.cacheRead', cacheError);
     }
-
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      console.warn('getAllUsers: Users sheet not found');
-      return [];
-    }
-
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return []; // No data or header only
-
-    const [headers] = data;
-    const users = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const user = createUserObjectFromRow(row, headers);
-
-      if (options.activeOnly && !user.isActive) continue;
-      if (options.publishedOnly) {
-        const config = safeJsonParse_(user.configJson, null);
-        if (!config || !config.isPublished) continue;
-      }
-
-      users.push(user);
-    }
-
-    if (!skipCache) {
-      // Why: 100+ユーザでJSONが100KB超えるとCacheService.putが黙って失敗する。
-      //      saveToCacheWithSizeCheckでサイズ超過を検出しログに残す。
-      saveToCacheWithSizeCheck(cacheKey, users, CACHE_DURATION.DATABASE_LONG);
-    }
-
+    const users = loadUsersFromSheet();
+    if (isCacheable(users)) saveToCacheWithSizeCheck(cacheKey, users, CACHE_DURATION.DATABASE_LONG);
     return users;
   } catch (error) {
     logError_('getAllUsers', error);
