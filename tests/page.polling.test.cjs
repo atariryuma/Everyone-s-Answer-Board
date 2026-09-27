@@ -995,3 +995,65 @@ test('refreshAfterDelete: 手元の一覧から消したあと、必ず bypassCa
   assert.equal(loads[0].preserveAdminMode, true, '管理モードは維持する');
   assert.equal(loads[0].showLoading, false, '一致しているときは静かに読み直す');
 });
+
+// =====================================================================
+// クラスフィルタの既定: 児童は答えるときに選んだ自分のクラス (__resolveClassFilter)
+// =====================================================================
+
+function storageStub() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), clear: () => m.clear(), _m: m };
+}
+
+function makeFilterInstance({ isEditor, ownClass, explicit } = {}) {
+  const { instance, ctx } = makeInstance();
+  ctx.sessionStorage = storageStub();
+  ctx.localStorage = storageStub();
+  ctx.window.SHEET_NAME = 'phase1';
+  instance.state = { userId: 'u1', isEditor: Boolean(isEditor) };
+  if (ownClass) ctx.localStorage.setItem('lessonClass:u1', ownClass);
+  if (explicit) ctx.sessionStorage.setItem('classFilter_u1_phase1', explicit);
+  instance.elements = { classFilter: { value: '', innerHTML: '', classList: { remove() {}, add() {} } } };
+  return { instance, ctx };
+}
+
+test('クラス既定: 児童はまだ何も選んでいなければ、答えるときに選んだ自分のクラスで読む', () => {
+  const { instance } = makeFilterInstance({ ownClass: '6年2組' });
+  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: true }).selectedClass, '6年2組', '初回読込');
+  instance.elements.classFilter.value = 'すべて';
+  assert.equal(instance.getCurrentFilterState().classFilter, '6年2組', '2 回目以降も同じ値で読む (表示とズレない)');
+});
+
+test('クラス既定: 自分で「すべて」や別クラスを選んだらそれが勝つ', () => {
+  const { instance } = makeFilterInstance({ ownClass: '6年2組', explicit: 'すべて' });
+  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: true }).selectedClass, 'すべて');
+  assert.equal(instance.getCurrentFilterState().classFilter, null);
+});
+
+test('クラス既定: 教師 (編集者) は従来どおり「すべて」', () => {
+  const { instance } = makeFilterInstance({ isEditor: true, ownClass: '6年2組' });
+  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: true }).selectedClass, 'すべて');
+});
+
+test('populateClassFilter: 自分のクラスが選択肢にあればそれを選ぶ。行が無いときは降格を覚えない', () => {
+  const { instance, ctx } = makeFilterInstance({ ownClass: '6年2組' });
+  // 「考える」でまだ答えていない: 行が無い → 表示は「すべて」だが sessionStorage には書かない
+  instance.populateClassFilter([]);
+  assert.equal(instance.elements.classFilter.value, 'すべて');
+  assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null, '既定を「すべて」で上書きしない');
+  // 「出会う」で全員分が来た → 自分のクラス
+  instance.populateClassFilter([{ class: '6年1組' }, { class: '6年2組' }]);
+  assert.equal(instance.elements.classFilter.value, '6年2組');
+  // 自分のクラスの行が無いフェーズ → 「すべて」に降格し、それを覚える (空結果を引き続けない)
+  instance.populateClassFilter([{ class: '6年1組' }]);
+  assert.equal(instance.elements.classFilter.value, 'すべて');
+  assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), 'すべて');
+});
+
+test('clearPersistedClassFilter: フェーズ切替のリセット後は既定から決め直す', () => {
+  const { instance, ctx } = makeFilterInstance({ ownClass: '6年2組', explicit: '6年3組' });
+  assert.equal(instance.getCurrentFilterState().classFilter, '6年3組');
+  instance.clearPersistedClassFilter();
+  assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null);
+  assert.equal(instance.getCurrentFilterState().classFilter, '6年2組');
+});

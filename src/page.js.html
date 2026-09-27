@@ -2727,6 +2727,7 @@
         // 自分が起こした切替なので、生徒向けの「切替わりました」バナーは出さない。
         this.state.__suppressBoardSwitchToast = true;
         if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';
+        this.clearPersistedClassFilter();
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
       } catch (err) {
         console.error('phase switch failed:', err);
@@ -2806,8 +2807,9 @@
       if (index === this.state.reviewPhaseIndex) return;
       this.state.reviewPhaseIndex = index;
       this.__renderReviewPhasePills();
-      // 前 phase のクラス選択が次 phase に無いことがあるので毎回リセットする。
+      // 前 phase のクラス選択が次 phase に無いことがあるので毎回リセットする (既定から決め直す)。
       if (this.elements.classFilter) this.elements.classFilter.value = 'すべて';
+      this.clearPersistedClassFilter();
       await this.loadSheetData({ showLoading: true, isInitialLoad: false });
     }
 
@@ -3179,7 +3181,7 @@
       const isInitialLoad = config.isInitialLoad;
       // Why: 初回ロードでも sessionStorage に保存された前回のクラスフィルター選択を適用する。
       //      これが無いと、DOM だけ前回選択が見えているのに表示データは全件という不一致になる。
-      const persistedClass = this.loadPersistedClassFilter();
+      const persistedClass = this.__resolveClassFilter(null);
       const filterState = isInitialLoad
         ? {
             rawClassFilter: persistedClass,
@@ -3233,13 +3235,17 @@
       if (!classFilter) return;
       const escape = window.sharedUtilities.security.escapeHtml;
       const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
-      // 優先順: 現在 DOM 値 > sessionStorage 前回値 > 'すべて'      // 選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
-      const desired = classFilter.value || this.loadPersistedClassFilter() || 'すべて';
+      // 優先順は __resolveClassFilter に集約 (fetch と表示がズレないため)。
+      //   選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
+      const desired = this.__resolveClassFilter(classFilter.value);
       classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escape(c) + '">'+ escape(c) + '</option>').join('');
       classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
       // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
-      if (classFilter.value !== desired && typeof this.persistClassFilter === 'function') {
+      //   ただし行が 1 件も無いとき (「考える」でまだ答えていない児童など) は判断材料が無いので
+      //   降格を覚えない。覚えると自分のクラス既定が「すべて」で上書きされ、以後効かなくなる。
+      const hasRows = Array.isArray(rows) && rows.length > 0;
+      if (hasRows && classFilter.value !== desired && typeof this.persistClassFilter === 'function') {
         this.persistClassFilter(classFilter.value);
       }
     }
@@ -3288,7 +3294,7 @@
     }
 
     getCurrentFilterState() {
-      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const classFilter = this.__resolveClassFilter(this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
 
       return {
@@ -4559,14 +4565,43 @@
      *      混乱するので、タブ閉鎖で消える session スコープを選ぶ。
      */
     loadPersistedClassFilter() {
+      return this.__explicitClassFilter() || 'すべて';
+    }
+    // このタブで利用者が自分で選んだ値。無ければ null (既定に任せる)。
+    __explicitClassFilter() {
       try {
-        return sessionStorage.getItem(this.getScopedKey('classFilter')) || 'すべて';
-      } catch (_) { return 'すべて'; }
+        return sessionStorage.getItem(this.getScopedKey('classFilter')) || null;
+      } catch (_) { return null; }
     }
     persistClassFilter(value) {
       try {
         sessionStorage.setItem(this.getScopedKey('classFilter'), value);
       } catch (_) { /* quota / privacy mode など: 無視して次回に委ねる */ }
+    }
+    // 教師のフェーズ切替など「絞り込みを一度ほどく」場面で呼ぶ。次の読込は既定から決め直す。
+    clearPersistedClassFilter() {
+      try {
+        sessionStorage.removeItem(this.getScopedKey('classFilter'));
+      } catch (_) { /* 消せなくても次の change で上書きされる */ }
+    }
+
+    /**
+     * いま使うクラスフィルタを 1 か所で決める。読込 (fetch) と select の表示が同じ値を見る。
+     *   優先順: このタブで自分が選んだ値 > 児童なら答えるときに選んだ自分のクラス > 今の select 値 > すべて
+     *
+     * Why 児童だけか: 児童は基本的に自分のクラスを見たい (全クラスを見たければ select で選べる)。
+     *   教師は電子黒板で全体を映すので「すべて」のまま。判定はクライアントだけで完結し、
+     *   サーバの読みや cache の形は変えない (2026-09-08 の quota 事故の轍を踏まない)。
+     * @param {string} [domValue] - select の現在値 (初回読込では無い)
+     */
+    __resolveClassFilter(domValue) {
+      const explicit = this.__explicitClassFilter();
+      if (explicit) return explicit;
+      if (this.state && this.state.isEditor !== true) {
+        const own = this.__lessonStoredClass();
+        if (own) return own;
+      }
+      return domValue || 'すべて';
     }
 
     /**
