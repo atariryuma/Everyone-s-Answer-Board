@@ -2445,75 +2445,82 @@ function getLessonReviewGrid(userId, lessonId) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
-    const lessonJson = (auth.found.lesson.lessonJson) || {};
-    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
-
-    // 入力フェーズだけを時系列で読む (browse/discuss には投稿が存在しない)。
-    const inputPhases = [];
-    for (let i = 0; i < phases.length; i++) {
-      if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0) {
-        inputPhases.push({ index: i, def: phases[i] });
-      }
-    }
-    if (inputPhases.length === 0) {
-      return createSuccessResponse('入力フェーズなし', { students: [], phaseCount: 0 });
-    }
-
-    // email をキーに、フェーズごとの回答を集める。
-    const byEmail = new Map();
-    for (let p = 0; p < inputPhases.length; p++) {
-      const rows = __readAllLessonRows_(inputPhases[p].def);
-      for (let r = 0; r < rows.length; r++) {
-        const row = rows[r];
-        if (!row.email) continue;
-        const entry = byEmail.get(row.email) || { email: row.email, name: '', class: '', answers: [] };
-        // 名前は後のフェーズで入力されることもあるので、空でなければ最新で更新する。
-        if (row.name) entry.name = row.name;
-        if (row.class) entry.class = row.class;
-        entry.answers.push(Object.assign({ phaseIndex: inputPhases[p].index }, row));
-        byEmail.set(row.email, entry);
-      }
-    }
-
-    const students = [];
-    byEmail.forEach((entry) => {
-      const answers = entry.answers.sort((a, b) => a.phaseIndex - b.phaseIndex);
-      const first = answers[0] || null;
-      const last = answers.length > 1 ? answers[answers.length - 1] : null;
-      let distance = 0;
-      if (first && last) {
-        const dx = (Number(last.numericX) || 0) - (Number(first.numericX) || 0);
-        const dy = (Number(last.numericY) || 0) - (Number(first.numericY) || 0);
-        distance = Math.sqrt(dx * dx + dy * dy);
-      }
-      students.push({
-        name: entry.name,
-        email: entry.email,
-        class: entry.class,
-        first,
-        last,
-        distance,
-        // 位置が動いたかどうかは事実として返すだけ。評価はしない。
-        moved: distance > 0,
-        answeredPhases: answers.length
-      });
-    });
-
-    students.sort((a, b) => {
-      // 未提出 (last なし) は最後に。それ以外は移動距離の小さい順。
-      if (!a.last && b.last) return 1;
-      if (a.last && !b.last) return -1;
-      return a.distance - b.distance;
-    });
-
-    return createSuccessResponse('見取りグリッド', {
-      students,
-      phaseCount: inputPhases.length
-    });
+    const change = __buildLessonChangeStudents_((auth.found.lesson.lessonJson) || {});
+    return createSuccessResponse(change.phaseCount ? '見取りグリッド' : '入力フェーズなし', change);
   } catch (error) {
     logError_('getLessonReviewGrid', error);
     return createExceptionResponse(error);
   }
+}
+
+/**
+ * 児童ごとの ● 最初 → ★ いま を組み立てる (見取りグリッドと授業中の回答一覧で共用)。
+ * 各回答には sheetName を付ける (一覧が「いまボードに出ている方」にだけ ☆ を出すため)。
+ *
+ * @param {Object} lessonJson
+ * @returns {{students: Array, phaseCount: number}}
+ */
+function __buildLessonChangeStudents_(lessonJson) {
+  const phases = Array.isArray(lessonJson && lessonJson.phases) ? lessonJson.phases : [];
+
+  // 入力フェーズだけを時系列で読む (browse/discuss には投稿が存在しない)。
+  const inputPhases = [];
+  for (let i = 0; i < phases.length; i++) {
+    if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0) {
+      inputPhases.push({ index: i, def: phases[i] });
+    }
+  }
+  if (inputPhases.length === 0) return { students: [], phaseCount: 0 };
+
+  // email をキーに、フェーズごとの回答を集める。
+  const byEmail = new Map();
+  for (let p = 0; p < inputPhases.length; p++) {
+    const def = inputPhases[p].def;
+    const rows = __readAllLessonRows_(def);
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row.email) continue;
+      const entry = byEmail.get(row.email) || { email: row.email, name: '', class: '', answers: [] };
+      // 名前は後のフェーズで入力されることもあるので、空でなければ最新で更新する。
+      if (row.name) entry.name = row.name;
+      if (row.class) entry.class = row.class;
+      entry.answers.push(Object.assign({ phaseIndex: inputPhases[p].index, sheetName: def.sheetName || '' }, row));
+      byEmail.set(row.email, entry);
+    }
+  }
+
+  const students = [];
+  byEmail.forEach((entry) => {
+    const answers = entry.answers.sort((a, b) => a.phaseIndex - b.phaseIndex);
+    const first = answers[0] || null;
+    const last = answers.length > 1 ? answers[answers.length - 1] : null;
+    let distance = 0;
+    if (first && last) {
+      const dx = (Number(last.numericX) || 0) - (Number(first.numericX) || 0);
+      const dy = (Number(last.numericY) || 0) - (Number(first.numericY) || 0);
+      distance = Math.sqrt(dx * dx + dy * dy);
+    }
+    students.push({
+      name: entry.name,
+      email: entry.email,
+      class: entry.class,
+      first,
+      last,
+      distance,
+      // 位置が動いたかどうかは事実として返すだけ。評価はしない。
+      moved: distance > 0,
+      answeredPhases: answers.length
+    });
+  });
+
+  students.sort((a, b) => {
+    // 未提出 (last なし) は最後に。それ以外は移動距離の小さい順。
+    if (!a.last && b.last) return 1;
+    if (a.last && !b.last) return -1;
+    return a.distance - b.distance;
+  });
+
+  return { students, phaseCount: inputPhases.length };
 }
 
 /**
@@ -2532,8 +2539,8 @@ function getLessonReviewGrid(userId, lessonId) {
  *
  * @param {string} userId - 授業の所有者
  * @param {string} lessonId
- * @param {Object} [options] - { sinceSig: 前回の sig }
- * @returns {Object} { supported, sig, unchanged?, phase, axis, rows, pending }
+ * @param {Object} [options] - { sinceSig: 前回の sig, includeChange: ● → ★ も返す }
+ * @returns {Object} { supported, sig, unchanged?, phase, axis, rows, pending, change }
  */
 function getLessonLiveAnswers(userId, lessonId, options) {
   try {
@@ -2576,7 +2583,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
     // 変化の検出用 sig。行の追加・置き直し・ハイライトのどれでも変わるよう、中身ごと hash する
     //   (timestamp だけだと同じ時刻の置き直しを見落とす。30 行 × 500 字でも hash は一瞬)。
-    const sig = __liveAnswersSig_(source.sheetName + '|' + phaseIndex + '|' + rows
+    const rowsSig = (source.sheetName + '|' + phaseIndex + '|' + rows
       .map(r => [r.rowIndex, r.timestamp, r.name, r.class, r.numericX, r.numericY,
         r.reason, r.addedInsight, r.highlight ? 1 : 0].join('\u0001')).join('\u0002')
       + '|' + (pending ? pending.map(p => p.email).join(',') : '-'));
@@ -2589,6 +2596,10 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       // 一覧が「どのフェーズの回答か」を示すため (出会う = 考えるの回答)
       sourceSheetName: source.sheetName || ''
     };
+    // ● → ★ を開いているときだけ、入力フェーズ全部を読んで児童ごとの変化を足す
+    //   (どの読みも 10 秒 cache 越し。「もう一度考える」は pending で既に前のシートを読んでいる)。
+    const change = (options && options.includeChange) ? __buildLessonChangeStudents_(lessonJson) : null;
+    const sig = __liveAnswersSig_(rowsSig + (change ? '|' + JSON.stringify(change.students) : '|-'));
     if (options && options.sinceSig && options.sinceSig === sig) {
       return createSuccessResponse('変更なし', { supported: true, unchanged: true, sig, phase: phaseInfo });
     }
@@ -2608,7 +2619,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       classes: Array.isArray(lessonJson.classes) ? lessonJson.classes.map(String) : [],
       axis,
       rows,
-      pending
+      pending,
+      change
     });
   } catch (error) {
     logError_('getLessonLiveAnswers', error);

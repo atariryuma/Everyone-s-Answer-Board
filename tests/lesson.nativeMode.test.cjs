@@ -1168,6 +1168,36 @@ test('getLessonLiveAnswers: Form を使う授業は supported:false (列の意�
   assert.equal(res.data.supported, false);
 });
 
+test('getLessonLiveAnswers: ● → ★ を開いているときだけ児童ごとの変化を返す (同じ polling に乗せる)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThreeStudents(h, lessonId);
+
+  const plain = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(plain.data.change, null, '既定では読まない (入力フェーズ全部を読むので)');
+
+  const res = h.context.getLessonLiveAnswers('u1', lessonId, { includeChange: true });
+  const students = Array.from(res.data.change.students);
+  assert.deepEqual(students.map(s => s.name), ['はるき', 'そら', 'みお'], '見取りグリッドと同じ並び');
+  // ☆ を「ボードに出ている側」にだけ出すため、各回答がどのシートのものかを持つ
+  assert.equal(students[0].first.sheetName, 'phase1');
+  assert.equal(students[0].last.sheetName, 'phase4');
+  assert.equal(res.data.phase.sourceSheetName, 'phase4');
+  assert.ok(Number.isInteger(students[0].last.rowIndex));
+
+  // ● → ★ の有無で sig が変わる (切り替えた直後に古い形の応答を「変更なし」で返さない)
+  assert.notEqual(plain.data.sig, res.data.sig);
+  const same = h.context.getLessonLiveAnswers('u1', lessonId, { includeChange: true, sinceSig: res.data.sig });
+  assert.equal(same.data.unchanged, true);
+});
+
+test('getLessonReviewGrid: 共通化後も入力フェーズが無ければ空を返す', () => {
+  const h = loadContext();
+  const res = h.context.__buildLessonChangeStudents_({ phases: [{ name: '議論', screenRole: 'discuss' }] });
+  assert.equal(res.phaseCount, 0);
+  assert.equal(Array.from(res.students).length, 0);
+});
+
 test('toggleLessonHighlight: ボードが同じシートを指していれば、ボードと同じ toggleHighlight に委ねる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

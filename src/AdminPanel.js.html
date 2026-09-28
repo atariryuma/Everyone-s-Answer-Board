@@ -4789,59 +4789,6 @@
       });
     })();
 
-    /**
-     * 見取りグリッド: 児童ごとの ● 最初 → ★ いま を読む。
-     *
-     * 「いまの回答」の「● → ★」タブを開いたときにだけ読み込む (polling しない)。
-     * 授業後の見取り用で、授業中の指名には「位置ごと」を使う。
-     */
-    function renderLessonReviewGrid() {
-      const box = document.getElementById('lesson-review-grid');
-      if (!box || !currentLessonId) return;
-      const esc = window.sharedUtilities.security.escapeHtml;
-      box.textContent = '読み込み中...';
-      gasRun('lesson.reviewGrid', { userId, lessonId: currentLessonId }).then((res) => {
-        if (!res || !res.success) {
-          box.textContent = (res && res.message) || '回答を読み込めませんでした';
-          return;
-        }
-        const students = res.data.students || [];
-        if (!students.length) {
-          box.textContent = 'まだ回答がありません。';
-          return;
-        }
-        const cell = (a) => a
-          ? `<div class="text-xs text-theme-muted">(${a.numericX ?? '-'}, ${a.numericY ?? '-'})</div>
-             <div>${esc(a.reason || '')}</div>`
-          : '<span class="text-theme-muted">—</span>';
-        box.innerHTML =
-          '<p class="lesson-live-note">位置が動かなかった児童から順に並びます。' +
-            '移動の大小は学びの深さではないので、評価や順位づけはしません。</p>' +
-          '<div class="overflow-x-auto"><table class="w-full text-sm">' +
-          '<thead><tr class="text-xs text-theme-muted text-left">' +
-            '<th class="p-2">児童</th><th class="p-2">● 最初のことば</th>' +
-            '<th class="p-2">★ いまのことば</th><th class="p-2">＋ 加わったこと</th>' +
-          '</tr></thead><tbody>' +
-          students.map((s) => (
-            '<tr class="lesson-review-row border-t border-theme-subtle">' +
-              '<td class="p-2 whitespace-nowrap">' +
-                '<div class="font-bold">' + esc(s.name || s.email || '') + '</div>' +
-                '<div class="text-xs text-theme-muted">' +
-                  (s.moved ? '位置が動いた' : '位置は同じ') + '</div>' +
-              '</td>' +
-              '<td class="p-2">' + cell(s.first) + '</td>' +
-              '<td class="p-2">' + cell(s.last) + '</td>' +
-              '<td class="p-2">' + (s.last && s.last.addedInsight
-                ? esc(s.last.addedInsight)
-                : '<span class="text-theme-muted">—</span>') + '</td>' +
-            '</tr>'
-          )).join('') +
-          '</tbody></table></div>';
-      }).catch((err) => {
-        box.textContent = (err && err.message) || '回答の読み込みに失敗しました';
-      });
-    }
-
     // ---------- いまの回答 (授業中の回答一覧) ----------
     //   教師がフェーズを送りながら、誰がどこに・なぜ立っているかを把握し、意図的指名と
     //   ハイライトに使う。管理パネルはボードと別の画面なので投影に乗らない。
@@ -4908,7 +4855,6 @@
       live.sig = '';
       liveRender();
       liveFetch();
-      if (live.view === 'change') renderLessonReviewGrid();
     }
 
     function liveSchedule(ms) {
@@ -4926,7 +4872,9 @@
       if (live.inflight) { live.refetch = true; return; }
       live.inflight = true;
       const lessonId = live.lessonId;
-      gasRun('lesson.liveAnswers', { userId, lessonId, sinceSig: live.sig }).then((res) => {
+      // ● → ★ を開いているときだけ、児童ごとの変化もまとめて返してもらう (同じ polling に乗せる)。
+      const includeChange = live.view === 'change';
+      gasRun('lesson.liveAnswers', { userId, lessonId, sinceSig: live.sig, includeChange }).then((res) => {
         if (lessonId !== live.lessonId) return;
         if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を読み込めませんでした'));
         live.errors = 0;
@@ -5005,15 +4953,11 @@
 
     function liveRender() {
       const body = document.getElementById('lesson-live-body');
-      const grid = document.getElementById('lesson-review-grid');
       const countEl = document.getElementById('lesson-live-count');
       const srcEl = document.getElementById('lesson-live-source');
       const pendEl = document.getElementById('lesson-live-pending');
-      if (!body || !grid) return;
+      if (!body) return;
       liveSyncControls();
-      const changeMode = live.view === 'change';
-      body.classList.toggle('hidden', changeMode);
-      grid.classList.toggle('hidden', !changeMode);
 
       const d = live.data;
       if (!d) {
@@ -5046,13 +4990,16 @@
       }
       liveRenderPending(pendEl, d.pending);
 
-      if (changeMode) return;
+      const axis = d.axis || { boardMode: 'matrix', min: 1, max: 5, x: {}, y: {} };
+      const showClass = !live.classFilter && Array.isArray(d.classes) && d.classes.length > 1;
+      if (live.view === 'change') {
+        body.innerHTML = liveRenderChange(d, axis, showClass, esc);
+        return;
+      }
       if (!rows.length) {
         body.innerHTML = '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
         return;
       }
-      const axis = d.axis || { boardMode: 'matrix', min: 1, max: 5, x: {}, y: {} };
-      const showClass = !live.classFilter && Array.isArray(d.classes) && d.classes.length > 1;
       const card = (r) => liveCard(r, axis, showClass, esc);
       if (live.view === 'arrival') {
         const sorted = rows.slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
@@ -5065,7 +5012,7 @@
     // 未提出: 2 回目以降の入力フェーズだけ (前の入力フェーズに答えた児童が母集団)。
     function liveRenderPending(el, pending) {
       if (!el) return;
-      if (!Array.isArray(pending) || live.view === 'change') { el.classList.add('hidden'); return; }
+      if (!Array.isArray(pending)) { el.classList.add('hidden'); return; }
       const esc = window.sharedUtilities.security.escapeHtml;
       const list = pending.filter((p) => !live.classFilter || p.class === live.classFilter);
       el.classList.remove('hidden');
@@ -5120,13 +5067,37 @@
       )).join('') + '</div>';
     }
 
+    // 理由の全文表示の状態はシート + 行で持つ (「考える」の 2 行目と「もう一度考える」の 2 行目は別人)。
+    function liveRowKey(sheetName, rowIndex) {
+      return String(sheetName || '') + ':' + rowIndex;
+    }
+
+    // ☆ ボタン。押せるのは「いまボードに出ているシート」の行だけ (呼び出し側が判定する)。
+    function liveHlButton(a) {
+      const hl = Boolean(a.highlight);
+      const busy = live.pendingHl.has(a.rowIndex);
+      const canHl = Number.isInteger(a.rowIndex) && a.rowIndex >= 2;
+      return '<button type="button" class="live-hl-btn' + (busy ? ' is-busy' : '') + '"' +
+        ' data-live-hl="' + (canHl ? a.rowIndex : '') + '" aria-pressed="' + hl + '"' +
+        ' aria-label="' + (hl ? 'ハイライトを解除する' : 'ボードでハイライトする') + '"' +
+        ' title="' + (hl ? 'ハイライトを解除' : 'ボードでハイライト') + '"' +
+        (canHl && !busy ? '' : ' disabled') + '>' +
+        '<svg class="icon" aria-hidden="true"><use href="#i-star-' + (hl ? 'solid' : 'outline') + '"></use></svg>' +
+      '</button>';
+    }
+
+    function liveReason(a, sheetName, esc) {
+      const key = liveRowKey(sheetName, a.rowIndex);
+      return '<p class="live-reason' + (live.expanded.has(key) ? ' is-expanded' : '') + '" data-live-row="' + esc(key) + '">' +
+        esc(a.reason || '') + '</p>' +
+        (a.addedInsight ? '<p class="live-insight">＋ ' + esc(a.addedInsight) + '</p>' : '');
+    }
+
     function liveCard(r, axis, showClass, esc) {
       const hl = Boolean(r.highlight);
-      const busy = live.pendingHl.has(r.rowIndex);
-      const canHl = Number.isInteger(r.rowIndex) && r.rowIndex >= 2;
       const fresh = liveFreshness(r);
       const name = live.hideNames ? '（名前を隠しています）' : (r.name || r.email || '（名前なし）');
-      const expanded = live.expanded.has(r.rowIndex);
+      const src = (live.data && live.data.phase && live.data.phase.sourceSheetName) || '';
       return '<article class="live-card' + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '') + '">' +
         '<div class="live-card-head">' +
           livePosMap(r, axis, esc) +
@@ -5135,18 +5106,60 @@
             (showClass && r.class ? '<span class="live-class">' + esc(r.class) + '</span>' : '') +
             (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
           '</div>' +
-          '<button type="button" class="live-hl-btn' + (busy ? ' is-busy' : '') + '"' +
-            ' data-live-hl="' + (canHl ? r.rowIndex : '') + '" aria-pressed="' + hl + '"' +
-            ' aria-label="' + (hl ? 'ハイライトを解除する' : 'ボードでハイライトする') + '"' +
-            ' title="' + (hl ? 'ハイライトを解除' : 'ボードでハイライト') + '"' +
-            (canHl && !busy ? '' : ' disabled') + '>' +
-            '<svg class="icon" aria-hidden="true"><use href="#i-star-' + (hl ? 'solid' : 'outline') + '"></use></svg>' +
-          '</button>' +
+          liveHlButton(r) +
         '</div>' +
-        '<p class="live-reason' + (expanded ? ' is-expanded' : '') + '" data-live-row="' + (canHl ? r.rowIndex : '') + '">' +
-          esc(r.reason || '') + '</p>' +
-        (r.addedInsight ? '<p class="live-insight">＋ ' + esc(r.addedInsight) + '</p>' : '') +
+        liveReason(r, src, esc) +
       '</article>';
+    }
+
+    // ● → ★: 児童ごとに最初の考えといまの考えを横に並べる (授業後の見取りと同じ並び)。
+    //   並びは移動距離の小さい順 = 位置が動かなかった児童が先頭 (理由だけ深まった学びを沈めない)。
+    //   ☆ はボードに出ている側 (出会う = ●、もう一度考える以降 = ★) にだけ出す。
+    //   もう一方にハイライトを付けてもボードには出ないので、押せる形にしない。
+    function liveRenderChange(d, axis, showClass, esc) {
+      const change = d.change;
+      if (!change) return '<p class="lesson-live-empty">読み込み中...</p>';
+      const src = (d.phase && d.phase.sourceSheetName) || '';
+      const students = (change.students || []).filter((st) => !live.classFilter || st.class === live.classFilter);
+      if (!students.length) return '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+      const cell = (a, mark) => {
+        if (!a) {
+          return '<div class="live-change-cell is-empty" role="cell"><span class="live-change-mark">' + mark + '</span> まだ</div>';
+        }
+        const onBoard = Boolean(a.sheetName) && a.sheetName === src;
+        const hl = onBoard && Boolean(a.highlight);
+        const fresh = liveFreshness(a);
+        return '<div class="live-change-cell' + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '') + '" role="cell">' +
+          '<div class="live-change-cell-head">' +
+            '<span class="live-change-mark" aria-hidden="true">' + mark + '</span>' +
+            livePosMap(a, axis, esc) +
+            (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
+            (onBoard ? liveHlButton(a) : '') +
+          '</div>' +
+          liveReason(a, a.sheetName, esc) +
+        '</div>';
+      };
+      const noStar = !students.some((st) => st.last);
+      return '<p class="lesson-live-note">位置が動かなかった児童から順に並びます。' +
+          '移動の大小は学びの深さではないので、評価や順位づけはしません。' +
+          (noStar ? '「もう一度考える」で送られると ★ が並びます。' : '') + '</p>' +
+        '<div class="live-change" role="table" aria-label="児童ごとの最初の考えといまの考え">' +
+          '<div class="live-change-row live-change-headrow" role="row">' +
+            '<span role="columnheader">児童</span><span role="columnheader">● 最初のことば</span>' +
+            '<span role="columnheader">★ いまのことば</span>' +
+          '</div>' +
+          students.map((st) => {
+            const name = live.hideNames ? '（名前を隠しています）' : (st.name || st.email || '（名前なし）');
+            return '<div class="live-change-row" role="row">' +
+              '<div class="live-change-who" role="rowheader">' +
+                '<span class="live-name">' + esc(name) + '</span>' +
+                (showClass && st.class ? '<span class="live-class">' + esc(st.class) + '</span>' : '') +
+                (st.last ? '<span class="live-change-moved">' + (st.moved ? '位置が動いた' : '位置は同じ') + '</span>' : '') +
+              '</div>' +
+              cell(st.first, '●') + cell(st.last, '★') +
+            '</div>';
+          }).join('') +
+        '</div>';
     }
 
     // 小さな位置図 (マトリクス = 5×5、数直線 = 1×5)。ボードの点と同じ位置を手元で読む。
@@ -5182,21 +5195,29 @@
       const rowIndex = Number(btn.dataset.liveHl);
       const d = live.data;
       if (!rowIndex || !d || !d.phase || live.pendingHl.has(rowIndex)) return;
-      const row = (d.rows || []).find((r) => r.rowIndex === rowIndex);
-      if (!row) return;
-      const prev = Boolean(row.highlight);
+      // 同じ行は「位置ごと」のカードと ● → ★ のセルの両方にいる。表示を揃えるため全部を書き換える。
+      const src = d.phase.sourceSheetName || '';
+      const targets = (d.rows || []).filter((r) => r.rowIndex === rowIndex);
+      if (d.change) {
+        (d.change.students || []).forEach((st) => [st.first, st.last].forEach((a) => {
+          if (a && a.sheetName === src && a.rowIndex === rowIndex) targets.push(a);
+        }));
+      }
+      if (!targets.length) return;
+      const prev = Boolean(targets[0].highlight);
+      const setAll = (v) => targets.forEach((t) => { t.highlight = v; });
       // 楽観更新: 押した瞬間に一覧を切り替える。ボードへは数秒で届く。
-      row.highlight = !prev;
+      setAll(!prev);
       live.pendingHl.add(rowIndex);
       liveRender();
       gasRun('lesson.toggleHighlight', {
         userId, lessonId: live.lessonId, rowIndex, sheetName: d.phase.sourceSheetName || ''
       }).then((res) => {
         if (!res || !res.success) throw new Error(window.serverMessage(res, 'ハイライトを切り替えられませんでした'));
-        row.highlight = typeof res.highlighted === 'boolean' ? res.highlighted : !prev;
+        setAll(typeof res.highlighted === 'boolean' ? res.highlighted : !prev);
         live.sig = '';   // 次の polling で確定値を取り直す
       }).catch((err) => {
-        row.highlight = prev;
+        setAll(prev);
         const msg = (err && err.message) || 'ハイライトを切り替えられませんでした';
         window.notifications.error(msg.replace(/^PHASE_CHANGED:\s*/, ''));
         if (/^PHASE_CHANGED/.test(msg)) { live.sig = ''; liveFetch(); }
@@ -5212,10 +5233,12 @@
       root.addEventListener('click', (event) => {
         const viewBtn = event.target.closest('[data-live-view]');
         if (viewBtn) {
+          const prevView = live.view;
           live.view = viewBtn.dataset.liveView;
           if (live.view !== 'change') liveStore(LIVE_STORE_VIEW, live.view);
           liveRender();
-          if (live.view === 'change') renderLessonReviewGrid();
+          // ● → ★ に出入りしたら返してもらう中身が変わるので、待たずに取り直す。
+          if ((prevView === 'change') !== (live.view === 'change')) { live.sig = ''; liveFetch(); }
           return;
         }
         const hlBtn = event.target.closest('[data-live-hl]');
@@ -5229,13 +5252,12 @@
         if (event.target.closest('#lesson-live-refresh')) {
           live.sig = '';
           liveFetch();
-          if (live.view === 'change') renderLessonReviewGrid();
           return;
         }
         // 理由は 4 行で畳む。押すと全文 (指名前に読み切るため)。
         const reason = event.target.closest('.live-reason');
         if (reason && reason.dataset.liveRow) {
-          const key = Number(reason.dataset.liveRow);
+          const key = reason.dataset.liveRow;
           if (live.expanded.has(key)) live.expanded.delete(key); else live.expanded.add(key);
           reason.classList.toggle('is-expanded', live.expanded.has(key));
         }
