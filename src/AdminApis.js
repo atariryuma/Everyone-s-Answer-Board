@@ -550,7 +550,8 @@ function markWelcomeSeen() {
 // ADMIN_EMAIL を返す経由でパス、フロントエンドからの直叩きは reject)。
 const __FRONTEND_USER_DISPATCH_OPS = Object.freeze(new Set([
   'lesson.list', 'lesson.create', 'lesson.delete', 'lesson.duplicate',
-  'lesson.templates', 'lesson.review', 'lesson.reviewGrid', 'lesson.closeForms', 'lesson.updateDraft',
+  'lesson.templates', 'lesson.review', 'lesson.reviewGrid', 'lesson.liveAnswers', 'lesson.toggleHighlight',
+  'lesson.closeForms', 'lesson.updateDraft',
   'lesson.start', 'lesson.advance', 'lesson.end', 'lesson.knownClasses',
   'uploadLessonImage'
 ]));
@@ -1368,6 +1369,22 @@ function dispatchAdminOperation(operation, params) {
       { const e = reqStr('userId'); if (e) return e; }
       { const e = reqStr('lessonId'); if (e) return e; }
       return getLessonReviewGrid(params.userId, params.lessonId);
+    }
+    case 'lesson.liveAnswers': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      const sinceSig = typeof params.sinceSig === 'string' ? params.sinceSig.slice(0, 64) : '';
+      return getLessonLiveAnswers(params.userId, params.lessonId, { sinceSig });
+    }
+    case 'lesson.toggleHighlight': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      { const e = reqStr('sheetName'); if (e) return e; }
+      const rowIndex = Number(params.rowIndex);
+      if (!Number.isInteger(rowIndex) || rowIndex < 2) {
+        return createErrorResponse('rowIndex が不正です', null, { error: 'INVALID_ROW_INDEX' });
+      }
+      return toggleLessonHighlight(params.userId, params.lessonId, rowIndex, params.sheetName);
     }
     case 'lesson.delete': {
       { const e = reqStr('userId'); if (e) return e; }

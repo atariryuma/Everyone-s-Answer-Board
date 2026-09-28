@@ -72,17 +72,32 @@
   /* .swing-high は廃止 (移動量でドットを強調しない)。
      Why: 「大きく動いた児童」を黄色で目立たせると、移動量が学びの深さに見え、
        位置が変わらないまま理由が深まった学びが不可視になる。分布は記述に徹する。 */
-  /* 教師注目マーク（HIGHLIGHT）: 金縁 + 微発光。
+  /* 教師注目マーク（HIGHLIGHT）: 紫の塗り + 白縁 + 一回り大きい + 発光。
      Why: 教師が「みんなで考えたい」とマークした意見を viz でも一目で識別できるようにする。
        同調圧力 (児童間リアクション) は subtle ring で抑制しているのに対し、
        教師の意図的な促しは多面的視点の提示なので積極的に強調 OK（DCE 観点で安全）。
-     stroke は JS インライン style (#fbbf24) で priority 上書きするので、CSS は drop-shadow (glow) を担当。 */
+     Why 紫 (--brand-highlight) か: 掲示板カードのハイライトと同じ色にして「先生の注目 = 紫」を
+       1 つに揃える。リアクションの縁 (赤/琥珀/緑)・孤立意見の金の発光・hover の黄と重ならない。
+       旧来の「シアンの点 + 金縁」は投影すると点が青のまま見え、金縁は「なるほど」の琥珀と紛れた。
+     Why 4 重符号か: 紫とシアンは 1 型/2 型色覚では色相で見分けにくい。塗りの明度差に加えて
+       白縁・大きさ (HIGHLIGHT_R_BONUS)・発光で、色に頼らず判別できるようにする。
+     塗りと縁は CSS だけが持つ (JS の applyReactionRingStyles は highlight の inline style を外す)。 */
   .viz-dot.highlight {
-    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-accent) 65%, transparent));
+    fill: var(--brand-highlight);
+    stroke: #ffffff;  /* theme:exempt - 塗りと背景を分ける白縁 (light でも発光の内側に白い輪として見える) */
+    stroke-width: 2.5;
+    stroke-opacity: 1;
+    stroke-dasharray: none;
+    opacity: 1;
+    filter: drop-shadow(0 0 1.5px var(--brand-highlight))
+      drop-shadow(0 0 6px color-mix(in srgb, var(--brand-highlight) 70%, transparent));
   }
   body.projector-mode .viz-dot.highlight {
-    /* 電子黒板 / プロジェクタでも視認しやすいよう glow を強める */
-    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--brand-accent) 85%, transparent));
+    /* 電子黒板 / プロジェクタでも視認しやすいよう縁と発光を強める
+       (body.projector-mode .viz-dot の stroke-width 1.6 より後・強い指定で上書きする) */
+    stroke-width: 3;
+    filter: drop-shadow(0 0 2px var(--brand-highlight))
+      drop-shadow(0 0 10px color-mix(in srgb, var(--brand-highlight) 85%, transparent));
   }
   /* ghost マーカー: 「過去位置」を示す薄色 dot。
      学級全体の分布では使わない (groupByStudent は ghost を常に空配列で返す)。
@@ -401,7 +416,7 @@
 
   /* 孤立意見 (lone-voice): 象限内 1 票だけの意見に control-tower 的な金色ハロー。
      学術会議 2020 報告 p.14「マジョリティのマイノリティへの同調強要」回避用 (v2691)。
-     highlight (教師注目, drop-shadow 0 0 4-7px color-mix(in srgb, var(--brand-accent) 65%, transparent)) より淡く、
+     highlight (教師注目, 紫の塗り + 発光) より控えめに、
      1 票でも「ここに 1 つあるよ」と教師が即座に発見できる程度の glow。
      stroke は触らず drop-shadow のみで実現するので、reaction ring 色とも共存する。 */
   .viz-dot.lone-voice {
@@ -410,9 +425,15 @@
   body.projector-mode .viz-dot.lone-voice {
     filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent) 60%, transparent));
   }
-  /* lone-voice + highlight 同時: highlight 側の drop-shadow を優先 (cascade で後者が勝つ) */
+  /* lone-voice + highlight 同時: highlight の発光を優先する (lone-voice の金は付けない)。
+     lone-voice の規則が highlight より後ろにあるので、ここで明示的に上書きし直す。 */
   .viz-dot.highlight.lone-voice {
-    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent) 75%, transparent));
+    filter: drop-shadow(0 0 1.5px var(--brand-highlight))
+      drop-shadow(0 0 6px color-mix(in srgb, var(--brand-highlight) 70%, transparent));
+  }
+  body.projector-mode .viz-dot.highlight.lone-voice {
+    filter: drop-shadow(0 0 2px var(--brand-highlight))
+      drop-shadow(0 0 10px color-mix(in srgb, var(--brand-highlight) 85%, transparent));
   }
 
   /* .viz-trail (議論前→現在の ghost trail) は撤去済み。

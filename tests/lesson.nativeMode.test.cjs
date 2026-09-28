@@ -1048,6 +1048,174 @@ test('getMyLessonTrajectory: 未投稿なら空 (先に他人を見せない)', 
 });
 
 // =====================================================================
+// 授業中の回答一覧 (getLessonLiveAnswers / toggleLessonHighlight)
+//
+// Why: 一覧とボードが別のシートを見ると、一覧で押したハイライトが別の児童の行に付く。
+//   「一覧が読むシート = ボードの config が指すシート」を pin する。
+// =====================================================================
+
+// 3 人が「考える」に投稿した状態を作る (teacher に戻して返す)。
+function seedThinkPhase(h, lessonId) {
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  submitAs(h, 'a@example.com', { lessonId, phaseIndex: 0, numericX: 1, numericY: 2, reason: '自首を勧める', class: '6年1組', name: 'あおい' });
+  submitAs(h, 'b@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '迷う', class: '6年1組', name: 'ぼたん' });
+  submitAs(h, 'c@example.com', { lessonId, phaseIndex: 0, numericX: 5, numericY: 4, reason: '逃がす', class: '6年1組', name: 'ちひろ' });
+  h.setEmail('teacher@example.com');
+}
+
+test('getLessonLiveAnswers: 入力フェーズは名前つきの全回答を行番号つきで返す (教師の手元用)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.supported, true);
+  const rows = Array.from(res.data.rows);
+  assert.deepEqual(rows.map(r => r.name), ['あおい', 'ぼたん', 'ちひろ']);
+  assert.deepEqual(rows.map(r => r.rowIndex), [2, 3, 4], 'ボードのハイライトと同じ行番号');
+  assert.equal(rows[0].reason, '自首を勧める');
+  assert.equal(rows[0].highlight, false);
+  assert.ok(rows[0].timestamp, '届いた順に並べるための時刻');
+  assert.equal(res.data.phase.index, 0);
+  assert.equal(res.data.phase.sourceSheetName, 'phase1');
+  assert.equal(res.data.axis.boardMode, 'matrix');
+  assert.deepEqual(Array.from(res.data.classes), ['6年1組']);
+  assert.equal(res.data.pending, null, '最初の入力フェーズでは未提出は分からない (名簿を持たない)');
+});
+
+test('getLessonLiveAnswers: 「出会う」ではボードと同じ「考える」のシートを読む', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  advanceAsTeacher(h, lessonId, 1);
+
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(res.data.phase.name, '出会う');
+  assert.equal(res.data.phase.sourceSheetName, 'phase1');
+  assert.equal(Array.from(res.data.rows).length, 3);
+});
+
+test('getLessonLiveAnswers: 「もう一度考える」は前の入力フェーズに答えてまだ送っていない児童を返す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  submitAs(h, 'a@example.com', { lessonId, phaseIndex: 3, numericX: 2, numericY: 2, reason: 'やはり自首', addedInsight: '友の未来', class: '6年1組', name: 'あおい' });
+  h.setEmail('teacher@example.com');
+
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(res.data.phase.sourceSheetName, 'phase4');
+  const rows = Array.from(res.data.rows);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].addedInsight, '友の未来');
+  assert.deepEqual(Array.from(res.data.pending).map(p => p.name).sort(), ['ちひろ', 'ぼたん']);
+});
+
+test('getLessonLiveAnswers: 変化が無ければ rows を省く (polling の転送量を抑える)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+
+  const first = h.context.getLessonLiveAnswers('u1', lessonId);
+  const same = h.context.getLessonLiveAnswers('u1', lessonId, { sinceSig: first.data.sig });
+  assert.equal(same.data.unchanged, true);
+  assert.equal(same.data.rows, undefined);
+
+  // 置き直し (同じ児童・同じ行数) でも sig は変わる
+  submitAs(h, 'b@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 3, reason: 'やっぱり逃がす', class: '6年1組', name: 'ぼたん' });
+  h.setEmail('teacher@example.com');
+  const changed = h.context.getLessonLiveAnswers('u1', lessonId, { sinceSig: first.data.sig });
+  assert.notEqual(changed.data.unchanged, true);
+  assert.equal(Array.from(changed.data.rows).find(r => r.name === 'ぼたん').numericX, 4);
+});
+
+test('getLessonLiveAnswers: HIGHLIGHT 列 (ボードのハイライトが足す) を読む', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  const sheet = h.nativeSheets.get('phase1');
+  sheet._data[0][8] = 'HIGHLIGHT';
+  sheet._data[2][8] = 'TRUE';
+
+  const rows = Array.from(h.context.getLessonLiveAnswers('u1', lessonId).data.rows);
+  assert.deepEqual(rows.map(r => r.highlight), [false, true, false]);
+});
+
+test('getLessonLiveAnswers: polling 経路は lesson 行を cache 越しに読む (429 storm 対策)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  let guarded = 0;
+  h.context.withStampedeGuard_ = (o) => { guarded++; return o.loader(); };
+  assert.equal(h.context.getLessonLiveAnswers('u1', lessonId).success, true);
+  assert.ok(guarded >= 1, '__findLessonByIdCached_ を通る');
+});
+
+test('getLessonLiveAnswers: 所有者以外 (児童) は取得できない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  h.setEmail('a@example.com');
+  assert.equal(h.context.getLessonLiveAnswers('u1', lessonId).success, false);
+});
+
+test('getLessonLiveAnswers: Form を使う授業は supported:false (列の意味が違うので出さない)', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', '従来', 'doutoku-3phase');
+  const res = h.context.getLessonLiveAnswers('u1', draft.data.lesson.lessonId);
+  assert.equal(res.success, true);
+  assert.equal(res.data.supported, false);
+});
+
+test('toggleLessonHighlight: ボードが同じシートを指していれば、ボードと同じ toggleHighlight に委ねる', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'native_ss_1', sheetName: 'phase1' });
+  const calls = [];
+  h.context.toggleHighlight = (uid, row) => { calls.push([uid, row]); return { success: true, highlighted: true }; };
+  const store = new Map([['lesson_rows_native_ss_1_phase1', '[]']]);
+  h.context.CacheService = { getScriptCache: () => ({
+    get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
+  }) };
+
+  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
+  assert.equal(res.success, true);
+  assert.deepEqual(calls, [['u1', 3]]);
+  assert.ok(!store.has('lesson_rows_native_ss_1_phase1'), '一覧の行 cache を捨てる (次の polling で確定値)');
+});
+
+test('toggleLessonHighlight: フェーズが変わって一覧のシートが古ければ書かない (別の児童に付けない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'native_ss_1', sheetName: 'phase4' });
+  let called = false;
+  h.context.toggleHighlight = () => { called = true; return { success: true }; };
+
+  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
+  assert.equal(res.success, false);
+  assert.match(res.message, /^PHASE_CHANGED/);
+  assert.equal(called, false);
+});
+
+test('toggleLessonHighlight: ボードの config が授業のフェーズとずれていれば書かない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  // config の再適用に失敗して、ボードが別のシートを指したままの状態
+  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'other_ss', sheetName: 'フォームの回答 1' });
+  let called = false;
+  h.context.toggleHighlight = () => { called = true; return { success: true }; };
+
+  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
+  assert.equal(res.success, false);
+  assert.equal(called, false);
+});
+
+// =====================================================================
 // config パッチが実際の検証を通るか (本番で「開始」が失敗した回帰)
 //
 // Why これが要るか: パッチの中身だけを assert しても、それが

@@ -623,6 +623,12 @@ function executeBoardRowOperation(options) {
             cacheErr && cacheErr.message);
         }
       }
+      // 授業モードの回答シートなら、教師の回答一覧が読む行 cache (10 秒) も捨てる。
+      //   ボード側で押したハイライトが一覧に次の polling で出るようにするため。
+      //   授業モード以外のシートでは該当 key が無いだけで無害。
+      if (typeof __invalidatePhaseRows_ === 'function') {
+        __invalidatePhaseRows_({ spreadsheetId: config.spreadsheetId, sheetName: config.sheetName });
+      }
       return formatSuccess(result);
     } finally {
       try { cache.remove(lockKey); } catch (e) { console.warn(`${label}: Cache cleanup failed:`, e.message); }

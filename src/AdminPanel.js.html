@@ -4744,6 +4744,8 @@
           card.addEventListener('click', () => lessonAdvance('next', Number(card.dataset.phaseJump), card));
         });
       }
+      // フェーズを送った直後に一覧も新しいフェーズの回答へ切り替える。
+      liveOnRunnerRendered(lesson);
     }
 
     // ---------- 対象クラス (実行中でも直せる) ----------
@@ -4788,10 +4790,10 @@
     })();
 
     /**
-     * 見取りグリッド: 児童ごとの ● 最初 → ★ いま を読む (授業後用)。
+     * 見取りグリッド: 児童ごとの ● 最初 → ★ いま を読む。
      *
-     * 開いたときにだけ読み込む。授業中に常時表示すると、教師の注意が
-     * 児童の顔から画面に移ってしまう。
+     * 「いまの回答」の「● → ★」タブを開いたときにだけ読み込む (polling しない)。
+     * 授業後の見取り用で、授業中の指名には「位置ごと」を使う。
      */
     function renderLessonReviewGrid() {
       const box = document.getElementById('lesson-review-grid');
@@ -4813,6 +4815,8 @@
              <div>${esc(a.reason || '')}</div>`
           : '<span class="text-theme-muted">—</span>';
         box.innerHTML =
+          '<p class="lesson-live-note">位置が動かなかった児童から順に並びます。' +
+            '移動の大小は学びの深さではないので、評価や順位づけはしません。</p>' +
           '<div class="overflow-x-auto"><table class="w-full text-sm">' +
           '<thead><tr class="text-xs text-theme-muted text-left">' +
             '<th class="p-2">児童</th><th class="p-2">● 最初のことば</th>' +
@@ -4838,11 +4842,409 @@
       });
     }
 
-    (function initLessonReviewGrid() {
-      const wrap = document.getElementById('lesson-review-grid-wrap');
-      if (!wrap) return;
-      wrap.addEventListener('toggle', () => {
-        if (wrap.open) renderLessonReviewGrid();
+    // ---------- いまの回答 (授業中の回答一覧) ----------
+    //   教師がフェーズを送りながら、誰がどこに・なぜ立っているかを把握し、意図的指名と
+    //   ハイライトに使う。管理パネルはボードと別の画面なので投影に乗らない。
+    //   読み込みは 10 秒 polling。Runner を離れる / タブが隠れると止まる (429 storm 対策:
+    //   サーバ側も lesson 行 cache + 回答 10 秒 cache を通り、変化が無ければ rows を省く)。
+    const LIVE_POLL_MS = 10000;
+    const LIVE_NEW_MS = 60000;          // 届いてからこの間だけ NEW / 置き直し を付ける
+    const LIVE_STORE_NAMES = 'eab.lessonLive.hideNames';
+    const LIVE_STORE_VIEW = 'eab.lessonLive.view';
+    const live = {
+      lessonId: null,
+      view: 'position',                 // position | arrival | change
+      hideNames: false,
+      classFilter: '',
+      sig: '',
+      data: null,
+      timer: null,
+      inflight: false,
+      refetch: false,                   // 読み込み中に「今すぐ」が来たら、終わり次第もう 1 回
+      errors: 0,
+      firstSeen: new Map(),             // `${email}|${timestamp}` → { at, kind }
+      seenEmails: new Set(),
+      baselineDone: false,              // 最初の読み込みで見えた分は NEW にしない
+      expanded: new Set(),              // 理由を全文表示中のカード (rowIndex)
+      pendingHl: new Set(),             // ハイライト送信中の rowIndex (連打防止)
+      hasChangeView: false,
+      sheetPhaseNames: {}               // sheetName → フェーズ名 (「出会う」が何の回答を見ているか)
+    };
+    // 表示の好みは端末ごとの便宜 (失敗しても既定で動く)。
+    try { live.hideNames = window.localStorage.getItem(LIVE_STORE_NAMES) === '1'; }
+    catch (_) { /* storage 不可 (プライベート窓等) でも既定 = 名前表示で動く */ }
+    try {
+      const v = window.localStorage.getItem(LIVE_STORE_VIEW);
+      if (v === 'position' || v === 'arrival') live.view = v;
+    } catch (_) { /* 同上: 既定 = 位置ごと */ }
+
+    function liveStore(key, value) {
+      try { window.localStorage.setItem(key, value); }
+      catch (_) { /* 保存できなくても今回の表示は切り替わっている */ }
+    }
+
+    function liveRunning() {
+      return document.body.classList.contains('mode-run-lesson')
+        && Boolean(live.lessonId) && live.lessonId === currentLessonId;
+    }
+
+    // renderRunner から呼ぶ (開いたとき / フェーズを送ったとき)。
+    function liveOnRunnerRendered(lesson) {
+      const phases = (lesson.lessonJson && lesson.lessonJson.phases) || [];
+      live.hasChangeView = phases.filter((p) => p && (p.screenRole === 'input' || p.screenRole === 'reinput')).length >= 2;
+      if (live.view === 'change' && !live.hasChangeView) live.view = 'position';
+      live.sheetPhaseNames = {};
+      phases.forEach((p) => { if (p && p.sheetName && !live.sheetPhaseNames[p.sheetName]) live.sheetPhaseNames[p.sheetName] = p.name || ''; });
+      if (live.lessonId !== lesson.lessonId) {
+        live.lessonId = lesson.lessonId;
+        live.data = null;
+        live.classFilter = '';
+        live.firstSeen.clear();
+        live.seenEmails.clear();
+        live.expanded.clear();
+        live.baselineDone = false;
+      }
+      // フェーズが変わったかもしれないので、sig を捨てて必ず全件を取り直す。
+      live.sig = '';
+      liveRender();
+      liveFetch();
+      if (live.view === 'change') renderLessonReviewGrid();
+    }
+
+    function liveSchedule(ms) {
+      if (live.timer) clearTimeout(live.timer);
+      live.timer = setTimeout(() => {
+        live.timer = null;
+        if (!liveRunning()) return;     // Runner を離れたら止まる (再開は renderRunner)
+        if (document.hidden) return;    // 隠れている間は読まない (visibilitychange で再開)
+        liveFetch();
+      }, ms);
+    }
+
+    function liveFetch() {
+      if (!liveRunning()) return;
+      if (live.inflight) { live.refetch = true; return; }
+      live.inflight = true;
+      const lessonId = live.lessonId;
+      gasRun('lesson.liveAnswers', { userId, lessonId, sinceSig: live.sig }).then((res) => {
+        if (lessonId !== live.lessonId) return;
+        if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を読み込めませんでした'));
+        live.errors = 0;
+        const d = res.data || {};
+        if (!d.supported) {
+          live.data = { supported: false };
+        } else if (d.unchanged && live.data && live.data.supported) {
+          live.data.phase = d.phase;
+        } else {
+          live.data = d;
+          live.sig = d.sig || '';
+          liveNoteArrivals(d.rows || []);
+        }
+        // 変化が無くても描き直す (NEW の期限切れを落とすため。30 枚程度なので軽い)。
+        liveRender();
+      }).catch((err) => {
+        live.errors += 1;
+        const src = document.getElementById('lesson-live-source');
+        if (src) src.textContent = '読み込みに失敗しました。自動で再試行します（' + ((err && err.message) || '') + '）';
+      }).finally(() => {
+        live.inflight = false;
+        if (live.refetch) { live.refetch = false; live.sig = ''; liveFetch(); return; }
+        if (liveRunning()) liveSchedule(live.errors ? Math.min(LIVE_POLL_MS * (1 + live.errors), 30000) : LIVE_POLL_MS);
+      });
+    }
+
+    function liveNoteArrivals(rows) {
+      const now = Date.now();
+      rows.forEach((r) => {
+        const key = r.email + '|' + r.timestamp;
+        if (live.firstSeen.has(key)) return;
+        const kind = live.seenEmails.has(r.email) ? 'updated' : 'new';
+        live.firstSeen.set(key, { at: live.baselineDone ? now : 0, kind });
+        live.seenEmails.add(r.email);
+      });
+      live.baselineDone = true;
+    }
+
+    function liveFreshness(r) {
+      const seen = live.firstSeen.get(r.email + '|' + r.timestamp);
+      if (!seen || !seen.at || Date.now() - seen.at > LIVE_NEW_MS) return null;
+      return seen.kind === 'updated' ? '置き直し' : 'NEW';
+    }
+
+    function liveSyncControls() {
+      document.querySelectorAll('#lesson-live [data-live-view]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.liveView === live.view));
+      });
+      const changeTab = document.getElementById('lesson-live-change-tab');
+      if (changeTab) changeTab.classList.toggle('hidden', !live.hasChangeView);
+      const namesBtn = document.getElementById('lesson-live-names');
+      if (namesBtn) {
+        namesBtn.setAttribute('aria-pressed', String(live.hideNames));
+        namesBtn.textContent = live.hideNames ? '名前を表示' : '名前を隠す';
+      }
+      const sel = document.getElementById('lesson-live-class');
+      const classes = (live.data && Array.isArray(live.data.classes)) ? live.data.classes : [];
+      if (sel) {
+        // 授業は 1 クラスで行うのが普通なので、複数あるときだけ選ばせる。
+        sel.classList.toggle('hidden', classes.length < 2);
+        const sig = classes.join('\u0001');
+        if (sel.dataset.sig !== sig) {
+          sel.dataset.sig = sig;
+          sel.innerHTML = '';
+          [''].concat(classes).forEach((c) => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c || 'すべてのクラス';
+            sel.appendChild(opt);
+          });
+        }
+        if (live.classFilter && classes.indexOf(live.classFilter) < 0) live.classFilter = '';
+        sel.value = live.classFilter;
+      }
+    }
+
+    function liveRender() {
+      const body = document.getElementById('lesson-live-body');
+      const grid = document.getElementById('lesson-review-grid');
+      const countEl = document.getElementById('lesson-live-count');
+      const srcEl = document.getElementById('lesson-live-source');
+      const pendEl = document.getElementById('lesson-live-pending');
+      if (!body || !grid) return;
+      liveSyncControls();
+      const changeMode = live.view === 'change';
+      body.classList.toggle('hidden', changeMode);
+      grid.classList.toggle('hidden', !changeMode);
+
+      const d = live.data;
+      if (!d) {
+        body.innerHTML = '<p class="lesson-live-empty">読み込み中...</p>';
+        return;
+      }
+      if (!d.supported) {
+        if (countEl) countEl.textContent = '';
+        if (srcEl) srcEl.textContent = '';
+        pendEl.classList.add('hidden');
+        body.innerHTML = '<p class="lesson-live-empty">この一覧は、児童が画面から考えを送る授業（授業モード）で使えます。' +
+          'Google フォームを使う授業では、ボードで回答を確認してください。</p>';
+        return;
+      }
+
+      const esc = window.sharedUtilities.security.escapeHtml;
+      const rows = (d.rows || []).filter((r) => !live.classFilter || r.class === live.classFilter);
+      if (countEl) countEl.textContent = rows.length + '人';
+      if (srcEl) {
+        const ph = d.phase || {};
+        const isInput = ph.screenRole === 'input' || ph.screenRole === 'reinput';
+        const srcName = live.sheetPhaseNames[ph.sourceSheetName] || '';
+        const classes = Array.isArray(d.classes) ? d.classes : [];
+        const parts = [];
+        if (classes.length === 1) parts.push(classes[0]);
+        parts.push(isInput || !srcName ? '「' + (ph.name || '') + '」の回答'
+          : '「' + (ph.name || '') + '」中 · ボードに出ている「' + srcName + '」の回答');
+        parts.push('10 秒ごとに更新');
+        srcEl.textContent = parts.join(' · ');
+      }
+      liveRenderPending(pendEl, d.pending);
+
+      if (changeMode) return;
+      if (!rows.length) {
+        body.innerHTML = '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+        return;
+      }
+      const axis = d.axis || { boardMode: 'matrix', min: 1, max: 5, x: {}, y: {} };
+      const showClass = !live.classFilter && Array.isArray(d.classes) && d.classes.length > 1;
+      const card = (r) => liveCard(r, axis, showClass, esc);
+      if (live.view === 'arrival') {
+        const sorted = rows.slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+        body.innerHTML = '<div class="live-list">' + sorted.map(card).join('') + '</div>';
+        return;
+      }
+      body.innerHTML = liveRenderGroups(rows, axis, card, esc);
+    }
+
+    // 未提出: 2 回目以降の入力フェーズだけ (前の入力フェーズに答えた児童が母集団)。
+    function liveRenderPending(el, pending) {
+      if (!el) return;
+      if (!Array.isArray(pending) || live.view === 'change') { el.classList.add('hidden'); return; }
+      const esc = window.sharedUtilities.security.escapeHtml;
+      const list = pending.filter((p) => !live.classFilter || p.class === live.classFilter);
+      el.classList.remove('hidden');
+      el.className = 'lesson-live-pending box ' + (list.length ? 'box-warning' : 'box-success');
+      if (!list.length) {
+        el.textContent = '前のフェーズで答えた全員が送りました。';
+        return;
+      }
+      const names = live.hideNames ? ''
+        : '：' + list.map((p) => esc(p.name || p.email || '')).join('、');
+      el.innerHTML = '<strong>まだ送っていない ' + list.length + '人</strong>' + names;
+    }
+
+    // 位置ごと: 横軸の左寄り / まん中 / 右寄り の 3 群。立場の違う児童を並べて指名しやすくする。
+    //   Why 横軸だけで分けるか: 横軸は教材の立場、縦軸は確信度 (迷い) なので、指名で
+    //   対比させたいのは横。縦は各カードの小さな位置図と数字で読む。
+    //   群の並びは軸の順 (左→右) で固定し、人数の多少で順序を変えない (多数派を先に見せない)。
+    function liveRenderGroups(rows, axis, card, esc) {
+      const min = Number(axis.min) || 1;
+      const max = Number(axis.max) || 5;
+      const mid = (min + max) / 2;
+      const hasMid = Number.isInteger(mid);
+      const xl = (axis.x && axis.x.min) || '';
+      const xh = (axis.x && axis.x.max) || '';
+      const groups = [
+        { title: xl ? '「' + xl + '」寄り' : '左寄り', range: min + '〜' + (Math.ceil(mid) - 1), rows: [] },
+        { title: 'まん中', range: String(mid), rows: [] },
+        { title: xh ? '「' + xh + '」寄り' : '右寄り', range: (Math.floor(mid) + 1) + '〜' + max, rows: [] }
+      ];
+      rows.forEach((r) => {
+        const x = r.numericX;
+        if (x === null || x === undefined || !Number.isFinite(Number(x))) groups[1].rows.push(r);
+        else if (Number(x) < mid) groups[0].rows.push(r);
+        else if (Number(x) > mid) groups[2].rows.push(r);
+        else groups[1].rows.push(r);
+      });
+      // 群の中は位置順 → 届いた順。新着で並びが入れ替わらない (読んでいる途中にカードが動かない)。
+      groups.forEach((g) => g.rows.sort((a, b) =>
+        ((Number(a.numericX) || 0) - (Number(b.numericX) || 0))
+        || String(a.timestamp).localeCompare(String(b.timestamp))));
+      const visible = groups.filter((g, i) => i !== 1 || hasMid || g.rows.length);
+      return '<div class="live-groups">' + visible.map((g) => (
+        '<section class="live-group box">' +
+          '<header class="live-group-head">' +
+            '<span class="live-group-title">' + esc(g.title) + '</span>' +
+            '<span class="live-group-meta">' + esc(g.range) + ' · ' + g.rows.length + '人</span>' +
+          '</header>' +
+          (g.rows.length
+            ? '<div class="live-group-cards">' + g.rows.map(card).join('') + '</div>'
+            : '<p class="live-group-empty">いません</p>') +
+        '</section>'
+      )).join('') + '</div>';
+    }
+
+    function liveCard(r, axis, showClass, esc) {
+      const hl = Boolean(r.highlight);
+      const busy = live.pendingHl.has(r.rowIndex);
+      const canHl = Number.isInteger(r.rowIndex) && r.rowIndex >= 2;
+      const fresh = liveFreshness(r);
+      const name = live.hideNames ? '（名前を隠しています）' : (r.name || r.email || '（名前なし）');
+      const expanded = live.expanded.has(r.rowIndex);
+      return '<article class="live-card' + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '') + '">' +
+        '<div class="live-card-head">' +
+          livePosMap(r, axis, esc) +
+          '<div class="live-card-who">' +
+            '<span class="live-name">' + esc(name) + '</span>' +
+            (showClass && r.class ? '<span class="live-class">' + esc(r.class) + '</span>' : '') +
+            (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
+          '</div>' +
+          '<button type="button" class="live-hl-btn' + (busy ? ' is-busy' : '') + '"' +
+            ' data-live-hl="' + (canHl ? r.rowIndex : '') + '" aria-pressed="' + hl + '"' +
+            ' aria-label="' + (hl ? 'ハイライトを解除する' : 'ボードでハイライトする') + '"' +
+            ' title="' + (hl ? 'ハイライトを解除' : 'ボードでハイライト') + '"' +
+            (canHl && !busy ? '' : ' disabled') + '>' +
+            '<svg class="icon" aria-hidden="true"><use href="#i-star-' + (hl ? 'solid' : 'outline') + '"></use></svg>' +
+          '</button>' +
+        '</div>' +
+        '<p class="live-reason' + (expanded ? ' is-expanded' : '') + '" data-live-row="' + (canHl ? r.rowIndex : '') + '">' +
+          esc(r.reason || '') + '</p>' +
+        (r.addedInsight ? '<p class="live-insight">＋ ' + esc(r.addedInsight) + '</p>' : '') +
+      '</article>';
+    }
+
+    // 小さな位置図 (マトリクス = 5×5、数直線 = 1×5)。ボードの点と同じ位置を手元で読む。
+    function livePosMap(r, axis, esc) {
+      const min = Number(axis.min) || 1;
+      const max = Number(axis.max) || 5;
+      const n = max - min + 1;
+      const isMatrix = axis.boardMode === 'matrix' && Boolean(axis.y);
+      const x = r.numericX;
+      const y = r.numericY;
+      let cells = '';
+      for (let row = 0; row < (isMatrix ? n : 1); row++) {
+        const yv = max - row;           // 上ほど縦軸の値が大きい (ボードと同じ向き)
+        for (let col = 0; col < n; col++) {
+          const on = x === min + col && (!isMatrix || y === yv);
+          cells += '<span class="live-pos-cell' + (on ? ' is-on' : '') + '"></span>';
+        }
+      }
+      const xs = (x === null || x === undefined) ? '-' : x;
+      const ys = (y === null || y === undefined) ? '-' : y;
+      const ax = axis.x || {};
+      const ay = axis.y || {};
+      const aria = isMatrix
+        ? '横 ' + xs + '（' + (ax.min || '左') + '〜' + (ax.max || '右') + '）、縦 ' + ys + '（' + (ay.min || '下') + '〜' + (ay.max || '上') + '）'
+        : xs + '（' + (ax.min || '左') + '〜' + (ax.max || '右') + '）';
+      return '<span class="live-pos" role="img" aria-label="' + esc(aria) + '">' +
+        '<span class="live-pos-grid">' + cells + '</span>' +
+        '<span class="live-pos-text">' + (isMatrix ? xs + '·' + ys : xs) + '</span>' +
+      '</span>';
+    }
+
+    function liveToggleHighlight(btn) {
+      const rowIndex = Number(btn.dataset.liveHl);
+      const d = live.data;
+      if (!rowIndex || !d || !d.phase || live.pendingHl.has(rowIndex)) return;
+      const row = (d.rows || []).find((r) => r.rowIndex === rowIndex);
+      if (!row) return;
+      const prev = Boolean(row.highlight);
+      // 楽観更新: 押した瞬間に一覧を切り替える。ボードへは数秒で届く。
+      row.highlight = !prev;
+      live.pendingHl.add(rowIndex);
+      liveRender();
+      gasRun('lesson.toggleHighlight', {
+        userId, lessonId: live.lessonId, rowIndex, sheetName: d.phase.sourceSheetName || ''
+      }).then((res) => {
+        if (!res || !res.success) throw new Error(window.serverMessage(res, 'ハイライトを切り替えられませんでした'));
+        row.highlight = typeof res.highlighted === 'boolean' ? res.highlighted : !prev;
+        live.sig = '';   // 次の polling で確定値を取り直す
+      }).catch((err) => {
+        row.highlight = prev;
+        const msg = (err && err.message) || 'ハイライトを切り替えられませんでした';
+        window.notifications.error(msg.replace(/^PHASE_CHANGED:\s*/, ''));
+        if (/^PHASE_CHANGED/.test(msg)) { live.sig = ''; liveFetch(); }
+      }).finally(() => {
+        live.pendingHl.delete(rowIndex);
+        liveRender();
+      });
+    }
+
+    (function initLessonLive() {
+      const root = document.getElementById('lesson-live');
+      if (!root) return;
+      root.addEventListener('click', (event) => {
+        const viewBtn = event.target.closest('[data-live-view]');
+        if (viewBtn) {
+          live.view = viewBtn.dataset.liveView;
+          if (live.view !== 'change') liveStore(LIVE_STORE_VIEW, live.view);
+          liveRender();
+          if (live.view === 'change') renderLessonReviewGrid();
+          return;
+        }
+        const hlBtn = event.target.closest('[data-live-hl]');
+        if (hlBtn && !hlBtn.disabled) { liveToggleHighlight(hlBtn); return; }
+        if (event.target.closest('#lesson-live-names')) {
+          live.hideNames = !live.hideNames;
+          liveStore(LIVE_STORE_NAMES, live.hideNames ? '1' : '0');
+          liveRender();
+          return;
+        }
+        if (event.target.closest('#lesson-live-refresh')) {
+          live.sig = '';
+          liveFetch();
+          if (live.view === 'change') renderLessonReviewGrid();
+          return;
+        }
+        // 理由は 4 行で畳む。押すと全文 (指名前に読み切るため)。
+        const reason = event.target.closest('.live-reason');
+        if (reason && reason.dataset.liveRow) {
+          const key = Number(reason.dataset.liveRow);
+          if (live.expanded.has(key)) live.expanded.delete(key); else live.expanded.add(key);
+          reason.classList.toggle('is-expanded', live.expanded.has(key));
+        }
+      });
+      const sel = document.getElementById('lesson-live-class');
+      if (sel) sel.addEventListener('change', () => { live.classFilter = sel.value; liveRender(); });
+      // タブに戻ってきたら、待たずに最新を読む (隠れている間は止めている)。
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && liveRunning()) liveFetch();
       });
     })();
 

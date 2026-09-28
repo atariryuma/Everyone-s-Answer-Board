@@ -3899,7 +3899,7 @@
       let editor = '';
       if (!reactionsOnly && this.state.isEditor) {
         const on = Boolean(safeData.highlight);
-        editor += '<button type="button" class="answer-action-btn highlight-btn like-btn text-theme-status-warning' + (on ? ' reacted' : '') + '" ' +
+        editor += '<button type="button" class="answer-action-btn highlight-btn like-btn' + (on ? ' reacted' : '') + '" ' +
           'aria-label="' + (on ? 'ハイライトを解除する' : 'ハイライトする') + '" aria-pressed="' + on + '" title="' + (on ? 'ハイライトを解除' : 'ハイライト') + '" ' +
           'data-row-index="' + safeData.rowIndex + '">' + this.getIcon('star', iconCls, on) + '</button>';
         if (this.state.showAdminFeatures) {

@@ -143,8 +143,8 @@
   //   リング色だけだと LIKE(赤) と CURIOUS(緑) が **赤緑色覚（男子の約 8%）に区別不能**。
   //   そこでリアクション種別ごとに stroke の破線パターンも変え、「色 + 線パターン」の二重符号化に
   //   する（WCAG 2.1 / Color Universal Design のセオリー: "色だけに頼らずパターン/ラベルでも区別")。
-  //   電子黒板に投影された dot を色覚に依らず読み分けられる。 highlight(金) は太線で既に判別可能なので
-  //   実線のまま。 色そのもの(REACTION_COLORS)はブランド統一のため変えない（ボタン/カードと一致）。
+  //   電子黒板に投影された dot を色覚に依らず読み分けられる。 highlight は「塗り + 白縁 + 大きさ + 発光」の
+  //   4 重符号なので破線は使わない (page.viz.css の .viz-dot.highlight)。 色そのもの(REACTION_COLORS)はブランド統一のため変えない（ボタン/カードと一致）。
   const REACTION_DASH = {
     UNDERSTAND: null,    // 実線 (なるほど)
     LIKE:       '5,3',   // 長破線 (いいね)
@@ -184,7 +184,11 @@
   // リアクションリング (stroke 装飾) を d3 selection に適用し、chain 継続のため
   //   selection を返す。 .on() ハンドラはレンダラ毎に異なる (selfL / self + sameCoordOf)
   //   ため呼び出し側に残す。
-  //   priority: HIGHLIGHT (教師注目, 金縁・実線・太め) > REACTION (児童間人気, 種別色 + 破線)。
+  //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気, 種別色 + 破線)。
+  //     HIGHLIGHT の見た目は CSS (.viz-dot.highlight) が全部持つ。ここでは inline style を外すだけ
+  //     (inline は CSS より強いので、残すと CSS の塗り・白縁が効かない)。
+  //     Why 縁ではなく塗りを変えるか: 旧来は「シアンの点 + 金縁」で、投影すると点は青のまま見え、
+  //       金縁は「なるほど」(琥珀の縁) や孤立意見 (金の発光) と区別がつかなかった。
   //   細く・淡く (2.0px / opacity 0.85): 主役は「位置 = 立場」、リング (人気) は脇役。
   //     太い枠線は「多数派 = 正解」の暗黙シグナル化リスク (道徳教育 / DCE レビュー 2026-05-14)。
   //   注: SVG presentation attribute (attr) は外部 CSS (.viz-dot{stroke}) に specificity で
@@ -192,23 +196,35 @@
   function applyReactionRingStyles(selection) {
     return selection
       .style('stroke', (d) => {
-        if (d.data && d.data.highlight) return '#fbbf24'; // amber-400 (gold)
+        if (d.data && d.data.highlight) return null;
         const t = topReactionType(d.data);
         return t ? REACTION_COLORS[t] : null;
       })
       .style('stroke-width', (d) => {
-        if (d.data && d.data.highlight) return 3.0;
+        if (d.data && d.data.highlight) return null;
         return topReactionType(d.data) ? 2.0 : null;
       })
       .style('stroke-opacity', (d) => {
-        if (d.data && d.data.highlight) return 1.0;
+        if (d.data && d.data.highlight) return null;
         return topReactionType(d.data) ? 0.85 : null;
       })
-      // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
+      // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は CSS の実線。
       .style('stroke-dasharray', (d) => {
         if (d.data && d.data.highlight) return null;
         return reactionDash(topReactionType(d.data));
       });
+  }
+
+  // 教師がハイライトした点は一回り大きく描き、重なりの最前面に出す。
+  //   Why 半径の一律原則 (移動量を評価しない) の例外にしてよいか: 大きさで示すのは児童の変化ではなく
+  //   「先生がみんなで考えたいと選んだ意見」という教師の意図で、多面的な視点を示す促しとして
+  //   強調してよい (page.viz.css の .viz-dot.highlight と同じ判断)。色だけに頼らない符号にもなる。
+  const HIGHLIGHT_R_BONUS = 2;
+  function isHighlightedNode(d) {
+    return Boolean(d && d.data && d.data.highlight);
+  }
+  function raiseHighlightedDots(g) {
+    g.selectAll('.viz-dot.current.highlight').raise();
   }
 
   // dot 中央のリアクション数バッジ。 AdminPanel 設定「リアクション数を表示」
@@ -226,6 +242,8 @@
       .attr('x', (d) => d.x)
       .attr('y', (d) => d.y + 3.5)
       .text((d) => totalReactions(d.data));
+    // 最前面に上げたハイライトの点より、さらに上に数字を置く (数字が点の下に隠れない)。
+    g.selectAll('.viz-dot-label').raise();
   }
 
   // ---------------------------------------------------------------------
@@ -719,7 +737,7 @@
       //   個人の変化は本人の画面と教師の授業後グリッドで ● → ★ として見る。
       //   学級全体の分布は「今どこに誰がいるか」の記述に徹する。
       const DOT_R = 7;
-      const radiusFor = () => DOT_R;
+      const radiusFor = (d) => DOT_R + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0);
 
       // 現在点（ビーズワーム配置）— force simulation で重なりを回避
       // Why: collide の半径は最大想定値で確保しないと大きい点同士が重なる。
@@ -735,7 +753,7 @@
       const sim = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(1))
         .force('y', d3.forceY(yCenter + 70).strength(0.18))
-        .force('collide', d3.forceCollide(COLLIDE_R))
+        .force('collide', d3.forceCollide((d) => COLLIDE_R + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0)))
         .stop();
       for (let i = 0; i < 120; i++) sim.tick();
 
@@ -769,6 +787,7 @@
         });
 
       // dot 中央のリアクション数バッジ (matrix と共通の renderDotLabels に集約)。
+      raiseHighlightedDots(g);
       renderDotLabels(g, nodes, this.state);
 
       // 統計 + 教師パネル
@@ -1023,7 +1042,7 @@
       // ドット半径は全員一律 (numberline の DOT_R と同じ理由: 移動量を評価しない)。
       //   「ブロブ化」を避けるため意図的に小さめ。
       const DOT_R_M = 6;
-      const radiusForMatrix = () => DOT_R_M;
+      const radiusForMatrix = (d) => DOT_R_M + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0);
 
       // 現在点：軸の整数値の近傍に寄せつつ、重なりは forceCollide で押し戻し。
       //
@@ -1104,7 +1123,7 @@
       const simM = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(0.5))
         .force('y', d3.forceY((d) => d.targetY).strength(0.5))
-        .force('collide', d3.forceCollide(COLLIDE_R_M))
+        .force('collide', d3.forceCollide((d) => COLLIDE_R_M + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0)))
         .stop();
       for (let i = 0; i < 250; i++) simM.tick();
 
@@ -1144,6 +1163,7 @@
         });
 
       // dot 中央のリアクション数バッジ (numberline と共通の renderDotLabels に集約)。
+      raiseHighlightedDots(g);
       renderDotLabels(g, nodes, this.state);
 
       updateStatsPills(this, current.length);

@@ -573,7 +573,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--brand-accent);
+  color: var(--brand-highlight);
   background: none;
   border: none;
   padding: 0;
@@ -741,7 +741,9 @@ html, body {
   border-color: currentColor;
   background: color-mix(in srgb, currentColor 12%, var(--theme-bg-elevated));
 }
-.highlight-btn.reacted { color: var(--brand-accent); }
+/* ハイライト (先生の注目) は点・カード枠・星・管理パネルの一覧まで --brand-highlight 1 色に揃える */
+.answer-action-btn.highlight-btn { color: var(--brand-highlight); }
+.highlight-btn.reacted { color: var(--brand-highlight); }
 .delete-answer-btn:hover {
   border-color: var(--theme-status-error-strong);
   background: var(--theme-status-error-soft);

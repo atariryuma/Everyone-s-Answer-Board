@@ -513,7 +513,11 @@ function __requireLessonOwner_(userId, lessonId, options) {
 
   if (!lessonId) return { callerUser, isAdmin, isCollaborator };
 
-  const found = __findLessonById_(lessonId);
+  // cachedLesson: 読み専用の polling 経路 (授業中の回答一覧) 用。lessons シートを毎回読まない。
+  //   戻りの found は { lesson } だけ (rowIndex / sheet を持たない) なので、write 経路では使わない。
+  const found = (options && options.cachedLesson)
+    ? __findLessonByIdCached_(lessonId)
+    : __findLessonById_(lessonId);
   if (!found) return { error: createErrorResponse('lesson が見つかりません') };
   if (found.lesson.userId !== userId) {
     return { error: createErrorResponse('lesson の所有者が一致しません') };
@@ -2512,6 +2516,155 @@ function getLessonReviewGrid(userId, lessonId) {
   }
 }
 
+/**
+ * 授業中の回答一覧 (教師の手元用)。いまボードに出ている回答を 1 人 1 行で返す。
+ *
+ * 用途: 教師が管理パネルでフェーズを送りながら、誰がどこに・なぜ立っているかを
+ *   リアルタイムに把握し、意図的指名とハイライトに使う。名前は教師にだけ見せる
+ *   (児童のボードは showNames:false のまま)。
+ *
+ * どのシートを読むかはボードの config と同じ関数 (__buildPhaseConfigPatch_) で決める。
+ * Why: 一覧とボードが別のシートを見ると、一覧で押したハイライトが別の児童の行に付く。
+ *   「出会う」「議論する」は直前の入力フェーズのシート、入力フェーズは自分のシート。
+ *
+ * polling 前提なので、lesson 行は cache 越し・回答は 10 秒 cache 越しに読む
+ *   (429 storm の再発を避ける)。sinceSig が一致すれば rows を省いて返す。
+ *
+ * @param {string} userId - 授業の所有者
+ * @param {string} lessonId
+ * @param {Object} [options] - { sinceSig: 前回の sig }
+ * @returns {Object} { supported, sig, unchanged?, phase, axis, rows, pending }
+ */
+function getLessonLiveAnswers(userId, lessonId, options) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true, cachedLesson: true });
+    if (auth.error) return auth.error;
+    const lesson = auth.found.lesson;
+    const lessonJson = lesson.lessonJson || {};
+    if (!__isNativePhase_({}, lessonJson)) {
+      // Form 経由の授業は列の意味が授業ごとに違うので、この一覧は出さない。
+      return createSuccessResponse('授業モードではありません', { supported: false });
+    }
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    const phaseIndex = __activePhaseIndex_(lessonJson);
+    const phase = phases[phaseIndex];
+    if (!phase) return createErrorResponse('現在のフェーズが見つかりません');
+
+    const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
+    const source = { spreadsheetId: patch.spreadsheetId, sheetName: patch.sheetName };
+    const rows = __readAllLessonRows_(source);
+
+    // 未提出: 2 回目以降の入力フェーズだけ分かる (名簿は持たないので、前の入力フェーズに
+    //   答えた児童を母集団にする)。最初の入力フェーズでは null = 「分からない」。
+    const screenRole = __phaseScreenRole_(phase);
+    let pending = null;
+    if (LESSON_INPUT_ROLES.indexOf(screenRole) >= 0) {
+      let prevInput = null;
+      for (let i = phaseIndex - 1; i >= 0; i--) {
+        if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0 && phases[i].sheetName) {
+          prevInput = phases[i];
+          break;
+        }
+      }
+      if (prevInput) {
+        const answered = new Set(rows.map(r => r.email));
+        pending = __readAllLessonRows_(prevInput)
+          .filter(r => !answered.has(r.email))
+          .map(r => ({ name: r.name, email: r.email, class: r.class }));
+      }
+    }
+
+    // 変化の検出用 sig。行の追加・置き直し・ハイライトのどれでも変わるよう、中身ごと hash する
+    //   (timestamp だけだと同じ時刻の置き直しを見落とす。30 行 × 500 字でも hash は一瞬)。
+    const sig = __liveAnswersSig_(source.sheetName + '|' + phaseIndex + '|' + rows
+      .map(r => [r.rowIndex, r.timestamp, r.name, r.class, r.numericX, r.numericY,
+        r.reason, r.addedInsight, r.highlight ? 1 : 0].join('\u0001')).join('\u0002')
+      + '|' + (pending ? pending.map(p => p.email).join(',') : '-'));
+    const phaseInfo = {
+      index: phaseIndex,
+      count: phases.length,
+      name: phase.name || '',
+      screenRole,
+      question: phase.question || '',
+      // 一覧が「どのフェーズの回答か」を示すため (出会う = 考えるの回答)
+      sourceSheetName: source.sheetName || ''
+    };
+    if (options && options.sinceSig && options.sinceSig === sig) {
+      return createSuccessResponse('変更なし', { supported: true, unchanged: true, sig, phase: phaseInfo });
+    }
+
+    const boardMode = (patch.displaySettings && patch.displaySettings.boardMode) || 'matrix';
+    const axis = {
+      boardMode,
+      x: patch.xAxisLabels || { min: '', max: '' },
+      y: boardMode === 'matrix' ? (patch.yAxisLabels || { min: '', max: '' }) : null,
+      min: 1,
+      max: 5
+    };
+    return createSuccessResponse('回答一覧', {
+      supported: true,
+      sig,
+      phase: phaseInfo,
+      classes: Array.isArray(lessonJson.classes) ? lessonJson.classes.map(String) : [],
+      axis,
+      rows,
+      pending
+    });
+  } catch (error) {
+    logError_('getLessonLiveAnswers', error);
+    return createExceptionResponse(error);
+  }
+}
+
+// 短い sig (djb2)。一覧の polling で「前回と同じか」だけを判定する。暗号用途ではない。
+function __liveAnswersSig_(text) {
+  let h = 5381;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36) + '_' + s.length.toString(36);
+}
+
+/**
+ * 授業中の回答一覧からハイライトを切り替える。
+ *
+ * 書き込みはボードと同じ toggleHighlight (同じ HIGHLIGHT 列・同じ行ロック・同じ board
+ * cache の無効化) に委ねる。ここで足すのは「一覧が見ているシート = いまのボードのシート」の照合だけ。
+ * Why: toggleHighlight はボードの config が指すシートの行番号に書く。フェーズ切替の直後や
+ *   config の再適用に失敗した状態で押すと、一覧で見ていたのとは別の児童の行に付く。
+ *
+ * @param {string} userId
+ * @param {string} lessonId
+ * @param {number} rowIndex - __readAllLessonRows_ の rowIndex
+ * @param {string} sheetName - 一覧が読んだシート (phase.sourceSheetName)
+ */
+function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true, cachedLesson: true });
+    if (auth.error) return auth.error;
+    const lessonJson = auth.found.lesson.lessonJson || {};
+    const phase = (lessonJson.phases || [])[__activePhaseIndex_(lessonJson)];
+    if (!phase) return createErrorResponse('現在のフェーズが見つかりません');
+    const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
+
+    const config = getConfigOrDefault(userId) || {};
+    const boardMatches = config.spreadsheetId === patch.spreadsheetId
+      && config.sheetName === patch.sheetName
+      && String(sheetName || '') === String(patch.sheetName || '');
+    if (!boardMatches) {
+      return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。一覧を読み込み直します');
+    }
+
+    const res = toggleHighlight(userId, rowIndex);
+    if (res && res.success) {
+      __invalidatePhaseRows_({ spreadsheetId: patch.spreadsheetId, sheetName: patch.sheetName });
+    }
+    return res;
+  } catch (error) {
+    logError_('toggleLessonHighlight', error);
+    return createExceptionResponse(error);
+  }
+}
+
 // 1 フェーズ分の全回答を読む (教師の見取り用)。
 // 回答シートの読み (航跡 / 見取り) は 10 秒 cache する。
 //   Why: 「ふりかえる」に入った瞬間、学級全員が同時に自分の航跡を読む (= 入力フェーズの数 ×
@@ -2544,22 +2697,35 @@ function __readAllLessonRows_(phaseDef, opts) {
     if (!sheet) return [];
     // 全行を 1 回で読む。SA proxy の getDataRange は実データ範囲だけを返す (空グリッドを読まない)。
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
+    // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect) ので、
+    //   固定 index ではなくヘッダー名で探す。無ければ全員 false。
+    const header = data[0] || [];
+    const highlightCol = header.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
+    // 空セルを 0 と読まない (数直線の縦軸は空欄で書かれる)。
+    const toNum = (cell) => {
+      if (cell === '' || cell === null || cell === undefined) return null;
+      const n = Number(cell);
+      return Number.isFinite(n) ? n : null;
+    };
     const values = data.slice(1);
     const out = [];
     for (let i = 0; i < values.length; i++) {
       const v = values[i];
       const email = String(v[1] || '').trim().toLowerCase();
       if (!email) continue;
-      const x = Number(v[4]);
-      const y = Number(v[5]);
+      const ts = v[0];
       out.push({
+        // シート上の行番号 (1-based, ヘッダー込み)。ボードのハイライト操作が同じ番号で行を指す。
+        rowIndex: i + 2,
+        timestamp: (ts instanceof Date) ? ts.toISOString() : String(ts || ''),
         email,
         class: String(v[2] || ''),
         name: String(v[3] || ''),
-        numericX: Number.isFinite(x) ? x : null,
-        numericY: Number.isFinite(y) ? y : null,
+        numericX: toNum(v[4]),
+        numericY: toNum(v[5]),
         reason: String(v[6] || ''),
-        addedInsight: String(v[7] || '')
+        addedInsight: String(v[7] || ''),
+        highlight: highlightCol >= 0 && String(v[highlightCol] || '').toUpperCase() === 'TRUE'
       });
     }
     if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
