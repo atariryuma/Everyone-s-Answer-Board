@@ -2614,6 +2614,30 @@
         this.state.boardPhaseNav = null;
       }
       this.__renderBoardPhaseNav();
+      // 「手元の回答一覧」リンクは外部公開 URL が要る (sandbox iframe の location では 404)。
+      //   SharedUtilities の prefetch が間に合っていなければここで 1 回だけ取りに行く。
+      if (this.state.boardPhaseNav && !this.__webAppBaseUrl()) {
+        runServer('getWebAppUrl').then((url) => {
+          if (url) { this.state.webAppUrl = url; this.__renderBoardPhaseNav(); }
+        }).catch(() => { /* リンクが出ないだけで授業の操作は続けられる */ });
+      }
+    }
+
+    __webAppBaseUrl() {
+      const url = this.state.webAppUrl
+        || (typeof _cachedWebAppUrl === 'string' ? _cachedWebAppUrl : '');
+      return (typeof url === 'string' && /^https:\/\//i.test(url)) ? url : '';
+    }
+
+    /**
+     * 管理パネルの「この授業の実行画面 (いまの回答)」へのリンク先。
+     *   ?lesson= を受けた管理パネルが実行画面を開き、回答一覧までスクロールする。
+     */
+    __lessonAdminUrl(lessonId) {
+      const base = this.__webAppBaseUrl();
+      if (!base || !lessonId || !this.state.userId) return '';
+      return base + '?mode=admin&userId=' + encodeURIComponent(this.state.userId)
+        + '&lesson=' + encodeURIComponent(lessonId);
     }
 
     /**
@@ -2642,6 +2666,21 @@
         primary.textContent = '次へ: ' + next.name;
         primary.addEventListener('click', () => this.__switchBoardPhase(next));
         wrap.appendChild(primary);
+      }
+      // 手元の回答一覧 (管理パネルの実行画面) を別タブで開く。
+      //   Why <a> か: URL を先に作っておけば、クリックがそのままブラウザのリンク遷移になり
+      //   ポップアップブロックに掛からない (非同期に window.open すると止められる)。
+      //   一覧には児童の名前が出るので、投影していない画面で開くよう title で添える。
+      const listUrl = this.__lessonAdminUrl(nav.lessonId);
+      if (listUrl) {
+        const link = document.createElement('a');
+        link.className = 'board-phase-btn lesson-control-link';
+        link.href = listUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = '手元の回答一覧';
+        link.title = '管理パネルでこの授業の回答一覧を開きます（名前が出るので、投影していない画面で）';
+        wrap.appendChild(link);
       }
       return wrap;
     }

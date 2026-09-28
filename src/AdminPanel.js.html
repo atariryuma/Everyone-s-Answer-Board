@@ -4705,12 +4705,22 @@
     window.lessonStartNow = lessonStartNow;
 
     // ---------- Runner (実行中) ----------
-    function openLessonRunner(lessonId, preloaded) {
+    function openLessonRunner(lessonId, preloaded, opts) {
       loadLessonThen(lessonId, preloaded, (lesson) => {
+        // ボードのリンクから来たとき、終わった授業の実行画面は開かない (操作できるものが無い)。
+        if (opts && opts.onlyActive && lesson.state !== 'active') {
+          currentLessonId = null;
+          window.notifications.info('この授業は実行中ではありません。授業の一覧から開いてください。');
+          return;
+        }
         document.body.classList.remove('mode-create-lesson');
         document.body.classList.add('mode-run-lesson');
         history.pushState({ lesson: lessonId, mode: 'run'}, '', '#lesson/' + lessonId);
         renderRunner(lesson);
+        if (opts && opts.focusLive) {
+          const liveEl = document.getElementById('lesson-live');
+          if (liveEl) liveEl.scrollIntoView({ block: 'start' });
+        }
       });
     }
 
@@ -5226,6 +5236,21 @@
         liveRender();
       });
     }
+
+    // ボードの「手元の回答一覧」から来たとき (?lesson=ID): その授業の実行画面を開き、一覧まで送る。
+    //   Why google.script.url か: この HTML は sandbox iframe で動くので window.location.search には
+    //   外側の URL のクエリが無い。外側の URL は google.script.url.getLocation でだけ読める。
+    (function openLessonFromUrl() {
+      try {
+        if (typeof google === 'undefined' || !google.script || !google.script.url) return;
+        google.script.url.getLocation((loc) => {
+          const lessonId = String((loc && loc.parameter && loc.parameter.lesson) || '');
+          // lessonId は lesson_ + uuid 断片。形が違うものはサーバに投げない。
+          if (!/^lesson_[A-Za-z0-9_-]{1,64}$/.test(lessonId)) return;
+          openLessonRunner(lessonId, null, { onlyActive: true, focusLive: true });
+        });
+      } catch (_) { /* 読めなければ通常の管理パネルとして開くだけ */ }
+    })();
 
     (function initLessonLive() {
       const root = document.getElementById('lesson-live');

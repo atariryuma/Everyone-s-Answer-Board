@@ -1057,3 +1057,25 @@ test('clearPersistedClassFilter: フェーズ切替のリセット後は既定�
   assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null);
   assert.equal(instance.getCurrentFilterState().classFilter, '6年2組');
 });
+
+// =====================================================================
+// 授業中の「手元の回答一覧」リンク (ボード → 管理パネルの実行画面)
+// =====================================================================
+
+test('__lessonAdminUrl: 外部公開 URL に mode=admin / userId / lesson を付ける', () => {
+  const { instance } = makeInstance();
+  instance.state.webAppUrl = 'https://script.google.com/a/macros/example.jp/s/ABC/exec';
+  assert.equal(
+    instance.__lessonAdminUrl('lesson_1a2b-3c'),
+    'https://script.google.com/a/macros/example.jp/s/ABC/exec?mode=admin&userId=u1&lesson=lesson_1a2b-3c'
+  );
+});
+
+test('__lessonAdminUrl: URL が未取得 / https でないならリンクを作らない (sandbox iframe の URL は 404)', () => {
+  const { instance } = makeInstance();
+  assert.equal(instance.__lessonAdminUrl('lesson_x'), '');
+  instance.state.webAppUrl = 'javascript:alert(1)';
+  assert.equal(instance.__lessonAdminUrl('lesson_x'), '');
+  instance.state.webAppUrl = 'https://example.com/exec';
+  assert.equal(instance.__lessonAdminUrl(''), '', '授業が無ければ出さない');
+});
