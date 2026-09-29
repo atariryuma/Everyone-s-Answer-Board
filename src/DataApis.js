@@ -1538,6 +1538,10 @@ function getNotificationUpdate(targetUserId, options = {}) {
       success: true,
       hasNewContent: false,
       newItemsCount: 0,
+      // ボードへの書き込み (投稿 / リアクション / ハイライト / 削除) のたびに上がる版番号。
+      //   Why: hasNewContent は「新しい行」しか見ないので、ハイライトのように行が増えない
+      //   変化は投影ボードに届かなかった。児童・教師の画面はこの番号が変われば読み直す。
+      boardVersion: getBoardDataVersion_(targetUser.userId),
       formMeta: {
         formUrl: (targetConfig && typeof targetConfig.formUrl === 'string') ? targetConfig.formUrl : '',
         formTitle: (targetConfig && typeof targetConfig.formTitle === 'string') ? targetConfig.formTitle : ''

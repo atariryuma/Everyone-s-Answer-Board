@@ -1218,3 +1218,16 @@ test('getNotificationUpdate: 授業中でなければ (lessonPhase=null) 従来�
   assert.equal(calls.sheetData, 1);
   assert.equal(res.lessonPhase, null);
 });
+
+test('getNotificationUpdate: ボードの版番号 (boardVersion) を載せる (ハイライト等の行が増えない変化の検知用)', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({ success: true, data: [] }),
+    CacheService: { getScriptCache: () => ({ get: (k) => k === 'board_data_ver:u1' ? '7' : null, put: () => {}, remove: () => {} }) }
+  });
+  const result = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
+  assert.equal(result.success, true);
+  assert.equal(result.boardVersion, '7');
+});

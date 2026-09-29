@@ -1080,3 +1080,47 @@ test('__buildTrajectoryHtml (4象限): 横軸ラベルは左右、縦軸ラベ�
   assert.ok(!/lesson-traj-axis|自首を勧める|逃がす|迷い/.test(svg), '図の中に軸ラベルを描かない (下辺に並ぶ原因)');
   assert.match(svg, /lesson-dot-first/); assert.match(svg, /★/);
 });
+
+// =====================================================================
+// ボードの版番号で読み直す (ハイライト・リアクション・削除の即時反映)
+// =====================================================================
+
+function makeVersionInstance() {
+  const { instance } = makeInstance();
+  instance.state.lastBoardVersion = null;
+  const loads = [];
+  instance.loadSheetData = (opts) => { loads.push(opts); return Promise.resolve(); };
+  return { instance, loads };
+}
+
+test('__handleBoardVersion: 初回は基準を覚えるだけで読み直さない', () => {
+  const { instance, loads } = makeVersionInstance();
+  assert.equal(instance.__handleBoardVersion({ boardVersion: '3' }, false), false);
+  assert.equal(instance.state.lastBoardVersion, '3');
+  assert.equal(loads.length, 0);
+});
+
+test('__handleBoardVersion: 版が変わり新着行が無ければ静かに読み直す (ハイライトが数秒で届く)', () => {
+  const { instance, loads } = makeVersionInstance();
+  instance.__handleBoardVersion({ boardVersion: '3' }, false);
+  assert.equal(instance.__handleBoardVersion({ boardVersion: '3', hasNewContent: false }, false), false, '同じ版では読まない');
+  assert.equal(instance.__handleBoardVersion({ boardVersion: '4', hasNewContent: false }, false), true);
+  assert.equal(loads.length, 1);
+  assert.equal(loads[0].showLoading, false);
+  assert.equal(loads[0].bypassCache, true);
+});
+
+test('__handleBoardVersion: 新着行があるときは既存の経路に任せる / 過去閲覧中は読まない', () => {
+  const { instance, loads } = makeVersionInstance();
+  instance.__handleBoardVersion({ boardVersion: '1' }, false);
+  assert.equal(instance.__handleBoardVersion({ boardVersion: '2', hasNewContent: true }, false), false);
+  assert.equal(instance.__handleBoardVersion({ boardVersion: '3', hasNewContent: false }, true), false);
+  assert.equal(loads.length, 0);
+  assert.equal(instance.state.lastBoardVersion, '3', '過去閲覧中でも基準は追従する');
+});
+
+test('__handleBoardVersion: boardVersion が無い応答 (旧サーバー) では何もしない', () => {
+  const { instance, loads } = makeVersionInstance();
+  assert.equal(instance.__handleBoardVersion({ hasNewContent: false }, false), false);
+  assert.equal(loads.length, 0);
+});

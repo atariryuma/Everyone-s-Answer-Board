@@ -129,6 +129,7 @@
         initializationComplete: false,
         isInitializing: true,
         lastSeenTimestamp: this.loadLastSeenTimestamp(),
+        lastBoardVersion: null,   // getNotificationUpdate の boardVersion の前回値 (差分で読み直す)
         startTime: Date.now(),
         // Why: ランダム順をセッション内で固定するためのシード。
         //      sessionStorage に保存することで、タブを開いている間はポーリング等で
@@ -1228,6 +1229,9 @@
             // 過去閲覧中は lastSeenFormUrl を更新するだけ（戻ったときに 2 度 toast しないように）
             this.state.lastSeenFormUrl = response.formMeta.formUrl || this.state.lastSeenFormUrl || '';
           }
+
+          // ボードの版番号が変わっていれば読み直す (新着行が無くても)。
+          this.__handleBoardVersion(response, viewingPast);
 
           // 授業モード: 教師のフェーズ送りを検知して画面の役割を切り替える。
           //   Why formMeta と別経路か: native 入力の授業は Form を持たないので formUrl が
@@ -2594,6 +2598,32 @@
      *
      * 生徒には出さない (時間軸は教師が 1 本に保つ)。実行中の授業が無ければ何も出ない。
      * ========================================================================== */
+    /**
+     * polling の応答に載る boardVersion (ボードへの書き込みごとに上がる番号) を前回値と比べ、
+     * 変わっていればボードを静かに読み直す。
+     *
+     * Why: 自動更新は hasNewContent (新しい行があるか) だけで判断していたので、ハイライト・
+     *   リアクション・削除のように行が増えない変化は投影ボードに出なかった (教師が管理パネルで
+     *   ☆ を押しても電子黒板が変わらない)。新着行があるときは従来の経路 (可視化は即時、
+     *   カードはバナー) に任せ、ここは「行は同じだが中身が変わった」場合だけを受け持つ。
+     *   カード表示でも既存カードの差分更新なので、読んでいる途中の児童の邪魔にならない。
+     *
+     * @returns {boolean} 読み直しを起こしたか
+     */
+    __handleBoardVersion(response, viewingPast) {
+      const v = response && response.boardVersion;
+      if (v === undefined || v === null) return false;
+      const next = String(v);
+      const prev = this.state.lastBoardVersion;
+      this.state.lastBoardVersion = next;
+      if (prev === null || prev === next) return false;           // 初回は基準を覚えるだけ
+      if (viewingPast || response.hasNewContent) return false;     // 過去閲覧中 / 新着は既存経路
+      if (document.getElementById('lessonScreen')) return false;   // 児童の授業画面がかぶさっている
+      if (typeof this.loadSheetData !== 'function') return false;
+      this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+      return true;
+    }
+
     async __initBoardPhaseNav() {
       const host = document.getElementById('boardPhaseNav');
       if (!host) return;
