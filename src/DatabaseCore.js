@@ -1173,6 +1173,22 @@ function createServiceAccountSpreadsheetProxy(sheetId, accessToken, saEmail) {
   };
 }
 
+// :append の応答 (updates.updatedRange) が A 列から始まっていることを確かめる。
+//   例: "'phase4'!A45:H45" は OK、"'phase4'!J68:Q68" は表検出がずれた書き込みなので失敗にする。
+//   応答に updatedRange が無い場合は判定できないので通す (古い応答形式との互換)。
+function assertAppendedAtColumnA_(response, label) {
+  let range = '';
+  try {
+    const body = safeJsonParse_(response && response.getContentText ? response.getContentText() : '', {});
+    range = (body && body.updates && body.updates.updatedRange) || '';
+  } catch (_) { return; /* 応答が読めないときは判定しない */ }
+  if (!range) return;
+  const m = /!\$?([A-Z]+)\$?(\d+)/.exec(range);
+  if (m && m[1] !== 'A') {
+    throw new Error(`${label}: 追記位置が A 列ではありません (${range})。シートの表の外に孤立したセルがあります`);
+  }
+}
+
 function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}, saEmail, parentResolveAuth) {
   const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
   // parent から渡された resolver を使い回せば、 cooldown 解決が連鎖して同 session 内で
@@ -1304,12 +1320,19 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         }
       };
     },
+    // :append の範囲は「シート名だけ」にしない。
+    //   Why: Sheets API はその範囲内で「最後のテーブル」を探し、その直下・その先頭列から書く
+    //   (公式仕様)。シート名だけを渡すと、表の外に孤立セルが 1 つあるだけで (例: 切替直後の
+    //   ボードで押した 👍 が phase4 の J65 に書かれる) 以後の追記がすべて J 列から積まれ、
+    //   B 列にメールが無いためアプリのどの読み取りにも出ない。2026-09-29 の 4組 25 人分がこれ。
+    //   A1 を範囲にすると「A1 を含むテーブル」の直下・A 列に固定される。書いた位置は応答の
+    //   updatedRange で必ず確かめ、A 列でなければ失敗として投げる (「送りました」を出さない)。
     appendRow: (rowData) => {
       try {
         const auth = resolveAuth();
         const payload = { values: [rowData] };
-        return fetchSheetsAPIWithRetry(
-          `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
+        const response = fetchSheetsAPIWithRetry(
+          `${baseUrl}/values/${sheetName}!A1:append?valueInputOption=RAW`,
           {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
@@ -1319,6 +1342,8 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
           auth.saEmail, resolveAuth,
           { idempotent: false }  // :append は非冪等 — 5xx/network での盲目 retry は重複行を生む
         );
+        assertAppendedAtColumnA_(response, `appendRow(${sheetName})`);
+        return response;
       } catch (error) {
         console.warn('appendRow via API failed after retries:', error.message);
         throw error;
@@ -1334,7 +1359,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         const auth = resolveAuth();
         const payload = { values };
         const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
+          `${baseUrl}/values/${sheetName}!A1:append?valueInputOption=RAW`,
           {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
@@ -1344,6 +1369,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
           auth.saEmail, resolveAuth,
           { idempotent: false }  // appendRow と同じ理由で盲目 retry 禁止
         );
+        assertAppendedAtColumnA_(response, `appendRows(${sheetName})`);
         // updates.updatedRange 例: "'lesson_responses'!A5:I100" → 開始行 5
         const body = safeJsonParse_(response.getContentText(), {});
         const range = (body && body.updates && body.updates.updatedRange) || '';

@@ -624,6 +624,16 @@ function executeBoardRowOperation(options) {
           return createErrorResponse('ボードの公開が終了しました');
         }
       }
+      // 回答の無い行 (A 列が空) には書かない。
+      //   Why: フェーズ切替の直後、ボードには前のシートの行 (例: 77 行) が出たままで、設定は
+      //   次のシート (例: 43 行) を指す。そこで押した 👍/★ は 45 行目以降の空行に書かれ、
+      //   表から離れた孤立セルになる。以後の追記 (:append) はその孤立セルを「最後のテーブル」
+      //   と見なしてその列から積むので、児童の回答がアプリから見えなくなる (2026-09-29)。
+      const [[anchorCell]] = sheet.getRange(rowNumber, 1, 1, 1).getValues();
+      if (String(anchorCell === null || anchorCell === undefined ? '' : anchorCell).trim() === '') {
+        console.warn(`${label}: target row is empty (stale rowIndex?)`, { targetUserId, rowNumber });
+        return createErrorResponse('ROW_CHANGED: 対象の回答が見つかりません。画面を読み込み直してください');
+      }
       const identity = expect.rowIdentity;
       if (identity && identity.column >= 1 && identity.value) {
         const [[actual]] = sheet.getRange(rowNumber, identity.column, 1, 1).getValues();

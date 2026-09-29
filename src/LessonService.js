@@ -2318,11 +2318,14 @@ function __findOwnLessonRow_(sheet, actorEmail) {
   try {
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     const target = String(actorEmail || '').trim().toLowerCase();
+    // 同じ児童の行が複数あれば最後の行 (最新の送信) を採用する。読む側 (__readOwnLessonAnswer_) と
+    //   揃える。復旧で行を移した直後など、重複行が残っていても置き直しが最新に当たるように。
+    let found = -1;
     for (let i = 1; i < data.length; i++) {
       const email = (data[i] || [])[LESSON_NATIVE_COL_EMAIL - 1];
-      if (String(email || '').trim().toLowerCase() === target) return i + 1;
+      if (String(email || '').trim().toLowerCase() === target) found = i + 1;
     }
-    return -1;
+    return found;
   } catch (error) {
     logError_('__findOwnLessonRow_', error);
     return -1;
@@ -2437,7 +2440,9 @@ function __readOwnLessonAnswer_(phaseDef, actorEmail, boardUserId) {
     //   児童ごと・入力フェーズごとに払っていた。
     const rows = __readAllLessonRows_(phaseDef, { boardUserId });
     const me = String(actorEmail || '').trim().toLowerCase();
-    const mine = rows.find((r) => r.email === me);
+    // 同じ児童の行が複数あれば最後 (最新の送信) を採用する (__findOwnLessonRow_ と同じ規則)。
+    let mine = null;
+    for (let i = 0; i < rows.length; i++) if (rows[i].email === me) mine = rows[i];
     if (!mine) return null;
     return {
       numericX: mine.numericX,

@@ -762,7 +762,8 @@ test('addReaction: uses cached headers from getSheetHeaders and avoids per-call 
         const out = [];
         for (let r = 0; r < numRows; r += 1) {
           const rowArr = [];
-          for (let c = 0; c < numCols; c += 1) rowArr.push('');
+          // A 列 (回答の有無の判定に使う) だけは値がある行として振る舞う
+          for (let c = 0; c < numCols; c += 1) rowArr.push(col + c === 1 ? 'answer-a' : '');
           out.push(rowArr);
         }
         return out;
@@ -988,4 +989,21 @@ test('toggleHighlight: 同じ児童の置き直し (timestamp が変わっただ
   sheet._data[2][0] = '2026-09-28T01:09:59.000Z';  // 一覧を読んだあとに送り直された
   const res = ctx.toggleHighlight('owner-1', 3, { rowIdentity: { column: 2, value: 'b@example.com' } });
   assert.equal(res.success, true, res.message);
+});
+
+test('executeBoardRowOperation: 回答の無い行 (A 列が空) には書かない (孤立セルを作らない)', () => {
+  const { ctx, sheet } = buildHighlightContext();   // データは 2〜3 行目だけ
+  const res = ctx.toggleHighlight('owner-1', 60);
+  assert.equal(res.success, false);
+  assert.match(res.message, /^ROW_CHANGED/);
+  assert.equal(sheet._data.length, 3, 'シートに新しいセルが増えていない');
+});
+
+test('addReaction: 回答の無い行には書かない', () => {
+  const sheet = createMockSheet({ headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'], rows: [['answer-a', '', '', '']] });
+  const ctx = buildAddReactionContext({ sheet });
+  const res = ctx.addReaction('owner-1', 77, 'LIKE');
+  assert.equal(res.success, false);
+  assert.match(res.message, /^ROW_CHANGED/);
+  assert.equal(sheet._writes.length, 0);
 });

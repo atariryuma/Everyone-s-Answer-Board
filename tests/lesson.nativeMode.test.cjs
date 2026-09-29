@@ -1504,3 +1504,26 @@ test('__readAllLessonRows_: 見出し行すら読めない (読み込み失敗) 
   assert.equal(rows.length, 0);
   assert.ok(![...store.keys()].some(k => k.startsWith('lesson_rows_')));
 });
+
+// =====================================================================
+// 同じ児童の行が複数あるとき (復旧直後など) は最新の行を採用する
+// =====================================================================
+
+test('__findOwnLessonRow_ / 自分の記録: 同じ児童の行が複数あれば最後の行を使う', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const sheet = h.nativeSheets.get('phase1');
+  sheet.appendRow(['2026-09-29T05:00:00.000Z', 'dup@example.com', '6年4組', 'D', 1, 1, '最初', '']);
+  sheet.appendRow(['2026-09-29T05:22:00.000Z', 'dup@example.com', '6年4組', 'D', 5, 5, '送り直し', '']);
+  assert.equal(h.context.__findOwnLessonRow_(sheet, 'dup@example.com'), 3, '最後の行');
+
+  h.setEmail('dup@example.com');
+  const tj = h.context.getMyLessonTrajectory('u1');
+  assert.equal(tj.data.phases[0].reason, '送り直し');
+  // 置き直しは最後の行を上書きし、行数は増えない
+  const before = sheet._data.length;
+  assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 2, numericY: 2, reason: '三回目', class: '6年4組', name: 'D' }).success, true);
+  assert.equal(sheet._data.length, before);
+  assert.equal(sheet._data[2][6], '三回目');
+});
