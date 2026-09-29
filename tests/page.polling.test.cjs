@@ -1057,3 +1057,26 @@ test('clearPersistedClassFilter: フェーズ切替のリセット後は既定�
   assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null);
   assert.equal(instance.getCurrentFilterState().classFilter, '6年2組');
 });
+
+// =====================================================================
+// ふりかえりの航跡図: 軸ラベルは入力画面と同じ枠に置く (横軸ラベルを図の下辺に並べない)
+// =====================================================================
+
+test('__buildTrajectoryHtml (4象限): 横軸ラベルは左右、縦軸ラベルは上下に、入力画面と同じ枠で出る', () => {
+  const { instance } = makeInstance();
+  instance.state.axisConfig = { xAxisLabels: { min: '自首を勧める', max: '逃がす' }, yAxisLabels: { min: '迷いあり', max: '迷いなし' } };
+  instance.state.lessonPhase = { formTemplate: 'matrix' };
+  const html = instance.__buildTrajectoryHtml([
+    { phaseIndex: 0, numericX: 4, numericY: 2, reason: '最初' },
+    { phaseIndex: 3, numericX: 2, numericY: 2, reason: 'いま', addedInsight: '' }
+  ]);
+  assert.match(html, /lesson-axis-left">自首を勧める</);
+  assert.match(html, /lesson-axis-right">逃がす</);
+  assert.match(html, /lesson-axis-top">迷いなし</);
+  assert.match(html, /lesson-axis-bottom">迷いあり</);
+  // 狭い画面用の下 1 行も同じ順 (左 → 右)
+  assert.match(html, /lesson-axis-xrow[^>]*><span>自首を勧める<\/span><span>逃がす<\/span>/);
+  const svg = html.slice(html.indexOf('<svg'), html.indexOf('</svg>'));
+  assert.ok(!/lesson-traj-axis|自首を勧める|逃がす|迷い/.test(svg), '図の中に軸ラベルを描かない (下辺に並ぶ原因)');
+  assert.match(svg, /lesson-dot-first/); assert.match(svg, /★/);
+});

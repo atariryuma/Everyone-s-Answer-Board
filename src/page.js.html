@@ -1784,7 +1784,9 @@
       if (phases.length > 1) {
         const oneD = (this.state.lessonPhase && this.state.lessonPhase.formTemplate === 'numberline')
           || (first.numericY === null || first.numericY === undefined);
-        html += oneD ? this.__buildTrajectoryLine(first, last) : this.__buildTrajectorySvg(first, last);
+        html += oneD
+          ? this.__buildTrajectoryLine(first, last)
+          : this.__buildLessonAxisFrame(this.__buildTrajectorySvg(first, last));
       }
       html += '<div class="lesson-quote lesson-quote-first">' +
         '<span class="lesson-quote-label">● 最初のことば</span>' +
@@ -1807,20 +1809,14 @@
      * 軸ラベルを添えるのは、ラベルが無いと「どちらに動いたのか」が読めないため。
      */
     __buildTrajectorySvg(first, last) {
-      const esc = this.__escape.bind(this);
-      const axis = this.state.axisConfig || {};
-      const x = axis.xAxisLabels || {}, y = axis.yAxisLabels || {};
+      // 軸ラベルは描かない。入力画面と同じ枠 (__buildLessonAxisFrame) が上下左右に置く。
       const pos = (v) => 30 + ((Number(v) || 3) - 1) / 4 * 140;   // 1-5 → 30-170
       const x1 = pos(first.numericX), y1 = 200 - pos(first.numericY);
       const x2 = pos(last.numericX),  y2 = 200 - pos(last.numericY);
-      return '<svg class="lesson-traj-svg" viewBox="0 0 200 216" role="img" ' +
+      return '<svg class="lesson-traj-svg" viewBox="0 0 200 200" role="img" ' +
         'aria-label="最初の考えといまの考えの位置">' +
         '<line class="lesson-axis" x1="100" y1="22" x2="100" y2="178" />' +
         '<line class="lesson-axis" x1="22" y1="100" x2="178" y2="100" />' +
-        '<text class="lesson-traj-axis" x="100" y="12" text-anchor="middle">' + esc(y.max || '') + '</text>' +
-        '<text class="lesson-traj-axis" x="100" y="196" text-anchor="middle">' + esc(y.min || '') + '</text>' +
-        '<text class="lesson-traj-axis" x="2" y="212">' + esc(x.min || '') + '</text>' +
-        '<text class="lesson-traj-axis" x="198" y="212" text-anchor="end">' + esc(x.max || '') + '</text>' +
         '<line class="lesson-traj-line" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" />' +
         '<circle class="lesson-dot-first" cx="' + x1 + '" cy="' + y1 + '" r="6" />' +
         '<text class="lesson-dot-now" x="' + x2 + '" y="' + (y2 + 6) + '" text-anchor="middle">★</text>' +
@@ -2020,19 +2016,23 @@
      *   児童はタップの意味を持てない。軸ラベルは教師がフェーズに設定したもの
      *   (config.xAxisLabels / yAxisLabels) をそのまま使う。
      */
-    __buildLessonAxisFrame() {
+    __buildLessonAxisFrame(innerHtml) {
       const esc = this.__escape.bind(this);
       const axis = this.state.axisConfig || {};
       const x = axis.xAxisLabels || {};
       const y = axis.yAxisLabels || {};
       const xMin = esc(x.min || ''), xMax = esc(x.max || '');
+      // innerHtml を渡せば格子の代わりにその内容を同じ枠に置く (ふりかえりの航跡図が使う)。
+      //   Why 枠を共有するか: 児童は数分前にこの枠で位置を選んでいる。ふりかえりの図だけ
+      //   横軸ラベルを下辺に置くと「逃がす = 下」のように読めてしまう。同じ枠なら、狭い画面での
+      //   ラベル位置の切替 (左右 ↔ 下 1 行) も同じ規則になる。
+      const inner = (typeof innerHtml === 'string' && innerHtml)
+        ? innerHtml
+        : '<div id="lessonGrid" class="lesson-grid" role="application" aria-label="考えの位置を選ぶ4象限"></div>';
       return '<div class="lesson-grid-frame">' +
         '<div class="lesson-axis-label lesson-axis-top">' + esc(y.max || '') + '</div>' +
         '<div class="lesson-axis-label lesson-axis-left">' + xMin + '</div>' +
-        '<div class="lesson-grid-wrap">' +
-          '<div id="lessonGrid" class="lesson-grid" role="application" ' +
-            'aria-label="考えの位置を選ぶ4象限"></div>' +
-        '</div>' +
+        '<div class="lesson-grid-wrap">' + inner + '</div>' +
         '<div class="lesson-axis-label lesson-axis-right">' + xMax + '</div>' +
         // 狭い画面用: 格子の真下に左右を示す 1 行 (CSS でどちらかだけが出る)
         '<div class="lesson-axis-xrow" aria-hidden="true">' +
