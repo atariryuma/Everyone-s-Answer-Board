@@ -485,11 +485,13 @@ function addReaction(targetUserId, rowIndex, reactionType) {
  * ハイライト切り替え（マルチテナント対応）。
  * @param {string} targetUserId - ボード所有者の userId
  * @param {number|string} rowIndex - 行番号または 'row_#'
+ * @param {Object} [expect] - 押した側が見ていた行の照合 (executeBoardRowOperation の expect)
  */
-function toggleHighlight(targetUserId, rowIndex) {
+function toggleHighlight(targetUserId, rowIndex, expect) {
   return executeBoardRowOperation({
     targetUserId,
     rowIndex,
+    expect,
     lockKeyPrefix: 'highlight',
     label: 'toggleHighlight',
     openContext: 'highlight_processing',
@@ -527,6 +529,13 @@ function toggleHighlight(targetUserId, rowIndex) {
  * @param {function(sheet, rowNumber, actorEmail): Object} options.process - クリティカルセクション内で実行する処理
  * @param {function(result): Object} options.formatSuccess - process の戻り値から API レスポンスを組み立て
  * @param {boolean} [options.requireEditor] editor 権限を要求する（true: ハイライト等の editor-only 操作）
+ * @param {Object} [options.expect] - 押した側が見ていた行の照合。どれも省略可。
+ *   { expectedSpreadsheetId, expectedSheetName, rowIdentity: { column, value } }
+ *   rowIdentity: その行の column 列 (1-based) が value であること (大文字小文字・前後空白は無視)。
+ *   Why ここで照合するか: 呼び出し側が別に config を読んで比べると、その後この関数が読む
+ *   config との間に隙間ができる。行番号のずれ (削除で繰り上がる) は行ロックの中でしか確かめられない。
+ *   Why timestamp でなく識別列か: timestamp は同じ児童の置き直しで変わる (同じ行なのに不一致になる)。
+ *   不一致は ROW_CHANGED で返し、書かない (別の回答に付けない)。
  * @returns {Object} API レスポンス
  */
 function executeBoardRowOperation(options) {
@@ -534,6 +543,7 @@ function executeBoardRowOperation(options) {
     targetUserId, rowIndex, lockKeyPrefix, label, openContext,
     concurrentMessage, process, formatSuccess, requireEditor
   } = options;
+  const expect = options.expect || {};
   const actorEmail = getCurrentEmail();
 
   try {
@@ -546,6 +556,10 @@ function executeBoardRowOperation(options) {
     const config = getConfigOrDefault(targetUserId, targetUser);
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
+    }
+    if ((expect.expectedSpreadsheetId && expect.expectedSpreadsheetId !== config.spreadsheetId)
+        || (expect.expectedSheetName && expect.expectedSheetName !== config.sheetName)) {
+      return createErrorResponse('ROW_CHANGED: ボードの表示が切り替わりました。画面を読み込み直してください');
     }
 
     if (!canActOnTargetBoard(actorEmail, targetUser, config, {
@@ -610,6 +624,15 @@ function executeBoardRowOperation(options) {
           return createErrorResponse('ボードの公開が終了しました');
         }
       }
+      const identity = expect.rowIdentity;
+      if (identity && identity.column >= 1 && identity.value) {
+        const [[actual]] = sheet.getRange(rowNumber, identity.column, 1, 1).getValues();
+        const norm = (v) => String(v || '').trim().toLowerCase();
+        if (norm(actual) !== norm(identity.value)) {
+          console.warn(`${label}: row identity mismatch (row shifted?)`, { targetUserId, rowNumber });
+          return createErrorResponse('ROW_CHANGED: 対象の回答が変わりました。画面を読み込み直してください');
+        }
+      }
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
       // board data cache を即時 stale 化 (viewer の次 polling で fresh fetch)。
       if (typeof bumpBoardDataVersion_ === 'function') {
@@ -622,12 +645,6 @@ function executeBoardRowOperation(options) {
           console.warn('bumpBoardDataVersion_ failed (board may be stale up to 12s):',
             cacheErr && cacheErr.message);
         }
-      }
-      // 授業モードの回答シートなら、教師の回答一覧が読む行 cache (10 秒) も捨てる。
-      //   ボード側で押したハイライトが一覧に次の polling で出るようにするため。
-      //   授業モード以外のシートでは該当 key が無いだけで無害。
-      if (typeof __invalidatePhaseRows_ === 'function') {
-        __invalidatePhaseRows_({ spreadsheetId: config.spreadsheetId, sheetName: config.sheetName });
       }
       return formatSuccess(result);
     } finally {

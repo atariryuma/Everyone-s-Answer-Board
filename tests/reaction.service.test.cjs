@@ -940,3 +940,52 @@ test('toggleHighlight: short-circuits when cache lock already held', () => {
   assert.equal(result.success, false);
   assert.match(result.message, /同時/);
 });
+
+// =====================================================================
+// executeBoardRowOperation の expect (押した側が見ていた行の照合)
+//   Why: 授業中の回答一覧は「どのシートのどの行 (どの児童) か」を覚えて ☆ を押す。フェーズ切替・
+//   config 再適用失敗・削除による行の繰り上がりで番号がずれたら、書かずに ROW_CHANGED を返す。
+// =====================================================================
+
+function buildHighlightContext() {
+  const sheet = createMockSheet({
+    headers: ['タイムスタンプ', 'メールアドレス', 'HIGHLIGHT'],
+    rows: [['2026-09-28T01:00:00.000Z', 'a@example.com', 'FALSE'], ['2026-09-28T01:05:00.000Z', 'b@example.com', 'FALSE']]
+  });
+  const ctx = buildAddReactionContext({ sheet });
+  ctx.getCurrentEmail = () => 'owner@example.com';
+  return { ctx, sheet };
+}
+
+test('toggleHighlight: expect が一致すれば書く', () => {
+  const { ctx, sheet } = buildHighlightContext();
+  const res = ctx.toggleHighlight('owner-1', 3, {
+    expectedSpreadsheetId: 'sheet-123', expectedSheetName: 'Sheet1',
+    rowIdentity: { column: 2, value: ' B@Example.com ' }  // 大文字小文字・前後空白は無視
+  });
+  assert.equal(res.success, true, res.message);
+  assert.equal(sheet._data[2][2], 'TRUE');
+});
+
+test('toggleHighlight: ボードが別のシートを指していれば書かない (ROW_CHANGED)', () => {
+  const { ctx, sheet } = buildHighlightContext();
+  const res = ctx.toggleHighlight('owner-1', 3, { expectedSpreadsheetId: 'other', expectedSheetName: 'Sheet1' });
+  assert.equal(res.success, false);
+  assert.match(res.message, /^ROW_CHANGED/);
+  assert.equal(sheet._data[2][2], 'FALSE');
+});
+
+test('toggleHighlight: 行がずれていれば (その行が別の児童なら) 書かない', () => {
+  const { ctx, sheet } = buildHighlightContext();
+  const res = ctx.toggleHighlight('owner-1', 2, { rowIdentity: { column: 2, value: 'b@example.com' } });
+  assert.equal(res.success, false);
+  assert.match(res.message, /^ROW_CHANGED/);
+  assert.equal(sheet._data[1][2], 'FALSE');
+});
+
+test('toggleHighlight: 同じ児童の置き直し (timestamp が変わっただけ) は照合を通る', () => {
+  const { ctx, sheet } = buildHighlightContext();
+  sheet._data[2][0] = '2026-09-28T01:09:59.000Z';  // 一覧を読んだあとに送り直された
+  const res = ctx.toggleHighlight('owner-1', 3, { rowIdentity: { column: 2, value: 'b@example.com' } });
+  assert.equal(res.success, true, res.message);
+});

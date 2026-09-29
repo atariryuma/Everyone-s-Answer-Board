@@ -741,9 +741,9 @@ html, body {
   border-color: currentColor;
   background: color-mix(in srgb, currentColor 12%, var(--theme-bg-elevated));
 }
-/* ハイライト (先生の注目) は点・カード枠・星・管理パネルの一覧まで --brand-highlight 1 色に揃える */
+/* ハイライト (先生の注目) は点・カード枠・星・管理パネルの一覧まで --brand-highlight 1 色に揃える
+   (押下済みの枠・背景は上の .answer-action-btn.reacted が currentColor から作る) */
 .answer-action-btn.highlight-btn { color: var(--brand-highlight); }
-.highlight-btn.reacted { color: var(--brand-highlight); }
 .delete-answer-btn:hover {
   border-color: var(--theme-status-error-strong);
   background: var(--theme-status-error-soft);

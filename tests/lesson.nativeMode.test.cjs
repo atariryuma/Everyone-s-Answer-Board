@@ -13,6 +13,8 @@ const vm = require('node:vm');
 const { gasResponseStubs } = require('./_helpers.cjs');
 
 const LESSON_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/LessonService.js'), 'utf8');
+// extractHighlight (回答シートの HIGHLIGHT 読み) は ReactionService の実物を使う (ボードと同じ読み方)。
+const REACTION_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/ReactionService.js'), 'utf8');
 
 // 汎用の in-memory シート。1-based row/col。
 function createSheet(headers, name) {
@@ -75,6 +77,8 @@ function loadContext(overrides = {}) {
   const sharingCalls = [];
   const editorsAdded = [];
   const cacheBumps = [];
+  // ボードの data version (DataApis の bump/get と同じ働き)。回答シートの行 cache の key に入る。
+  const boardVersions = new Map();
   let uuidCounter = 0;
   let currentEmail = overrides.currentEmail || 'teacher@example.com';
 
@@ -114,7 +118,8 @@ function loadContext(overrides = {}) {
       getSheet: (name) => nativeSs.getSheetByName(name)
     })),
     applySpreadsheetSharingDefaults: (id) => { sharingCalls.push(id); return { saAdded: true }; },
-    bumpBoardDataVersion_: (uid) => { cacheBumps.push(uid); },
+    bumpBoardDataVersion_: (uid) => { cacheBumps.push(uid); boardVersions.set(uid, (boardVersions.get(uid) || 0) + 1); },
+    getBoardDataVersion_: (uid) => String(boardVersions.get(uid) || 0),
     LESSONS_SHEET_HEADERS: LESSONS_HEADERS,
     LESSON_RESPONSES_SHEET_HEADERS: RESPONSES_HEADERS,
     deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
@@ -144,6 +149,7 @@ function loadContext(overrides = {}) {
 
   vm.createContext(context);
   vm.runInContext(LESSON_SOURCE, context, { filename: 'LessonService.js' });
+  vm.runInContext(REACTION_SOURCE, context, { filename: 'ReactionService.js' });
 
   return {
     context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps, editorsAdded,
@@ -731,7 +737,7 @@ test('lessons シートの読みは 1 回 (getDataRange) で、行ごとの getR
   assert.equal(counts.range, 0);
 });
 
-test('回答シートの読み (航跡) は 10 秒 cache され、送信で捨てられる', () => {
+test('回答シートの読み (航跡) は cache され、送信 (board version の bump) で次の読みが新しくなる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   h.context.getConfigOrDefault = withActiveLesson(lessonId);
@@ -739,17 +745,18 @@ test('回答シートの読み (航跡) は 10 秒 cache され、送信で捨�
   h.context.CacheService = { getScriptCache: () => ({
     get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
   }) };
-  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => { assert.equal(ttl, 10); store.set(k, JSON.stringify(v)); return true; };
+  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => { assert.equal(ttl, 60); store.set(k, JSON.stringify(v)); return true; };
   h.setEmail('student@example.com');
   assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 2, numericY: 4, reason: 'r', class: '6年1組', name: 'A' }).success, true);
   const first = h.context.getMyLessonTrajectory('u1');
   assert.equal(first.data.phases.length, 1);
-  assert.ok([...store.keys()].some(k => k.startsWith('lesson_rows_')), '全行が cache に入る');
-  // 送信すると cache が消え、次の読みで新しい値になる
+  const keysBefore = [...store.keys()].filter(k => k.startsWith('lesson_rows_'));
+  assert.equal(keysBefore.length, 1, '全行が cache に入る');
+  // 送信は board version を上げる = 書いた側が cache を捨てなくても、次の読みは別の key になる
   assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 5, numericY: 1, reason: 'r2', class: '6年1組', name: 'A' }).success, true);
-  assert.ok(![...store.keys()].some(k => k.startsWith('lesson_rows_')), '送信で cache を捨てる');
   const second = h.context.getMyLessonTrajectory('u1');
   assert.equal(second.data.phases[0].numericX, 5);
+  assert.ok([...store.keys()].some(k => k.startsWith('lesson_rows_') && !keysBefore.includes(k)), '新しい version の key で読み直す');
 });
 
 test('授業モードの snapshot は入力フェーズだけ (出会う / 議論する では同じ行を重複して積まない)', () => {
@@ -1198,22 +1205,21 @@ test('getLessonReviewGrid: 共通化後も入力フェーズが無ければ空�
   assert.equal(Array.from(res.students).length, 0);
 });
 
-test('toggleLessonHighlight: ボードが同じシートを指していれば、ボードと同じ toggleHighlight に委ねる', () => {
+test('toggleLessonHighlight: 一覧が見ていたシート・行をボードと同じ toggleHighlight に照合させて委ねる', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   seedThinkPhase(h, lessonId);
-  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'native_ss_1', sheetName: 'phase1' });
   const calls = [];
-  h.context.toggleHighlight = (uid, row) => { calls.push([uid, row]); return { success: true, highlighted: true }; };
-  const store = new Map([['lesson_rows_native_ss_1_phase1', '[]']]);
-  h.context.CacheService = { getScriptCache: () => ({
-    get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
-  }) };
+  h.context.toggleHighlight = (uid, row, expect) => { calls.push([uid, row, Object.assign({}, expect)]); return { success: true, highlighted: true }; };
 
-  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
+  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1', 'b@example.com');
   assert.equal(res.success, true);
-  assert.deepEqual(calls, [['u1', 3]]);
-  assert.ok(!store.has('lesson_rows_native_ss_1_phase1'), '一覧の行 cache を捨てる (次の polling で確定値)');
+  // 照合 (ボードの config / その行の児童) は executeBoardRowOperation が行ロックの中で行う
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], 3);
+  assert.equal(calls[0][2].expectedSpreadsheetId, 'native_ss_1');
+  assert.equal(calls[0][2].expectedSheetName, 'phase1');
+  assert.deepEqual(Object.assign({}, calls[0][2].rowIdentity), { column: 2, value: 'b@example.com' });
 });
 
 test('toggleLessonHighlight: フェーズが変わって一覧のシートが古ければ書かない (別の児童に付けない)', () => {
@@ -1221,27 +1227,12 @@ test('toggleLessonHighlight: フェーズが変わって一覧のシートが古
   const lessonId = startNativeLesson(h);
   seedThinkPhase(h, lessonId);
   advanceAsTeacher(h, lessonId, 3);
-  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'native_ss_1', sheetName: 'phase4' });
   let called = false;
   h.context.toggleHighlight = () => { called = true; return { success: true }; };
 
   const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
   assert.equal(res.success, false);
   assert.match(res.message, /^PHASE_CHANGED/);
-  assert.equal(called, false);
-});
-
-test('toggleLessonHighlight: ボードの config が授業のフェーズとずれていれば書かない', () => {
-  const h = loadContext();
-  const lessonId = startNativeLesson(h);
-  seedThinkPhase(h, lessonId);
-  // config の再適用に失敗して、ボードが別のシートを指したままの状態
-  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, spreadsheetId: 'other_ss', sheetName: 'フォームの回答 1' });
-  let called = false;
-  h.context.toggleHighlight = () => { called = true; return { success: true }; };
-
-  const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1');
-  assert.equal(res.success, false);
   assert.equal(called, false);
 });
 

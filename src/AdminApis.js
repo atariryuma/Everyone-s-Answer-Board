@@ -550,7 +550,7 @@ function markWelcomeSeen() {
 // ADMIN_EMAIL を返す経由でパス、フロントエンドからの直叩きは reject)。
 const __FRONTEND_USER_DISPATCH_OPS = Object.freeze(new Set([
   'lesson.list', 'lesson.create', 'lesson.delete', 'lesson.duplicate',
-  'lesson.templates', 'lesson.review', 'lesson.reviewGrid', 'lesson.liveAnswers', 'lesson.toggleHighlight',
+  'lesson.templates', 'lesson.review', 'lesson.liveAnswers', 'lesson.toggleHighlight',
   'lesson.closeForms', 'lesson.updateDraft',
   'lesson.start', 'lesson.advance', 'lesson.end', 'lesson.knownClasses',
   'uploadLessonImage'
@@ -1384,7 +1384,8 @@ function dispatchAdminOperation(operation, params) {
       if (!Number.isInteger(rowIndex) || rowIndex < 2) {
         return createErrorResponse('rowIndex が不正です', null, { error: 'INVALID_ROW_INDEX' });
       }
-      return toggleLessonHighlight(params.userId, params.lessonId, rowIndex, params.sheetName);
+      const expectedEmail = typeof params.expectedEmail === 'string' ? params.expectedEmail.slice(0, 254) : '';
+      return toggleLessonHighlight(params.userId, params.lessonId, rowIndex, params.sheetName, expectedEmail);
     }
     case 'lesson.delete': {
       { const e = reqStr('userId'); if (e) return e; }

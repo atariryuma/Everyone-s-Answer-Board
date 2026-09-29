@@ -17,7 +17,7 @@
  *   - renderNumberLine()     : M1 ビーズワーム
  *   - renderMatrix()         : M2 散布図
  *   - vizComputeSwings()     : 児童ごとの最初→最新の移動を算出（本人の ● → ★ 表示と
- *                              教師の授業後グリッド用。学級全体の分布では使わない）
+ *                              教師の手元の回答一覧 (● → ★) 用。学級全体の分布では使わない）
  *   - vizApplyProjectorMode(): URL クエリ ?display=projector のクラス付与
  * ===================================================================== */
 (function () {
@@ -196,21 +196,21 @@
   function applyReactionRingStyles(selection) {
     return selection
       .style('stroke', (d) => {
-        if (d.data && d.data.highlight) return null;
+        if (isHighlightedNode(d)) return null;
         const t = topReactionType(d.data);
         return t ? REACTION_COLORS[t] : null;
       })
       .style('stroke-width', (d) => {
-        if (d.data && d.data.highlight) return null;
+        if (isHighlightedNode(d)) return null;
         return topReactionType(d.data) ? 2.0 : null;
       })
       .style('stroke-opacity', (d) => {
-        if (d.data && d.data.highlight) return null;
+        if (isHighlightedNode(d)) return null;
         return topReactionType(d.data) ? 0.85 : null;
       })
       // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は CSS の実線。
       .style('stroke-dasharray', (d) => {
-        if (d.data && d.data.highlight) return null;
+        if (isHighlightedNode(d)) return null;
         return reactionDash(topReactionType(d.data));
       });
   }
@@ -222,6 +222,9 @@
   const HIGHLIGHT_R_BONUS = 2;
   function isHighlightedNode(d) {
     return Boolean(d && d.data && d.data.highlight);
+  }
+  function highlightRadiusBonus(d) {
+    return isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0;
   }
   function raiseHighlightedDots(g) {
     g.selectAll('.viz-dot.current.highlight').raise();
@@ -414,7 +417,7 @@
    * Why 用途を限定するか: distance は「本人に自分の ● → ★ を見せる」ためと
    *   「教師が授業後に一人ずつ読む」ための素材であって、学級全体の分布で
    *   誰が大きく動いたかを強調するためのものではない (移動量 ≠ 学びの深さ)。
-   *   授業後グリッドの既定ソートは distance 昇順 = 位置が動かなかった児童から読む。
+   *   教師の ● → ★ 一覧の並びは distance 昇順 = 位置が動かなかった児童から読む。
    */
   /**
    * 児童(emailHash)ごとの回答イベントを ts 昇順の配列で返す共有集計。
@@ -734,10 +737,10 @@
       //   実際には位置が変わらないまま理由だけが深まる学びがあり (「友達だから助ける」→
       //   「友情には厳しさも含まれると分かった上で、やはり助ける」)、移動量による強調は
       //   それを不可視にした上で「動いた方が良い」という評価を画面が発してしまう。
-      //   個人の変化は本人の画面と教師の授業後グリッドで ● → ★ として見る。
+      //   個人の変化は本人の画面と教師の手元の回答一覧 (● → ★) で見る。
       //   学級全体の分布は「今どこに誰がいるか」の記述に徹する。
       const DOT_R = 7;
-      const radiusFor = (d) => DOT_R + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0);
+      const radiusFor = (d) => DOT_R + highlightRadiusBonus(d);
 
       // 現在点（ビーズワーム配置）— force simulation で重なりを回避
       // Why: collide の半径は最大想定値で確保しないと大きい点同士が重なる。
@@ -753,7 +756,7 @@
       const sim = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(1))
         .force('y', d3.forceY(yCenter + 70).strength(0.18))
-        .force('collide', d3.forceCollide((d) => COLLIDE_R + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0)))
+        .force('collide', d3.forceCollide((d) => COLLIDE_R + highlightRadiusBonus(d)))
         .stop();
       for (let i = 0; i < 120; i++) sim.tick();
 
@@ -1042,7 +1045,7 @@
       // ドット半径は全員一律 (numberline の DOT_R と同じ理由: 移動量を評価しない)。
       //   「ブロブ化」を避けるため意図的に小さめ。
       const DOT_R_M = 6;
-      const radiusForMatrix = (d) => DOT_R_M + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0);
+      const radiusForMatrix = (d) => DOT_R_M + highlightRadiusBonus(d);
 
       // 現在点：軸の整数値の近傍に寄せつつ、重なりは forceCollide で押し戻し。
       //
@@ -1123,13 +1126,13 @@
       const simM = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(0.5))
         .force('y', d3.forceY((d) => d.targetY).strength(0.5))
-        .force('collide', d3.forceCollide((d) => COLLIDE_R_M + (isHighlightedNode(d) ? HIGHLIGHT_R_BONUS : 0)))
+        .force('collide', d3.forceCollide((d) => COLLIDE_R_M + highlightRadiusBonus(d)))
         .stop();
       for (let i = 0; i < 250; i++) simM.tick();
 
       // 学級全体の分布に個人の変化 (ghost / trace) は一切描かない。
       //   2026-05-13 の教師フィードバックで「全員分の ghost + trace」は画面が混雑するため
-      //   不採用。個人の ● → ★ は本人の画面と教師の授業後グリッドでのみ見せる。
+      //   不採用。個人の ● → ★ は本人の画面と教師の手元の回答一覧 (● → ★) でのみ見せる。
       // 既存 .ghost / .viz-trace 要素が前回 render 残ってないよう exit clean だけ走らせる。
       g.selectAll('.viz-dot.ghost').remove();
       g.selectAll('.viz-trace').remove();

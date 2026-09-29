@@ -89,13 +89,21 @@
     stroke-opacity: 1;
     stroke-dasharray: none;
     opacity: 1;
+  }
+  /* 発光は lone-voice (金の発光) と同時でも highlight を優先する。lone-voice の規則は
+     このファイルの後ろにあるので、.lone-voice 付きも同じ規則に含めて詳細度で勝たせる。 */
+  .viz-dot.highlight,
+  .viz-dot.highlight.lone-voice {
     filter: drop-shadow(0 0 1.5px var(--brand-highlight))
       drop-shadow(0 0 6px color-mix(in srgb, var(--brand-highlight) 70%, transparent));
   }
   body.projector-mode .viz-dot.highlight {
-    /* 電子黒板 / プロジェクタでも視認しやすいよう縁と発光を強める
-       (body.projector-mode .viz-dot の stroke-width 1.6 より後・強い指定で上書きする) */
+    /* 電子黒板 / プロジェクタでも視認しやすいよう縁を太くする
+       (body.projector-mode .viz-dot の stroke-width 1.6 より強い指定で上書きする) */
     stroke-width: 3;
+  }
+  body.projector-mode .viz-dot.highlight,
+  body.projector-mode .viz-dot.highlight.lone-voice {
     filter: drop-shadow(0 0 2px var(--brand-highlight))
       drop-shadow(0 0 10px color-mix(in srgb, var(--brand-highlight) 85%, transparent));
   }
@@ -425,16 +433,7 @@
   body.projector-mode .viz-dot.lone-voice {
     filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent) 60%, transparent));
   }
-  /* lone-voice + highlight 同時: highlight の発光を優先する (lone-voice の金は付けない)。
-     lone-voice の規則が highlight より後ろにあるので、ここで明示的に上書きし直す。 */
-  .viz-dot.highlight.lone-voice {
-    filter: drop-shadow(0 0 1.5px var(--brand-highlight))
-      drop-shadow(0 0 6px color-mix(in srgb, var(--brand-highlight) 70%, transparent));
-  }
-  body.projector-mode .viz-dot.highlight.lone-voice {
-    filter: drop-shadow(0 0 2px var(--brand-highlight))
-      drop-shadow(0 0 10px color-mix(in srgb, var(--brand-highlight) 85%, transparent));
-  }
+  /* lone-voice + highlight 同時は、上の .viz-dot.highlight 側の規則が発光を持つ。 */
 
   /* .viz-trail (議論前→現在の ghost trail) は撤去済み。
      個人の変化は学級全体の分布に描かない方針 (page.viz.js の設計注記を参照)。 */

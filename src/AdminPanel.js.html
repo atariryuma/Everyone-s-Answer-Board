@@ -4830,6 +4830,17 @@
       catch (_) { /* 保存できなくても今回の表示は切り替わっている */ }
     }
 
+    const LIVE_LOADING_HTML = '<p class="lesson-live-empty">読み込み中...</p>';
+    const LIVE_EMPTY_HTML = '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+
+    // クラスの絞り込みと名前の隠し方は、カード・● → ★・未提出のどこでも同じ規則にする。
+    function liveInClass(x) {
+      return !live.classFilter || x.class === live.classFilter;
+    }
+    function liveDisplayName(x) {
+      return live.hideNames ? '（名前を隠しています）' : (x.name || x.email || '（名前なし）');
+    }
+
     function liveRunning() {
       return document.body.classList.contains('mode-run-lesson')
         && Boolean(live.lessonId) && live.lessonId === currentLessonId;
@@ -4961,7 +4972,7 @@
 
       const d = live.data;
       if (!d) {
-        body.innerHTML = '<p class="lesson-live-empty">読み込み中...</p>';
+        body.innerHTML = LIVE_LOADING_HTML;
         return;
       }
       if (!d.supported) {
@@ -4974,7 +4985,7 @@
       }
 
       const esc = window.sharedUtilities.security.escapeHtml;
-      const rows = (d.rows || []).filter((r) => !live.classFilter || r.class === live.classFilter);
+      const rows = (d.rows || []).filter(liveInClass);
       if (countEl) countEl.textContent = rows.length + '人';
       if (srcEl) {
         const ph = d.phase || {};
@@ -4997,10 +5008,11 @@
         return;
       }
       if (!rows.length) {
-        body.innerHTML = '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+        body.innerHTML = LIVE_EMPTY_HTML;
         return;
       }
-      const card = (r) => liveCard(r, axis, showClass, esc);
+      const src = (d.phase && d.phase.sourceSheetName) || '';
+      const card = (r) => liveCard(r, axis, showClass, src, esc);
       if (live.view === 'arrival') {
         const sorted = rows.slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
         body.innerHTML = '<div class="live-list">' + sorted.map(card).join('') + '</div>';
@@ -5014,8 +5026,7 @@
       if (!el) return;
       if (!Array.isArray(pending)) { el.classList.add('hidden'); return; }
       const esc = window.sharedUtilities.security.escapeHtml;
-      const list = pending.filter((p) => !live.classFilter || p.class === live.classFilter);
-      el.classList.remove('hidden');
+      const list = pending.filter(liveInClass);
       el.className = 'lesson-live-pending box ' + (list.length ? 'box-warning' : 'box-success');
       if (!list.length) {
         el.textContent = '前のフェーズで答えた全員が送りました。';
@@ -5073,11 +5084,12 @@
     }
 
     // ☆ ボタン。押せるのは「いまボードに出ているシート」の行だけ (呼び出し側が判定する)。
+    //   見た目の土台は .icon-btn (円形・focus リング)。大きさと押下色だけ .live-hl-btn で足す。
     function liveHlButton(a) {
       const hl = Boolean(a.highlight);
       const busy = live.pendingHl.has(a.rowIndex);
       const canHl = Number.isInteger(a.rowIndex) && a.rowIndex >= 2;
-      return '<button type="button" class="live-hl-btn' + (busy ? ' is-busy' : '') + '"' +
+      return '<button type="button" class="icon-btn live-hl-btn' + (busy ? ' is-busy' : '') + '"' +
         ' data-live-hl="' + (canHl ? a.rowIndex : '') + '" aria-pressed="' + hl + '"' +
         ' aria-label="' + (hl ? 'ハイライトを解除する' : 'ボードでハイライトする') + '"' +
         ' title="' + (hl ? 'ハイライトを解除' : 'ボードでハイライト') + '"' +
@@ -5093,16 +5105,18 @@
         (a.addedInsight ? '<p class="live-insight">＋ ' + esc(a.addedInsight) + '</p>' : '');
     }
 
-    function liveCard(r, axis, showClass, esc) {
-      const hl = Boolean(r.highlight);
+    // 回答 1 件の枠 (カードと ● → ★ のセルで共通)。枠の見た目・NEW・ハイライトは .live-answer が持つ。
+    function liveAnswerClass(hl, fresh, extra) {
+      return 'live-answer' + (extra ? ' ' + extra : '') + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '');
+    }
+
+    function liveCard(r, axis, showClass, src, esc) {
       const fresh = liveFreshness(r);
-      const name = live.hideNames ? '（名前を隠しています）' : (r.name || r.email || '（名前なし）');
-      const src = (live.data && live.data.phase && live.data.phase.sourceSheetName) || '';
-      return '<article class="live-card' + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '') + '">' +
-        '<div class="live-card-head">' +
+      return '<article class="' + liveAnswerClass(Boolean(r.highlight), fresh) + '">' +
+        '<div class="live-answer-head">' +
           livePosMap(r, axis, esc) +
           '<div class="live-card-who">' +
-            '<span class="live-name">' + esc(name) + '</span>' +
+            '<span class="live-name">' + esc(liveDisplayName(r)) + '</span>' +
             (showClass && r.class ? '<span class="live-class">' + esc(r.class) + '</span>' : '') +
             (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
           '</div>' +
@@ -5118,19 +5132,18 @@
     //   もう一方にハイライトを付けてもボードには出ないので、押せる形にしない。
     function liveRenderChange(d, axis, showClass, esc) {
       const change = d.change;
-      if (!change) return '<p class="lesson-live-empty">読み込み中...</p>';
+      if (!change) return LIVE_LOADING_HTML;
       const src = (d.phase && d.phase.sourceSheetName) || '';
-      const students = (change.students || []).filter((st) => !live.classFilter || st.class === live.classFilter);
-      if (!students.length) return '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+      const students = (change.students || []).filter(liveInClass);
+      if (!students.length) return LIVE_EMPTY_HTML;
       const cell = (a, mark) => {
         if (!a) {
-          return '<div class="live-change-cell is-empty" role="cell"><span class="live-change-mark">' + mark + '</span> まだ</div>';
+          return '<div class="live-answer live-change-cell is-empty" role="cell"><span class="live-change-mark">' + mark + '</span> まだ</div>';
         }
         const onBoard = Boolean(a.sheetName) && a.sheetName === src;
-        const hl = onBoard && Boolean(a.highlight);
         const fresh = liveFreshness(a);
-        return '<div class="live-change-cell' + (hl ? ' is-highlighted' : '') + (fresh ? ' is-new' : '') + '" role="cell">' +
-          '<div class="live-change-cell-head">' +
+        return '<div class="' + liveAnswerClass(onBoard && Boolean(a.highlight), fresh, 'live-change-cell') + '" role="cell">' +
+          '<div class="live-answer-head">' +
             '<span class="live-change-mark" aria-hidden="true">' + mark + '</span>' +
             livePosMap(a, axis, esc) +
             (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
@@ -5148,17 +5161,16 @@
             '<span role="columnheader">児童</span><span role="columnheader">● 最初のことば</span>' +
             '<span role="columnheader">★ いまのことば</span>' +
           '</div>' +
-          students.map((st) => {
-            const name = live.hideNames ? '（名前を隠しています）' : (st.name || st.email || '（名前なし）');
-            return '<div class="live-change-row" role="row">' +
+          students.map((st) => (
+            '<div class="live-change-row" role="row">' +
               '<div class="live-change-who" role="rowheader">' +
-                '<span class="live-name">' + esc(name) + '</span>' +
+                '<span class="live-name">' + esc(liveDisplayName(st)) + '</span>' +
                 (showClass && st.class ? '<span class="live-class">' + esc(st.class) + '</span>' : '') +
                 (st.last ? '<span class="live-change-moved">' + (st.moved ? '位置が動いた' : '位置は同じ') + '</span>' : '') +
               '</div>' +
               cell(st.first, '●') + cell(st.last, '★') +
-            '</div>';
-          }).join('') +
+            '</div>'
+          )).join('') +
         '</div>';
     }
 
@@ -5211,7 +5223,9 @@
       live.pendingHl.add(rowIndex);
       liveRender();
       gasRun('lesson.toggleHighlight', {
-        userId, lessonId: live.lessonId, rowIndex, sheetName: d.phase.sourceSheetName || ''
+        userId, lessonId: live.lessonId, rowIndex, sheetName: src,
+        // 行ロックの中で「その行がこの児童か」を照合してもらう (削除で行番号がずれていたら書かない)。
+        expectedEmail: String(targets[0].email || '')
       }).then((res) => {
         if (!res || !res.success) throw new Error(window.serverMessage(res, 'ハイライトを切り替えられませんでした'));
         setAll(typeof res.highlighted === 'boolean' ? res.highlighted : !prev);
@@ -5219,8 +5233,8 @@
       }).catch((err) => {
         setAll(prev);
         const msg = (err && err.message) || 'ハイライトを切り替えられませんでした';
-        window.notifications.error(msg.replace(/^PHASE_CHANGED:\s*/, ''));
-        if (/^PHASE_CHANGED/.test(msg)) { live.sig = ''; liveFetch(); }
+        window.notifications.error(msg.replace(/^(PHASE|ROW)_CHANGED:\s*/, ''));
+        if (/^(PHASE|ROW)_CHANGED/.test(msg)) { live.sig = ''; liveFetch(); }
       }).finally(() => {
         live.pendingHl.delete(rowIndex);
         liveRender();

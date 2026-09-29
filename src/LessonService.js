@@ -280,7 +280,10 @@ function __findLessonById_(lessonId) {
 //   lessons シート全体を Sheets API で読んでいた (投稿 1 件 = lessons 2 read)。フェーズは
 //   教師が進めたときにしか変わらないので、短期 cache + 書き込み側の明示 invalidate で足りる。
 //   write 経路 (__updateLessonRow_ / __deleteLessonRow_) は rowIndex が要るので常に実読み。
-const LESSON_RECORD_CACHE_TTL_S = 15;
+// Why 60 秒か: 行を書く経路はすべて __invalidateLessonRecord_ を通るので、TTL は鮮度ではなく
+//   「書き込みが無いときの読み直し間隔」だけを決める。15 秒だと教師の回答一覧 (10 秒 polling) が
+//   2 回に 1 回 miss し、そのたびに lessons シート全体を読んでいた。
+const LESSON_RECORD_CACHE_TTL_S = 60;
 const LESSON_RECORD_LATEST_TTL_S = 120;
 function __lessonRecordCacheKey_(lessonId) {
   return 'lesson_rec_' + lessonId;
@@ -947,7 +950,6 @@ function __hydrateLessonSnapshots_(lesson) {
   const spreadsheet = openDatabase();
   if (!spreadsheet) return;
   const width = LESSON_RESPONSES_SHEET_HEADERS.length;
-  const toNum = (v) => (v === '' || v === null || v === undefined) ? null : Number(v);
 
   for (const sn of targets) {
     try {
@@ -957,13 +959,13 @@ function __hydrateLessonSnapshots_(lesson) {
       sn.rows = values
         .filter(v => String(v[0]) === String(lesson.lessonId) && Number(v[1]) === Number(sn.phaseIndex))
         .map(v => ({
-          rowIndex: toNum(v[2]),
+          rowIndex: __cellToNumOrNull_(v[2]),
           timestamp: String(v[3] || ''),
           class: String(v[4] || ''),
           answer: v[5],
           reason: v[6],
-          numericX: toNum(v[7]),
-          numericY: toNum(v[8])
+          numericX: __cellToNumOrNull_(v[7]),
+          numericY: __cellToNumOrNull_(v[8])
         }));
       if (sn.rows.length !== sn.rowCount) {
         sn.reason = 'ARCHIVE_POINTER_DRIFT:' + sn.rows.length + '/' + sn.rowCount;
@@ -2268,12 +2270,16 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
   }
 }
 
-// 線形尺度 (1-5) の検証。範囲外・非数値は null。
+// 線形尺度の範囲。投稿の検証と、教師の回答一覧が返す軸の範囲の両方がここを見る。
+const LESSON_SCALE_MIN = 1;
+const LESSON_SCALE_MAX = 5;
+
+// 線形尺度 (LESSON_SCALE_MIN〜MAX) の検証。範囲外・非数値は null。
 function __validateLessonScale_(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   const rounded = Math.round(n);
-  if (rounded < 1 || rounded > 5) return null;
+  if (rounded < LESSON_SCALE_MIN || rounded > LESSON_SCALE_MAX) return null;
   return rounded;
 }
 
@@ -2385,8 +2391,8 @@ function submitLessonAnswer(targetUserId, payload) {
     // browse フェーズを見ている他の児童の画面に反映されるよう board cache を落とす。
     if (typeof bumpBoardDataVersion_ === 'function') {
       try {
+        // 回答シートの行 cache も version を key に持つので、これ 1 つで一緒に新しくなる。
         bumpBoardDataVersion_(targetUserId);
-        __invalidatePhaseRows_(phaseDef);
       } catch (cacheErr) {
         // 黙って落とさない: cache version を上げ損ねると、他の児童のボードに
         //   古い分布が最大 12 秒残る。症状 (反映されない) だけが出て原因が
@@ -2407,11 +2413,11 @@ function submitLessonAnswer(targetUserId, payload) {
 }
 
 // 1 フェーズ分の自分の回答を読む。無ければ null。
-function __readOwnLessonAnswer_(phaseDef, actorEmail) {
+function __readOwnLessonAnswer_(phaseDef, actorEmail, boardUserId) {
   try {
     // 全行 (10 秒 cache) から本人の行を抜く。以前は寸法 + email 列 + 該当行の 3 read を
     //   児童ごと・入力フェーズごとに払っていた。
-    const rows = __readAllLessonRows_(phaseDef);
+    const rows = __readAllLessonRows_(phaseDef, { boardUserId });
     const me = String(actorEmail || '').trim().toLowerCase();
     const mine = rows.find((r) => r.email === me);
     if (!mine) return null;
@@ -2445,7 +2451,7 @@ function getLessonReviewGrid(userId, lessonId) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
-    const change = __buildLessonChangeStudents_((auth.found.lesson.lessonJson) || {});
+    const change = __buildLessonChangeStudents_((auth.found.lesson.lessonJson) || {}, userId);
     return createSuccessResponse(change.phaseCount ? '見取りグリッド' : '入力フェーズなし', change);
   } catch (error) {
     logError_('getLessonReviewGrid', error);
@@ -2454,13 +2460,14 @@ function getLessonReviewGrid(userId, lessonId) {
 }
 
 /**
- * 児童ごとの ● 最初 → ★ いま を組み立てる (見取りグリッドと授業中の回答一覧で共用)。
+ * 児童ごとの ● 最初 → ★ いま を組み立てる (CLI の lesson.reviewGrid と授業中の回答一覧で共用)。
  * 各回答には sheetName を付ける (一覧が「いまボードに出ている方」にだけ ☆ を出すため)。
  *
  * @param {Object} lessonJson
+ * @param {string} boardUserId - 授業の所有者 (回答シートの行 cache の version を引く)
  * @returns {{students: Array, phaseCount: number}}
  */
-function __buildLessonChangeStudents_(lessonJson) {
+function __buildLessonChangeStudents_(lessonJson, boardUserId) {
   const phases = Array.isArray(lessonJson && lessonJson.phases) ? lessonJson.phases : [];
 
   // 入力フェーズだけを時系列で読む (browse/discuss には投稿が存在しない)。
@@ -2476,7 +2483,7 @@ function __buildLessonChangeStudents_(lessonJson) {
   const byEmail = new Map();
   for (let p = 0; p < inputPhases.length; p++) {
     const def = inputPhases[p].def;
-    const rows = __readAllLessonRows_(def);
+    const rows = __readAllLessonRows_(def, { boardUserId });
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       if (!row.email) continue;
@@ -2534,8 +2541,9 @@ function __buildLessonChangeStudents_(lessonJson) {
  * Why: 一覧とボードが別のシートを見ると、一覧で押したハイライトが別の児童の行に付く。
  *   「出会う」「議論する」は直前の入力フェーズのシート、入力フェーズは自分のシート。
  *
- * polling 前提なので、lesson 行は cache 越し・回答は 10 秒 cache 越しに読む
- *   (429 storm の再発を避ける)。sinceSig が一致すれば rows を省いて返す。
+ * polling 前提なので、lesson 行・回答とも cache 越しに読む (429 storm の再発を避ける)。
+ *   回答の行 cache はボードの data version を key に持つので、投稿・ハイライト・削除の
+ *   どれでも次の polling で新しくなる。sinceSig が一致すれば rows を省いて返す。
  *
  * @param {string} userId - 授業の所有者
  * @param {string} lessonId
@@ -2559,7 +2567,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
     const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
     const source = { spreadsheetId: patch.spreadsheetId, sheetName: patch.sheetName };
-    const rows = __readAllLessonRows_(source);
+    const rows = __readAllLessonRows_(source, { boardUserId: userId });
 
     // 未提出: 2 回目以降の入力フェーズだけ分かる (名簿は持たないので、前の入力フェーズに
     //   答えた児童を母集団にする)。最初の入力フェーズでは null = 「分からない」。
@@ -2575,7 +2583,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       }
       if (prevInput) {
         const answered = new Set(rows.map(r => r.email));
-        pending = __readAllLessonRows_(prevInput)
+        pending = __readAllLessonRows_(prevInput, { boardUserId: userId })
           .filter(r => !answered.has(r.email))
           .map(r => ({ name: r.name, email: r.email, class: r.class }));
       }
@@ -2597,8 +2605,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       sourceSheetName: source.sheetName || ''
     };
     // ● → ★ を開いているときだけ、入力フェーズ全部を読んで児童ごとの変化を足す
-    //   (どの読みも 10 秒 cache 越し。「もう一度考える」は pending で既に前のシートを読んでいる)。
-    const change = (options && options.includeChange) ? __buildLessonChangeStudents_(lessonJson) : null;
+    //   (どの読みも行 cache 越し。「もう一度考える」は pending で既に前のシートを読んでいる)。
+    const change = (options && options.includeChange) ? __buildLessonChangeStudents_(lessonJson, userId) : null;
     const sig = __liveAnswersSig_(rowsSig + (change ? '|' + JSON.stringify(change.students) : '|-'));
     if (options && options.sinceSig && options.sinceSig === sig) {
       return createSuccessResponse('変更なし', { supported: true, unchanged: true, sig, phase: phaseInfo });
@@ -2609,8 +2617,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       boardMode,
       x: patch.xAxisLabels || { min: '', max: '' },
       y: boardMode === 'matrix' ? (patch.yAxisLabels || { min: '', max: '' }) : null,
-      min: 1,
-      max: 5
+      min: LESSON_SCALE_MIN,
+      max: LESSON_SCALE_MAX
     };
     return createSuccessResponse('回答一覧', {
       supported: true,
@@ -2640,16 +2648,18 @@ function __liveAnswersSig_(text) {
  * 授業中の回答一覧からハイライトを切り替える。
  *
  * 書き込みはボードと同じ toggleHighlight (同じ HIGHLIGHT 列・同じ行ロック・同じ board
- * cache の無効化) に委ねる。ここで足すのは「一覧が見ているシート = いまのボードのシート」の照合だけ。
- * Why: toggleHighlight はボードの config が指すシートの行番号に書く。フェーズ切替の直後や
- *   config の再適用に失敗した状態で押すと、一覧で見ていたのとは別の児童の行に付く。
+ * cache の無効化) に委ねる。ここで決めるのは「一覧が見ていたのはどのシートのどの行か」だけで、
+ * 照合そのものは executeBoardRowOperation が自分の config 読みと行ロックの中で行う。
+ * Why: toggleHighlight はボードの config が指すシートの行番号に書く。フェーズ切替の直後・
+ *   config の再適用失敗・行の削除で番号がずれた状態で押すと、別の児童の行に付く。
  *
  * @param {string} userId
  * @param {string} lessonId
  * @param {number} rowIndex - __readAllLessonRows_ の rowIndex
  * @param {string} sheetName - 一覧が読んだシート (phase.sourceSheetName)
+ * @param {string} [expectedEmail] - 一覧が見ていたその行の児童 (授業モードのシートは 1 児童 1 行)
  */
-function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName) {
+function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName, expectedEmail) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true, cachedLesson: true });
     if (auth.error) return auth.error;
@@ -2657,47 +2667,55 @@ function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName) {
     const phase = (lessonJson.phases || [])[__activePhaseIndex_(lessonJson)];
     if (!phase) return createErrorResponse('現在のフェーズが見つかりません');
     const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
-
-    const config = getConfigOrDefault(userId) || {};
-    const boardMatches = config.spreadsheetId === patch.spreadsheetId
-      && config.sheetName === patch.sheetName
-      && String(sheetName || '') === String(patch.sheetName || '');
-    if (!boardMatches) {
+    if (String(sheetName || '') !== String(patch.sheetName || '')) {
       return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。一覧を読み込み直します');
     }
-
-    const res = toggleHighlight(userId, rowIndex);
-    if (res && res.success) {
-      __invalidatePhaseRows_({ spreadsheetId: patch.spreadsheetId, sheetName: patch.sheetName });
-    }
-    return res;
+    return toggleHighlight(userId, rowIndex, {
+      expectedSpreadsheetId: patch.spreadsheetId,
+      expectedSheetName: patch.sheetName,
+      rowIdentity: expectedEmail ? { column: LESSON_NATIVE_COL_EMAIL, value: expectedEmail } : null
+    });
   } catch (error) {
     logError_('toggleLessonHighlight', error);
     return createExceptionResponse(error);
   }
 }
 
-// 1 フェーズ分の全回答を読む (教師の見取り用)。
-// 回答シートの読み (航跡 / 見取り) は 10 秒 cache する。
-//   Why: 「ふりかえる」に入った瞬間、学級全員が同時に自分の航跡を読む (= 入力フェーズの数 ×
-//   人数の read)。行は 1 児童 1 行で 30 行程度なので、全行を 1 回読んで cache し、本人分は
-//   メモリで抜く。送信時に該当シートの cache を捨てるので、送った直後の再読み込みでも古くならない。
-const LESSON_ROWS_CACHE_TTL_S = 10;
-function __phaseRowsCacheKey_(phaseDef) {
-  return 'lesson_rows_' + phaseDef.spreadsheetId + '_' + phaseDef.sheetName;
-}
-function __invalidatePhaseRows_(phaseDef) {
-  if (!phaseDef || !phaseDef.spreadsheetId || typeof CacheService === 'undefined') return;
-  try { CacheService.getScriptCache().remove(__phaseRowsCacheKey_(phaseDef)); }
-  catch (_) { /* cache 不通は機能的に無害 (TTL 10 秒で切れる) */ }
+// 1 フェーズ分の全回答を読む (航跡 / 見取り / 教師の回答一覧)。
+// 回答シートの読みは cache し、key にボードの data version (getBoardDataVersion_) を含める。
+//   Why cache か: 「ふりかえる」に入った瞬間、学級全員が同時に自分の航跡を読む (= 入力フェーズの
+//   数 × 人数の read)。行は 1 児童 1 行で 30 行程度なので、全行を 1 回読んで cache し、本人分は
+//   メモリで抜く。教師の回答一覧も 10 秒ごとにここを読む。
+//   Why version を key にするか: 投稿・ハイライト・リアクション・削除はどれも
+//   bumpBoardDataVersion_ を呼ぶので、書いた側がこの cache を個別に捨てなくても次の読みで
+//   新しい key になる (削除で行番号がずれた直後に古い番号を返さない)。TTL は「書き込みが
+//   無いときの読み直し間隔」だけを決めるので、polling (10 秒) より長くしてよい。
+const LESSON_ROWS_CACHE_TTL_S = 60;
+function __phaseRowsCacheKey_(phaseDef, boardUserId) {
+  return 'lesson_rows_' + phaseDef.spreadsheetId + '_' + phaseDef.sheetName
+    + '_v' + getBoardDataVersion_(boardUserId);
 }
 
+// 空セルを 0 と読まない (数直線の縦軸は空欄で書かれる)。非数値も null。
+function __cellToNumOrNull_(cell) {
+  if (cell === '' || cell === null || cell === undefined) return null;
+  const n = Number(cell);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * @param {Object} phaseDef - { spreadsheetId, sheetName }
+ * @param {Object} opts - { boardUserId: 授業の所有者 (cache の version 用), fresh }
+ *   boardUserId が無ければ cache を使わない (version で捨てられない cache を作らない)。
+ */
 function __readAllLessonRows_(phaseDef, opts) {
   try {
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return [];
-    const fresh = Boolean(opts && opts.fresh);
-    const cacheKey = __phaseRowsCacheKey_(phaseDef);
-    if (!fresh && typeof CacheService !== 'undefined') {
+    const boardUserId = opts && opts.boardUserId;
+    const useCache = !(opts && opts.fresh) && Boolean(boardUserId)
+      && typeof CacheService !== 'undefined' && typeof getBoardDataVersion_ === 'function';
+    const cacheKey = useCache ? __phaseRowsCacheKey_(phaseDef, boardUserId) : '';
+    if (useCache) {
       try {
         const hit = CacheService.getScriptCache().get(cacheKey);
         if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
@@ -2710,15 +2728,9 @@ function __readAllLessonRows_(phaseDef, opts) {
     // 全行を 1 回で読む。SA proxy の getDataRange は実データ範囲だけを返す (空グリッドを読まない)。
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect) ので、
-    //   固定 index ではなくヘッダー名で探す。無ければ全員 false。
+    //   固定 index ではなくヘッダー名で探す。値の読み方はボードと同じ extractHighlight に任せる。
     const header = data[0] || [];
     const highlightCol = header.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
-    // 空セルを 0 と読まない (数直線の縦軸は空欄で書かれる)。
-    const toNum = (cell) => {
-      if (cell === '' || cell === null || cell === undefined) return null;
-      const n = Number(cell);
-      return Number.isFinite(n) ? n : null;
-    };
     const values = data.slice(1);
     const out = [];
     for (let i = 0; i < values.length; i++) {
@@ -2733,14 +2745,14 @@ function __readAllLessonRows_(phaseDef, opts) {
         email,
         class: String(v[2] || ''),
         name: String(v[3] || ''),
-        numericX: toNum(v[4]),
-        numericY: toNum(v[5]),
+        numericX: __cellToNumOrNull_(v[4]),
+        numericY: __cellToNumOrNull_(v[5]),
         reason: String(v[6] || ''),
         addedInsight: String(v[7] || ''),
-        highlight: highlightCol >= 0 && String(v[highlightCol] || '').toUpperCase() === 'TRUE'
+        highlight: extractHighlight(v, header, highlightCol)
       });
     }
-    if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
+    if (useCache && typeof saveToCacheWithSizeCheck === 'function') {
       saveToCacheWithSizeCheck(cacheKey, out, LESSON_ROWS_CACHE_TTL_S);
     }
     return out;
@@ -2777,7 +2789,7 @@ function getMyLessonTrajectory(targetUserId) {
       const ph = phases[i];
       // 入力フェーズだけが航跡の点になる (browse/discuss には投稿が存在しない)。
       if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(ph)) < 0) continue;
-      const entry = __readOwnLessonAnswer_(ph, actorEmail);
+      const entry = __readOwnLessonAnswer_(ph, actorEmail, targetUserId);
       if (entry) out.push(Object.assign({ phaseIndex: i, phaseName: ph.name || '' }, entry));
     }
     return createSuccessResponse('自分の記録を取得しました', { phases: out });
