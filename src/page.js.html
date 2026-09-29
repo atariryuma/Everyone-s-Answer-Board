@@ -2171,6 +2171,7 @@
       const needY = phase.formTemplate !== 'numberline';
       if (!draft || !draft.numericX || (needY && !draft.numericY)) {
         this.showToast('まず、自分の考えの位置をえらんでください');
+        this.__reportLessonSubmit('POSITION_MISSING', phase);
         return;
       }
       const reasonEl = document.getElementById('lessonReason');
@@ -2179,6 +2180,7 @@
       if (!reason) {
         this.showToast('理由を書いてください');
         if (reasonEl) reasonEl.focus();
+        this.__reportLessonSubmit('EMPTY_REASON', phase);
         return;
       }
 
@@ -2189,6 +2191,7 @@
         if (!picked) {
           this.showToast('クラスを選んでください');
           classEl.focus();
+          this.__reportLessonSubmit('CLASS_MISSING', phase);
           return;
         }
         this.__saveLessonClass(picked);
@@ -2201,6 +2204,7 @@
         if (!typed) {
           this.showToast('名前を入力してください');
           nameEl.focus();
+          this.__reportLessonSubmit('NAME_MISSING', phase);
           return;
         }
         this.__saveLessonName(typed);
@@ -2221,7 +2225,11 @@
           name: this.__lessonStoredName()
         });
         if (!res || !res.success) {
-          throw new Error((res && res.message) || '送信に失敗しました');
+          // サーバーが断った (理由コードは res.error)。サーバー側にも同じ記録が残る。
+          this.__reportLessonSubmit('REFUSED:' + ((res && res.error) || 'UNKNOWN'), phase);
+          const refused = new Error((res && res.message) || '送信に失敗しました');
+          refused.reported = true;   // onFail で二重に報告しない
+          throw refused;
         }
         this.showToast('考えを送りました');
         // 送った内容を画面の状態にする。以後は「送りました」画面。
@@ -2235,12 +2243,36 @@
         this.__renderLessonScreen();
       };
 
+      const onFail = (err) => {
+        this.showToast((err && err.message) || '送信に失敗しました');
+        // サーバーの拒否は send() 内で報告済み (err.reported)。ここに来る未報告の失敗は通信そのもの。
+        if (!(err && err.reported)) {
+          this.__reportLessonSubmit('TRANSPORT:' + String((err && err.message) || '').slice(0, 60), phase);
+        }
+      };
       if (window.sharedUtilities && window.sharedUtilities.buttons && btn) {
-        await window.sharedUtilities.buttons.withBusy(btn, send, { busyText: '送っています…' })
-          .catch((err) => this.showToast(err.message || '送信に失敗しました'));
+        await window.sharedUtilities.buttons.withBusy(btn, send, { busyText: '送っています…' }).catch(onFail);
       } else {
-        try { await send(); } catch (err) { this.showToast(err.message || '送信に失敗しました'); }
+        try { await send(); } catch (err) { onFail(err); }
       }
+    }
+
+    /**
+     * 送れなかった送信を Cloud Logging に残す (画面側で止めた場合も、サーバーが断った場合も)。
+     *   Why: 2026-09-29 に 25 人分が届かなかったとき、児童側で何が起きたかを示す記録が無かった。
+     *   本文 (理由の文章) は送らない。1 セッション 20 件・同じ内容は 1 回、の上限は報告器が持つ。
+     */
+    __reportLessonSubmit(code, phase) {
+      try {
+        if (!window.ClientErrorReporter || typeof window.ClientErrorReporter.report !== 'function') return;
+        const p = phase || {};
+        window.ClientErrorReporter.report({
+          level: 'warn',
+          message: '[lesson/submit] ' + code + ' phase=' + (p.phaseIndex === undefined ? '-' : p.phaseIndex) + ' role=' + (p.screenRole || '-'),
+          context: 'lesson/submit',
+          source: JSON.stringify({ code: String(code).slice(0, 40), phaseIndex: p.phaseIndex, lessonId: p.lessonId })
+        });
+      } catch (_) { /* 記録の失敗は送信の体験に影響させない */ }
     }
 
     /**

@@ -1124,3 +1124,25 @@ test('__handleBoardVersion: boardVersion が無い応答 (旧サーバー) で�
   assert.equal(instance.__handleBoardVersion({ hasNewContent: false }, false), false);
   assert.equal(loads.length, 0);
 });
+
+// =====================================================================
+// 送れなかった送信の報告 (児童の画面側)
+// =====================================================================
+
+test('__reportLessonSubmit: 理由コードとフェーズを報告器に渡す (本文は含めない)', () => {
+  const { instance, ctx } = makeInstance();
+  const sent = [];
+  ctx.window.ClientErrorReporter = { report: (p) => sent.push(p) };
+  instance.__reportLessonSubmit('POSITION_MISSING', { phaseIndex: 3, screenRole: 'reinput', lessonId: 'lesson_x' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].level, 'warn');
+  assert.equal(sent[0].context, 'lesson/submit');
+  assert.match(sent[0].message, /\[lesson\/submit\] POSITION_MISSING phase=3 role=reinput/);
+  assert.deepEqual(JSON.parse(sent[0].source), { code: 'POSITION_MISSING', phaseIndex: 3, lessonId: 'lesson_x' });
+});
+
+test('__reportLessonSubmit: 報告器が無ければ何もしない', () => {
+  const { instance, ctx } = makeInstance();
+  ctx.window.ClientErrorReporter = undefined;
+  assert.doesNotThrow(() => instance.__reportLessonSubmit('EMPTY_REASON', { phaseIndex: 0 }));
+});

@@ -1527,3 +1527,58 @@ test('__findOwnLessonRow_ / 自分の記録: 同じ児童の行が複数あれ�
   assert.equal(sheet._data.length, before);
   assert.equal(sheet._data[2][6], '三回目');
 });
+
+// =====================================================================
+// 送信を断った理由 / 受理した位置を必ず記録する
+// =====================================================================
+
+function captureLogs(h) {
+  const warns = [], logs = [];
+  h.context.console.warn = (...a) => warns.push(a.map(String).join(' '));
+  h.context.console.log = (...a) => logs.push(a.map(String).join(' '));
+  return { warns, logs };
+}
+
+test('submitLessonAnswer: 議論フェーズの送信は理由コード付きで WARNING に残る (文言は従来どおり)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  advanceAsTeacher(h, lessonId, 2);
+  const { warns } = captureLogs(h);
+  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 2, numericX: 3, numericY: 3, reason: 'r', class: '6年4組' });
+  assert.equal(res.success, false);
+  assert.equal(res.message, 'いまは考えを送る時間ではありません');
+  assert.equal(res.error, 'NOT_INPUT_PHASE');
+  assert.equal(warns.length, 1);
+  assert.match(warns[0], /\[lesson\/submit\] refused code=NOT_INPUT_PHASE .*clientPhase=2 serverPhase=2 role=discuss actor=chi…@ class=6年4組/);
+});
+
+test('submitLessonAnswer: フェーズのずれは client / server 両方のフェーズが記録される', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  const { warns } = captureLogs(h);
+  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: 'r' });
+  assert.equal(res.error, 'PHASE_MISMATCH');
+  assert.match(res.message, /^PHASE_CHANGED/);
+  assert.match(warns[0], /code=PHASE_MISMATCH .*clientPhase=0 serverPhase=3/);
+});
+
+test('submitLessonAnswer: 受理したら書いたシートと行を INFO に残す (追記 / 置き直し)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const { warns, logs } = captureLogs(h);
+  // in-memory の appendRow は行番号を返さないので getLastRow で補う
+  const sheet = h.nativeSheets.get('phase1');
+  const origAppend = sheet.appendRow;
+  sheet.appendRow = (r) => { origAppend(r); return sheet; };
+  assert.equal(submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: '最初', class: '6年4組' }).success, true);
+  assert.equal(submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: '置き直し', class: '6年4組' }).success, true);
+  assert.equal(warns.length, 0);
+  const ok = logs.filter(l => l.startsWith('[lesson/submit] ok'));
+  assert.equal(ok.length, 2);
+  assert.match(ok[0], /sheet=phase1 row=2 mode=append/);
+  assert.match(ok[1], /sheet=phase1 row=2 mode=update/);
+});

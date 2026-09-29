@@ -2345,51 +2345,59 @@ function __findOwnLessonRow_(sheet, actorEmail) {
  * @param {Object} payload - { lessonId, phaseIndex, numericX, numericY, reason, addedInsight, class, name }
  */
 function submitLessonAnswer(targetUserId, payload) {
+  const startedAt = Date.now();
+  // 断った送信は必ず 1 行残す (2026-09-29 の「送ったのに届かない」で、断った理由がどこにも無く
+  //   原因を 3 時間追った)。文言は変えない (画面側はこの文言を出す)。機械コードは error に入れる。
+  const p = payload || {};
+  const ctx = { lesson: p.lessonId, clientPhase: p.phaseIndex, serverPhase: null, role: null, actor: null, cls: p.class };
+  const refuse = (code, message) => __refuseLessonSubmit_(code, message, ctx, startedAt);
   try {
     const actorEmail = getCurrentEmail();
-    if (!actorEmail) return createAuthError();
+    ctx.actor = actorEmail;
+    if (!actorEmail) return refuse('NO_EMAIL', 'ユーザー認証が必要です');
 
-    const p = payload || {};
     const phase = __getViewerLessonPhase_(targetUserId, { fresh: true });
-    if (!phase) return createErrorResponse('この授業はいま投稿を受け付けていません');
+    if (!phase) return refuse('NO_ACTIVE_LESSON', 'この授業はいま投稿を受け付けていません');
+    ctx.serverPhase = phase.phaseIndex;
+    ctx.role = phase.screenRole;
 
     // client の lessonId / phaseIndex は「ズレの検出」にのみ使う。真実はサーバの active phase。
     //   フェーズ切替の直後に届いた投稿を、前のフェーズの行として書かないための照合。
     if (p.lessonId && String(p.lessonId) !== String(phase.lessonId)) {
-      return createErrorResponse('PHASE_CHANGED: 授業が切り替わりました。画面を読み込み直してください');
+      return refuse('LESSON_MISMATCH', 'PHASE_CHANGED: 授業が切り替わりました。画面を読み込み直してください');
     }
     if (p.phaseIndex !== undefined && p.phaseIndex !== null && Number(p.phaseIndex) !== phase.phaseIndex) {
-      return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。画面を読み込み直してください');
+      return refuse('PHASE_MISMATCH', 'PHASE_CHANGED: フェーズが切り替わりました。画面を読み込み直してください');
     }
     if (LESSON_INPUT_ROLES.indexOf(phase.screenRole) < 0) {
-      return createErrorResponse('いまは考えを送る時間ではありません');
+      return refuse('NOT_INPUT_PHASE', 'いまは考えを送る時間ではありません');
     }
 
     // 直前の fresh 判定が埋めた cache を読む (以前はここで lessons シートをもう 1 回読んでいた)。
     const found = __findLessonByIdCached_(phase.lessonId, { noStale: true });
-    if (!found || !found.lesson) return createErrorResponse('授業が見つかりません');
+    if (!found || !found.lesson) return refuse('LESSON_NOT_FOUND', '授業が見つかりません');
     const lessonJson = found.lesson.lessonJson || {};
     const phaseDef = (lessonJson.phases || [])[phase.phaseIndex];
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) {
-      return createErrorResponse('回答シートが未設定です');
+      return refuse('SHEET_NOT_CONFIGURED', '回答シートが未設定です');
     }
 
     const isMatrix = phaseDef.formTemplate === 'matrix';
     const x = __validateLessonScale_(p.numericX);
-    if (x === null) return createErrorResponse('横軸の値が不正です');
+    if (x === null) return refuse('INVALID_X', '横軸の値が不正です');
     const y = isMatrix ? __validateLessonScale_(p.numericY) : null;
-    if (isMatrix && y === null) return createErrorResponse('縦軸の値が不正です');
+    if (isMatrix && y === null) return refuse('INVALID_Y', '縦軸の値が不正です');
 
     const reason = __sanitizeLessonText_(p.reason);
-    if (!reason) return createErrorResponse('理由を書いてください');
+    if (!reason) return refuse('EMPTY_REASON', '理由を書いてください');
     const addedInsight = __sanitizeLessonText_(p.addedInsight);
 
     // openSpreadsheet は { spreadsheet, auth, accessMode, getSheet(name) } を返す。
     //   SA proxy / native のどちらでも getSheet() 経由で取ること。
     const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_submit' });
-    if (!access) return createErrorResponse('回答シートを開けませんでした');
+    if (!access) return refuse('SHEET_OPEN_FAILED', '回答シートを開けませんでした');
     const sheet = access.getSheet(phaseDef.sheetName);
-    if (!sheet) return createErrorResponse('回答シートが見つかりません');
+    if (!sheet) return refuse('SHEET_NOT_FOUND', '回答シートが見つかりません');
 
     const row = [
       new Date().toISOString(),
@@ -2403,11 +2411,18 @@ function submitLessonAnswer(targetUserId, payload) {
     ];
 
     const existingRow = __findOwnLessonRow_(sheet, actorEmail);
+    let writtenRow = existingRow;
     if (existingRow > 0) {
       sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
     } else {
-      sheet.appendRow(row);
+      writtenRow = __lessonAppendedRow_(sheet.appendRow(row));
     }
+    // 受理した送信も 1 行残す (どのシートの何行目に書いたか)。行がずれて見えなくなる事故を、
+    //   次は「送信完了なのに一覧に無い」の時点でログから突き止められるようにする。
+    console.log('[lesson/submit] ok', __lessonSubmitLogFields_(Object.assign({}, ctx, {
+      sheet: phaseDef.sheetName, row: writtenRow > 0 ? writtenRow : '?', mode: existingRow > 0 ? 'update' : 'append',
+      ms: Date.now() - startedAt
+    })));
 
     // browse フェーズを見ている他の児童の画面に反映されるよう board cache を落とす。
     if (typeof bumpBoardDataVersion_ === 'function') {
@@ -2431,6 +2446,46 @@ function submitLessonAnswer(targetUserId, payload) {
     logError_('submitLessonAnswer', error);
     return createExceptionResponse(error);
   }
+}
+
+// 送信を断ったときの記録 + 応答。文言はそのまま、機械コードは error に載せる。
+function __refuseLessonSubmit_(code, message, ctx, startedAt) {
+  console.warn('[lesson/submit] refused', __lessonSubmitLogFields_(Object.assign({}, ctx, {
+    code, ms: Date.now() - (startedAt || Date.now())
+  })));
+  return createErrorResponse(message, null, { error: code });
+}
+
+// ログ 1 行分の `key=value` 列。児童のメールは先頭 3 文字だけ (誰か分かれば足りる)。
+function __lessonSubmitLogFields_(f) {
+  const actor = f.actor ? String(f.actor).replace(/^(.{0,3}).*@.*$/, '$1…@') : '-';
+  const parts = [
+    'lesson=' + (f.lesson || '-'),
+    'clientPhase=' + (f.clientPhase === undefined || f.clientPhase === null ? '-' : f.clientPhase),
+    'serverPhase=' + (f.serverPhase === null || f.serverPhase === undefined ? '-' : f.serverPhase),
+    'role=' + (f.role || '-'),
+    'actor=' + actor,
+    'class=' + (f.cls || '-')
+  ];
+  if (f.code) parts.unshift('code=' + f.code);
+  if (f.sheet) parts.push('sheet=' + f.sheet, 'row=' + f.row, 'mode=' + f.mode);
+  if (f.ms !== undefined) parts.push('ms=' + f.ms);
+  return parts.join(' ');
+}
+
+// appendRow の戻りから書いた行番号を取る。SA proxy は API 応答 (updates.updatedRange) を返し、
+//   SpreadsheetApp の Sheet は行番号を返さないので getLastRow で補う。取れなければ -1。
+function __lessonAppendedRow_(res) {
+  try {
+    if (res && typeof res.getContentText === 'function') {
+      const body = safeJsonParse_(res.getContentText(), {});
+      const range = (body && body.updates && body.updates.updatedRange) || '';
+      const m = /![A-Z]+(\d+)/.exec(range);
+      return m ? Number(m[1]) : -1;
+    }
+    if (res && typeof res.getLastRow === 'function') return res.getLastRow();
+  } catch (_) { /* 行番号はログ用。取れなくても送信は成功している */ }
+  return -1;
 }
 
 // 1 フェーズ分の自分の回答を読む。無ければ null。
