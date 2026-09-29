@@ -152,10 +152,14 @@ function getSheetHeaders(sheet) {
 
   const info = { lastCol, headers };
 
-  try {
-    cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
-  } catch (cacheError) {
-    console.warn('getSheetHeaders: Cache write failed:', cacheError.message);
+  // 空の見出しは cache しない。回答シートは必ず見出し行を持つので、空 = 読み込み失敗 (429 等)。
+  //   cache すると、その間そのシートを見る全員のボードが長時間崩れる。
+  if (headers.length > 0) {
+    try {
+      cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
+    } catch (cacheError) {
+      console.warn('getSheetHeaders: Cache write failed:', cacheError.message);
+    }
   }
 
   return info;

@@ -1223,6 +1223,11 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
   return {
     getName: () => sheetName,
     getSheetId: () => additionalInfo.sheetId || 0,
+    // SpreadsheetApp の Sheet と同じく親 SS の ID を返す。
+    //   Why 必須か: 見出し / 行数の cache key は getParent().getId() で SS を区別する。
+    //   無いと key が 'unknown_<シート名>' になり、授業モードの phase1 のように同名のシートを
+    //   テナント中で取り違えていた (別の授業の見出し・行数が児童のボードに出る)。
+    getParent: () => ({ getId: () => sheetId }),
     getLastRow: () => {
       if (additionalInfo.rowCount) return additionalInfo.rowCount;
       return fetchDimensionsOnce().rowCount;

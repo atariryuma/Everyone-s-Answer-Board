@@ -3,6 +3,19 @@
      GAS Compatible utility functions for all HTML files
      ============================================================================= */
 
+  // requestIdleCallback を持たないブラウザ (Safari / iPad の一部) の代替。page.js が
+  //   描画と初期化で直接呼ぶので、無いと ReferenceError でボードや案内画面が止まる。
+  if (typeof window.requestIdleCallback !== 'function') {
+    window.requestIdleCallback = function (cb, opts) {
+      return setTimeout(function () {
+        cb({ didTimeout: false, timeRemaining: function () { return 0; } });
+      }, (opts && opts.timeout) ? Math.min(opts.timeout, 50) : 1);
+    };
+  }
+  if (typeof window.cancelIdleCallback !== 'function') {
+    window.cancelIdleCallback = function (id) { clearTimeout(id); };
+  }
+
   // GAS iframe/sandbox環境の既知の警告・エラーを抑制
   (function () {
     const gasSuppressPatterns = [

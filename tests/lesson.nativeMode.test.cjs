@@ -613,7 +613,7 @@ test('__getViewerLessonPhase_: 児童の polling は cache から返し、教師
     })
   };
   h.context.saveToCacheWithSizeCheck = (k, v, ttl) => {
-    assert.equal(ttl, 10, '短期 TTL');
+    if (!k.endsWith(':last')) assert.equal(ttl, 10, '短期 TTL');
     h.context.CacheService.getScriptCache().put(k, JSON.stringify(v));
     return true;
   };
@@ -745,7 +745,10 @@ test('回答シートの読み (航跡) は cache され、送信 (board version
   h.context.CacheService = { getScriptCache: () => ({
     get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
   }) };
-  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => { assert.equal(ttl, 60); store.set(k, JSON.stringify(v)); return true; };
+  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => {
+    if (k.startsWith('lesson_rows_')) assert.equal(ttl, 60);
+    store.set(k, JSON.stringify(v)); return true;
+  };
   h.setEmail('student@example.com');
   assert.equal(h.context.submitLessonAnswer('u1', { lessonId, phaseIndex: 0, numericX: 2, numericY: 4, reason: 'r', class: '6年1組', name: 'A' }).success, true);
   const first = h.context.getMyLessonTrajectory('u1');
@@ -1462,4 +1465,42 @@ test('__findOwnLessonRow_: 全行 1 回読みで自分の行を見つける (寸
   assert.equal(h.context.__findOwnLessonRow_(sheet, 'b@example.com'), 3);
   assert.equal(h.context.__findOwnLessonRow_(sheet, 'zzz@example.com'), -1);
   assert.equal(dims, 0, 'getLastRow (metadata read) を使わない');
+});
+
+// =====================================================================
+// 読み込み失敗 (429 等) を「授業なし」「回答なし」として固定しない
+// =====================================================================
+
+function withMemCache(h) {
+  const store = new Map();
+  h.context.CacheService = { getScriptCache: () => ({
+    get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
+  }) };
+  h.context.saveToCacheWithSizeCheck = (k, v) => { store.set(k, JSON.stringify(v)); return true; };
+  return store;
+}
+
+test('__getViewerLessonPhase_: lesson 行が読めないときは直前のフェーズを返す (児童の画面を授業から外さない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const store = withMemCache(h);
+  const first = h.context.__getViewerLessonPhase_('u1');
+  assert.equal(first.lessonId, lessonId);
+
+  store.delete('lesson_phase_u1');                       // 10 秒 cache が切れた
+  h.context.__findLessonByIdCached_ = () => null;         // lessons シートが 429 で読めない
+  const polled = h.context.__getViewerLessonPhase_('u1');
+  assert.ok(polled && polled.lessonId === lessonId, '直前のフェーズを返す');
+  assert.ok(!store.has('lesson_phase_u1'), '失敗は cache しない');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }), null, '投稿の検証は古いフェーズで受理しない');
+});
+
+test('__readAllLessonRows_: 見出し行すら読めない (読み込み失敗) ときは cache しない', () => {
+  const h = loadContext();
+  const store = withMemCache(h);
+  h.context.openSpreadsheet = () => ({ getSheet: () => ({ getDataRange: () => ({ getValues: () => [] }) }) });
+  const rows = h.context.__readAllLessonRows_({ spreadsheetId: 'ss', sheetName: 'phase1' }, { boardUserId: 'u1' });
+  assert.equal(rows.length, 0);
+  assert.ok(![...store.keys()].some(k => k.startsWith('lesson_rows_')));
 });

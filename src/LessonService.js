@@ -2183,6 +2183,8 @@ function __viewerBoardConfig_(targetUserId) {
 //   (getSheets + getLastRow + TextFinder + header + row = 5 call/poll) 429 quota に当たる。
 //   フェーズは教師が進めたときにしか変わらないので、短期 cache + 変更時の明示 invalidate で足りる。
 const LESSON_PHASE_CACHE_TTL_S = 10;
+// 読み込みに失敗した poll に返す「直前のフェーズ」の保持時間 (授業 1 コマ分)。
+const LESSON_PHASE_LAST_TTL_S = 3600;
 function __viewerLessonPhaseCacheKey_(targetUserId) {
   return 'lesson_phase_' + targetUserId;
 }
@@ -2217,9 +2219,22 @@ function __getViewerLessonPhase_(targetUserId, opts) {
       } catch (_) { /* cache 不通 / 壊れた値は再計算で回復する */ }
     }
     const phase = __computeViewerLessonPhase_(targetUserId, { fresh });
-    if (!fresh && typeof saveToCacheWithSizeCheck === 'function') {
+    if (phase === undefined) {
+      // 読み込み失敗 (429 等)。「授業なし」を返すと児童の画面が授業から外れ、書きかけの入力が
+      //   消える。polling 用には直前に分かっていたフェーズを返し、失敗は cache しない。
+      //   投稿の検証 (fresh) は古いフェーズで受理しないよう null (= 受け付けない) のまま。
+      if (fresh) return null;
+      try {
+        const last = CacheService.getScriptCache().get(cacheKey + ':last');
+        const parsed = last ? JSON.parse(last) : null;
+        return parsed && parsed.phase ? parsed.phase : null;
+      } catch (_) { return null; /* 直前の値も無ければ従来どおり「授業なし」 */ }
+    }
+    if (typeof saveToCacheWithSizeCheck === 'function') {
       // null (授業中でない) も cache する。掲示板モードの polling で毎回 config を読まないため。
-      saveToCacheWithSizeCheck(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
+      if (!fresh) saveToCacheWithSizeCheck(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
+      // 読み込み失敗時の代わりに返す「直前に分かっていたフェーズ」。
+      saveToCacheWithSizeCheck(cacheKey + ':last', { phase }, LESSON_PHASE_LAST_TTL_S);
     }
     return phase;
   } catch (error) {
@@ -2232,6 +2247,7 @@ function __getViewerLessonPhase_(targetUserId, opts) {
  * @param {string} targetUserId
  * @param {Object} [opts]
  * @param {boolean} [opts.fresh] - true なら lesson 行の stale 応答 (stampede 中の直前値) を受けない
+ * @returns {Object|null|undefined} フェーズ / null = 授業中でない / undefined = 読み込み失敗
  */
 function __computeViewerLessonPhase_(targetUserId, opts) {
   try {
@@ -2240,7 +2256,9 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
     if (!lessonId) return null;
 
     const found = __findLessonByIdCached_(lessonId, { noStale: Boolean(opts && opts.fresh) });
-    if (!found || !found.lesson || found.lesson.state !== 'active') return null;
+    // config が授業を指しているのに行が引けない = lessons シートの読み込み失敗 (429 等)。
+    if (!found || !found.lesson) return undefined;
+    if (found.lesson.state !== 'active') return null;
 
     const lessonJson = found.lesson.lessonJson || {};
     if (!__isNativePhase_({}, lessonJson)) return null;  // Form 経由の授業では使わない
@@ -2266,7 +2284,7 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
     };
   } catch (error) {
     logError_('__computeViewerLessonPhase_', error);
-    return null;
+    return undefined;
   }
 }
 
@@ -2752,7 +2770,9 @@ function __readAllLessonRows_(phaseDef, opts) {
         highlight: extractHighlight(v, header, highlightCol)
       });
     }
-    if (useCache && typeof saveToCacheWithSizeCheck === 'function') {
+    // data が空 = 見出し行すら読めていない = 読み込み失敗 (429 等)。空を cache すると
+    //   60 秒間「回答なし」に見えるので、失敗は cache しない。
+    if (useCache && data.length > 0 && typeof saveToCacheWithSizeCheck === 'function') {
       saveToCacheWithSizeCheck(cacheKey, out, LESSON_ROWS_CACHE_TTL_S);
     }
     return out;
