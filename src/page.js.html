@@ -1585,6 +1585,7 @@
 
       // フェーズが変わったら、前のフェーズの入力内容は持ち越さない。
       this.state.lessonDraft = null;
+      this.state.lessonPrefilled = false;
       this.state.lessonSent = null;
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
@@ -1868,6 +1869,9 @@
       host.innerHTML =
         '<div class="lesson-card">' +
           '<h2 class="lesson-title">' + esc(phase.question || 'いまの考えは？') + '</h2>' +
+          (isReinput && this.state.lessonPrefilled
+            ? '<p id="lessonPrefillHint" class="lesson-hint">前回の位置とことばが入っています。話し合いで変わったところを直してから送りましょう</p>'
+            : '') +
           (needClass
             ? '<label class="lesson-label" for="lessonClass">クラス</label>' +
               '<select id="lessonClass" class="lesson-input">' +
@@ -1993,24 +1997,104 @@
           if (!cur || cur.lessonId !== phase.lessonId || cur.phaseIndex !== phase.phaseIndex) return;
           const phases = (res && res.success && res.data && res.data.phases) || [];
           if (!phases.length) return;
-          let changed = false;
           const first = phases[0];
-          if (first.phaseIndex < phase.phaseIndex && !this.state.lessonPrevPoint) {
-            this.state.lessonPrevPoint = { numericX: first.numericX, numericY: first.numericY };
-            changed = true;
-          }
           const mine = phases.filter((p) => p.phaseIndex === phase.phaseIndex)[0];
+          // このフェーズに自分の行がある = 送信済み。画面ごと「送りました」に切り替える。
           if (mine && !this.state.lessonSent && !this.state.lessonEditing) {
             this.state.lessonSent = {
               lessonId: phase.lessonId, phaseIndex: phase.phaseIndex,
               numericX: mine.numericX, numericY: mine.numericY,
               reason: mine.reason || '', addedInsight: mine.addedInsight || ''
             };
-            changed = true;
+            if (document.getElementById('lessonScreen')) this.__renderLessonScreen();
+            return;
           }
-          if (changed && document.getElementById('lessonScreen')) this.__renderLessonScreen();
+          // 再入力フェーズ: 最初の ● を下敷きにし、前回の位置とことばを初期値として入れる。
+          //   Why 初期値か: 位置が同じ児童は選び直さなくてよく、理由を打ち直さなくてよい。
+          //   書く時間を「変わったこと・加わったこと」に集中させる (書く量で授業が押していた)。
+          //   Why その場で埋めるか: 画面を作り直すと、打ち始めていた児童の入力のフォーカスと
+          //   日本語変換が切れる。埋めるのは空の欄だけ (打ち始めていれば触らない)。
+          if (phase.screenRole === 'reinput' && first.phaseIndex < phase.phaseIndex) {
+            if (!this.state.lessonPrevPoint) {
+              this.state.lessonPrevPoint = { numericX: first.numericX, numericY: first.numericY };
+            }
+            const seeded = this.__seedReinputDraft(first);
+            if (seeded.position || seeded.reason) this.state.lessonPrefilled = true;
+            if (!this.__applyLessonRecordInPlace(this.state.lessonPrevPoint, this.state.lessonDraft)
+                && document.getElementById('lessonScreen')) {
+              this.__renderLessonScreen();   // 入力画面がまだ無いときだけ描き直す
+            }
+          }
         })
         .catch(() => { this.state.lessonRecordKey = null; /* 次の描画で読み直す */ });
+    }
+
+    /**
+     * 再入力フェーズの下書きに、最初の答え (位置・理由) を「空の欄だけ」入れる。
+     *   児童が先に触っていた欄は触らない。「加わったこと」は新しく書くものなので入れない。
+     * @returns {{position:boolean, reason:boolean}} 何を入れたか
+     */
+    __seedReinputDraft(first) {
+      const draft = Object.assign({}, this.state.lessonDraft || {});
+      const out = { position: false, reason: false };
+      if (!first) return out;
+      const hasX = first.numericX !== null && first.numericX !== undefined && first.numericX !== '';
+      if (!draft.numericX && hasX) {
+        draft.numericX = Number(first.numericX);
+        draft.numericY = (first.numericY === null || first.numericY === undefined || first.numericY === '')
+          ? null : Number(first.numericY);
+        out.position = true;
+      }
+      if (!String(draft.reason || '').trim() && String(first.reason || '').trim()) {
+        draft.reason = String(first.reason);
+        out.reason = true;
+      }
+      if (out.position || out.reason) this.state.lessonDraft = draft;
+      return out;
+    }
+
+    /**
+     * 入力画面を作り直さずに、● (最初の位置)・選択中の位置・理由の初期値・案内文を反映する。
+     * @returns {boolean} 入力画面 (格子か数直線) が画面にあって反映できたか
+     */
+    __applyLessonRecordInPlace(prev, draft) {
+      const host = document.getElementById('lessonGrid') || document.getElementById('lessonScale');
+      if (!host) return false;
+      const oneD = host.id === 'lessonScale';
+      const cellFor = (x, y) => host.querySelector(oneD
+        ? '.lesson-cell[data-x="' + x + '"]'
+        : '.lesson-cell[data-x="' + x + '"][data-y="' + y + '"]');
+      if (prev && prev.numericX) {
+        const c = cellFor(prev.numericX, prev.numericY);
+        if (c && !c.classList.contains('is-prev')) {
+          c.classList.add('is-prev');
+          c.setAttribute('aria-label', (c.getAttribute('aria-label') || '') + '（最初に選んだところ）');
+          const mark = document.createElement('span');
+          mark.className = 'lesson-cell-prev';
+          mark.setAttribute('aria-hidden', 'true');
+          mark.textContent = '●';
+          c.appendChild(mark);
+        }
+      }
+      if (draft && draft.numericX && !host.querySelector('.lesson-cell.is-selected')) {
+        const c = cellFor(draft.numericX, draft.numericY);
+        if (c) c.classList.add('is-selected');
+      }
+      const reasonEl = document.getElementById('lessonReason');
+      if (reasonEl && !String(reasonEl.value || '').trim() && draft && draft.reason) {
+        reasonEl.value = draft.reason;
+      }
+      if (this.state.lessonPrefilled && !document.getElementById('lessonPrefillHint')) {
+        const title = host.closest('.lesson-card') && host.closest('.lesson-card').querySelector('.lesson-title');
+        if (title) {
+          const hint = document.createElement('p');
+          hint.id = 'lessonPrefillHint';
+          hint.className = 'lesson-hint';
+          hint.textContent = '前回の位置とことばが入っています。話し合いで変わったところを直してから送りましょう';
+          title.insertAdjacentElement('afterend', hint);
+        }
+      }
+      return true;
     }
 
     /**

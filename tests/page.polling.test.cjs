@@ -1146,3 +1146,42 @@ test('__reportLessonSubmit: 報告器が無ければ何もしない', () => {
   ctx.window.ClientErrorReporter = undefined;
   assert.doesNotThrow(() => instance.__reportLessonSubmit('EMPTY_REASON', { phaseIndex: 0 }));
 });
+
+// =====================================================================
+// もう一度考える: 最初の答えを初期値にする (空の欄だけ)
+// =====================================================================
+
+test('__seedReinputDraft: 下書きが空なら位置と理由を入れる (加わったことは入れない)', () => {
+  const { instance } = makeInstance();
+  instance.state.lessonDraft = null;
+  const seeded = instance.__seedReinputDraft({ phaseIndex: 0, numericX: 4, numericY: 2, reason: '友達だから', addedInsight: '' });
+  assert.equal(seeded.position, true); assert.equal(seeded.reason, true);
+  assert.equal(instance.state.lessonDraft.numericX, 4);
+  assert.equal(instance.state.lessonDraft.numericY, 2);
+  assert.equal(instance.state.lessonDraft.reason, '友達だから');
+  assert.equal(instance.state.lessonDraft.addedInsight, undefined);
+});
+
+test('__seedReinputDraft: 児童が先に打った理由や選んだ位置は上書きしない', () => {
+  const { instance } = makeInstance();
+  instance.state.lessonDraft = { reason: '打ちかけ' };
+  let seeded = instance.__seedReinputDraft({ numericX: 4, numericY: 2, reason: '前回' });
+  assert.equal(seeded.position, true); assert.equal(seeded.reason, false);
+  assert.equal(instance.state.lessonDraft.reason, '打ちかけ');
+  assert.equal(instance.state.lessonDraft.numericX, 4);
+
+  instance.state.lessonDraft = { numericX: 1, numericY: 5 };
+  seeded = instance.__seedReinputDraft({ numericX: 4, numericY: 2, reason: '前回' });
+  assert.equal(seeded.position, false); assert.equal(seeded.reason, true);
+  assert.equal(instance.state.lessonDraft.numericX, 1, '選んだ位置はそのまま');
+  assert.equal(instance.state.lessonDraft.reason, '前回');
+});
+
+test('__seedReinputDraft: 数直線 (縦の値なし) でも位置を入れられる', () => {
+  const { instance } = makeInstance();
+  instance.state.lessonDraft = null;
+  const seeded = instance.__seedReinputDraft({ numericX: 3, numericY: null, reason: 'r' });
+  assert.equal(seeded.position, true);
+  assert.equal(instance.state.lessonDraft.numericX, 3);
+  assert.equal(instance.state.lessonDraft.numericY, null);
+});
