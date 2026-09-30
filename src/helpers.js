@@ -106,6 +106,13 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
  *     (b) 短く待って key が埋まるのを待つ (waitMs × waitTries)、
  *   それでも無ければ自分で読む (止まるより読むほうがマシ)。
  *
+ * busyValue を渡した呼び出し (board data) は「自分で読む」をしない:
+ *   待っても埋まらず、まだ誰かが読んでいる (flight 中) か、直前の読みが失敗していた
+ *   (failKey; failTtl 秒) なら busyValue を返す。Why: 2026-09-30 の 429 storm は
+ *   「出会う」に入った瞬間の 30 人同時 miss で、直前の結果が無い (「考える」の間は誰も
+ *   ボードを読まない) ため全員が 1.2 秒待って自分で読み、読みが 429 で失敗すると cache が
+ *   埋まらず次の poll でまた全員が読む、という正帰還だった。失敗を短く覚えて読まない側に倒す。
+ *
  * flight flag の get→put は非アトミックなので、同一瞬間の衝突は数件 claim しうる。
  *   目的は「30 → 数件」であって「厳密に 1 件」ではない。
  *
@@ -121,7 +128,9 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
  * @param {boolean} [opts.allowStale=false] - flight 中に latestKey を返してよいか
  * @param {number} [opts.waitMs=0] - flight 中に key が埋まるのを待つ 1 回の長さ (ms)。0 なら待たない
  * @param {number} [opts.waitTries=3] - 待つ回数
- * @returns {*} cache hit / 直前の結果 / loader の結果
+ * @param {*} [opts.busyValue] - 指定すると「自分で読む」代わりにこの値を返す (flight 中 / 直前の失敗中)
+ * @param {number} [opts.failTtl=0] - loader の結果が cache 不可だったことを覚える秒数 (0 = 覚えない)
+ * @returns {*} cache hit / 直前の結果 / loader の結果 / busyValue
  */
 function withStampedeGuard_(opts) {
   const loader = opts.loader;
@@ -143,6 +152,21 @@ function withStampedeGuard_(opts) {
 
   const hit = read(key);
   if (hit !== null) return hit;
+
+  const canBeBusy = opts.busyValue !== undefined;
+  const failTtl = Number(opts.failTtl) || 0;
+  const failKey = failTtl > 0 ? key + ':fail' : null;
+  const staleOrBusy = () => {
+    if (opts.allowStale && latestKey) {
+      const stale = read(latestKey);
+      if (stale !== null) return stale;
+    }
+    return opts.busyValue;
+  };
+  const flagSet = (k) => { try { return Boolean(cache.get(k)); } catch (_) { return false; } };
+
+  // 直前の読みが失敗している間は読まない (失敗中に 30 人が読み直すと quota が戻らない)。
+  if (canBeBusy && failKey && flagSet(failKey)) return staleOrBusy();
 
   let claimed = false;
   try {
@@ -166,6 +190,8 @@ function withStampedeGuard_(opts) {
         if (filled !== null) return filled;
       }
     }
+    // 待っても埋まらない: まだ誰かが読んでいる / 読みが失敗した。busy を返せる呼び出しは読まない。
+    if (canBeBusy && (flagSet(flightKey) || (failKey && flagSet(failKey)))) return staleOrBusy();
   }
 
   let fresh;
@@ -179,6 +205,8 @@ function withStampedeGuard_(opts) {
   if (isCacheable(fresh)) {
     saveToCacheWithSizeCheck(key, fresh, opts.ttl);
     if (latestKey) saveToCacheWithSizeCheck(latestKey, fresh, latestTtl);
+  } else if (failKey) {
+    try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
   }
   return fresh;
 }

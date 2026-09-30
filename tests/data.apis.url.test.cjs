@@ -1231,3 +1231,54 @@ test('getNotificationUpdate: ボードの版番号 (boardVersion) を載せる (
   assert.equal(result.success, true);
   assert.equal(result.boardVersion, '7');
 });
+
+// =====================================================================
+// 「出会う」前の cache 温め / 混雑 (BUSY) の扱い (2026-09-30 の 429 storm 対策)
+// =====================================================================
+
+test('prewarmBoardDataCache_: 全体 + クラスごとに 1 回ずつ読み、児童が読む key に書く', () => {
+  const store = new Map();
+  const loads = [];
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: (uid, options) => { loads.push(options.classFilter || '_'); return { success: true, data: [] }; },
+    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    CacheService: { getScriptCache: () => ({
+      get: (k) => (k === 'board_data_ver:u1' ? '7' : (store.has(k) ? store.get(k) : null)),
+      put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
+    }) },
+    withStampedeGuard_: undefined   // 素朴経路 (helpers.js 不在) で key の形を検証する
+  });
+  const out = ctx.prewarmBoardDataCache_('u1', 'owner@example.com', ['6年1組', '6年2組']);
+  assert.equal(out.warmed, 3); assert.equal(out.failed, 0);
+  assert.equal(loads.join(','), '_,6年1組,6年2組');
+  assert.equal(store.has('board_data:u1:7:_:newest'), true);
+  assert.equal(store.has('board_data:u1:7:6年1組:newest'), true, '児童 (自分のクラスで絞る) が読む key');
+  assert.equal(store.has('board_data:u1:7:6年2組:newest'), true);
+});
+
+test('getNotificationUpdate: ボードが混んでいる (BUSY) ときは失敗にせず「新着なし」+ boardBusy で返す', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({ success: false, message: 'should not be called' }),
+    withBoardDataCache_: undefined,
+    withStampedeGuard_: () => ctx.boardDataBusyResult_()
+  });
+  const result = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
+  assert.equal(result.success, true);
+  assert.equal(result.hasNewContent, false);
+  assert.equal(result.boardBusy, true);
+});
+
+test('buildSheetDataErrorResult_: BUSY はそのまま通す (受け手が busy で見分ける)', () => {
+  const ctx = loadDataApisContext();
+  const busy = ctx.boardDataBusyResult_();
+  assert.equal(ctx.buildSheetDataErrorResult_(busy), busy);
+  assert.equal(busy.busy, true);
+  assert.equal(busy.error, 'BUSY');
+  assert.equal(ctx.buildSheetDataErrorResult_({ message: 'x' }).data.length, 0);
+});

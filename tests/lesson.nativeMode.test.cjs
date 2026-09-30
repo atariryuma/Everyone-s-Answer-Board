@@ -1698,3 +1698,29 @@ test('__isManualEndLesson_: lesson 行が読めないときは終了させない
   const h = loadContext();
   assert.equal(h.context.__isManualEndLesson_('missing'), true);
 });
+
+// =====================================================================
+// 「出会う」に入る前にボードの cache を温める (2026-09-30 の 429 storm 対策)
+// =====================================================================
+
+test('advanceLessonPhase: 「出会う」(browse) に入るときだけ prewarmBoardDataCache_ を教師のクラスで呼ぶ', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const calls = [];
+  h.context.prewarmBoardDataCache_ = (uid, email, classes) => { calls.push({ uid, email, classes }); return { warmed: 2, failed: 0 }; };
+  advanceAsTeacher(h, lessonId, 1);   // 考える → 出会う
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].uid, 'u1');
+  assert.equal(calls[0].email, 'teacher@example.com');
+  assert.deepEqual(calls[0].classes, ['6年1組']);
+  advanceAsTeacher(h, lessonId, 2);   // 出会う → 議論する (児童はボードを読まない)
+  assert.equal(calls.length, 1, 'browse 以外では温めない');
+});
+
+test('advanceLessonPhase: prewarm が落ちても切替は成功する', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.prewarmBoardDataCache_ = () => { throw new Error('quota'); };
+  const res = advanceAsTeacher(h, lessonId, 1);
+  assert.equal(res.data.activePhaseIndex, 1);
+});

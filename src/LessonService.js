@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_ */
+/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -1721,6 +1721,19 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
         null,
         { error: 'PHASE_CONFIG_PATCH_FAILED', activePhaseIndex: toIdx }
       );
+    }
+
+    // 「出会う」に入る前に、児童が最初の poll で読むボードの cache を温める。
+    //   Why: 「考える」の間は誰もボードを読まないので直前の結果が無く、切替の直後に学級全員が
+    //   同時に読んで 429 になった (2026-09-30)。教師の 1 実行がクラスごとに読んでおけば、
+    //   児童は全員 cache hit で入れる。失敗しても切替は成立している (児童は次の poll で読み直す)。
+    if (target.screenRole === LESSON_SCREEN_ROLES.BROWSE && typeof prewarmBoardDataCache_ === 'function') {
+      try {
+        const warm = prewarmBoardDataCache_(userId, getCurrentEmail(), lessonJson.classes);
+        if (warm.failed > 0) console.warn(`[lesson/advance] board cache prewarm failed=${warm.failed} warmed=${warm.warmed}`);
+      } catch (e) {
+        console.warn('[lesson/advance] board cache prewarm error:', e && e.message);
+      }
     }
 
     return createSuccessResponse(`フェーズ ${toIdx + 1}: ${target.name} に切替えました`, {

@@ -127,3 +127,68 @@ test('withStampedeGuard_: CacheService が無ければそのまま loader', () =
   const { context } = loadContext({ CacheService: undefined });
   assert.equal(context.withStampedeGuard_({ key: 'k', ttl: 1, loader: () => ({ v: 1 }) }).v, 1);
 });
+
+// =====================================================================
+// busyValue / failTtl: 混んでいる間は「自分で読む」をしない (2026-09-30 の 429 正帰還を止める)
+// =====================================================================
+
+test('withStampedeGuard_: busyValue あり + 待っても flight 中なら busy を返して読まない', () => {
+  const { context, store, sleeps } = loadContext();
+  store.set('k1:flight', '1');
+  let loads = 0;
+  const out = context.withStampedeGuard_({
+    key: 'k1', ttl: 10, waitMs: 50, waitTries: 2, busyValue: { busy: true },
+    loader: () => { loads++; return { v: 'mine' }; }
+  });
+  assert.deepEqual(out, { busy: true });
+  assert.equal(loads, 0);
+  assert.deepEqual(sleeps, [50, 50]);
+});
+
+test('withStampedeGuard_: busyValue あり + 待つ間に flight が消えて key も無い (読みが失敗) なら自分で読む', () => {
+  const { context, store } = loadContext({ onSleep: (s) => s.delete('k1:flight') });
+  store.set('k1:flight', '1');
+  let loads = 0;
+  const out = context.withStampedeGuard_({
+    key: 'k1', ttl: 10, waitMs: 50, waitTries: 1, busyValue: { busy: true },
+    loader: () => { loads++; return { v: 'mine' }; }
+  });
+  assert.equal(out.v, 'mine', 'fail marker が無ければ (loader が落ちた等) 読む');
+  assert.equal(loads, 1);
+});
+
+test('withStampedeGuard_: failTtl あり: cache 不可の結果のあと failTtl 中は誰も読まず busy (stale があれば stale)', () => {
+  const { context, store } = loadContext();
+  let loads = 0;
+  const opts = {
+    key: 'k1', ttl: 10, latestKey: 'k1:latest', failTtl: 8, busyValue: { busy: true },
+    isCacheable: (v) => Boolean(v && v.success),
+    loader: () => { loads++; return { success: false }; }
+  };
+  const first = context.withStampedeGuard_(opts);
+  assert.equal(first.success, false);
+  assert.equal(loads, 1);
+  assert.equal(store.get('k1:fail'), '1', '失敗を覚える');
+
+  const second = context.withStampedeGuard_(opts);
+  assert.deepEqual(second, { busy: true }, '失敗中は読まない');
+  assert.equal(loads, 1);
+
+  store.set('k1:latest', JSON.stringify({ success: true, v: 'old' }));
+  const third = context.withStampedeGuard_(Object.assign({}, opts, { allowStale: true }));
+  assert.equal(third.v, 'old', 'stale があれば stale');
+  assert.equal(loads, 1);
+
+  store.delete('k1:fail');
+  const fourth = context.withStampedeGuard_(opts);
+  assert.equal(fourth.success, false, 'fail が解けたら 1 件が読み直す');
+  assert.equal(loads, 2);
+});
+
+test('withStampedeGuard_: busyValue も failTtl も無い呼び出しは従来どおり (失敗を覚えない)', () => {
+  const { context, store } = loadContext();
+  context.withStampedeGuard_({
+    key: 'k1', ttl: 10, isCacheable: (v) => Boolean(v && v.success), loader: () => ({ success: false })
+  });
+  assert.equal(store.has('k1:fail'), false);
+});

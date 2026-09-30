@@ -145,6 +145,7 @@
         lessonPhase: null,
         lessonDraft: null,
         lessonPrevPoint: null,
+        boardReloadPending: false,
         // 送信済みの自分の回答 (このフェーズ)。再読み込みしても getMyLessonTrajectory で復元する。
         lessonSent: null,
         // 「置き直す」を押して送信済みのまま入力画面に戻っている最中か
@@ -2807,7 +2808,9 @@
       const next = String(v);
       const prev = this.state.lastBoardVersion;
       this.state.lastBoardVersion = next;
-      if (prev === null || prev === next) return false;           // 初回は基準を覚えるだけ
+      // 前回の読み直しが BUSY で保留なら、version が同じでも読み直す (保留のままにしない)。
+      const pending = this.state.boardReloadPending === true;
+      if (!pending && (prev === null || prev === next)) return false;   // 初回は基準を覚えるだけ
       if (viewingPast || response.hasNewContent) return false;     // 過去閲覧中 / 新着は既存経路
       if (document.getElementById('lessonScreen')) return false;   // 児童の授業画面がかぶさっている
       if (typeof this.loadSheetData !== 'function') return false;
@@ -3283,10 +3286,17 @@
 
         const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
+        if (result && result.busy) {
+          // サーバーが混んでいる (他の誰かが読んでいる / 直前の読みが失敗)。いまの表示を保ち、
+          //   次の poll で読み直す (__handleBoardVersion が boardReloadPending を見る)。
+          this.state.boardReloadPending = true;
+          return;
+        }
         if (!result || !result.success) {
           this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
           return;
         }
+        this.state.boardReloadPending = false;
 
         const responseData = result.data || [];
 

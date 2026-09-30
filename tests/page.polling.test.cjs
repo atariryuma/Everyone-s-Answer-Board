@@ -1194,3 +1194,22 @@ test('__renderLessonPrevNote: ことばが空なら案内だけ。最初の答�
   assert.equal(instance.__renderLessonPrevNote(), false);
   assert.equal(host.hidden, true);
 });
+
+// =====================================================================
+// BUSY (混雑) の読み直し: version が同じでも保留中なら次の poll で読み直す
+// =====================================================================
+
+test('__handleBoardVersion: boardReloadPending なら version が同じでも読み直す', () => {
+  const { instance, ctx } = makeInstance();
+  ctx.document.getElementById = () => null;
+  const calls = [];
+  instance.loadSheetData = (o) => { calls.push(o); return Promise.resolve(); };
+  instance.state.lastBoardVersion = '5';
+  instance.state.boardReloadPending = true;
+  assert.equal(instance.__handleBoardVersion({ boardVersion: 5, hasNewContent: false }, false), true);
+  assert.equal(calls.length, 1);
+
+  instance.state.boardReloadPending = false;
+  assert.equal(instance.__handleBoardVersion({ boardVersion: 5, hasNewContent: false }, false), false, '保留が無ければ従来どおり');
+  assert.equal(calls.length, 1);
+});

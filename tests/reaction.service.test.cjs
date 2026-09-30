@@ -1007,3 +1007,18 @@ test('addReaction: 回答の無い行には書かない', () => {
   assert.match(res.message, /^ROW_CHANGED/);
   assert.equal(sheet._writes.length, 0);
 });
+
+test('executeBoardRowOperation: A 列が読めなかった (429 で空配列) ときは空行と混同せず BUSY で断る', () => {
+  const { ctx, sheet } = buildHighlightContext();
+  const origGetRange = sheet.getRange;
+  sheet.getRange = (row, col, numRows, numCols) => {
+    const range = origGetRange.call(sheet, row, col, numRows, numCols);
+    if (col === 1 && numCols === 1) return Object.assign({}, range, { getValues: () => [] });
+    return range;
+  };
+  const res = ctx.toggleHighlight('owner-1', 2);
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'BUSY');
+  assert.equal(res.busy, true);
+  assert.equal(sheet._writes.length, 0);
+});

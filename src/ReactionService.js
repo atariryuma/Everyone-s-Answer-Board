@@ -350,7 +350,10 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   const highlightCol = highlightColIndex + 1;
 
   const highlightRange = sheet.getRange(rowNumber, highlightCol, 1, 1);
-  const [[currentValue = '']] = highlightRange.getValues();
+  // 読めなかった (429 で空配列) なら書かない: 空と見なして TRUE を書くと、意図と逆に倒れうる。
+  const currentRow = (highlightRange.getValues() || [])[0];
+  if (!currentRow) throw new Error('highlight cell read failed (quota?)');
+  const currentValue = currentRow[0] === null || currentRow[0] === undefined ? '' : currentRow[0];
   const isHighlighted = String(currentValue).toUpperCase() === 'TRUE';
   const newValue = isHighlighted ? 'FALSE' : 'TRUE';
 
@@ -629,14 +632,27 @@ function executeBoardRowOperation(options) {
       //   次のシート (例: 43 行) を指す。そこで押した 👍/★ は 45 行目以降の空行に書かれ、
       //   表から離れた孤立セルになる。以後の追記 (:append) はその孤立セルを「最後のテーブル」
       //   と見なしてその列から積むので、児童の回答がアプリから見えなくなる (2026-09-29)。
-      const [[anchorCell]] = sheet.getRange(rowNumber, 1, 1, 1).getValues();
+      // 読めなかった (429 で空配列が返る) ときは「空行」と混同せず、混雑として断る。
+      //   Why: `const [[a]] = []` は TypeError になり、原因が 429 なのに「undefined is not
+      //   iterable」として記録されていた (2026-09-30)。
+      const anchorRow = (sheet.getRange(rowNumber, 1, 1, 1).getValues() || [])[0];
+      if (!anchorRow) {
+        console.warn(`${label}: anchor cell read failed (quota?)`, { targetUserId, rowNumber });
+        return createErrorResponse('いま混み合っています。少し待ってからもう一度押してください', null, { error: 'BUSY', busy: true });
+      }
+      const anchorCell = anchorRow[0];
       if (String(anchorCell === null || anchorCell === undefined ? '' : anchorCell).trim() === '') {
         console.warn(`${label}: target row is empty (stale rowIndex?)`, { targetUserId, rowNumber });
         return createErrorResponse('ROW_CHANGED: 対象の回答が見つかりません。画面を読み込み直してください');
       }
       const identity = expect.rowIdentity;
       if (identity && identity.column >= 1 && identity.value) {
-        const [[actual]] = sheet.getRange(rowNumber, identity.column, 1, 1).getValues();
+        const identityRow = (sheet.getRange(rowNumber, identity.column, 1, 1).getValues() || [])[0];
+        if (!identityRow) {
+          console.warn(`${label}: identity cell read failed (quota?)`, { targetUserId, rowNumber });
+          return createErrorResponse('いま混み合っています。少し待ってからもう一度押してください', null, { error: 'BUSY', busy: true });
+        }
+        const actual = identityRow[0];
         const norm = (v) => String(v || '').trim().toLowerCase();
         if (norm(actual) !== norm(identity.value)) {
           console.warn(`${label}: row identity mismatch (row shifted?)`, { targetUserId, rowNumber });

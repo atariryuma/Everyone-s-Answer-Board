@@ -881,6 +881,7 @@ function validateHeaderIntegrity(targetUserId) {
 // getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
 //   複数の read 経路で同一だったのを集約。
 function buildSheetDataErrorResult_(result) {
+  if (result && result.busy) return result;   // BUSY はそのまま (受け手が busy で見分ける)
   return {
     success: false,
     error: result?.message || 'データ取得エラー',
@@ -1053,7 +1054,10 @@ const BOARD_DATA_CACHE_TTL_SEC = 12;
 //   残りは直前の結果 (LATEST, 60 秒) を返す。授業モードでは児童の投稿ごとに version が
 //   上がるので、これが無いと投稿 1 件ごとに全員分の read が走る。
 const BOARD_DATA_LATEST_TTL_SEC = 60;
-const BOARD_DATA_FLIGHT_TTL_SEC = 5;
+const BOARD_DATA_FLIGHT_TTL_SEC = 8;
+// 読みが失敗 (429 等) したあと、誰も読み直さない秒数。1 poll 周期 (5s) より長く、quota の
+//   分単位の回復が少しでも進む長さ。長すぎると児童の「出会う」が空のまま止まる。
+const BOARD_DATA_FAIL_TTL_SEC = 8;
 
 // Board cache key prefixes (集約。 hardcoded string を排除して typo 防止)。
 const BOARD_CACHE_KEYS_ = {
@@ -1159,6 +1163,10 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
   // Why stale を許すか: viewer の polling は「新着があるか」を見るだけで、数秒古い分布を
   //   1 周期だけ見ても授業は壊れない。逆に 30 人が同時に実体を読むと quota が焼けて
   //   全員が止まる。待つ (waitMs) のは stale すら無い初回だけ。
+  // Why busy を返すか: 待っても埋まらないとき「自分で読む」と、読みが 429 で失敗した瞬間に
+  //   全員が読みに行って quota が戻らない (2026-09-30 の「出会う」5 分間 429)。混んでいる間は
+  //   BUSY を返し、児童の画面は次の poll で読み直す (advanceLessonPhase が「出会う」に入る前に
+  //   cache を温めるので、通常はここに来ない)。
   return withStampedeGuard_({
     key,
     ttl: BOARD_DATA_CACHE_TTL_SEC,
@@ -1169,9 +1177,47 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     latestKey: `${BOARD_CACHE_KEYS_.LATEST}${userId}:${filter}:${sort}`,
     latestTtl: BOARD_DATA_LATEST_TTL_SEC,
     allowStale,
-    waitMs: 400,
-    waitTries: 3
+    waitMs: 500,
+    waitTries: 6,
+    failTtl: BOARD_DATA_FAIL_TTL_SEC,
+    busyValue: boardDataBusyResult_()
   });
+}
+
+// 「いま混んでいる」応答。success:false だが読みの失敗ではないので、受け手は busy で見分けて
+//   何も出さず次の poll で読み直す (page.js loadSheetData / __handleBoardVersion)。
+function boardDataBusyResult_() {
+  return createErrorResponse('いま混み合っています。数秒後にもう一度読み込みます', [],
+    { error: 'BUSY', busy: true, sheetName: '', header: '' });
+}
+
+/**
+ * 「出会う」に入る直前に、児童が最初の poll で読む cache を教師の実行で温める。
+ *
+ * Why: 「考える」の間は誰もボードを読まないので直前の結果 (latest) が無く、フェーズ切替の
+ *   直後に 30 人が同時に miss して全員が読み、429 になっていた (2026-09-30)。教師の 1 実行が
+ *   クラスごと (児童は自分のクラスで絞る) + 全体 (教師の電子黒板) を読んでおけば、児童は
+ *   全員 cache hit で入れる。version は config patch で上がった後なので、ここで書いた key を
+ *   児童がそのまま読む。失敗しても切替は成立している (児童側は BUSY → 次の poll で読み直す)。
+ *
+ * @param {string} userId - ボードの所有者 (教師)
+ * @param {string} teacherEmail
+ * @param {string[]} classes - 授業に登録されたクラス
+ * @returns {{warmed: number, failed: number}}
+ */
+function prewarmBoardDataCache_(userId, teacherEmail, classes) {
+  const out = { warmed: 0, failed: 0 };
+  const access = resolveViewerBoardAccess_(userId, teacherEmail, false);
+  if (!access.ok) return out;
+  const { targetUser, config } = access;
+  const filters = [undefined].concat((Array.isArray(classes) ? classes : []).map(String).filter(Boolean));
+  for (const classFilter of filters) {
+    const options = { classFilter, sortBy: 'newest', includeTimestamp: true, adminMode: true, requestingUser: teacherEmail };
+    const res = withBoardDataCache_(userId, options, () =>
+      getUserSheetData(userId, options, targetUser, config), { allowStale: false });
+    if (res && res.success) out.warmed++; else out.failed++;
+  }
+  return out;
 }
 
 /**
@@ -1571,6 +1617,11 @@ function getNotificationUpdate(targetUserId, options = {}) {
           { allowStale: isViewerOnly })
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
 
+    // 混んでいる間は「新着なし」で返す (lessonPhase / boardVersion は届ける)。失敗にすると
+    //   児童の polling が backoff に入り、フェーズ切替の通知まで遅れる。
+    if (userData && userData.busy) {
+      return Object.assign(envelope, { hasNewContent: false, boardBusy: true });
+    }
     if (!userData || !userData.success) {
       return createErrorResponse('Data access failed');
     }
