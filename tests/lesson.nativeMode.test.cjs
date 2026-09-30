@@ -1640,3 +1640,45 @@ test('submitLessonAnswer: 受理したら書いたシートと行を INFO に残
   assert.match(ok[0], /sheet=phase1 row=2 mode=append/);
   assert.match(ok[1], /sheet=phase1 row=2 mode=update/);
 });
+
+// =====================================================================
+// 授業モードは自動アーカイブしない (教師が「授業終了」を押すまで終わらない)
+// Why: 実態は 1 授業を複数クラス × 複数日で使う。最終回答から 4h / ボード非公開で終了させる
+//   safety net (Form 経由の 1 コマ想定) が当たると、翌朝には授業が勝手に終わっている。
+// =====================================================================
+
+test('__maybeAutoArchiveLesson_: 授業モードは条件を満たしても archive しない (manual_end_only)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  h.context.getPublishedSheetData = () => ({ success: true, data: [{ rowIndex: 2, answer: 'r' }] });
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const res = h.context.__maybeAutoArchiveLesson_(
+    { userId: 'u1', userEmail: 'teacher@example.com' },
+    { activeLessonId: lessonId, currentLessonStartedAt: tenMinAgo }
+  );
+  assert.equal(res.archived, false);
+  assert.equal(res.reason, 'manual_end_only');
+  assert.equal(h.context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId).state, 'active');
+});
+
+test('dailyLessonArchiveSweep: 授業モードの授業は回答シートを読まずに skip する', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  let boardReads = 0;
+  h.context.getPublishedSheetData = () => { boardReads++; return { success: true, data: [] }; };
+  h.context.getAllUsers = () => [{ userId: 'u1', userEmail: 'teacher@example.com' }];
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, currentLessonStartedAt: dayAgo, isPublished: true });
+  const summary = h.context.dailyLessonArchiveSweep();
+  assert.equal(summary.archived, 0);
+  assert.equal(summary.skipped, 1);
+  assert.equal(boardReads, 0, '回答シートを読まない');
+  assert.equal(h.context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId).state, 'active');
+});
+
+test('__isManualEndLesson_: lesson 行が読めないときは終了させない側に倒す', () => {
+  const h = loadContext();
+  assert.equal(h.context.__isManualEndLesson_('missing'), true);
+});

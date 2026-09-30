@@ -1913,6 +1913,7 @@ function __maybeAutoArchiveLesson_(targetUser, currentConfig) {
     const activeLessonId = currentConfig.activeLessonId;
     const startedAt = currentConfig.currentLessonStartedAt;
     if (!activeLessonId || !startedAt) return { archived: false, reason: 'no_active_lesson' };
+    if (__isManualEndLesson_(activeLessonId)) return { archived: false, reason: 'manual_end_only' };
 
     const elapsedMs = Date.now() - new Date(startedAt).getTime();
     if (!(elapsedMs >= LESSON_AUTO_ARCHIVE_MIN_MS)) {
@@ -1944,6 +1945,28 @@ function __maybeAutoArchiveLesson_(targetUser, currentConfig) {
 }
 
 /**
+ * 自動アーカイブの対象外か (= 教師が「授業終了」を押すまで終わらない授業か)。
+ *
+ * Why 授業モードを対象外にするか: 実態は 1 つの授業を複数クラス × 複数日で使う
+ *   (2026-09 は 4 クラス 3 週間)。「最終回答から 4 時間で終了」「ボードを非公開にしたら終了」の
+ *   safety net は Form 経由の 1 コマ授業を想定したもので、授業モードに当たると翌朝には授業が
+ *   勝手に終わっていて、児童の ● → ★ の続きが取れなくなる。
+ *   本番ではこれまで trigger が未設置だったため踏んでいないが、setupApp を再実行した瞬間に
+ *   設置されるので、判定として明示する。
+ *   lesson 行が読めない (429 等) ときも対象外に倒す: 読めないときに終了させる理由はない。
+ */
+function __isManualEndLesson_(lessonId) {
+  try {
+    const found = __findLessonByIdCached_(lessonId);
+    if (!found || !found.lesson) return true;
+    return __isNativePhase_({}, found.lesson.lessonJson || {});
+  } catch (error) {
+    logError_('__isManualEndLesson_', error);
+    return true;
+  }
+}
+
+/**
  * 1 日 1 回の cron entry。公開し忘れ lesson を回収する。
  *
  * Why: unpublish し忘れて翌日になったケースの safety net。
@@ -1971,6 +1994,11 @@ function dailyLessonArchiveSweep() {
         continue;
       }
       if (!cfg || !cfg.currentLessonStartedAt || !cfg.activeLessonId) {
+        summary.skipped++;
+        continue;
+      }
+      // 授業モードは教師が「授業終了」を押すまで終わらない (回答シートを読む前に判定する)。
+      if (__isManualEndLesson_(cfg.activeLessonId)) {
         summary.skipped++;
         continue;
       }
