@@ -3489,6 +3489,8 @@
         } catch (_) { /* テレメトリのみ。描画には影響しない */ }
         const hadAxisConfig = Boolean(this.state.axisConfig);
         this.state.axisConfig = result.axisConfig || null;
+        // 自分の点を見つけるための仮名 (授業モードの「出会う」で使う)。
+        if (result.viewerEmailHash !== undefined) this.state.viewerEmailHash = result.viewerEmailHash || null;
         // 授業のフェーズは同じ応答で届く (undefined = 判定なし。振り返り画面など)。
         if (result.lessonPhase !== undefined && !this.state.isReviewMode) {
           this.__applyLessonPhase(result.lessonPhase);

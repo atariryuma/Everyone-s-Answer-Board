@@ -238,6 +238,30 @@
     g.selectAll('.viz-dot.current.highlight').raise();
   }
 
+  // 自分の点 (授業モードの「出会う」だけ)。
+  //   Why: 30 の点の中で自分がどこかが分からないと、「自分と違う考え」を読み始められない。
+  //   縁取りと「じぶん」の小さな文字だけ。位置や理由の見え方は他の点と同じ (優劣をつけない)。
+  //   掲示板モード (授業なし) では出さない: リアクションのリングと縁取りが重なるため。
+  function isMeNode(d, app) {
+    if (!reactionsOff(app)) return false;
+    const me = app && app.state && app.state.viewerEmailHash;
+    return Boolean(me && d && d.data && d.data.emailHash && d.data.emailHash === me);
+  }
+  function renderMeLabel(g, nodes, app) {
+    const mine = nodes.filter((n) => isMeNode(n, app));
+    const join = g.selectAll('.viz-dot-me').data(mine, (d) => 'me_' + d.data.rowIndex);
+    join.exit().remove();
+    join.enter().append('text')
+      .attr('class', 'viz-dot-me')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .merge(join)
+      .attr('x', (d) => d.x)
+      .attr('y', (d) => d.y - 10)
+      .text('じぶん');
+    g.selectAll('.viz-dot-me').raise();
+  }
+
   // dot 中央のリアクション数バッジ。 AdminPanel 設定「リアクション数を表示」
   //   (state.showCounts) を尊重。 非表示でも stroke リングは残るので「人気の有無」は分かる。
   function renderDotLabels(g, nodes, state, app) {
@@ -509,7 +533,8 @@
       : `${item.numericX}`;
     let headerText;
     if (isStudentRecord) {
-      headerText = (showName && item.name) ? escapeForTooltip(item.name) : '匿名';
+      const isMe = Boolean(app && app.state && app.state.viewerEmailHash && item.emailHash === app.state.viewerEmailHash && reactionsOff(app));
+      headerText = (showName && item.name) ? escapeForTooltip(item.name) : (isMe ? 'あなた' : '匿名');
     } else {
       // pie/wordcloud などのカテゴリラベル — name フィールドは「選択肢」「語」等の意味
       headerText = item.name ? escapeForTooltip(item.name) : '';
@@ -783,7 +808,8 @@
           .attr('cy', (d) => d.y)
           .attr('r', (d) => radiusFor(d))
           .classed('swing-high', false)
-          .classed('highlight', (d) => Boolean(d.data && d.data.highlight)),
+          .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
+          .classed('is-me', (d) => isMeNode(d, selfL)),
         this
       )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, selfL))
@@ -801,6 +827,7 @@
       // dot 中央のリアクション数バッジ (matrix と共通の renderDotLabels に集約)。
       raiseHighlightedDots(g);
       renderDotLabels(g, nodes, this.state, this);
+      renderMeLabel(g, nodes, this);
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
@@ -1159,7 +1186,8 @@
           .attr('r', (d) => radiusForMatrix(d))
           .classed('swing-high', false)
           .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
-          .classed('lone-voice', (d) => isLoneVoice(d)),
+          .classed('lone-voice', (d) => isLoneVoice(d))
+          .classed('is-me', (d) => isMeNode(d, self)),
         this
       )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
@@ -1178,6 +1206,7 @@
       // dot 中央のリアクション数バッジ (numberline と共通の renderDotLabels に集約)。
       raiseHighlightedDots(g);
       renderDotLabels(g, nodes, this.state, this);
+      renderMeLabel(g, nodes, this);
 
       updateStatsPills(this, current.length);
       // 象限キーワードは SVG 内に統合済 (旧 HTML パネルは廃止)。mode 切替で残存する panel は除去。
@@ -1772,6 +1801,7 @@
   // テスト用: リアクションリングと数バッジの gating (授業モードで描かない) を直接検証する。
   StudyQuestApp.prototype.__applyReactionRingStyles = applyReactionRingStyles;
   StudyQuestApp.prototype.__renderDotLabels = renderDotLabels;
+  StudyQuestApp.prototype.__isMeNode = isMeNode;
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）

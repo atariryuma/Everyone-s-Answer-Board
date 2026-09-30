@@ -124,3 +124,16 @@ test('数バッジ: 授業モードでは showCounts=true でも描かない', (
   proto.__renderDotLabels(g, nodes, { showCounts: true }, { __lessonReactionsOff: () => true });
   assert.equal(bound.length, 0);
 });
+
+// ---- 自分の点 (授業モードの「出会う」だけ) ----
+test('isMeNode: 授業中で emailHash が自分のものなら true、授業なし・他人・hash なしは false', () => {
+  const { StudyQuestApp } = loadViz();
+  const isMe = StudyQuestApp.prototype.__isMeNode;
+  const appOn = { state: { viewerEmailHash: 'abc' }, __lessonReactionsOff: () => true };
+  const appOff = { state: { viewerEmailHash: 'abc' }, __lessonReactionsOff: () => false };
+  assert.equal(isMe({ data: { emailHash: 'abc' } }, appOn), true);
+  assert.equal(isMe({ data: { emailHash: 'xyz' } }, appOn), false);
+  assert.equal(isMe({ data: {} }, appOn), false);
+  assert.equal(isMe({ data: { emailHash: 'abc' } }, appOff), false, '掲示板モードでは出さない');
+  assert.equal(isMe({ data: { emailHash: 'abc' } }, { state: {}, __lessonReactionsOff: () => true }), false);
+});

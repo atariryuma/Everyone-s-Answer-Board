@@ -1028,6 +1028,10 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     axisConfig,
     formMeta,
     viewerIsTeacher,
+    // 閲覧者自身の仮名 (行の emailHash と同じ salt)。児童が分布の中で自分の点を見つけるため。
+    //   自分のハッシュだけなので他者の同定には使えない。行の hash と同じ関数を 1 回呼ぶだけ。
+    viewerEmailHash: (viewerContext.email && typeof emailToShortHash === 'function')
+      ? (emailToShortHash(viewerContext.email) || null) : null,
     // 授業中の現在フェーズ (null = 授業中でない)。undefined は「判定していない」(review 等)。
     ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {})
   };
@@ -1318,7 +1322,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           lessonPhase
         ),
         targetUserConfig,
-        { isAdmin: isSystemAdmin, isOwnBoard }
+        { isAdmin: isSystemAdmin, isOwnBoard, email: viewerEmail }
       );
     }
 

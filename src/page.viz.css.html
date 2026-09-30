@@ -127,6 +127,23 @@
     stroke: rgba(255, 255, 255, 0.9);  /* theme:exempt - colored dot 上の白ハロー (badge separator) */
     stroke-width: 2.5;
   }
+  /* 自分の点 (授業モードの「出会う」だけ)。縁取り + 「じぶん」の小さな文字。
+     色は塗らない (優劣に見えない)。highlight (教師の ☆) が付いたら ☆ の見た目を優先する。 */
+  .viz-dot.is-me:not(.highlight) {
+    stroke: var(--theme-text-primary);
+    stroke-width: 2.5;
+    stroke-opacity: 1;
+    stroke-dasharray: 3 2;
+  }
+  .viz-dot-me {
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--theme-text-primary);
+    paint-order: stroke fill;
+    stroke: var(--theme-bg-base);
+    stroke-width: 3;
+  }
+  body.projector-mode .viz-dot-me { font-size: 13px; }
   /* 行リストポップアップ (pie のカテゴリ / wordcloud の単語クリック時) */
   .viz-rows-popup {
     position: fixed;
