@@ -1579,11 +1579,18 @@
       if (!phase) {
         // 授業が終わった / 掲示板モードに戻った
         this.__teardownLessonScreen();
+        if (prev) this.__pruneLessonDrafts(prev.lessonId);
         return;
       }
       if (!changed) return;
 
-      // フェーズが変わったら、前のフェーズの入力内容は持ち越さない。
+      // フェーズが変わったら、前のフェーズの入力内容は画面から外す (state は持ち越さない)。
+      //   書きかけ自体は端末 (localStorage) に残っていて、教師が同じフェーズに戻せば復元される。
+      //   Why: 教師が進めた瞬間に送った児童が拒否され、書き直しになった (2026-09-30)。
+      //   教師はその場でフェーズを戻して回収するので、戻ったときに続きから送れればよい。
+      if (prev && this.state.isEditor !== true && this.__hasUnsentLessonDraft(prev)) {
+        this.showToast('書きかけは残しています。先生がもどしたら、そのまま送れます');
+      }
       this.state.lessonDraft = null;
       this.state.lessonPrevPoint = null;
       this.state.lessonSent = null;
@@ -1860,6 +1867,8 @@
         this.__renderLessonSent(host, phase, sent);
         return;
       }
+      // 端末に残した書きかけがあれば復元する (教師が戻した / 端末を再読み込みした)。
+      if (!this.state.lessonDraft) this.state.lessonDraft = this.__restoreLessonDraft(phase);
       const draft = this.state.lessonDraft || {};
       const storedName = this.__lessonStoredName();
       // クラス: 授業に登録されたクラスが複数で、まだ選んでいなければ聞く。1 つなら聞かない。
@@ -1917,6 +1926,7 @@
         if (!el) return;
         el.addEventListener('input', () => {
           this.state.lessonDraft = Object.assign({}, this.state.lessonDraft || {}, { [key]: el.value });
+          this.__persistLessonDraft();
         });
       };
       keep('lessonReason', 'reason');
@@ -2168,6 +2178,7 @@
           numericX: Number(cell.getAttribute('data-x')),
           numericY: Number(cell.getAttribute('data-y'))
         });
+        this.__persistLessonDraft();
       });
       // 再入力フェーズの下敷き (最初の ●) は __loadMyLessonRecord が読んで描き直す。
     }
@@ -2231,6 +2242,7 @@
           numericX: Number(cell.getAttribute('data-x')),
           numericY: null
         });
+        this.__persistLessonDraft();
       });
     }
 
@@ -2305,6 +2317,8 @@
           throw refused;
         }
         this.showToast('考えを送りました');
+        // 送れたので端末の書きかけは要らない (記録はサーバにある)。
+        this.__clearLessonDraft(phase);
         // 送った内容を画面の状態にする。以後は「送りました」画面。
         this.state.lessonSent = {
           lessonId: phase.lessonId, phaseIndex: phase.phaseIndex,
@@ -2346,6 +2360,78 @@
           source: JSON.stringify({ code: String(code).slice(0, 40), phaseIndex: p.phaseIndex, lessonId: p.lessonId })
         });
       } catch (_) { /* 記録の失敗は送信の体験に影響させない */ }
+    }
+
+    /**
+     * 書きかけの端末保存。key は 授業 × フェーズ なので、別の授業・別のフェーズには出ない。
+     *
+     * Why localStorage か: サーバに下書きを送ると 1 文字ごとに Sheets 書きになり、429 の原因を
+     *   自分で作る。端末に置くだけなら通信ゼロで、失敗しても「消える」という従来の状態に戻るだけ。
+     *   送れたら消す (記録はサーバにある)。授業が終わったらその授業の分をまとめて消す。
+     */
+    __lessonDraftKey(phase) {
+      if (!phase || !phase.lessonId) return '';
+      return 'lessonDraft:' + this.state.userId + ':' + phase.lessonId + ':' + phase.phaseIndex;
+    }
+
+    __persistLessonDraft() {
+      const phase = this.state.lessonPhase;
+      const key = this.__lessonDraftKey(phase);
+      if (!key || ['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
+      try {
+        const d = this.state.lessonDraft || {};
+        localStorage.setItem(key, JSON.stringify({
+          numericX: d.numericX || null,
+          numericY: d.numericY || null,
+          reason: String(d.reason || '').slice(0, 500),
+          addedInsight: String(d.addedInsight || '').slice(0, 500),
+          savedAt: Date.now()
+        }));
+      } catch (_) { /* プライベートモード等では残らないだけ (従来どおり) */ }
+    }
+
+    __restoreLessonDraft(phase) {
+      const key = this.__lessonDraftKey(phase);
+      if (!key) return null;
+      try {
+        const raw = localStorage.getItem(key);
+        const d = raw ? JSON.parse(raw) : null;
+        if (!d || typeof d !== 'object') return null;
+        return {
+          numericX: Number(d.numericX) || null,
+          numericY: Number(d.numericY) || null,
+          reason: String(d.reason || ''),
+          addedInsight: String(d.addedInsight || '')
+        };
+      } catch (_) { return null; /* 壊れた値は無いものとして扱う */ }
+    }
+
+    __clearLessonDraft(phase) {
+      const key = this.__lessonDraftKey(phase);
+      if (!key) return;
+      try { localStorage.removeItem(key); } catch (_) { /* 消せなくても次の授業には出ない (key が違う) */ }
+    }
+
+    // フェーズが変わる直前の判定: 送っていない書きかけ (位置かことば) が端末にあるか。
+    __hasUnsentLessonDraft(prevPhase) {
+      if (!prevPhase || ['input', 'reinput'].indexOf(prevPhase.screenRole) < 0) return false;
+      const sent = this.state.lessonSent;
+      if (sent && sent.lessonId === prevPhase.lessonId && sent.phaseIndex === prevPhase.phaseIndex && !this.state.lessonEditing) return false;
+      const d = this.__restoreLessonDraft(prevPhase);
+      return Boolean(d && (d.numericX || String(d.reason || '').trim()));
+    }
+
+    // 授業が終わったら、その授業の書きかけを端末から消す。
+    __pruneLessonDrafts(lessonId) {
+      try {
+        const prefix = 'lessonDraft:' + this.state.userId + ':' + lessonId + ':';
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf(prefix) === 0) keys.push(k);
+        }
+        keys.forEach((k) => localStorage.removeItem(k));
+      } catch (_) { /* 残っても次の授業には出ない (key に lessonId を含む) */ }
     }
 
     /**
