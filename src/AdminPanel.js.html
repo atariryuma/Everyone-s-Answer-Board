@@ -5159,6 +5159,14 @@
     //   並びは移動距離の小さい順 = 位置が動かなかった児童が先頭 (理由だけ深まった学びを沈めない)。
     //   ☆ はボードに出ている側 (出会う = ●、もう一度考える以降 = ★) にだけ出す。
     //   もう一方にハイライトを付けてもボードには出ないので、押せる形にしない。
+    // ことばが変わったか。位置が同じでも根拠が変わった児童を拾うための印 (評価はしない)。
+    //   空白の違いだけは「同じ」とみなす (端末で改行が入るだけの差を変化と数えない)。
+    function liveWordsChanged(first, last) {
+      if (!first || !last) return false;
+      const norm = (v) => String(v || '').replace(/\s+/g, '');
+      return norm(first.reason) !== norm(last.reason);
+    }
+
     function liveRenderChange(d, axis, showClass, esc) {
       const change = d.change;
       if (!change) return LIVE_LOADING_HTML;
@@ -5196,6 +5204,8 @@
                 '<span class="live-name">' + esc(liveDisplayName(st)) + '</span>' +
                 (showClass && st.class ? '<span class="live-class">' + esc(st.class) + '</span>' : '') +
                 (st.last ? '<span class="live-change-moved">' + (st.moved ? '位置が動いた' : '位置は同じ') + '</span>' : '') +
+                (st.last ? '<span class="live-change-moved' + (liveWordsChanged(st.first, st.last) ? ' is-words-changed' : '') + '">' +
+                  (liveWordsChanged(st.first, st.last) ? 'ことばが変わった' : 'ことばは同じ') + '</span>' : '') +
               '</div>' +
               cell(st.first, '●') + cell(st.last, '★') +
             '</div>'
