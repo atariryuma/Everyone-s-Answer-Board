@@ -1337,7 +1337,23 @@ test('授業モードは児童同士に名前を見せない (ボードの既存
     const patch = h.context.__buildPhaseConfigPatch_(phases[i], lessonJson, 'l1');
     assert.equal(patch.displaySettings.showNames, false,
       `phase ${i} で名前が見える設定になっている`);
+    // リアクションも同じ扱い (いいね数で意見の価値が決まる場にしない)
+    assert.equal(patch.displaySettings.showReactions, false,
+      `phase ${i} でリアクションが効く設定になっている`);
   }
+});
+
+test('phase が明示的に showReactions=true を指定した場合だけリアクションを出す', () => {
+  const h = loadContext();
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  const phase = lessonJson.phases[1];
+  phase.spreadsheetId = 'ss1';
+  phase.sheetName = 'phase2';
+  phase.displaySettings = { showReactions: true };
+  const patch = h.context.__buildPhaseConfigPatch_(phase, lessonJson, 'l1');
+  assert.equal(patch.displaySettings.showReactions, true);
+  assert.equal(patch.displaySettings.showNames, false, '名前の既定は変わらない');
 });
 
 test('phase が明示的に showNames=true を指定した場合だけ従う', () => {

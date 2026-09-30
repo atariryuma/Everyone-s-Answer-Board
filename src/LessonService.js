@@ -1319,6 +1319,14 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     if (baseDisplay.showNames !== true) {
       displaySettings.showNames = false;
     }
+    // リアクション (いいね等) も授業モードでは出さない。
+    //   Why: 「いいね数で意見の価値が決まる」を避けるのが授業モードの設計 (少数の立場を
+    //   表明する場)。これまではボード設定の showReactions を引き継いでいたので、教師が別の
+    //   目的で ON にしていると「出会う」でリアクションが効いた。showNames と同じく、phase 側で
+    //   明示的に true を指定した場合だけ従う。
+    if (baseDisplay.showReactions !== true) {
+      displaySettings.showReactions = false;
+    }
   }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
   if (yAxisLabels) patch.yAxisLabels = yAxisLabels;
