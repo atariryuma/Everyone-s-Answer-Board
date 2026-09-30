@@ -4096,17 +4096,25 @@
         );
       }
       if (p.formTemplate === 'matrix') {
+        // 授業モード (道徳) の軸は「立場の両端」。正誤にならない立て方の例を固定で見せる (AI ではない)。
+        //   横軸は教材で決まるので例だけ、縦軸は既定の「迷い」がそのまま使える。
+        const axisExamples = currentLessonNative
+          ? '<p class="phase-axis-note">横軸の例 — 正直・誠実「言う ↔ 言わない」／友情・信頼「自首をすすめる ↔ にがす」／' +
+            '規則の尊重「決まりを守る ↔ 事情を優先する」／親切・思いやり「手を貸す ↔ 見守る」／' +
+            '公正・公平「全員同じ ↔ 事情に合わせる」。縦軸は「迷いあり ↔ 迷いなし」のままで使えます</p>'
+          : '';
         return (
           '<details class="phase-detail" open>' +
             '<summary>X 軸 / Y 軸ラベル</summary>' +
             '<div class="phase-detail-row">' +
               '<label class="phase-detail-tag">X:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xLow" data-phase-index="' + i +
-                '" value="'+ esc(o.xLow || '') + '" maxlength="20" placeholder="例: 効率↓" />' +
+                '" value="'+ esc(o.xLow || '') + '" maxlength="20" placeholder="' + (currentLessonNative ? '例: 言う' : '例: 効率↓') + '" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xHigh" data-phase-index="' + i +
-                '" value="'+ esc(o.xHigh || '') + '" maxlength="20" placeholder="例: 効率↑" />' +
+                '" value="'+ esc(o.xHigh || '') + '" maxlength="20" placeholder="' + (currentLessonNative ? '例: 言わない' : '例: 効率↑') + '" />' +
             '</div>' +
+            axisExamples +
             '<div class="phase-detail-row">' +
               '<label class="phase-detail-tag">Y:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="yLow" data-phase-index="' + i +
