@@ -1215,6 +1215,76 @@ html, body {
   .lesson-progress span { animation: none; left: 0; width: 100%; opacity: 0.5; }
 }
 
+/* 授業の帯 (教師の投影だけ): 5 フェーズの今ここ + いま児童の画面では。押すものは無い。 */
+.lesson-strip-host.hidden { display: none; }
+#lessonPhaseStrip {
+  margin: var(--space-3) 0;
+}
+.lesson-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--theme-bg-surface);
+  border: 1px solid var(--theme-border-subtle);
+}
+.lesson-card .lesson-strip {
+  background: transparent;
+  border: 0;
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--theme-border-subtle);
+  border-radius: 0;
+}
+.lesson-strip-phases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.lesson-strip-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--theme-border-subtle);
+  color: var(--theme-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+.lesson-strip-phase.is-done {
+  color: var(--theme-text-secondary);
+}
+.lesson-strip-phase.is-current {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--theme-bg-base);
+  font-weight: 700;
+  font-size: var(--font-size-base);
+}
+.lesson-strip-num {
+  font-weight: 700;
+}
+.lesson-strip-caption {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--theme-text-secondary);
+  text-align: center;
+}
+.lesson-strip-caption-label {
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  margin-right: var(--space-2);
+}
+.lesson-strip-caption-label::after {
+  content: '：';
+}
+
 /* 授業の操作面 (ピル + 次へ / 終了)。ヘッダ・待機画面・帯で同じ見た目。 */
 .lesson-control {
   display: flex;

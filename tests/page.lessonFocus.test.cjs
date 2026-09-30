@@ -155,3 +155,66 @@ test('版番号の変化: 教師は焦点画面がかぶさっていても読み
   assert.equal(app.__handleBoardVersion({ boardVersion: '3', hasNewContent: false }, false), false);
   assert.equal(loads, 1);
 });
+
+// =====================================================================
+// 授業の帯 (教師の投影): 5 フェーズの今ここ + いま児童の画面では
+// Why: 投影からは構造 (遮断・停止・匿名・前後比較) が見えない。参観者にも読めるようにする。
+// =====================================================================
+
+function fakeEl(tag) {
+  const el = {
+    tag, className: '', textContent: '', children: [], attrs: {},
+    classList: { add(c) { el.className += ' ' + c; }, remove(c) { el.className = el.className.replace(c, ''); }, contains: () => false },
+    setAttribute(k, v) { el.attrs[k] = v; },
+    appendChild(ch) { el.children.push(ch); return ch; }
+  };
+  return el;
+}
+function textOf(el) {
+  if (typeof el === 'string') return el;
+  if (el.text !== undefined) return el.text;
+  return (el.textContent || '') + el.children.map(textOf).join('');
+}
+
+test('帯: フェーズ名を順に並べ、現在地だけ強調し、問いは出さない', () => {
+  const { app, ctx } = loadApp();
+  ctx.document.createElement = fakeEl;
+  ctx.document.createTextNode = (t) => ({ text: t });
+  app.state.boardPhaseNav = {
+    lessonId: 'L1', activePhaseIndex: 2,
+    phases: [
+      { name: '考える', screenRole: 'input', question: '秘密の問い1' },
+      { name: '出会う', screenRole: 'browse', question: '秘密の問い2' },
+      { name: '議論する', screenRole: 'discuss', question: '秘密の問い3' },
+      { name: 'もう一度考える', screenRole: 'reinput', question: '秘密の問い4' },
+      { name: 'ふりかえる', screenRole: 'reflect', question: '秘密の問い5' }
+    ]
+  };
+  const node = app.__buildLessonStripNode();
+  const list = node.children[0];
+  assert.equal(list.children.length, 5);
+  assert.ok(list.children[2].className.indexOf('is-current') >= 0);
+  assert.equal(list.children[2].attrs['aria-current'], 'step');
+  assert.ok(list.children[0].className.indexOf('is-done') >= 0);
+  assert.ok(list.children[4].className.indexOf('is-current') < 0 && list.children[4].className.indexOf('is-done') < 0);
+  const all = textOf(node);
+  assert.ok(all.indexOf('もう一度考える') >= 0);
+  assert.ok(all.indexOf('秘密の問い') < 0, '未来の問いは出さない');
+  assert.ok(all.indexOf('端末を閉じています') >= 0, '議論する = 端末を閉じている');
+});
+
+test('帯: 役割ごとの「いま児童の画面では」が構造を言い切る', () => {
+  const { app } = loadApp();
+  assert.ok(app.__lessonRoleCaption('input').indexOf('他の人の考えは見えません') >= 0);
+  assert.ok(app.__lessonRoleCaption('browse').indexOf('書き込みはできません') >= 0);
+  assert.ok(app.__lessonRoleCaption('reinput').indexOf('最初の自分') >= 0);
+  assert.ok(app.__lessonRoleCaption('reflect').indexOf('学級の分布は出ません') >= 0);
+  assert.equal(app.__lessonRoleCaption('unknown'), '');
+});
+
+test('帯: 授業が無ければ空 (何も出さない)', () => {
+  const { app, ctx } = loadApp();
+  ctx.document.createElement = fakeEl;
+  app.state.boardPhaseNav = null;
+  assert.equal(app.__buildLessonStripNode().children.length, 0);
+});

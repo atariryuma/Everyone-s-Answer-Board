@@ -1649,6 +1649,7 @@
       const stageText = transition.stage === 'loading' ? '読み込んでいます' : '切り替えています';
       host.innerHTML =
         '<div class="lesson-card lesson-transition" aria-busy="true" aria-live="polite">' +
+          '<div class="lesson-strip-host"></div>' +
           '<p class="lesson-teacher-phase">' + esc(stageText) + '</p>' +
           '<h2 class="lesson-title">' + esc(to.name || '') + '</h2>' +
           '<div class="lesson-progress" aria-hidden="true"><span></span></div>' +
@@ -1674,6 +1675,7 @@
         : '';
       host.innerHTML =
         '<div class="lesson-card lesson-teacher-wait">' +
+          '<div class="lesson-strip-host"></div>' +
           '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
           '<div class="lesson-count" aria-live="polite">' +
@@ -1748,6 +1750,7 @@
         : '';
       host.innerHTML =
         '<div class="lesson-card lesson-focus" aria-live="polite">' +
+          '<div class="lesson-strip-host"></div>' +
           '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
           '<ol class="lesson-focus-list' + (shown.length >= 3 ? ' is-dense' : '') + '">' + items + '</ol>' +
@@ -1962,7 +1965,7 @@
           (phase.formTemplate === 'numberline' ? this.__buildLessonScaleFrame() : this.__buildLessonAxisFrame()) +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
-            'placeholder="そこを選んだ理由を書いてください">' + esc(draft.reason || '') + '</textarea>' +
+            'placeholder="「〜だから」で書いてみよう（例：うそをつくと、あとで友だちが悲しむから）">' + esc(draft.reason || '') + '</textarea>' +
           (isReinput
             ? '<label class="lesson-label" for="lessonInsight">友達の考えを聞いて、加わったこと・変わったことは？</label>' +
               '<textarea id="lessonInsight" class="lesson-input" rows="3" maxlength="500" ' +
@@ -2941,6 +2944,63 @@
       return wrap;
     }
 
+    // 「いま児童の画面では」の 1 行。役割 (screenRole) ごとに固定。
+    //   Why: 投影からは「他の人の考えが見えない状態で書いている」「端末を閉じている」という
+    //   構造そのものが見えない。参観者にも児童にも、隠す理由のないことばかりなので書いて出す。
+    __lessonRoleCaption(role) {
+      const map = {
+        input: '自分の位置と理由を書いています。他の人の考えは見えません',
+        browse: '学級の分布と理由を読んでいます。書き込みはできません',
+        discuss: '端末を閉じています',
+        reinput: '最初の自分を見ながら、置き直しています',
+        reflect: '自分の最初といまの考えを見ています。学級の分布は出ません'
+      };
+      return map[role] || '';
+    }
+
+    /**
+     * 授業の帯 (教師の投影だけ): 5 フェーズの「今ここ」+「いま児童の画面では」。
+     *   板書の「授業の流れ」と同じ役割。フェーズ名だけを出し、問いは出さない (未来の問いは見せない)。
+     *   押すものは無い。ヘッダ下・待機画面・焦点画面・切替中のどこに出ても同じ builder。
+     */
+    __buildLessonStripNode() {
+      const nav = this.state.boardPhaseNav;
+      const wrap = document.createElement('div');
+      wrap.className = 'lesson-strip';
+      if (!nav || !Array.isArray(nav.phases)) return wrap;
+      const list = document.createElement('ol');
+      list.className = 'lesson-strip-phases';
+      list.setAttribute('aria-label', '授業の流れ');
+      nav.phases.forEach((p, i) => {
+        const li = document.createElement('li');
+        li.className = 'lesson-strip-phase' + (i === nav.activePhaseIndex ? ' is-current' : (i < nav.activePhaseIndex ? ' is-done' : ''));
+        if (i === nav.activePhaseIndex) li.setAttribute('aria-current', 'step');
+        const num = document.createElement('span');
+        num.className = 'lesson-strip-num';
+        num.textContent = String(i + 1);
+        const name = document.createElement('span');
+        name.className = 'lesson-strip-name';
+        name.textContent = p.name || '';
+        li.appendChild(num);
+        li.appendChild(name);
+        list.appendChild(li);
+      });
+      wrap.appendChild(list);
+      const cur = nav.phases[nav.activePhaseIndex] || null;
+      const caption = this.__lessonRoleCaption(cur && cur.screenRole);
+      if (caption) {
+        const cap = document.createElement('p');
+        cap.className = 'lesson-strip-caption';
+        const label = document.createElement('span');
+        label.className = 'lesson-strip-caption-label';
+        label.textContent = 'いま児童の画面では';
+        cap.appendChild(label);
+        cap.appendChild(document.createTextNode(caption));
+        wrap.appendChild(cap);
+      }
+      return wrap;
+    }
+
     /**
      * polling で届いたフェーズと操作面の現在地を揃える。
      *   nav が無いのに授業中なら読み直す (ボードを開いたあとに授業を始めたケース)。
@@ -2984,6 +3044,17 @@
       for (let i = 0; i < hosts.length; i++) {
         hosts[i].textContent = '';
         if (nav) hosts[i].appendChild(this.__buildLessonControlNode());
+      }
+      // 授業の帯 (ヘッダ下 + 各オーバーレイ)。授業が無ければ畳む。
+      const strips = document.querySelectorAll('.lesson-strip-host');
+      for (let i = 0; i < strips.length; i++) {
+        strips[i].textContent = '';
+        if (nav) {
+          strips[i].classList.remove('hidden');
+          strips[i].appendChild(this.__buildLessonStripNode());
+        } else {
+          strips[i].classList.add('hidden');
+        }
       }
     }
 
