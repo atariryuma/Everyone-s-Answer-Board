@@ -48,3 +48,4 @@ scripts/config.*.json
 
 # Optional: Keep .clasp.json.template for reference
 !.clasp.json.template
+.claude/launch.json
