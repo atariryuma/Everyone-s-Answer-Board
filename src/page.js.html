@@ -1962,8 +1962,7 @@
           (phase.formTemplate === 'numberline' ? this.__buildLessonScaleFrame() : this.__buildLessonAxisFrame()) +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
-            'placeholder="「〜だから」で書いてみよう（例：うそをつくと、あとで友だちが悲しむから）">' + esc(draft.reason || '') + '</textarea>' +
-          '<p id="lessonReasonHint" class="lesson-hint lesson-reason-hint" aria-live="polite" hidden></p>' +
+            'placeholder="そこを選んだ理由を書いてください">' + esc(draft.reason || '') + '</textarea>' +
           (isReinput
             ? '<label class="lesson-label" for="lessonInsight">友達の考えを聞いて、加わったこと・変わったことは？</label>' +
               '<textarea id="lessonInsight" class="lesson-input" rows="3" maxlength="500" ' +
@@ -2001,18 +2000,6 @@
       };
       keep('lessonReason', 'reason');
       keep('lessonInsight', 'addedInsight');
-      // 理由の書き方の足場。送信は止めない (書けない子を止めると立場そのものが出せなくなる)。
-      const reasonEl = document.getElementById('lessonReason');
-      const hintEl = document.getElementById('lessonReasonHint');
-      if (reasonEl && hintEl) {
-        const refresh = () => {
-          const hint = this.__lessonReasonHint(reasonEl.value);
-          hintEl.textContent = hint;
-          hintEl.hidden = !hint;
-        };
-        reasonEl.addEventListener('input', refresh);
-        refresh();
-      }
 
       // 再読み込み後も「送った」が分かるように、自分の記録をサーバから 1 度だけ読む。
       this.__loadMyLessonRecord(phase);
@@ -2442,20 +2429,6 @@
           source: JSON.stringify({ code: String(code).slice(0, 40), phaseIndex: p.phaseIndex, lessonId: p.lessonId })
         });
       } catch (_) { /* 記録の失敗は送信の体験に影響させない */ }
-    }
-
-    /**
-     * 理由の書き出しの型 (根拠の形になっているか) の一言。空文字 = 何も出さない。
-     *
-     * Why 止めないか: 「〜だから」を強制すると、書けない子は立場を出せなくなる。
-     *   根拠の形は「議論で理由を比べる」の前提なので、促すだけにする。
-     *   短いうちは出さない (書き始めの 1 文字目から注意されるのは邪魔)。
-     */
-    __lessonReasonHint(text) {
-      const t = String(text || '').replace(/[\s。．.!！?？]+$/g, '');
-      if (t.length < 6) return '';
-      if (/(から|ので|ため|ためだ|からだ|からです|のです|んだ)$/.test(t)) return '';
-      return '「〜だから」「〜ので」で終わると、理由が友達に伝わりやすいよ';
     }
 
     /**

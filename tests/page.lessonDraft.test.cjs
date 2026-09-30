@@ -152,21 +152,3 @@ test('授業が終わると、その授業の書きかけだけを端末から�
   app.__applyLessonPhase(null);
   assert.deepEqual(Array.from(store.keys()).sort(), ['lessonDraft:u1:L9:0', 'lessonName:u1']);
 });
-
-// =====================================================================
-// 理由の書き出しの型 (促すだけ、止めない)
-// =====================================================================
-
-test('__lessonReasonHint: 「〜から」「〜ので」「〜ため」で終わっていれば何も出さない', () => {
-  const { app } = loadApp();
-  for (const t of ['うそをつくと友だちが悲しむから', '相手のことを考えたので。', 'あとでこうかいするため', '正直に言うべきだからです', '本当のことを言いたいんだ！']) {
-    assert.equal(app.__lessonReasonHint(t), '', t);
-  }
-});
-
-test('__lessonReasonHint: 根拠の形になっていなければ一言、短いうちは出さない', () => {
-  const { app } = loadApp();
-  assert.ok(app.__lessonReasonHint('正直に言うのが友だちのため。でも迷う').length > 0);
-  assert.equal(app.__lessonReasonHint('正直に'), '');
-  assert.equal(app.__lessonReasonHint(''), '');
-});
