@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_ */
+/* global __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_ */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -464,7 +464,25 @@ function extractHighlight(row, headers, precomputedIndex = null) {
  * @param {number|string} rowIndex - 行番号または 'row_#'
  * @param {string} reactionType
  */
+// 授業モード (native の授業が実行中) ではリアクションが存在しない。
+//   Why サーバでも止めるか: 画面から消しただけでは、古い画面や直接の呼び出しで書けてしまう。
+//   「いいね数で意見の価値が決まる」を避けるのは授業モードの設計なので、権能として守る。
+//   判定はフェーズ応答と同じ cache (10 秒) を使うので、投稿ごとの追加 read は無い。
+//   判定できないとき (null) は従来どおり通す: 掲示板モードのボードを壊さない。
+function __isLessonReactionsOff_(targetUserId) {
+  try {
+    if (typeof __getViewerLessonPhase_ !== 'function') return false;
+    return Boolean(__getViewerLessonPhase_(targetUserId));
+  } catch (error) {
+    logError_('__isLessonReactionsOff_', error);
+    return false;
+  }
+}
+
 function addReaction(targetUserId, rowIndex, reactionType) {
+  if (__isLessonReactionsOff_(targetUserId)) {
+    return createErrorResponse('授業中はリアクションを使えません', null, { error: 'LESSON_ACTIVE' });
+  }
   return executeBoardRowOperation({
     targetUserId,
     rowIndex,

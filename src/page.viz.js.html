@@ -193,25 +193,33 @@
   //     太い枠線は「多数派 = 正解」の暗黙シグナル化リスク (道徳教育 / DCE レビュー 2026-05-14)。
   //   注: SVG presentation attribute (attr) は外部 CSS (.viz-dot{stroke}) に specificity で
   //     負けるため、必ずインライン style で適用する。
-  function applyReactionRingStyles(selection) {
+  // 授業モード (native の授業が実行中) ではリアクションが存在しない = リングも数も描かない。
+  //   判定は page.js の __lessonReactionsOff (lessonPhase の有無) に委ねる。
+  function reactionsOff(app) {
+    return Boolean(app && typeof app.__lessonReactionsOff === 'function' && app.__lessonReactionsOff());
+  }
+
+  function applyReactionRingStyles(selection, app) {
+    const off = reactionsOff(app);
+    const top = (d) => (off ? null : topReactionType(d.data));
     return selection
       .style('stroke', (d) => {
         if (isHighlightedNode(d)) return null;
-        const t = topReactionType(d.data);
+        const t = top(d);
         return t ? REACTION_COLORS[t] : null;
       })
       .style('stroke-width', (d) => {
         if (isHighlightedNode(d)) return null;
-        return topReactionType(d.data) ? 2.0 : null;
+        return top(d) ? 2.0 : null;
       })
       .style('stroke-opacity', (d) => {
         if (isHighlightedNode(d)) return null;
-        return topReactionType(d.data) ? 0.85 : null;
+        return top(d) ? 0.85 : null;
       })
       // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は CSS の実線。
       .style('stroke-dasharray', (d) => {
         if (isHighlightedNode(d)) return null;
-        return reactionDash(topReactionType(d.data));
+        return reactionDash(top(d));
       });
   }
 
@@ -232,8 +240,8 @@
 
   // dot 中央のリアクション数バッジ。 AdminPanel 設定「リアクション数を表示」
   //   (state.showCounts) を尊重。 非表示でも stroke リングは残るので「人気の有無」は分かる。
-  function renderDotLabels(g, nodes, state) {
-    const showCounts = !!(state && state.showCounts);
+  function renderDotLabels(g, nodes, state, app) {
+    const showCounts = !!(state && state.showCounts) && !reactionsOff(app);
     const reactedNodes = showCounts ? nodes.filter((n) => totalReactions(n.data) > 0) : [];
     const labelJoin = g.selectAll('.viz-dot-label').data(reactedNodes, (d) => 'l_' + d.data.rowIndex);
     labelJoin.exit().remove();
@@ -302,7 +310,7 @@
     const isNamed = (app.state && app.state.displayMode === 'named');
 
     // 各行のリアクションボタンを「カードと完全に同じ生成器」で作る (色 / SVG / showCounts / aria)。
-    const canMakeBtns = typeof app.createReactionButtons === 'function';
+    const canMakeBtns = typeof app.createReactionButtons === 'function' && !reactionsOff(app);
     const cards = rows.map((r) => {
       const displayName = isNamed
         ? escapeForTooltip(r.name || (r.email ? r.email.split('@')[0] : '') || '匿名')
@@ -775,7 +783,8 @@
           .attr('cy', (d) => d.y)
           .attr('r', (d) => radiusFor(d))
           .classed('swing-high', false)
-          .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
+          .classed('highlight', (d) => Boolean(d.data && d.data.highlight)),
+        this
       )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, selfL))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, selfL))
@@ -791,7 +800,7 @@
 
       // dot 中央のリアクション数バッジ (matrix と共通の renderDotLabels に集約)。
       raiseHighlightedDots(g);
-      renderDotLabels(g, nodes, this.state);
+      renderDotLabels(g, nodes, this.state, this);
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
@@ -1150,7 +1159,8 @@
           .attr('r', (d) => radiusForMatrix(d))
           .classed('swing-high', false)
           .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
-          .classed('lone-voice', (d) => isLoneVoice(d))
+          .classed('lone-voice', (d) => isLoneVoice(d)),
+        this
       )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
@@ -1167,7 +1177,7 @@
 
       // dot 中央のリアクション数バッジ (numberline と共通の renderDotLabels に集約)。
       raiseHighlightedDots(g);
-      renderDotLabels(g, nodes, this.state);
+      renderDotLabels(g, nodes, this.state, this);
 
       updateStatsPills(this, current.length);
       // 象限キーワードは SVG 内に統合済 (旧 HTML パネルは廃止)。mode 切替で残存する panel は除去。
@@ -1759,6 +1769,9 @@
   StudyQuestApp.prototype.__contrastingPair = contrastingPair;
   StudyQuestApp.prototype.__consensusKeywords = consensusKeywords;
   StudyQuestApp.prototype.__reactionDash = reactionDash;
+  // テスト用: リアクションリングと数バッジの gating (授業モードで描かない) を直接検証する。
+  StudyQuestApp.prototype.__applyReactionRingStyles = applyReactionRingStyles;
+  StudyQuestApp.prototype.__renderDotLabels = renderDotLabels;
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）

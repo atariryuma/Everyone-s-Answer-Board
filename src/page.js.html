@@ -3566,8 +3566,9 @@
       if (data.highlight) {
         element.classList.add('highlighted');
         return;
-      } else {
       }
+      // 授業モードではリアクションの色を付けない (機能ごと存在しない)。
+      if (this.__lessonReactionsOff()) return;
 
       const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
       ).map(rt => rt.key);
@@ -4179,13 +4180,26 @@
      * @param {Object} safeData - { rowIndex, reactions, highlight }
      * @param {Object} [opts] - { size: 'card' | 'modal', reactionsOnly?: boolean }
      */
+    /**
+     * 授業モード (native の授業が実行中) ではリアクションが存在しない。
+     *
+     * Why: 「いいね数で意見の価値が決まる」を避けるのが授業モードの設計。数を隠しても
+     *   色のリングで「反応あり／なし」の二値と早い者勝ちの増幅は残るので、機能ごと出さない。
+     *   設定は増やさない (授業中かどうかは lessonPhase で既に分かる)。サーバも授業中の
+     *   addReaction を拒否するので、これは見せ方の制御であって権限ではない。
+     *   掲示板モード (Form 経由) は従来どおり。
+     */
+    __lessonReactionsOff() {
+      return Boolean(this.state && this.state.lessonPhase);
+    }
+
     __buildAnswerActionsHtml(safeData, opts) {
       const size = (opts && opts.size) || 'card';
       const reactionsOnly = Boolean(opts && opts.reactionsOnly);
       const iconCls = size === 'modal' ? 'w-6 h-6' : 'w-5 h-5';
       const countCls = size === 'modal' ? 'text-2xl' : 'text-lg';
       const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-      const reactions = this.reactionTypes.map(rt => {
+      const reactions = this.__lessonReactionsOff() ? '' : this.reactionTypes.map(rt => {
         const info = (safeData.reactions && safeData.reactions[rt.key]) || { count: 0, reacted: false };
         const cls = info.reacted ? ' reacted' : '';
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
@@ -4210,8 +4224,10 @@
             '<svg class="icon ' + iconCls + '" aria-hidden="true"><use href="#i-trash"></use></svg></button>';
         }
       }
+      // 何も無ければ空の枠も出さない (授業モードで押すものが無いときに余白だけ残さない)。
+      if (!reactions && !editor) return '';
       return '<div class="answer-actions' + (size === 'modal' ? ' answer-actions--lg' : '') + '">' +
-        '<div class="answer-actions-group" role="group" aria-label="回答への反応">' + reactions + '</div>' +
+        (reactions ? '<div class="answer-actions-group" role="group" aria-label="回答への反応">' + reactions + '</div>' : '') +
         (editor ? '<div class="answer-actions-group answer-actions-editor" role="group" aria-label="編集者の操作">' + editor + '</div>' : '') +
       '</div>';
     }

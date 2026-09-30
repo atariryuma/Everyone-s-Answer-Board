@@ -1022,3 +1022,44 @@ test('executeBoardRowOperation: A 列が読めなかった (429 で空配列) �
   assert.equal(res.busy, true);
   assert.equal(sheet._writes.length, 0);
 });
+
+// =====================================================================
+// 授業モード (native の授業が実行中) ではリアクションが存在しない
+// Why: 数を隠しても色のリングで「反応あり／なし」と早い者勝ちの増幅は残る。機能ごと止める。
+//   画面から消すだけでは古い画面や直接呼び出しで書けるので、サーバで権能として守る。
+// =====================================================================
+
+test('addReaction: 授業モードの授業が実行中なら拒否し、シートに書かない', () => {
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', '', '']]
+  });
+  const ctx = buildAddReactionContext({ sheet });
+  ctx.__getViewerLessonPhase_ = () => ({ lessonId: 'L1', phaseIndex: 1, screenRole: 'browse' });
+
+  const result = ctx.addReaction('owner-1', 2, 'LIKE');
+
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'LESSON_ACTIVE');
+  assert.equal(sheet._writes.length, 0);
+});
+
+test('addReaction: 授業中でなければ (null) 従来どおり通る', () => {
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', '', '']]
+  });
+  const ctx = buildAddReactionContext({ sheet });
+  ctx.__getViewerLessonPhase_ = () => null;
+  assert.equal(ctx.addReaction('owner-1', 2, 'LIKE').success, true);
+});
+
+test('addReaction: フェーズ判定が例外を投げても掲示板モードを壊さない (通す)', () => {
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', '', '']]
+  });
+  const ctx = buildAddReactionContext({ sheet });
+  ctx.__getViewerLessonPhase_ = () => { throw new Error('429'); };
+  assert.equal(ctx.addReaction('owner-1', 2, 'LIKE').success, true);
+});
