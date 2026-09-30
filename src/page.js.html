@@ -1686,13 +1686,75 @@
       this.__renderBoardPhaseNav();
     }
 
-    // データ更新 (polling) のたびに送信済み人数を描き直す。待機画面が出ていないときは何もしない。
+    // データ更新 (polling) のたびに教師の画面を描き直す。
+    //   入力フェーズ: 送信済み人数 (待機画面が出ていないときは何もしない)。
+    //   議論する: ☆ の追加・解除がボードの版番号で届くので、焦点の一覧を描き直す。
+    //     ☆ が 0 になったら投影を分布に戻し、最初の ☆ が付いたら焦点に切り替える。
     __refreshLessonTeacherWait() {
       const phase = this.state.lessonPhase;
       if (!phase || this.state.isEditor !== true) return;
+      if (this.state.lessonTransition) return;
+      if (phase.screenRole === 'discuss') {
+        if (this.__lessonFocusRows().length > 0) this.__renderLessonDiscussFocus(phase);
+        else this.__teardownLessonScreen();
+        return;
+      }
       if (['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
       if (!document.getElementById('lessonScreen')) return;
       this.__renderLessonTeacherWait(phase);
+    }
+
+    // 「議論する」で投影する理由 = 教師が ☆ を付けた行。クラス絞り込みは取得時に効いている。
+    //   並びはシートの行順 (= 送った順)。☆ を付けた順は持っていないので、並べ替えはしない。
+    __lessonFocusRows() {
+      const rows = Array.isArray(this.state.currentAnswers) ? this.state.currentAnswers : [];
+      return rows.filter((r) => r && r.highlight);
+    }
+
+    /**
+     * 教師の投影画面 (議論する): ☆ の理由を大きく並べる。分布は消す。名前は出さない。
+     *
+     * Why: 「出会う」で分布を見せたあと、議論に入るときに黒板に残るものが無かった。
+     *   教師が ☆ を押す行為を「議論の焦点を決める」操作にする。押すものは増えない
+     *   (☆ と「次へ」だけ)。児童の画面は「画面をとじて、話そう」のまま。
+     *   4 件まで: 電子黒板で読める大きさを保つ。5 件目以降は数だけ出す (☆ を外せば入れ替わる)。
+     */
+    __renderLessonDiscussFocus(phase) {
+      const esc = this.__escape.bind(this);
+      let host = document.getElementById('lessonScreen');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'lessonScreen';
+        host.className = 'lesson-screen';
+        document.body.appendChild(host);
+      }
+      document.body.classList.add('lesson-active');
+      const all = this.__lessonFocusRows();
+      const LIMIT = 4;
+      const shown = all.slice(0, LIMIT);
+      const items = shown.map((r) => {
+        const bars = (typeof this.__renderModalAxisBars === 'function') ? (this.__renderModalAxisBars(r) || '') : '';
+        // 本文は理由。理由が無いボード (掲示板形式) は回答文。回答が数値の写しなら出さない。
+        const opinion = String(r.opinion == null ? '' : r.opinion).trim();
+        const numericEcho = opinion !== '' && (opinion === String(r.numericX) || opinion === String(r.numericY));
+        const text = (r.reason && String(r.reason).trim()) ? String(r.reason) : (numericEcho ? '' : opinion);
+        return '<li class="lesson-focus-item">' +
+            (bars ? '<div class="lesson-focus-axis">' + bars + '</div>' : '') +
+            '<p class="lesson-focus-text">' + esc(text) + '</p>' +
+          '</li>';
+      }).join('');
+      const more = all.length > LIMIT
+        ? '<p class="lesson-focus-more">ほか ' + (all.length - LIMIT) + ' 件に ☆ が付いています（4 件まで映ります）</p>'
+        : '';
+      host.innerHTML =
+        '<div class="lesson-card lesson-focus" aria-live="polite">' +
+          '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
+          '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
+          '<ol class="lesson-focus-list' + (shown.length >= 3 ? ' is-dense' : '') + '">' + items + '</ol>' +
+          more +
+          '<div class="lesson-control-host" role="group" aria-label="授業のフェーズ切替"></div>' +
+        '</div>';
+      this.__renderBoardPhaseNav();
     }
 
     /**
@@ -1719,6 +1781,12 @@
         }
         if (phase.screenRole === 'input' || phase.screenRole === 'reinput') {
           this.__renderLessonTeacherWait(phase);
+          return;
+        }
+        // 議論する: 教師が「出会う」で ☆ を付けた理由を、投影画面に大きく並べる。
+        //   ☆ が無ければ分布のまま (何も変わらない)。
+        if (phase.screenRole === 'discuss' && this.__lessonFocusRows().length > 0) {
+          this.__renderLessonDiscussFocus(phase);
           return;
         }
         this.__teardownLessonScreen();
@@ -2812,7 +2880,10 @@
       const pending = this.state.boardReloadPending === true;
       if (!pending && (prev === null || prev === next)) return false;   // 初回は基準を覚えるだけ
       if (viewingPast || response.hasNewContent) return false;     // 過去閲覧中 / 新着は既存経路
-      if (document.getElementById('lessonScreen')) return false;   // 児童の授業画面がかぶさっている
+      // 児童の授業画面がかぶさっているときは読まない (児童は分布を映していない)。
+      //   教師の待機画面・議論の焦点画面もかぶさるが、こちらは ☆ の増減 (行が増えない変化) を
+      //   映す必要があるので読む。
+      if (this.state.isEditor !== true && document.getElementById('lessonScreen')) return false;
       if (typeof this.loadSheetData !== 'function') return false;
       this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
       return true;
