@@ -1270,20 +1270,6 @@ html, body {
 .lesson-strip-num {
   font-weight: 700;
 }
-.lesson-strip-caption {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--theme-text-secondary);
-  text-align: center;
-}
-.lesson-strip-caption-label {
-  font-weight: 700;
-  color: var(--theme-text-primary);
-  margin-right: var(--space-2);
-}
-.lesson-strip-caption-label::after {
-  content: '：';
-}
 
 /* 授業の操作面 (ピル + 次へ / 終了)。ヘッダ・待機画面・帯で同じ見た目。 */
 .lesson-control {
@@ -1311,11 +1297,6 @@ html, body {
 }
 .lesson-control .board-phase-btn:disabled { cursor: default; }
 .lesson-control .board-phase-btn.is-busy { opacity: 0.6; cursor: wait; }
-.lesson-control .lesson-control-current {
-  font-size: var(--font-size-sm);
-  color: var(--theme-text-secondary);
-  white-space: nowrap;
-}
 .lesson-control .lesson-control-primary {
   margin-left: var(--space-2);
   background: var(--brand-accent);
@@ -1335,13 +1316,12 @@ html, body {
 
 
 /* 議論フェーズ (教師の投影): ☆ の理由を大きく並べる。分布は消す。 */
+.lesson-focus-host.hidden { display: none; }
+#lessonFocusHost { margin: 0 0 var(--space-3); }
 .lesson-focus {
-  max-width: 64rem;
-  gap: var(--space-4);
-}
-.lesson-focus .lesson-teacher-phase,
-.lesson-focus .lesson-title {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 .lesson-focus-list {
   list-style: none;
@@ -1351,50 +1331,54 @@ html, body {
   grid-template-columns: 1fr;
   gap: var(--space-3);
 }
-.lesson-focus-list.is-dense {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.lesson-focus-list.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lesson-focus-list.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lesson-focus-list.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1023px) {
+  .lesson-focus-list.cols-3,
+  .lesson-focus-list.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
-  .lesson-focus-list.is-dense { grid-template-columns: 1fr; }
+  .lesson-focus-list.cols-2,
+  .lesson-focus-list.cols-3,
+  .lesson-focus-list.cols-4 { grid-template-columns: 1fr; }
 }
 .lesson-focus-item {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
-  background: var(--theme-bg-base);
+  background: var(--theme-bg-surface);
   border: 1px solid var(--theme-border-subtle);
-  border-left: 4px solid var(--brand-accent);
+  border-left: 4px solid var(--brand-highlight);
 }
+/* 位置バー: 数値は出さない (点数に見える)。軸ラベルは立場そのものなので切らずに折り返す。 */
 .lesson-focus-axis .modal-axis-row {
   font-size: var(--font-size-sm);
+  grid-template-columns: minmax(0, 1fr) 2fr minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.lesson-focus-axis .modal-axis-label-min,
+.lesson-focus-axis .modal-axis-label-max {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.3;
 }
 .lesson-focus-text {
   margin: 0;
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-xl);
   line-height: 1.5;
   color: var(--theme-text-primary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.lesson-focus-list.is-dense .lesson-focus-text {
-  font-size: var(--font-size-xl);
 }
 .lesson-focus-more {
   margin: 0;
   text-align: center;
   font-size: var(--font-size-sm);
   color: var(--theme-text-muted);
-}
-.lesson-focus .lesson-control-host {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-2);
-}
-.lesson-focus .lesson-control .board-phase-btn {
-  font-size: var(--font-size-sm);
-  padding: var(--space-2) var(--space-3);
 }
 
 /* 議論フェーズ: 端末に用事がないことを画面自身が伝える。 */

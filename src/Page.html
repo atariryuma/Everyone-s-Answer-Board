@@ -229,8 +229,10 @@
 
     </header>
     <!-- 授業の帯: 5 フェーズの「今ここ」と「いま児童の画面では」。教師 (投影) だけ。page.js が中身を注入。
-         参観者が「何が行われているか」を投影から読めるようにする。押すものは無い (操作は ☆ と「次へ」だけ)。 -->
+         押すものは無い (操作は ☆ と「次へ」だけ)。児童も見るので、児童を説明する文は出さない。 -->
     <div id="lessonPhaseStrip" class="lesson-strip-host hidden"></div>
+    <!-- 議論する: ☆ の理由を分布の上に並べる (教師の投影だけ)。page.js が中身を注入。 -->
+    <div id="lessonFocusHost" class="lesson-focus-host hidden"></div>
     <!-- 新着通知バナー -->
     <div id="newContentBanner" class="notification-banner-base hidden" role="alert" aria-live="polite" aria-label="新着通知バナー">
       <div class="flex items-center gap-3">

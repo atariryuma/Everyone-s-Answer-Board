@@ -68,7 +68,7 @@ test('☆ の行だけが焦点になる', () => {
   assert.deepEqual(app.__lessonFocusRows().map((r) => r.rowIndex), [2, 4]);
 });
 
-test('議論する + ☆あり: 教師の画面は焦点の一覧になり、分布 (teardown) にはしない', () => {
+test('議論する + ☆あり: 教師の画面は焦点の一覧を分布の上に出し、分布 (teardown) も見せる', () => {
   const { app } = loadApp();
   app.state.lessonPhase = discuss;
   app.state.currentAnswers = rows;
@@ -76,15 +76,19 @@ test('議論する + ☆あり: 教師の画面は焦点の一覧になり、分
   app.__renderLessonDiscussFocus = () => { focus++; };
   app.__renderLessonScreen();
   assert.equal(focus, 1);
-  assert.deepEqual(app.calls, []);
+  assert.deepEqual(app.calls, ['teardown'], '分布は消さない');
 });
 
-test('議論する + ☆なし: 従来どおり分布のまま (何も変わらない)', () => {
-  const { app } = loadApp();
+test('議論する + ☆なし: 焦点は空で、分布だけ', () => {
+  const { app, ctx } = loadApp();
   app.state.lessonPhase = discuss;
   app.state.currentAnswers = rows.map((r) => Object.assign({}, r, { highlight: false }));
+  const host = { innerHTML: 'old', hidden: false, classList: { add() { host.hidden = true; }, remove() { host.hidden = false; } } };
+  ctx.document.getElementById = (id) => (id === 'lessonFocusHost' ? host : null);
   app.__renderLessonScreen();
   assert.deepEqual(app.calls, ['teardown']);
+  assert.equal(host.innerHTML, '');
+  assert.equal(host.hidden, true);
 });
 
 test('児童の画面は変わらない (議論するは「画面をとじて、話そう」のまま)', () => {
@@ -100,7 +104,7 @@ test('児童の画面は変わらない (議論するは「画面をとじて、
   assert.equal(focus, 0);
 });
 
-test('データ更新のたびに焦点を描き直し、☆ が 0 になれば分布に戻す', () => {
+test('データ更新のたびに焦点を描き直す (☆ の増減を映す)', () => {
   const { app } = loadApp();
   app.state.lessonPhase = discuss;
   app.state.currentAnswers = rows;
@@ -110,34 +114,42 @@ test('データ更新のたびに焦点を描き直し、☆ が 0 になれば�
   assert.equal(focus, 1);
   app.state.currentAnswers = rows.map((r) => Object.assign({}, r, { highlight: false }));
   app.__refreshLessonTeacherWait();
-  assert.deepEqual(app.calls, ['teardown']);
+  assert.equal(focus, 2, '☆ が 0 でも描き直す (空になる)');
 });
 
-test('焦点の HTML: 理由と軸の位置は出すが、名前・クラスは出さない。5 件目以降は数だけ', () => {
+function focusHost(ctx) {
+  const host = { innerHTML: '', hidden: true, classList: { add() { host.hidden = true; }, remove() { host.hidden = false; } } };
+  ctx.document.getElementById = (id) => (id === 'lessonFocusHost' ? host : null);
+  return host;
+}
+
+test('焦点の HTML: 理由と軸の位置は出すが、名前・クラス・数値 (n/5) は出さない。5 件目以降は数だけ', () => {
   const { app, ctx } = loadApp();
   app.state.lessonPhase = discuss;
   const many = [];
   for (let i = 0; i < 6; i++) many.push({ rowIndex: i + 2, numericX: 1 + (i % 5), numericY: 3, reason: '理由' + i, highlight: true, name: '名前' + i, class: '6年1組' });
   app.state.currentAnswers = many;
-  let html = '';
-  ctx.document.getElementById = (id) => (id === 'lessonScreen' ? { set innerHTML(v) { html = v; }, get innerHTML() { return html; } } : null);
+  const host = focusHost(ctx);
   app.__renderLessonDiscussFocus(discuss);
+  const html = host.innerHTML;
+  assert.equal(host.hidden, false);
   assert.ok(html.indexOf('理由0') >= 0 && html.indexOf('理由3') >= 0, '4 件目まで出る');
   assert.ok(html.indexOf('理由4') < 0, '5 件目は出ない');
   assert.ok(html.indexOf('ほか 2 件') >= 0);
   assert.ok(html.indexOf('名前0') < 0 && html.indexOf('6年1組') < 0, '名前とクラスは出さない');
   assert.ok(html.indexOf('言わない') >= 0, '軸ラベルつきの位置バーが出る');
-  assert.ok(html.indexOf('is-dense') >= 0, '3 件以上は 2 列');
-  assert.ok(html.indexOf('lesson-control-host') >= 0, '「次へ」の操作面がある');
+  assert.ok(html.indexOf('modal-axis-value') < 0 && html.indexOf('/5<') < 0, '数値 (n/5) は出さない (点数に見える)');
+  assert.ok(html.indexOf('cols-4') >= 0, '4 件は 4 列');
+  assert.ok(html.indexOf('lesson-control-host') < 0, '操作面はヘッダにある (焦点には置かない)');
 });
 
 test('焦点の HTML: 理由は escape される', () => {
   const { app, ctx } = loadApp();
   app.state.lessonPhase = discuss;
   app.state.currentAnswers = rows;
-  let html = '';
-  ctx.document.getElementById = (id) => (id === 'lessonScreen' ? { set innerHTML(v) { html = v; }, get innerHTML() { return html; } } : null);
+  const host = focusHost(ctx);
   app.__renderLessonDiscussFocus(discuss);
+  const html = host.innerHTML;
   assert.ok(html.indexOf('&lt;b&gt;') >= 0);
   assert.ok(html.indexOf('<b>') < 0);
 });
@@ -157,8 +169,7 @@ test('版番号の変化: 教師は焦点画面がかぶさっていても読み
 });
 
 // =====================================================================
-// 授業の帯 (教師の投影): 5 フェーズの今ここ + いま児童の画面では
-// Why: 投影からは構造 (遮断・停止・匿名・前後比較) が見えない。参観者にも読めるようにする。
+// 授業の帯 (教師の投影): 5 フェーズの今ここ。児童を説明する文は出さない (児童も投影を見る)。
 // =====================================================================
 
 function fakeEl(tag) {
@@ -166,6 +177,7 @@ function fakeEl(tag) {
     tag, className: '', textContent: '', children: [], attrs: {},
     classList: { add(c) { el.className += ' ' + c; }, remove(c) { el.className = el.className.replace(c, ''); }, contains: () => false },
     setAttribute(k, v) { el.attrs[k] = v; },
+    addEventListener() {},
     appendChild(ch) { el.children.push(ch); return ch; }
   };
   return el;
@@ -200,16 +212,17 @@ test('帯: フェーズ名を順に並べ、現在地だけ強調し、問いは
   const all = textOf(node);
   assert.ok(all.indexOf('もう一度考える') >= 0);
   assert.ok(all.indexOf('秘密の問い') < 0, '未来の問いは出さない');
-  assert.ok(all.indexOf('端末を閉じています') >= 0, '議論する = 端末を閉じている');
+  assert.ok(all.indexOf('児童の画面') < 0 && all.indexOf('閉じて') < 0, '児童を説明する文は出さない (児童も投影を見る)');
+  assert.equal(node.children.length, 1, 'フェーズの並びだけ');
 });
 
-test('帯: 役割ごとの「いま児童の画面では」が構造を言い切る', () => {
-  const { app } = loadApp();
-  assert.ok(app.__lessonRoleCaption('input').indexOf('他の人の考えは見えません') >= 0);
-  assert.ok(app.__lessonRoleCaption('browse').indexOf('書き込みはできません') >= 0);
-  assert.ok(app.__lessonRoleCaption('reinput').indexOf('最初の自分') >= 0);
-  assert.ok(app.__lessonRoleCaption('reflect').indexOf('学級の分布は出ません') >= 0);
-  assert.equal(app.__lessonRoleCaption('unknown'), '');
+test('操作面: 「次へ」だけ (現在地は帯が示す)', () => {
+  const { app, ctx } = loadApp();
+  ctx.document.createElement = fakeEl;
+  app.state.boardPhaseNav = { lessonId: 'L1', activePhaseIndex: 1, phases: [{ name: '考える' }, { name: '出会う' }, { name: '議論する' }] };
+  const node = app.__buildLessonControlNode();
+  assert.equal(node.children.length, 1);
+  assert.equal(textOf(node), '次へ: 議論する');
 });
 
 test('帯: 授業が無ければ空 (何も出さない)', () => {

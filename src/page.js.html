@@ -1590,7 +1590,7 @@
       //   Why: 教師が進めた瞬間に送った児童が拒否され、書き直しになった (2026-09-30)。
       //   教師はその場でフェーズを戻して回収するので、戻ったときに続きから送れればよい。
       if (prev && this.state.isEditor !== true && this.__hasUnsentLessonDraft(prev)) {
-        this.showToast('書きかけは残しています。先生がもどしたら、そのまま送れます');
+        this.showToast('書きかけは残しています');
       }
       this.state.lessonDraft = null;
       this.state.lessonPrevPoint = null;
@@ -1676,7 +1676,6 @@
       host.innerHTML =
         '<div class="lesson-card lesson-teacher-wait">' +
           '<div class="lesson-strip-host"></div>' +
-          '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
           '<div class="lesson-count" aria-live="polite">' +
             '<span class="lesson-count-num">' + stats.total + '</span>' +
@@ -1697,8 +1696,7 @@
       if (!phase || this.state.isEditor !== true) return;
       if (this.state.lessonTransition) return;
       if (phase.screenRole === 'discuss') {
-        if (this.__lessonFocusRows().length > 0) this.__renderLessonDiscussFocus(phase);
-        else this.__teardownLessonScreen();
+        this.__renderLessonDiscussFocus(phase);
         return;
       }
       if (['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
@@ -1714,28 +1712,31 @@
     }
 
     /**
-     * 教師の投影画面 (議論する): ☆ の理由を大きく並べる。分布は消す。名前は出さない。
+     * 教師の投影画面 (議論する): ☆ の理由を分布の上に並べる。分布は消さない。名前は出さない。
      *
      * Why: 「出会う」で分布を見せたあと、議論に入るときに黒板に残るものが無かった。
      *   教師が ☆ を押す行為を「議論の焦点を決める」操作にする。押すものは増えない
      *   (☆ と「次へ」だけ)。児童の画面は「画面をとじて、話そう」のまま。
+     *   分布を残すのは、☆ が学級全体のどこにあるかを指しながら話すため。
+     *   位置は軸ラベルつきのバーで示し、数値 (n/5) は出さない: 点数に見える。
      *   4 件まで: 電子黒板で読める大きさを保つ。5 件目以降は数だけ出す (☆ を外せば入れ替わる)。
+     *   ☆ が無ければ何も出さない (分布だけ)。
      */
     __renderLessonDiscussFocus(phase) {
+      const host = document.getElementById('lessonFocusHost');
+      if (!host) return;
       const esc = this.__escape.bind(this);
-      let host = document.getElementById('lessonScreen');
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'lessonScreen';
-        host.className = 'lesson-screen';
-        document.body.appendChild(host);
-      }
-      document.body.classList.add('lesson-active');
       const all = this.__lessonFocusRows();
+      if (all.length === 0) {
+        host.innerHTML = '';
+        host.classList.add('hidden');
+        return;
+      }
       const LIMIT = 4;
       const shown = all.slice(0, LIMIT);
       const items = shown.map((r) => {
-        const bars = (typeof this.__renderModalAxisBars === 'function') ? (this.__renderModalAxisBars(r) || '') : '';
+        const bars = (typeof this.__renderModalAxisBars === 'function')
+          ? (this.__renderModalAxisBars(r, { showValue: false }) || '') : '';
         // 本文は理由。理由が無いボード (掲示板形式) は回答文。回答が数値の写しなら出さない。
         const opinion = String(r.opinion == null ? '' : r.opinion).trim();
         const numericEcho = opinion !== '' && (opinion === String(r.numericX) || opinion === String(r.numericY));
@@ -1749,15 +1750,19 @@
         ? '<p class="lesson-focus-more">ほか ' + (all.length - LIMIT) + ' 件に ☆ が付いています（4 件まで映ります）</p>'
         : '';
       host.innerHTML =
-        '<div class="lesson-card lesson-focus" aria-live="polite">' +
-          '<div class="lesson-strip-host"></div>' +
-          '<p class="lesson-teacher-phase">' + esc(phase.phaseName || '') + '</p>' +
-          '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
-          '<ol class="lesson-focus-list' + (shown.length >= 3 ? ' is-dense' : '') + '">' + items + '</ol>' +
+        '<div class="lesson-focus" aria-live="polite">' +
+          '<ol class="lesson-focus-list cols-' + shown.length + '">' + items + '</ol>' +
           more +
-          '<div class="lesson-control-host" role="group" aria-label="授業のフェーズ切替"></div>' +
         '</div>';
-      this.__renderBoardPhaseNav();
+      host.classList.remove('hidden');
+    }
+
+    // 議論する以外では焦点の一覧を出さない。
+    __clearLessonFocus() {
+      const host = document.getElementById('lessonFocusHost');
+      if (!host) return;
+      host.innerHTML = '';
+      host.classList.add('hidden');
     }
 
     /**
@@ -1768,7 +1773,7 @@
      */
     __renderLessonScreen() {
       const phase = this.state.lessonPhase;
-      if (!phase) return this.__teardownLessonScreen();
+      if (!phase) { this.__clearLessonFocus(); return this.__teardownLessonScreen(); }
 
       // 教師 (編集者) は答える側ではなく、分布を映す側。入力画面はかぶせない。
       //   ただし入力フェーズ (考える / もう一度考える) の間は分布も出さない。
@@ -1783,15 +1788,13 @@
           return;
         }
         if (phase.screenRole === 'input' || phase.screenRole === 'reinput') {
+          this.__clearLessonFocus();
           this.__renderLessonTeacherWait(phase);
           return;
         }
-        // 議論する: 教師が「出会う」で ☆ を付けた理由を、投影画面に大きく並べる。
-        //   ☆ が無ければ分布のまま (何も変わらない)。
-        if (phase.screenRole === 'discuss' && this.__lessonFocusRows().length > 0) {
-          this.__renderLessonDiscussFocus(phase);
-          return;
-        }
+        // 議論する: 教師が「出会う」で ☆ を付けた理由を、分布の上に並べる (☆ が無ければ分布だけ)。
+        if (phase.screenRole === 'discuss') this.__renderLessonDiscussFocus(phase);
+        else this.__clearLessonFocus();
         this.__teardownLessonScreen();
         return;
       }
@@ -1965,7 +1968,7 @@
           (phase.formTemplate === 'numberline' ? this.__buildLessonScaleFrame() : this.__buildLessonAxisFrame()) +
           '<label class="lesson-label" for="lessonReason">なぜ そこに置いたの？</label>' +
           '<textarea id="lessonReason" class="lesson-input" rows="3" maxlength="500" ' +
-            'placeholder="「〜だから」で書いてみよう（例：うそをつくと、あとで友だちが悲しむから）">' + esc(draft.reason || '') + '</textarea>' +
+            'placeholder="「〜だから」で書いてみよう">' + esc(draft.reason || '') + '</textarea>' +
           (isReinput
             ? '<label class="lesson-label" for="lessonInsight">友達の考えを聞いて、加わったこと・変わったことは？</label>' +
               '<textarea id="lessonInsight" class="lesson-input" rows="3" maxlength="500" ' +
@@ -2884,8 +2887,7 @@
       if (!pending && (prev === null || prev === next)) return false;   // 初回は基準を覚えるだけ
       if (viewingPast || response.hasNewContent) return false;     // 過去閲覧中 / 新着は既存経路
       // 児童の授業画面がかぶさっているときは読まない (児童は分布を映していない)。
-      //   教師の待機画面・議論の焦点画面もかぶさるが、こちらは ☆ の増減 (行が増えない変化) を
-      //   映す必要があるので読む。
+      //   教師の待機画面はかぶさるが、☆ の増減 (行が増えない変化) を映す必要があるので読む。
       if (this.state.isEditor !== true && document.getElementById('lessonScreen')) return false;
       if (typeof this.loadSheetData !== 'function') return false;
       this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
@@ -2926,13 +2928,8 @@
       wrap.className = 'lesson-control';
       if (!nav) return wrap;
       const busy = Boolean(this.state.__phaseSwitching);
-      const cur = nav.phases[nav.activePhaseIndex] || null;
       const next = nav.phases[nav.activePhaseIndex + 1] || null;
-      // 現在地 (押せない) と「次へ」だけ。任意のフェーズへの移動・終了は管理パネルで行う。
-      const current = document.createElement('span');
-      current.className = 'lesson-control-current';
-      current.textContent = (nav.activePhaseIndex + 1) + ' / ' + nav.phases.length + (cur ? '  ' + cur.name : '');
-      wrap.appendChild(current);
+      // 「次へ」だけ。現在地は帯 (5 フェーズの並び) が示す。任意のフェーズへの移動・終了は管理パネルで行う。
       if (next) {
         const primary = document.createElement('button');
         primary.type = 'button';
@@ -2944,24 +2941,12 @@
       return wrap;
     }
 
-    // 「いま児童の画面では」の 1 行。役割 (screenRole) ごとに固定。
-    //   Why: 投影からは「他の人の考えが見えない状態で書いている」「端末を閉じている」という
-    //   構造そのものが見えない。参観者にも児童にも、隠す理由のないことばかりなので書いて出す。
-    __lessonRoleCaption(role) {
-      const map = {
-        input: '自分の位置と理由を書いています。他の人の考えは見えません',
-        browse: '学級の分布と理由を読んでいます。書き込みはできません',
-        discuss: '端末を閉じています',
-        reinput: '最初の自分を見ながら、置き直しています',
-        reflect: '自分の最初といまの考えを見ています。学級の分布は出ません'
-      };
-      return map[role] || '';
-    }
-
     /**
-     * 授業の帯 (教師の投影だけ): 5 フェーズの「今ここ」+「いま児童の画面では」。
+     * 授業の帯 (教師の投影だけ): 5 フェーズの「今ここ」。
      *   板書の「授業の流れ」と同じ役割。フェーズ名だけを出し、問いは出さない (未来の問いは見せない)。
-     *   押すものは無い。ヘッダ下・待機画面・焦点画面・切替中のどこに出ても同じ builder。
+     *   児童の様子を説明する文は出さない: 投影は児童も見る。児童を三人称で実況する文になり、
+     *   「端末を閉じています」は教師の指示しだいで嘘になる (進め方をアプリが決めつけない)。
+     *   押すものは無い。ヘッダ下・待機画面・切替中のどこに出ても同じ builder。
      */
     __buildLessonStripNode() {
       const nav = this.state.boardPhaseNav;
@@ -2986,18 +2971,6 @@
         list.appendChild(li);
       });
       wrap.appendChild(list);
-      const cur = nav.phases[nav.activePhaseIndex] || null;
-      const caption = this.__lessonRoleCaption(cur && cur.screenRole);
-      if (caption) {
-        const cap = document.createElement('p');
-        cap.className = 'lesson-strip-caption';
-        const label = document.createElement('span');
-        label.className = 'lesson-strip-caption-label';
-        label.textContent = 'いま児童の画面では';
-        cap.appendChild(label);
-        cap.appendChild(document.createTextNode(caption));
-        wrap.appendChild(cap);
-      }
       return wrap;
     }
 
@@ -5650,7 +5623,8 @@
      * @param {Object} data 1 行分のデータ
      * @returns {string|null} HTML or null (該当モードでなければ null → caller がテキスト表示する)
      */
-    __renderModalAxisBars(data) {
+    __renderModalAxisBars(data, opts) {
+      const showValue = !(opts && opts.showValue === false);
       const mode = this.state.boardMode;
       const isMatrix = mode === 'matrix';
       const isNumberline = mode === 'numberline';
@@ -5671,7 +5645,7 @@
           ((value - defaultMin) / (defaultMax - defaultMin)) * 100));
         // 数値は行の右端で独立表示。ドットの右隣にラベルが来てもはみ出さず、
         //   全行で表示位置が一定 (= 視線で 5/5 を縦に追える)。
-        return ''          + '<div class="modal-axis-row" role="img" aria-label="'+ escape(minLabel) + ' から '+ escape(maxLabel) + ' のうち '+ value + '/'+ defaultMax + '">'          +   '<span class="modal-axis-label-min">'+ escape(minLabel) + '</span>'          +   '<span class="modal-axis-track">'          +     '<span class="modal-axis-dot" style="left:'+ pct.toFixed(1) + '%"></span>'          +   '</span>'          +   '<span class="modal-axis-label-max">'+ escape(maxLabel) + '</span>'          +   '<span class="modal-axis-value" aria-hidden="true">'+ value + '/'+ defaultMax + '</span>'          + '</div>';
+        return ''          + '<div class="modal-axis-row" role="img" aria-label="'+ escape(minLabel) + ' から '+ escape(maxLabel) + ' のうち '+ value + '/'+ defaultMax + '">'          +   '<span class="modal-axis-label-min">'+ escape(minLabel) + '</span>'          +   '<span class="modal-axis-track">'          +     '<span class="modal-axis-dot" style="left:'+ pct.toFixed(1) + '%"></span>'          +   '</span>'          +   '<span class="modal-axis-label-max">'+ escape(maxLabel) + '</span>'          +   (showValue ? '<span class="modal-axis-value" aria-hidden="true">'+ value + '/'+ defaultMax + '</span>' : '')          + '</div>';
       };
 
       let html = '';
