@@ -1454,6 +1454,64 @@ test('lesson 行 cache: 他が読んでいる間 (flight 中) の polling は直
   assert.equal(reads.lessons, before + 1, '投稿の判定は待って自分で読む (stale を受けない)');
 });
 
+// =====================================================================
+// 回答シートの読み (航跡 / 教師の一覧) の stampede guard
+// Why: 「ふりかえる」に入った瞬間に学級全員が同時に自分の航跡を読む。cache は最初の 1 件が
+//   埋めるが、その前に来た全員が同じシートを読むと Sheets API の read quota が焼ける
+//   (2026-09-30 の 429)。読むのは 1 件、残りは埋まるのを待つ、を固定する。
+// =====================================================================
+
+test('回答シートの読み: 他が読んでいる間 (flight 中) は待って cache から取り、シートを読まない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  const { store } = withRealCache(h);
+  const sheet = h.nativeSheets.get('phase1');
+  let sheetReads = 0;
+  const origGetDataRange = sheet.getDataRange;
+  sheet.getDataRange = function () { sheetReads++; return origGetDataRange.apply(this, arguments); };
+  const phaseDef = { spreadsheetId: 'native_ss_1', sheetName: 'phase1' };
+  const key = h.context.__phaseRowsCacheKey_(phaseDef, 'u1');
+
+  // 先頭の 1 件が読んで cache を埋める
+  assert.equal(h.context.__readAllLessonRows_(phaseDef, { boardUserId: 'u1' }).length, 3);
+  assert.equal(sheetReads, 1);
+  assert.ok(store.has(key), '全行が cache に入る');
+  assert.ok(!store.has(key + ':flight'), '読み終えたら flight を外す');
+
+  // 2 人目以降は cache から (シートを読まない)
+  assert.equal(h.context.__readAllLessonRows_(phaseDef, { boardUserId: 'u1' }).length, 3);
+  assert.equal(sheetReads, 1);
+
+  // 誰かが読んでいる最中 (flight 中) に来た読みは、待っている間に埋まれば cache から取る
+  store.delete(key);
+  store.set(key + ':flight', '1');
+  let sleeps = 0;
+  h.context.Utilities.sleep = () => { sleeps++; if (sleeps === 2) store.set(key, JSON.stringify([{ email: 'x' }])); };
+  const waited = h.context.__readAllLessonRows_(phaseDef, { boardUserId: 'u1' });
+  assert.equal(waited.length, 1, '待っている間に埋まった cache を返す');
+  assert.equal(sheetReads, 1, 'シートは読まない');
+  assert.ok(sleeps >= 2 && sleeps <= 4);
+
+  // 待っても埋まらなければ自分で読む (止まるより読む)
+  store.delete(key);
+  store.set(key + ':flight', '1');
+  h.context.Utilities.sleep = () => {};
+  assert.equal(h.context.__readAllLessonRows_(phaseDef, { boardUserId: 'u1' }).length, 3);
+  assert.equal(sheetReads, 2);
+});
+
+test('回答シートの読み: 読み込み失敗 (見出し行なし) は guard 経由でも cache しない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const { store } = withRealCache(h);
+  h.context.openSpreadsheet = () => ({ getSheet: () => ({ getDataRange: () => ({ getValues: () => [] }) }) });
+  const rows = h.context.__readAllLessonRows_({ spreadsheetId: 'ss', sheetName: 'phase1' }, { boardUserId: 'u1' });
+  assert.equal(rows.length, 0);
+  assert.ok(![...store.keys()].some(k => k.startsWith('lesson_rows_') && !k.endsWith(':flight')), '失敗は cache しない');
+});
+
 test('__findOwnLessonRow_: 全行 1 回読みで自分の行を見つける (寸法 + email 列の 2 read をやめた)', () => {
   const h = loadContext();
   const sheet = createSheet(['ts', 'email', 'class', 'name', 'x', 'y', 'reason', 'insight'], 'phase1');

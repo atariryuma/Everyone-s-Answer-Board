@@ -2792,19 +2792,61 @@ function __readAllLessonRows_(phaseDef, opts) {
     const boardUserId = opts && opts.boardUserId;
     const useCache = !(opts && opts.fresh) && Boolean(boardUserId)
       && typeof CacheService !== 'undefined' && typeof getBoardDataVersion_ === 'function';
-    const cacheKey = useCache ? __phaseRowsCacheKey_(phaseDef, boardUserId) : '';
-    if (useCache) {
+    if (!useCache) {
+      const direct = __loadLessonRowsFromSheet_(phaseDef);
+      return direct ? direct : [];
+    }
+    // 「ふりかえる」に入った瞬間、学級全員 (30〜100 人) が同時に自分の航跡を読みに来る。
+    //   cache は最初の 1 件が埋めるが、シート読みには 1〜3 秒かかるので、その間に来た全員が
+    //   cache miss で同じシートを読み、Sheets API の read quota (毎分/ユーザー) を焼く
+    //   (2026-09-30 の 429 はここ)。client 側の 0〜2.5 秒のばらしだけでは足りない。
+    //   withStampedeGuard_ で「読むのは 1 件、残りは埋まるのを待つ」にする。
+    //   allowStale は使わない: version が変わった直後 (置き直しの直後) に 1 つ前の版を返すと、
+    //   本人の ★ が航跡から欠ける。待っても埋まらなければ自分で読む (止まるより読む)。
+    const cacheKey = __phaseRowsCacheKey_(phaseDef, boardUserId);
+    if (typeof withStampedeGuard_ !== 'function') {
+      // guard 無し (テスト等): 従来どおり cache get → 読み → put。
       try {
         const hit = CacheService.getScriptCache().get(cacheKey);
         if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
       } catch (_) { /* 壊れた値は読み直しで回復する */ }
+      const loaded = __loadLessonRowsFromSheet_(phaseDef);
+      if (Array.isArray(loaded) && typeof saveToCacheWithSizeCheck === 'function') {
+        saveToCacheWithSizeCheck(cacheKey, loaded, LESSON_ROWS_CACHE_TTL_S);
+      }
+      return Array.isArray(loaded) ? loaded : [];
     }
+    const guarded = withStampedeGuard_({
+      key: cacheKey,
+      ttl: LESSON_ROWS_CACHE_TTL_S,
+      loader: () => __loadLessonRowsFromSheet_(phaseDef),
+      // 見出し行すら読めていない (429 等) は null で返し cache しない。
+      //   空を cache すると 60 秒間「回答なし」に見える。
+      isCacheable: (v) => Array.isArray(v),
+      allowStale: false,
+      waitMs: 500,
+      waitTries: 4
+    });
+    return Array.isArray(guarded) ? guarded : [];
+  } catch (error) {
+    logError_('__readAllLessonRows_', error);
+    return [];
+  }
+}
+
+/**
+ * シートから 1 フェーズ分の全行を読んで正規化する (cache を通さない実体)。
+ * @returns {Array|null} 行の配列。見出し行すら読めなかった (429 等の読み込み失敗) なら null。
+ */
+function __loadLessonRowsFromSheet_(phaseDef) {
+  try {
     const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_rows' });
-    if (!access) return [];
+    if (!access) return null;
     const sheet = access.getSheet(phaseDef.sheetName);
-    if (!sheet) return [];
+    if (!sheet) return null;
     // 全行を 1 回で読む。SA proxy の getDataRange は実データ範囲だけを返す (空グリッドを読まない)。
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
+    if (data.length === 0) return null;
     // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect) ので、
     //   固定 index ではなくヘッダー名で探す。値の読み方はボードと同じ extractHighlight に任せる。
     const header = data[0] || [];
@@ -2830,15 +2872,10 @@ function __readAllLessonRows_(phaseDef, opts) {
         highlight: extractHighlight(v, header, highlightCol)
       });
     }
-    // data が空 = 見出し行すら読めていない = 読み込み失敗 (429 等)。空を cache すると
-    //   60 秒間「回答なし」に見えるので、失敗は cache しない。
-    if (useCache && data.length > 0 && typeof saveToCacheWithSizeCheck === 'function') {
-      saveToCacheWithSizeCheck(cacheKey, out, LESSON_ROWS_CACHE_TTL_S);
-    }
     return out;
   } catch (error) {
-    logError_('__readAllLessonRows_', error);
-    return [];
+    logError_('__loadLessonRowsFromSheet_', error);
+    return null;
   }
 }
 
