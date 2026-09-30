@@ -1148,40 +1148,49 @@ test('__reportLessonSubmit: 報告器が無ければ何もしない', () => {
 });
 
 // =====================================================================
-// もう一度考える: 最初の答えを初期値にする (空の欄だけ)
+// もう一度考える: 最初の答えは「参考」として見せるだけ (入力欄には入れない)
 // =====================================================================
 
-test('__seedReinputDraft: 下書きが空なら位置と理由を入れる (加わったことは入れない)', () => {
-  const { instance } = makeInstance();
+// 最小の DOM: #lessonPrevNote の器だけ。createElement は textContent / className / appendChild を持つ。
+function makePrevNoteDom(ctx) {
+  const mk = (tag) => ({
+    tag, className: '', textContent: '', children: [],
+    appendChild(c) { this.children.push(c); return c; }
+  });
+  const host = mk('div');
+  host.hidden = true;
+  host.classList = { remove: () => { host.hidden = false; }, add: () => { host.hidden = true; }, contains: () => host.hidden };
+  ctx.document.getElementById = (id) => (id === 'lessonPrevNote' ? host : null);
+  ctx.document.createElement = (tag) => mk(tag);
+  ctx.document.createTextNode = (s) => ({ tag: '#text', textContent: String(s) });
+  return host;
+}
+
+test('__renderLessonPrevNote: 案内と「さいしょのことば」を出す。下書きには触らない', () => {
+  const { instance, ctx } = makeInstance();
+  const host = makePrevNoteDom(ctx);
+  instance.state.lessonPrevPoint = { numericX: 4, numericY: 2, reason: '友達だから <b>' };
   instance.state.lessonDraft = null;
-  const seeded = instance.__seedReinputDraft({ phaseIndex: 0, numericX: 4, numericY: 2, reason: '友達だから', addedInsight: '' });
-  assert.equal(seeded.position, true); assert.equal(seeded.reason, true);
-  assert.equal(instance.state.lessonDraft.numericX, 4);
-  assert.equal(instance.state.lessonDraft.numericY, 2);
-  assert.equal(instance.state.lessonDraft.reason, '友達だから');
-  assert.equal(instance.state.lessonDraft.addedInsight, undefined);
+  assert.equal(instance.__renderLessonPrevNote(), true);
+  assert.equal(host.hidden, false);
+  assert.equal(host.children.length, 2);
+  assert.match(host.children[0].textContent, /さいしょに選んだところ/);
+  const quote = host.children[1];
+  assert.equal(quote.className, 'lesson-quote lesson-quote-prev');
+  assert.equal(quote.children[0].textContent, 'さいしょのことば');
+  assert.equal(quote.children[1].textContent, '友達だから <b>', 'textContent 経路 (escape 不要)');
+  assert.equal(instance.state.lessonDraft, null, '入力欄の下書きは空のまま');
 });
 
-test('__seedReinputDraft: 児童が先に打った理由や選んだ位置は上書きしない', () => {
-  const { instance } = makeInstance();
-  instance.state.lessonDraft = { reason: '打ちかけ' };
-  let seeded = instance.__seedReinputDraft({ numericX: 4, numericY: 2, reason: '前回' });
-  assert.equal(seeded.position, true); assert.equal(seeded.reason, false);
-  assert.equal(instance.state.lessonDraft.reason, '打ちかけ');
-  assert.equal(instance.state.lessonDraft.numericX, 4);
+test('__renderLessonPrevNote: ことばが空なら案内だけ。最初の答えが無ければ何も出さない', () => {
+  const { instance, ctx } = makeInstance();
+  let host = makePrevNoteDom(ctx);
+  instance.state.lessonPrevPoint = { numericX: 3, numericY: null, reason: '  ' };
+  assert.equal(instance.__renderLessonPrevNote(), true);
+  assert.equal(host.children.length, 1);
 
-  instance.state.lessonDraft = { numericX: 1, numericY: 5 };
-  seeded = instance.__seedReinputDraft({ numericX: 4, numericY: 2, reason: '前回' });
-  assert.equal(seeded.position, false); assert.equal(seeded.reason, true);
-  assert.equal(instance.state.lessonDraft.numericX, 1, '選んだ位置はそのまま');
-  assert.equal(instance.state.lessonDraft.reason, '前回');
-});
-
-test('__seedReinputDraft: 数直線 (縦の値なし) でも位置を入れられる', () => {
-  const { instance } = makeInstance();
-  instance.state.lessonDraft = null;
-  const seeded = instance.__seedReinputDraft({ numericX: 3, numericY: null, reason: 'r' });
-  assert.equal(seeded.position, true);
-  assert.equal(instance.state.lessonDraft.numericX, 3);
-  assert.equal(instance.state.lessonDraft.numericY, null);
+  host = makePrevNoteDom(ctx);
+  instance.state.lessonPrevPoint = null;
+  assert.equal(instance.__renderLessonPrevNote(), false);
+  assert.equal(host.hidden, true);
 });

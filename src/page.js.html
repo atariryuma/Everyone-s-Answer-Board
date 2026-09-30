@@ -1585,7 +1585,7 @@
 
       // フェーズが変わったら、前のフェーズの入力内容は持ち越さない。
       this.state.lessonDraft = null;
-      this.state.lessonPrefilled = false;
+      this.state.lessonPrevPoint = null;
       this.state.lessonSent = null;
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
@@ -1869,9 +1869,7 @@
       host.innerHTML =
         '<div class="lesson-card">' +
           '<h2 class="lesson-title">' + esc(phase.question || 'いまの考えは？') + '</h2>' +
-          (isReinput && this.state.lessonPrefilled
-            ? '<p id="lessonPrefillHint" class="lesson-hint">前回の位置とことばが入っています。話し合いで変わったところを直してから送りましょう</p>'
-            : '') +
+          (isReinput ? '<div id="lessonPrevNote" class="lesson-prev-note hidden"></div>' : '') +
           (needClass
             ? '<label class="lesson-label" for="lessonClass">クラス</label>' +
               '<select id="lessonClass" class="lesson-input">' +
@@ -1901,6 +1899,7 @@
 
       if (phase.formTemplate === 'numberline') this.__buildLessonScale(isReinput);
       else this.__buildLessonGrid(isReinput);
+      if (isReinput) this.__renderLessonPrevNote();
       const btn = document.getElementById('lessonSubmit');
       if (btn) {
         btn.addEventListener('click', () => this.__submitLessonAnswer());
@@ -1999,6 +1998,13 @@
           if (!phases.length) return;
           const first = phases[0];
           const mine = phases.filter((p) => p.phaseIndex === phase.phaseIndex)[0];
+          // 再入力フェーズ: 最初の ● とことばを「参考」として持つ (送信済み画面でも ● を出す)。
+          const isReinput = phase.screenRole === 'reinput' && first.phaseIndex < phase.phaseIndex;
+          if (isReinput && !this.state.lessonPrevPoint) {
+            this.state.lessonPrevPoint = {
+              numericX: first.numericX, numericY: first.numericY, reason: String(first.reason || '')
+            };
+          }
           // このフェーズに自分の行がある = 送信済み。画面ごと「送りました」に切り替える。
           if (mine && !this.state.lessonSent && !this.state.lessonEditing) {
             this.state.lessonSent = {
@@ -2009,18 +2015,12 @@
             if (document.getElementById('lessonScreen')) this.__renderLessonScreen();
             return;
           }
-          // 再入力フェーズ: 最初の ● を下敷きにし、前回の位置とことばを初期値として入れる。
-          //   Why 初期値か: 位置が同じ児童は選び直さなくてよく、理由を打ち直さなくてよい。
-          //   書く時間を「変わったこと・加わったこと」に集中させる (書く量で授業が押していた)。
-          //   Why その場で埋めるか: 画面を作り直すと、打ち始めていた児童の入力のフォーカスと
-          //   日本語変換が切れる。埋めるのは空の欄だけ (打ち始めていれば触らない)。
-          if (phase.screenRole === 'reinput' && first.phaseIndex < phase.phaseIndex) {
-            if (!this.state.lessonPrevPoint) {
-              this.state.lessonPrevPoint = { numericX: first.numericX, numericY: first.numericY };
-            }
-            const seeded = this.__seedReinputDraft(first);
-            if (seeded.position || seeded.reason) this.state.lessonPrefilled = true;
-            if (!this.__applyLessonRecordInPlace(this.state.lessonPrevPoint, this.state.lessonDraft)
+          // 入力欄には入れない。Why: 入っていると児童はそのまま送ってしまう (考え直す時間が消える)。
+          //   位置は必ず選び直し、理由は必ず書き直す (前と同じ場所・同じ考えでもよい)。
+          //   Why その場で反映するか: 画面を作り直すと、打ち始めていた児童の入力のフォーカスと
+          //   日本語変換が切れる。
+          if (isReinput) {
+            if (!this.__applyLessonRecordInPlace(this.state.lessonPrevPoint)
                 && document.getElementById('lessonScreen')) {
               this.__renderLessonScreen();   // 入力画面がまだ無いときだけ描き直す
             }
@@ -2030,42 +2030,18 @@
     }
 
     /**
-     * 再入力フェーズの下書きに、最初の答え (位置・理由) を「空の欄だけ」入れる。
-     *   児童が先に触っていた欄は触らない。「加わったこと」は新しく書くものなので入れない。
-     * @returns {{position:boolean, reason:boolean}} 何を入れたか
-     */
-    __seedReinputDraft(first) {
-      const draft = Object.assign({}, this.state.lessonDraft || {});
-      const out = { position: false, reason: false };
-      if (!first) return out;
-      const hasX = first.numericX !== null && first.numericX !== undefined && first.numericX !== '';
-      if (!draft.numericX && hasX) {
-        draft.numericX = Number(first.numericX);
-        draft.numericY = (first.numericY === null || first.numericY === undefined || first.numericY === '')
-          ? null : Number(first.numericY);
-        out.position = true;
-      }
-      if (!String(draft.reason || '').trim() && String(first.reason || '').trim()) {
-        draft.reason = String(first.reason);
-        out.reason = true;
-      }
-      if (out.position || out.reason) this.state.lessonDraft = draft;
-      return out;
-    }
-
-    /**
-     * 入力画面を作り直さずに、● (最初の位置)・選択中の位置・理由の初期値・案内文を反映する。
+     * 入力画面を作り直さずに、● (最初の位置) と「さいしょのことば」を反映する。
+     *   入力欄 (選択中の位置・理由) には触らない。
      * @returns {boolean} 入力画面 (格子か数直線) が画面にあって反映できたか
      */
-    __applyLessonRecordInPlace(prev, draft) {
+    __applyLessonRecordInPlace(prev) {
       const host = document.getElementById('lessonGrid') || document.getElementById('lessonScale');
       if (!host) return false;
       const oneD = host.id === 'lessonScale';
-      const cellFor = (x, y) => host.querySelector(oneD
-        ? '.lesson-cell[data-x="' + x + '"]'
-        : '.lesson-cell[data-x="' + x + '"][data-y="' + y + '"]');
       if (prev && prev.numericX) {
-        const c = cellFor(prev.numericX, prev.numericY);
+        const c = host.querySelector(oneD
+          ? '.lesson-cell[data-x="' + prev.numericX + '"]'
+          : '.lesson-cell[data-x="' + prev.numericX + '"][data-y="' + prev.numericY + '"]');
         if (c && !c.classList.contains('is-prev')) {
           c.classList.add('is-prev');
           c.setAttribute('aria-label', (c.getAttribute('aria-label') || '') + '（最初に選んだところ）');
@@ -2076,24 +2052,37 @@
           c.appendChild(mark);
         }
       }
-      if (draft && draft.numericX && !host.querySelector('.lesson-cell.is-selected')) {
-        const c = cellFor(draft.numericX, draft.numericY);
-        if (c) c.classList.add('is-selected');
+      this.__renderLessonPrevNote();
+      return true;
+    }
+
+    /**
+     * 「さいしょに選んだところ」の案内と「さいしょのことば」を、入力画面の上に読むだけで出す。
+     *   Why 入力欄に入れないか: 入っていると、そのまま送る児童が出る。
+     *   Why ことばを見せるか: 自分が何と書いたかを思い出してから、いまの考えを書く。
+     * @returns {boolean} 出せたか (器が無い / まだ最初の答えが無いなら false)
+     */
+    __renderLessonPrevNote() {
+      const el = document.getElementById('lessonPrevNote');
+      const prev = this.state.lessonPrevPoint;
+      if (!el || !prev || !prev.numericX) return false;
+      el.textContent = '';
+      const lead = document.createElement('p');
+      lead.className = 'lesson-hint';
+      lead.textContent = '● は、さいしょに選んだところです。話し合いを聞いて、いまの考えでもう一度えらび、理由を書きましょう';
+      el.appendChild(lead);
+      const words = String(prev.reason || '').trim();
+      if (words) {
+        const q = document.createElement('div');
+        q.className = 'lesson-quote lesson-quote-prev';
+        const label = document.createElement('span');
+        label.className = 'lesson-quote-label';
+        label.textContent = 'さいしょのことば';
+        q.appendChild(label);
+        q.appendChild(document.createTextNode(words));
+        el.appendChild(q);
       }
-      const reasonEl = document.getElementById('lessonReason');
-      if (reasonEl && !String(reasonEl.value || '').trim() && draft && draft.reason) {
-        reasonEl.value = draft.reason;
-      }
-      if (this.state.lessonPrefilled && !document.getElementById('lessonPrefillHint')) {
-        const title = host.closest('.lesson-card') && host.closest('.lesson-card').querySelector('.lesson-title');
-        if (title) {
-          const hint = document.createElement('p');
-          hint.id = 'lessonPrefillHint';
-          hint.className = 'lesson-hint';
-          hint.textContent = '前回の位置とことばが入っています。話し合いで変わったところを直してから送りましょう';
-          title.insertAdjacentElement('afterend', hint);
-        }
-      }
+      el.classList.remove('hidden');
       return true;
     }
 
