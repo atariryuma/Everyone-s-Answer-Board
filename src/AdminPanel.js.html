@@ -4985,8 +4985,15 @@
       }
 
       const esc = window.sharedUtilities.security.escapeHtml;
-      const rows = (d.rows || []).filter(liveInClass);
-      if (countEl) countEl.textContent = rows.length + '人';
+      const allRows = d.rows || [];
+      const rows = allRows.filter(liveInClass);
+      // 絞り込み中は「表示している人数 / 全体」と、隠している人数を明示する。
+      //   Why: 絞り込みが効いていることに気づかず「届いていない」と読んでしまうため。
+      const changeAll = (live.view === 'change' && d.change && Array.isArray(d.change.students)) ? d.change.students : null;
+      const shown = changeAll ? changeAll.filter(liveInClass).length : rows.length;
+      const total = changeAll ? changeAll.length : allRows.length;
+      if (countEl) countEl.textContent = live.classFilter ? (shown + '人（全 ' + total + ' 人）') : (shown + '人');
+      liveRenderFilterNote(shown, total);
       if (srcEl) {
         const ph = d.phase || {};
         const isInput = ph.screenRole === 'input' || ph.screenRole === 'reinput';
@@ -4999,7 +5006,7 @@
         parts.push('10 秒ごとに更新');
         srcEl.textContent = parts.join(' · ');
       }
-      liveRenderPending(pendEl, d.pending);
+      liveRenderPending(pendEl, d.pending, rows.length);
 
       const axis = d.axis || { boardMode: 'matrix', min: 1, max: 5, x: {}, y: {} };
       const showClass = !live.classFilter && Array.isArray(d.classes) && d.classes.length > 1;
@@ -5021,20 +5028,42 @@
       body.innerHTML = liveRenderGroups(rows, axis, card, esc);
     }
 
+    // 絞り込み中の注記。絞り込みが無いときは出さない。
+    function liveRenderFilterNote(shown, total) {
+      const el = document.getElementById('lesson-live-filter-note');
+      if (!el) return;
+      if (!live.classFilter) { el.classList.add('hidden'); el.textContent = ''; return; }
+      const hidden = Math.max(0, total - shown);
+      el.textContent = '「' + live.classFilter + '」だけを表示しています（' + shown + '人）。' +
+        (hidden > 0 ? '他のクラスの ' + hidden + '人は隠しています。' : '他のクラスの回答はありません。') +
+        'すべて見るには「すべてのクラス」を選んでください。';
+      el.classList.remove('hidden');
+    }
+
     // 未提出: 2 回目以降の入力フェーズだけ (前の入力フェーズに答えた児童が母集団)。
-    function liveRenderPending(el, pending) {
+    function liveRenderPending(el, pending, shownRows) {
       if (!el) return;
       if (!Array.isArray(pending)) { el.classList.add('hidden'); return; }
       const esc = window.sharedUtilities.security.escapeHtml;
       const list = pending.filter(liveInClass);
-      el.className = 'lesson-live-pending box ' + (list.length ? 'box-warning' : 'box-success');
+      // 絞り込み中は、数えていない他クラスの人数も添える (「全員送った」を誤解しないように)。
+      const hiddenPending = live.classFilter ? pending.length - list.length : 0;
+      const scope = live.classFilter ? '「' + live.classFilter + '」の' : '';
+      const note = hiddenPending > 0 ? '（他のクラスの ' + hiddenPending + '人は数えていません）' : '';
       if (!list.length) {
-        el.textContent = '前のフェーズで答えた全員が送りました。';
+        // 絞り込んだクラスに、前のフェーズの回答も今の回答も無い = そのクラスはまだ何もしていない。
+        //   「全員が送りました」と出すと誤解するので、事実だけを書く。
+        const nobody = Boolean(live.classFilter) && !(shownRows > 0);
+        el.className = 'lesson-live-pending box ' + (nobody ? '' : 'box-success');
+        el.textContent = (nobody
+          ? scope + '児童の回答は、前のフェーズにも今のフェーズにもまだありません。'
+          : scope + '前のフェーズで答えた全員が送りました。') + note;
         return;
       }
+      el.className = 'lesson-live-pending box box-warning';
       const names = live.hideNames ? ''
         : '：' + list.map((p) => esc(p.name || p.email || '')).join('、');
-      el.innerHTML = '<strong>まだ送っていない ' + list.length + '人</strong>' + names;
+      el.innerHTML = '<strong>' + esc(scope) + 'まだ送っていない ' + list.length + '人</strong>' + names + esc(note);
     }
 
     // 位置ごと: 横軸の左寄り / まん中 / 右寄り の 3 群。立場の違う児童を並べて指名しやすくする。

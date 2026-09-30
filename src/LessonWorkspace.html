@@ -194,6 +194,8 @@
     <p class="lesson-live-note">
       この一覧は先生だけが見られます。☆ を押すと、ボードのその回答がハイライトされます（数秒で投影に反映）。
     </p>
+    <!-- クラスで絞り込んでいる間だけ出す。「届いているのに一覧に無い」を絞り込みのせいと分かるように。 -->
+    <p id="lesson-live-filter-note" class="lesson-live-note lesson-live-filter-note hidden" aria-live="polite"></p>
     <div id="lesson-live-pending" class="lesson-live-pending hidden"></div>
     <!-- 位置ごと / 新しい順 / ● → ★ のどれもここに描く (同じ 10 秒 polling に乗る)。 -->
     <div id="lesson-live-body" class="lesson-live-body"></div>
