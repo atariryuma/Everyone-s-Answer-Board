@@ -137,3 +137,16 @@ test('isMeNode: 授業中で emailHash が自分のものなら true、授業な
   assert.equal(isMe({ data: { emailHash: 'abc' } }, appOff), false, '掲示板モードでは出さない');
   assert.equal(isMe({ data: { emailHash: 'abc' } }, { state: {}, __lessonReactionsOff: () => true }), false);
 });
+
+test('授業モードでは象限にキーワードも「まだ誰もいない視点」も添えない (掲示板モードは従来どおり)', () => {
+  const { StudyQuestApp } = loadViz();
+  const qa = StudyQuestApp.prototype.__quadrantAnnotation;
+  const lesson = { __lessonReactionsOff: () => true };
+  const board = { __lessonReactionsOff: () => false };
+  assert.equal(qa(lesson, 25, 0), 'none', '空いた象限へ誘わない');
+  assert.equal(qa(lesson, 25, 1), 'none', '1 人の象限でもその子のことばを見出しにしない');
+  assert.equal(qa(lesson, 25, 9), 'none');
+  assert.equal(qa(board, 25, 0), 'empty');
+  assert.equal(qa(board, 25, 3), 'keywords');
+  assert.equal(qa(board, 0, 0), 'none', '回答が無ければ何も出さない');
+});

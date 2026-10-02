@@ -199,6 +199,16 @@
     return Boolean(app && typeof app.__lessonReactionsOff === 'function' && app.__lessonReactionsOff());
   }
 
+  // 象限ラベルの下に何を添えるか: 'empty' (まだ誰もいない視点) / 'keywords' (象限のキーワード) / 'none'。
+  //   授業モードでは何も添えない。Why: キーワードは学級の考えにシステムが意味のラベルを付けることになり
+  //   (意味を与えるのは教師の仕事)、象限に 1 人なら その子のことばが見出しになる。「まだ誰もいない視点」は
+  //   空いた立場へシステムが誘うことになる (誘うかどうかは教師が場を見て決める発問)。掲示板モードは従来どおり。
+  function quadrantAnnotation(app, rowCount, cellCount) {
+    if (reactionsOff(app)) return 'none';
+    if (rowCount > 0 && cellCount === 0) return 'empty';
+    return cellCount > 0 ? 'keywords' : 'none';
+  }
+
   function applyReactionRingStyles(selection, app) {
     const off = reactionsOff(app);
     const top = (d) => (off ? null : topReactionType(d.data));
@@ -945,7 +955,10 @@
         // Empty Chair（"The Empty Chair", 欠けている視点の提示）—
         //   誰も意見を置いていない象限を「まだ誰もいない視点」として控えめに示す。
         //   多様な視点を促し「孤立した学び」を防ぐ(中教審 2021)。 強調はしない (muted hint)。
-        if (rows.length > 0 && !buckets[key].length) {
+        //   授業モードでは添えない (quadrantAnnotation)。
+        const annotation = quadrantAnnotation(selfM, rows.length, buckets[key].length);
+        if (annotation === 'none') return;
+        if (annotation === 'empty') {
           const hintY = anchor === 'top' ? y + 22 : y - 22;
           g.append('text').attr('class', 'viz-empty-chair-hint')
             .attr('x', x).attr('y', hintY)
@@ -1131,8 +1144,11 @@
         }
         return set;
       })();
+      // 授業モードでは孤立意見を光らせない。Why: 投影と児童の画面で一人の子に光を当てることになる。
+      //   教師が少数意見を見つける手がかりは、管理パネルの回答一覧 (位置ごとのまとまり) にある。
+      const loneVoiceOff = reactionsOff(this);
       const isLoneVoice = (d) => {
-        if (!d || !d.data) return false;
+        if (loneVoiceOff || !d || !d.data) return false;
         if (d.data.emailHash) return loneVoiceHashes.has(d.data.emailHash);
         if (typeof d.data.rowIndex === 'number') return loneVoiceHashes.has('rowIndex:' + d.data.rowIndex);
         return false;
@@ -1802,6 +1818,7 @@
   StudyQuestApp.prototype.__applyReactionRingStyles = applyReactionRingStyles;
   StudyQuestApp.prototype.__renderDotLabels = renderDotLabels;
   StudyQuestApp.prototype.__isMeNode = isMeNode;
+  StudyQuestApp.prototype.__quadrantAnnotation = quadrantAnnotation;
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）
