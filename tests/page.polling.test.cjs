@@ -940,7 +940,9 @@ test('フェーズ切替: 押した瞬間に「切り替えています」、応
 // =====================================================================
 
 function makeActionsInstance(isEditor, showAdminFeatures) {
-  const { instance } = makeInstance();
+  const { instance, ctx } = makeInstance();
+  // リアクションを使うボード (reactionMode 未指定は「使わない」で、ボタン自体が出ない)。
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'count' };
   instance.state = { userId: 'u1', isEditor, showAdminFeatures, showCounts: true };
   instance.reactionTypes = [{ key: 'LIKE', icon: 'like' }, { key: 'UNDERSTAND', icon: 'understand' }, { key: 'CURIOUS', icon: 'curious' }];
   instance.getIcon = (name) => '<i data-icon="' + name + '"></i>';

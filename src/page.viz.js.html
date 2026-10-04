@@ -193,10 +193,19 @@
   //     太い枠線は「多数派 = 正解」の暗黙シグナル化リスク (道徳教育 / DCE レビュー 2026-05-14)。
   //   注: SVG presentation attribute (attr) は外部 CSS (.viz-dot{stroke}) に specificity で
   //     負けるため、必ずインライン style で適用する。
-  // 授業モード (native の授業が実行中) ではリアクションが存在しない = リングも数も描かない。
-  //   判定は page.js の __lessonReactionsOff (lessonPhase の有無) に委ねる。
+  // リアクションが存在しないボード (授業モード、または reactionMode='off') = ボタンも数も出さない。
+  //   判定は page.js の __reactionsOff / __reactionColorsOff に委ねる (規則を 1 か所に置く)。
   function reactionsOff(app) {
-    return Boolean(app && typeof app.__lessonReactionsOff === 'function' && app.__lessonReactionsOff());
+    return Boolean(app && typeof app.__reactionsOff === 'function' && app.__reactionsOff());
+  }
+  // 点のリング (多寡の色) を描かないボード: 上に加えて reactionMode='private' (押せるが多寡は見せない)。
+  function reactionColorsOff(app) {
+    return Boolean(app && typeof app.__reactionColorsOff === 'function' && app.__reactionColorsOff());
+  }
+  // 授業モード (native の授業が実行中) か。自分の点・孤立意見・象限の添え書きは授業だけの見せ方なので、
+  //   リアクションの有無ではなくこちらで判定する。
+  function inLesson(app) {
+    return Boolean(app && typeof app.__inLesson === 'function' && app.__inLesson());
   }
 
   // 象限ラベルの下に何を添えるか: 'empty' (まだ誰もいない視点) / 'keywords' (象限のキーワード) / 'none'。
@@ -204,13 +213,13 @@
   //   (意味を与えるのは教師の仕事)、象限に 1 人なら その子のことばが見出しになる。「まだ誰もいない視点」は
   //   空いた立場へシステムが誘うことになる (誘うかどうかは教師が場を見て決める発問)。掲示板モードは従来どおり。
   function quadrantAnnotation(app, rowCount, cellCount) {
-    if (reactionsOff(app)) return 'none';
+    if (inLesson(app)) return 'none';
     if (rowCount > 0 && cellCount === 0) return 'empty';
     return cellCount > 0 ? 'keywords' : 'none';
   }
 
   function applyReactionRingStyles(selection, app) {
-    const off = reactionsOff(app);
+    const off = reactionColorsOff(app);
     const top = (d) => (off ? null : topReactionType(d.data));
     return selection
       .style('stroke', (d) => {
@@ -253,7 +262,7 @@
   //   縁取りと「じぶん」の小さな文字だけ。位置や理由の見え方は他の点と同じ (優劣をつけない)。
   //   掲示板モード (授業なし) では出さない: リアクションのリングと縁取りが重なるため。
   function isMeNode(d, app) {
-    if (!reactionsOff(app)) return false;
+    if (!inLesson(app)) return false;
     const me = app && app.state && app.state.viewerEmailHash;
     return Boolean(me && d && d.data && d.data.emailHash && d.data.emailHash === me);
   }
@@ -543,7 +552,7 @@
       : `${item.numericX}`;
     let headerText;
     if (isStudentRecord) {
-      const isMe = Boolean(app && app.state && app.state.viewerEmailHash && item.emailHash === app.state.viewerEmailHash && reactionsOff(app));
+      const isMe = Boolean(app && app.state && app.state.viewerEmailHash && item.emailHash === app.state.viewerEmailHash && inLesson(app));
       headerText = (showName && item.name) ? escapeForTooltip(item.name) : (isMe ? 'あなた' : '匿名');
     } else {
       // pie/wordcloud などのカテゴリラベル — name フィールドは「選択肢」「語」等の意味
@@ -1146,7 +1155,7 @@
       })();
       // 授業モードでは孤立意見を光らせない。Why: 投影と児童の画面で一人の子に光を当てることになる。
       //   教師が少数意見を見つける手がかりは、管理パネルの回答一覧 (位置ごとのまとまり) にある。
-      const loneVoiceOff = reactionsOff(this);
+      const loneVoiceOff = inLesson(this);
       const isLoneVoice = (d) => {
         if (loneVoiceOff || !d || !d.data) return false;
         if (d.data.emailHash) return loneVoiceHashes.has(d.data.emailHash);

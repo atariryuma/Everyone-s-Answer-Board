@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_ */
+/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -340,6 +340,16 @@ function sanitizeDisplaySettings(displaySettings) {
   const mode = displaySettings.boardMode;
   if (typeof mode === 'string' && VALID_BOARD_MODES.includes(mode)) {
     sanitized.boardMode = mode;
+  }
+
+  // リアクションの見せ方 (validators.js の REACTION_MODES)。指定があるときだけ保持し、
+  //   showReactions (数の表示) はそこから導出する。未指定の旧 config は resolveReactionMode が
+  //   showReactions から読み替えるので、ここでは形を変えない。
+  const reactionMode = displaySettings.reactionMode;
+  if (typeof reactionMode === 'string' && typeof VALID_REACTION_MODES !== 'undefined'
+      && VALID_REACTION_MODES.includes(reactionMode)) {
+    sanitized.reactionMode = reactionMode;
+    sanitized.showReactions = reactionMode === 'count';
   }
 
   return sanitized;

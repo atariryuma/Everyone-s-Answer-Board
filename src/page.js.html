@@ -3613,8 +3613,8 @@
         element.classList.add('highlighted');
         return;
       }
-      // 授業モードではリアクションの色を付けない (機能ごと存在しない)。
-      if (this.__lessonReactionsOff()) return;
+      // リアクションの色・枠は「色で示す」「数も見せる」のときだけ (授業モード・使わない・ボタンだけ では付けない)。
+      if (this.__reactionColorsOff()) return;
 
       const active = this.reactionTypes.filter(rt => data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
       ).map(rt => rt.key);
@@ -4145,7 +4145,7 @@
     generateCardCacheKey(safeData) {
       const userIdentifier = window.UNIFIED_CONFIG?.email ?
         window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
-      return `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.isEditor}`;
+      return `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.isEditor}-${this.__reactionMode()}`;
     }
 
     checkCardCache(cacheKey, safeData) {
@@ -4218,6 +4218,40 @@
       return { nameHtml, containerClass };
     }
 
+    // 授業モード (native の授業が実行中) か。リアクションの有無とは別に、
+    //   授業だけの見せ方 (自分の点・孤立意見を光らせない等) の判定に使う。
+    __inLesson() {
+      return Boolean(this.state && this.state.lessonPhase);
+    }
+
+    /**
+     * リアクションの見せ方 (validators.js の REACTION_MODES): off / private / color / count。
+     *   授業モード中は常に off。旧 config (reactionMode 無し) は showReactions から読み替える
+     *   (サーバの resolveReactionMode と同じ規則)。
+     *
+     * Why 既定が off か: 数だけ隠しても、色のリングで「反応あり／なし」の二値と
+     *   早い者勝ちの増幅は残る。「いいね数で意見の価値が決まる」を避けたいので、
+     *   教師が開いたボードでだけ出す。サーバも off では addReaction を拒否するので、
+     *   これは見せ方の制御であって権限ではない。
+     */
+    __reactionMode() {
+      if (this.__inLesson()) return 'off';
+      const ds = (window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.displaySettings) || {};
+      if (['off', 'private', 'color', 'count'].indexOf(ds.reactionMode) >= 0) return ds.reactionMode;
+      return ds.showReactions === true ? 'count' : 'off';
+    }
+
+    // ボタンごと出さない (off)。
+    __reactionsOff() {
+      return this.__reactionMode() === 'off';
+    }
+
+    // カードの色・枠、点のリングを出さない (off / private)。private は押せるが多寡を見せない。
+    __reactionColorsOff() {
+      const mode = this.__reactionMode();
+      return mode === 'off' || mode === 'private';
+    }
+
     /**
      * 回答への操作を 1 つの部品で作る。カード / 詳細モーダル / 分布の意見一覧、どこでも同じ。
      *   左: リアクション (全員)。右: ハイライト (編集者)、削除 (管理モード)。
@@ -4226,26 +4260,13 @@
      * @param {Object} safeData - { rowIndex, reactions, highlight }
      * @param {Object} [opts] - { size: 'card' | 'modal', reactionsOnly?: boolean }
      */
-    /**
-     * 授業モード (native の授業が実行中) ではリアクションが存在しない。
-     *
-     * Why: 「いいね数で意見の価値が決まる」を避けるのが授業モードの設計。数を隠しても
-     *   色のリングで「反応あり／なし」の二値と早い者勝ちの増幅は残るので、機能ごと出さない。
-     *   設定は増やさない (授業中かどうかは lessonPhase で既に分かる)。サーバも授業中の
-     *   addReaction を拒否するので、これは見せ方の制御であって権限ではない。
-     *   掲示板モード (Form 経由) は従来どおり。
-     */
-    __lessonReactionsOff() {
-      return Boolean(this.state && this.state.lessonPhase);
-    }
-
     __buildAnswerActionsHtml(safeData, opts) {
       const size = (opts && opts.size) || 'card';
       const reactionsOnly = Boolean(opts && opts.reactionsOnly);
       const iconCls = size === 'modal' ? 'w-6 h-6' : 'w-5 h-5';
       const countCls = size === 'modal' ? 'text-2xl' : 'text-lg';
       const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-      const reactions = this.__lessonReactionsOff() ? '' : this.reactionTypes.map(rt => {
+      const reactions = this.__reactionsOff() ? '' : this.reactionTypes.map(rt => {
         const info = (safeData.reactions && safeData.reactions[rt.key]) || { count: 0, reacted: false };
         const cls = info.reacted ? ' reacted' : '';
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
@@ -5762,10 +5783,7 @@
                         this.state.isAdminUser;
       if (isTeacher) return;
 
-      const reactionsEnabled = !!(window.UNIFIED_CONFIG
-                                  && window.UNIFIED_CONFIG.displaySettings
-                                  && window.UNIFIED_CONFIG.displaySettings.showReactions);
-      if (!reactionsEnabled) return;
+      if (this.__reactionsOff()) return;
 
       this.state.lastFocusedElement = document.activeElement;
       this.elements.infoModalContainer.classList.remove('hidden');
@@ -5875,7 +5893,8 @@
       // Why: highlight トグルと同じく、編集者（admin / own board）には常に見せる。
       //      生徒にはリアクション数を隠していても、先生はスコアで盛り上がった意見を
       //      素早く見つけたい授業運営ニーズがある。
-      const canSeeScore = this.state.showScoreSort || this.state.isEditor;
+      //      リアクションを使わないボードでは、並べ替えの根拠が無いので誰にも出さない。
+      const canSeeScore = !this.__reactionsOff() && (this.state.showScoreSort || this.state.isEditor);
       if (canSeeScore) {
         this.elements.scoreOption.style.display = 'block';
         return;
@@ -6301,8 +6320,15 @@
       }
 
       // UNIFIED_CONFIG は admin mode 中でも常に最新の設定で同期する。
+      const oldReactionMode = this.__reactionMode();
       if (window.UNIFIED_CONFIG) {
         window.UNIFIED_CONFIG.displaySettings = newDisplaySettings;
+      }
+      // リアクションの見せ方の切替は admin mode でも描き直す (ボタン・色が残らないように)。
+      if (oldReactionMode !== this.__reactionMode()) {
+        this.updateSortOptions();
+        this.clearCache();
+        this.renderWithCurrentData();
       }
 
       if (window.showAdminFeatures) {

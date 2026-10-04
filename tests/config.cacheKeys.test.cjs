@@ -466,3 +466,17 @@ test('saveUserConfig: uses validatePublishConfig when options.isPublish', () => 
   assert.equal(publishValidatorUsed, true);
   assert.equal(regularValidatorUsed, false);
 });
+
+// --- sanitizeDisplaySettings: reactionMode ---
+test('sanitizeDisplaySettings: reactionMode を保持し showReactions を導出、不正値・未指定は形を変えない', () => {
+  const { context } = loadConfigContext({ VALID_REACTION_MODES: ['off', 'private', 'color', 'count'] });
+  const off = context.sanitizeDisplaySettings({ reactionMode: 'off', showReactions: true });
+  assert.equal(off.reactionMode, 'off');
+  assert.equal(off.showReactions, false, 'off なのに数だけ出る食い違いを作らない');
+  const count = context.sanitizeDisplaySettings({ reactionMode: 'count' });
+  assert.equal(count.showReactions, true);
+  const bogus = context.sanitizeDisplaySettings({ reactionMode: 'loud', showReactions: true });
+  assert.equal(bogus.reactionMode, undefined);
+  assert.equal(bogus.showReactions, true);
+  assert.equal('reactionMode' in context.sanitizeDisplaySettings({}), false);
+});

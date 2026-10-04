@@ -53,6 +53,51 @@ function boardModeOptionsHtml(selected) {
   }).join('');
 }
 
+/**
+ * リアクション (いいね／なるほど／もっと知りたい) の見せ方。displaySettings.reactionMode の唯一の定義。
+ *   off     : 使わない。ボタンも色も出さず、サーバも受け付けない (既定)
+ *   private : ボタンだけ。押せるが、児童には数も色も出さない (多寡は教師が管理モードで見る)
+ *   color   : 反応の種類でカードに色、合計で枠の太さ (数字は出さない)
+ *   count   : 色に加えて数も出す
+ *
+ * Why 既定が off か: 数や色は「多い・少ない」を児童に見せ、意見の中身より人気に目を向けさせる。
+ *   必要な授業でだけ教師が開く。
+ * 旧設定 showReactions (数の表示) とは resolveReactionMode で読み替える: true → count、それ以外 → off。
+ */
+const REACTION_MODES = Object.freeze([
+  Object.freeze({ key: 'off',     label: '使わない' }),
+  Object.freeze({ key: 'private', label: 'ボタンだけ（数も色も児童に見せない）' }),
+  Object.freeze({ key: 'color',   label: '色で示す（数は見せない）' }),
+  Object.freeze({ key: 'count',   label: '数も見せる' })
+]);
+const VALID_REACTION_MODES = Object.freeze(REACTION_MODES.map(m => m.key));
+
+/**
+ * displaySettings からリアクションの見せ方を 1 つに決める。
+ * @param {Object} [displaySettings]
+ * @returns {'off'|'private'|'color'|'count'}
+ */
+function resolveReactionMode(displaySettings) {
+  const ds = displaySettings || {};
+  if (typeof ds.reactionMode === 'string' && VALID_REACTION_MODES.includes(ds.reactionMode)) {
+    return ds.reactionMode;
+  }
+  return ds.showReactions === true ? 'count' : 'off';
+}
+
+/**
+ * 管理画面のリアクション select 用 <option> を生成する (boardModeOptionsHtml と同じ理由)。
+ * @param {string} [selected='off']
+ * @returns {string}
+ */
+function reactionModeOptionsHtml(selected) {
+  const sel = typeof selected === 'string' ? selected : 'off';
+  return REACTION_MODES.map((m) => {
+    const isSel = m.key === sel ? ' selected' : '';
+    return `<option value="${m.key}"${isSel}>${m.label}</option>`;
+  }).join('');
+}
+
 
 /**
  * メールアドレス検証
@@ -465,6 +510,13 @@ function validateConfig(config) {
       const mode = config.displaySettings.boardMode;
       if (typeof mode === 'string' && VALIDATOR_BOARD_MODES.includes(mode)) {
         sanitizedDS.boardMode = mode;
+      }
+      // reactionMode も同じ理由でここで保持する。showReactions (数の表示) は reactionMode から導出して
+      //   食い違わせない (旧経路の showCounts は showReactions を見ている)。
+      const reactionMode = config.displaySettings.reactionMode;
+      if (typeof reactionMode === 'string' && VALID_REACTION_MODES.includes(reactionMode)) {
+        sanitizedDS.reactionMode = reactionMode;
+        sanitizedDS.showReactions = reactionMode === 'count';
       }
       result.sanitized.displaySettings = sanitizedDS;
     }

@@ -94,16 +94,21 @@ function loadReactionContext(overrides = {}) {
     findPublishedBoardOwner: (userId, viewerEmail, extra = {}) =>
       (context.findUserById ? context.findUserById(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
     getUserConfig: () => ({ success: true, config: {} }),
+    // 既定は「リアクションを使う」ボード (reactionMode 未指定は「使わない」になるため明示する)。
     getConfigOrDefault: () => ({
       spreadsheetId: 'sheet-123',
       sheetName: 'Sheet1',
-      isPublished: true
+      isPublished: true,
+      displaySettings: { reactionMode: 'count' }
     }),
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => null } }),
     ...overrides
   };
 
   vm.createContext(context);
+  // resolveReactionMode / REACTION_MODES は validators.js が唯一の定義。
+  const validators = fs.readFileSync(path.resolve(__dirname, '../src/validators.js'), 'utf8');
+  vm.runInContext(validators, context, { filename: 'validators.js' });
   const source = fs.readFileSync(path.resolve(__dirname, '../src/ReactionService.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'ReactionService.js' });
   context._cache = cache;
@@ -905,7 +910,7 @@ test('addReaction: still allows published-board viewer (viewer op is open)', () 
     overrides: {
       getCurrentEmail: () => 'student@example.com',
       isAdministrator: () => false,
-      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true }),
+      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true, displaySettings: { reactionMode: 'color' } }),
       findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
     }
   });
@@ -1062,4 +1067,72 @@ test('addReaction: フェーズ判定が例外を投げても掲示板モード�
   const ctx = buildAddReactionContext({ sheet });
   ctx.__getViewerLessonPhase_ = () => { throw new Error('429'); };
   assert.equal(ctx.addReaction('owner-1', 2, 'LIKE').success, true);
+});
+
+// =====================================================================
+// リアクションの見せ方 (displaySettings.reactionMode)。'off' (既定) ではサーバも受け付けない。
+// Why: 画面からボタンを消すだけでは、古い画面や直接の呼び出しで書けてしまう。
+// =====================================================================
+
+function buildModeContext(displaySettings, sheet) {
+  return buildAddReactionContext({
+    sheet,
+    overrides: {
+      getConfigOrDefault: () => ({ spreadsheetId: 'sheet-123', sheetName: 'Sheet1', isPublished: true, displaySettings })
+    }
+  });
+}
+
+test('addReaction: reactionMode=off なら REACTIONS_OFF で拒否し、シートに書かない', () => {
+  const sheet = createMockSheet({ headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'], rows: [['answer-a', '', '', '']] });
+  const result = buildModeContext({ reactionMode: 'off' }, sheet).addReaction('owner-1', 2, 'LIKE');
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'REACTIONS_OFF');
+  assert.equal(sheet._writes.length, 0);
+});
+
+test('addReaction: reactionMode 未指定の旧 config (showReactions=false / 設定なし) は「使わない」扱いで拒否', () => {
+  const sheet = createMockSheet({ headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'], rows: [['answer-a', '', '', '']] });
+  assert.equal(buildModeContext({ showReactions: false }, sheet).addReaction('owner-1', 2, 'LIKE').error, 'REACTIONS_OFF');
+  assert.equal(buildModeContext(undefined, sheet).addReaction('owner-1', 2, 'LIKE').error, 'REACTIONS_OFF');
+  assert.equal(sheet._writes.length, 0);
+});
+
+test('addReaction: private / color / count と、旧 showReactions=true は受け付ける', () => {
+  for (const ds of [{ reactionMode: 'private' }, { reactionMode: 'color' }, { reactionMode: 'count' }, { showReactions: true }]) {
+    const sheet = createMockSheet({ headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'], rows: [['answer-a', '', '', '']] });
+    assert.equal(buildModeContext(ds, sheet).addReaction('owner-1', 2, 'LIKE').success, true, JSON.stringify(ds));
+  }
+});
+
+test('addReaction: 権限の無い人には設定より先に Access denied を返す (設定を漏らさない)', () => {
+  const ctx = buildAddReactionContext({
+    overrides: {
+      getCurrentEmail: () => 'stranger@example.com',
+      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: false, displaySettings: { reactionMode: 'off' } })
+    }
+  });
+  assert.match(ctx.addReaction('owner-1', 2, 'LIKE').message, /Access denied/);
+});
+
+test('toggleHighlight: reactionMode=off でも教師のハイライトは使える', () => {
+  const sheet = createMockSheet({ headers: ['Q1', 'HIGHLIGHT'], rows: [['answer-a', 'FALSE']] });
+  const ctx = buildAddReactionContext({
+    sheet,
+    overrides: {
+      getCurrentEmail: () => 'owner@example.com',
+      getConfigOrDefault: () => ({ spreadsheetId: 'sheet-123', sheetName: 'Sheet1', isPublished: true, displaySettings: { reactionMode: 'off' } })
+    }
+  });
+  assert.equal(ctx.toggleHighlight('owner-1', 2).success, true);
+});
+
+test('resolveReactionMode: 正しい値はそのまま、旧 config は showReactions から読み替え', () => {
+  const ctx = loadReactionContext();
+  assert.equal(ctx.resolveReactionMode({ reactionMode: 'private' }), 'private');
+  assert.equal(ctx.resolveReactionMode({ reactionMode: 'bogus', showReactions: true }), 'count');
+  assert.equal(ctx.resolveReactionMode({ showReactions: true }), 'count');
+  assert.equal(ctx.resolveReactionMode({ showReactions: 'true' }), 'off', '文字列 "true" は信用しない');
+  assert.equal(ctx.resolveReactionMode({}), 'off');
+  assert.equal(ctx.resolveReactionMode(null), 'off');
 });

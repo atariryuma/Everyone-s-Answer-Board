@@ -348,3 +348,32 @@ test('validateMapping: answer/reason real duplicate still rejected', () => {
   assert.ok(r.errors.some(e => e.includes('重複')));
 });
 
+
+// =====================================================================
+// validateConfig: displaySettings.reactionMode (リアクションの見せ方)
+// Why: validateConfig は displaySettings を作り直すので、ここで保持しないと保存往復で消える。
+//   showReactions (数の表示) は reactionMode から導出して食い違わせない。
+// =====================================================================
+
+test('validateConfig: reactionMode を保持し、showReactions は count のときだけ true', () => {
+  const ctx = loadValidatorsContext();
+  for (const [mode, counts] of [['off', false], ['private', false], ['color', false], ['count', true]]) {
+    const ds = ctx.validateConfig({ displaySettings: { reactionMode: mode, showReactions: !counts } }).sanitized.displaySettings;
+    assert.equal(ds.reactionMode, mode);
+    assert.equal(ds.showReactions, counts, mode);
+  }
+});
+
+test('validateConfig: 不正な reactionMode は落とし、旧 showReactions はそのまま', () => {
+  const ctx = loadValidatorsContext();
+  const ds = ctx.validateConfig({ displaySettings: { reactionMode: 'loud', showReactions: true } }).sanitized.displaySettings;
+  assert.equal(ds.reactionMode, undefined);
+  assert.equal(ds.showReactions, true);
+});
+
+test('REACTION_MODES: 管理画面の <option> は 1 か所の定義から作り、既定は「使わない」', () => {
+  const ctx = loadValidatorsContext();
+  const html = ctx.reactionModeOptionsHtml();
+  assert.deepEqual([...html.matchAll(/value="(\w+)"/g)].map(m => m[1]), ['off', 'private', 'color', 'count']);
+  assert.match(html, /<option value="off" selected>使わない<\/option>/);
+});

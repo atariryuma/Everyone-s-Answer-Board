@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_ */
+/* global __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_, resolveReactionMode */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -490,6 +490,11 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     label: 'addReaction',
     openContext: 'reaction_processing',
     concurrentMessage: '同時リアクション処理中です。お待ちください。',
+    // リアクションを「使わない」ボード (既定)。画面から消すだけでは古い画面や直接の
+    //   呼び出しで書けてしまうので、授業モードと同じくサーバで拒否する。
+    rejectIf: (config) => (resolveReactionMode(config.displaySettings) === 'off')
+      ? createErrorResponse('このボードではリアクションを使いません', null, { error: 'REACTIONS_OFF' })
+      : null,
     process: (sheet, rowNumber, actorEmail, preloadedHeaders) =>
       processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders),
     formatSuccess: (result) => ({
@@ -550,6 +555,8 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
  * @param {function(sheet, rowNumber, actorEmail): Object} options.process - クリティカルセクション内で実行する処理
  * @param {function(result): Object} options.formatSuccess - process の戻り値から API レスポンスを組み立て
  * @param {boolean} [options.requireEditor] editor 権限を要求する（true: ハイライト等の editor-only 操作）
+ * @param {function(config): ?Object} [options.rejectIf] - ボード設定を見て拒否するときにエラーレスポンスを返す
+ *   (権限確認の直後・SS を開く前に呼ぶ。null なら続行)
  * @param {Object} [options.expect] - 押した側が見ていた行の照合。どれも省略可。
  *   { expectedSpreadsheetId, expectedSheetName, rowIdentity: { column, value } }
  *   rowIdentity: その行の column 列 (1-based) が value であること (大文字小文字・前後空白は無視)。
@@ -588,6 +595,11 @@ function executeBoardRowOperation(options) {
       requireEditor: requireEditor === true
     })) {
       return createErrorResponse('Access denied to target board');
+    }
+    // 権限の確認の後に置く: 見られない人にボードの設定 (リアクションを使うか) を返さない。
+    if (typeof options.rejectIf === 'function') {
+      const rejected = options.rejectIf(config);
+      if (rejected) return rejected;
     }
 
     const rowNumber = typeof rowIndex === 'string'

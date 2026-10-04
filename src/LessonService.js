@@ -1324,8 +1324,11 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     //   表明する場)。これまではボード設定の showReactions を引き継いでいたので、教師が別の
     //   目的で ON にしていると「出会う」でリアクションが効いた。showNames と同じく、phase 側で
     //   明示的に true を指定した場合だけ従う。
+    //   reactionMode も 'off' に揃える: patch はボード設定に deep merge されるので、
+    //   ボード側に残った reactionMode ('count' 等) が showReactions を true に戻してしまう。
     if (baseDisplay.showReactions !== true) {
       displaySettings.showReactions = false;
+      displaySettings.reactionMode = 'off';
     }
   }
   if (xAxisLabels) patch.xAxisLabels = xAxisLabels;

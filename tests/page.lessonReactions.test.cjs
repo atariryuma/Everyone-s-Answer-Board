@@ -1,8 +1,9 @@
 /**
- * 授業モード (native の授業が実行中) ではリアクションが存在しない。
+ * リアクションの見せ方: 授業モード (native の授業が実行中) と reactionMode='off' (既定) では存在しない。
+ *   'private' はボタンだけ (色・リングなし)、'color' / 'count' は色も出す。
  *
  * Why: 数を隠しても色のリングで「反応あり／なし」の二値と早い者勝ちの増幅は残る。
- *   設定は増やさず、lessonPhase の有無で機能ごと出さない。掲示板モードは従来どおり。
+ *   授業だけの見せ方 (自分の点・象限の添え書き) は __inLesson で別に判定する。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -40,8 +41,9 @@ function loadApp() {
 const phase = { lessonId: 'L1', phaseIndex: 1, screenRole: 'browse' };
 const row = { rowIndex: 2, reactions: { LIKE: { count: 3, reacted: false } }, highlight: false };
 
-test('掲示板モード (授業なし): リアクションボタンが 3 つ出る', () => {
-  const { app } = loadApp();
+test('掲示板モード (授業なし・reactionMode=count): リアクションボタンが 3 つ出る', () => {
+  const { app, ctx } = loadApp();
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'count' };
   const html = app.__buildAnswerActionsHtml(row, { size: 'card', reactionsOnly: true });
   assert.equal((html.match(/reaction-btn/g) || []).length, 3);
 });
@@ -58,6 +60,7 @@ test('授業モード: リアクションボタンが出ない (教師の ☆ �
 
 test('授業モード: カードにリアクションの色を付けない (☆ は付く)', () => {
   const { app, ctx } = loadApp();
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'count' };
   const card = new ctx.HTMLElement();
   app.applyReactionStyles(card, row);
   assert.ok(card.classes.has('reaction-bg-like') && card.classes.has('reaction-border-1'), '授業なしでは色が付く');
@@ -103,11 +106,11 @@ test('点のリング: 授業モードでは反応があってもリングを描
   const proto = StudyQuestApp.prototype;
   const data = [{ data: { rowIndex: 2, reactions: { LIKE: { count: 2 } }, highlight: false } }];
   const on = fakeSelection(data);
-  proto.__applyReactionRingStyles(on, { __lessonReactionsOff: () => false });
+  proto.__applyReactionRingStyles(on, { __reactionColorsOff: () => false });
   assert.ok(on.styles[0].stroke, '授業なしではリングが付く');
 
   const off = fakeSelection(data);
-  proto.__applyReactionRingStyles(off, { __lessonReactionsOff: () => true });
+  proto.__applyReactionRingStyles(off, { __reactionColorsOff: () => true });
   assert.equal(off.styles[0].stroke, null);
   assert.equal(off.styles[0]['stroke-width'], null);
   assert.equal(off.styles[0]['stroke-dasharray'], null);
@@ -119,9 +122,9 @@ test('数バッジ: 授業モードでは showCounts=true でも描かない', (
   const nodes = [{ x: 1, y: 1, data: { rowIndex: 2, reactions: { LIKE: { count: 2 } } } }];
   let bound = null;
   const g = { selectAll: () => ({ data: (arr) => { bound = arr; return { exit: () => ({ remove: () => {} }), enter: () => ({ append: () => ({ attr() { return this; }, merge() { return this; }, text() { return this; } }) }) }; }, raise: () => {} }) };
-  proto.__renderDotLabels(g, nodes, { showCounts: true }, { __lessonReactionsOff: () => false });
+  proto.__renderDotLabels(g, nodes, { showCounts: true }, { __reactionsOff: () => false });
   assert.equal(bound.length, 1);
-  proto.__renderDotLabels(g, nodes, { showCounts: true }, { __lessonReactionsOff: () => true });
+  proto.__renderDotLabels(g, nodes, { showCounts: true }, { __reactionsOff: () => true });
   assert.equal(bound.length, 0);
 });
 
@@ -129,24 +132,79 @@ test('数バッジ: 授業モードでは showCounts=true でも描かない', (
 test('isMeNode: 授業中で emailHash が自分のものなら true、授業なし・他人・hash なしは false', () => {
   const { StudyQuestApp } = loadViz();
   const isMe = StudyQuestApp.prototype.__isMeNode;
-  const appOn = { state: { viewerEmailHash: 'abc' }, __lessonReactionsOff: () => true };
-  const appOff = { state: { viewerEmailHash: 'abc' }, __lessonReactionsOff: () => false };
+  const appOn = { state: { viewerEmailHash: 'abc' }, __inLesson: () => true };
+  const appOff = { state: { viewerEmailHash: 'abc' }, __inLesson: () => false };
   assert.equal(isMe({ data: { emailHash: 'abc' } }, appOn), true);
   assert.equal(isMe({ data: { emailHash: 'xyz' } }, appOn), false);
   assert.equal(isMe({ data: {} }, appOn), false);
   assert.equal(isMe({ data: { emailHash: 'abc' } }, appOff), false, '掲示板モードでは出さない');
-  assert.equal(isMe({ data: { emailHash: 'abc' } }, { state: {}, __lessonReactionsOff: () => true }), false);
+  assert.equal(isMe({ data: { emailHash: 'abc' } }, { state: {}, __inLesson: () => true }), false);
 });
 
 test('授業モードでは象限にキーワードも「まだ誰もいない視点」も添えない (掲示板モードは従来どおり)', () => {
   const { StudyQuestApp } = loadViz();
   const qa = StudyQuestApp.prototype.__quadrantAnnotation;
-  const lesson = { __lessonReactionsOff: () => true };
-  const board = { __lessonReactionsOff: () => false };
+  const lesson = { __inLesson: () => true };
+  // リアクションを使わない掲示板でも、象限の添え書きは授業だけの制約なので従来どおり出る。
+  const board = { __inLesson: () => false, __reactionsOff: () => true };
   assert.equal(qa(lesson, 25, 0), 'none', '空いた象限へ誘わない');
   assert.equal(qa(lesson, 25, 1), 'none', '1 人の象限でもその子のことばを見出しにしない');
   assert.equal(qa(lesson, 25, 9), 'none');
   assert.equal(qa(board, 25, 0), 'empty');
   assert.equal(qa(board, 25, 3), 'keywords');
   assert.equal(qa(board, 0, 0), 'none', '回答が無ければ何も出さない');
+});
+
+// ---- reactionMode (掲示板の見せ方 4 段階) ----
+function rowWith(n) { return { rowIndex: 2, reactions: { LIKE: { count: n, reacted: false } }, highlight: false }; }
+
+test('reactionMode=off (既定・未指定): ボタンも色も出ない。教師の ☆ は残る', () => {
+  for (const ds of [{ reactionMode: 'off' }, {}, { showReactions: false }]) {
+    const { app, ctx } = loadApp();
+    ctx.window.UNIFIED_CONFIG.displaySettings = ds;
+    assert.equal(app.__buildAnswerActionsHtml(rowWith(3), { size: 'card', reactionsOnly: true }), '', JSON.stringify(ds));
+    const card = new ctx.HTMLElement();
+    app.applyReactionStyles(card, rowWith(3));
+    assert.equal(card.classes.size, 0, JSON.stringify(ds));
+    app.state.isEditor = true;
+    const html = app.__buildAnswerActionsHtml(rowWith(3), { size: 'modal' });
+    assert.equal((html.match(/reaction-btn/g) || []).length, 0);
+    assert.equal((html.match(/highlight-btn/g) || []).length, 1);
+  }
+});
+
+test('reactionMode=private: ボタンは出るが、カードに色も枠も付けない', () => {
+  const { app, ctx } = loadApp();
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'private' };
+  assert.equal((app.__buildAnswerActionsHtml(rowWith(12), { size: 'card', reactionsOnly: true }).match(/reaction-btn/g) || []).length, 3);
+  const card = new ctx.HTMLElement();
+  app.applyReactionStyles(card, rowWith(12));
+  assert.equal(card.classes.size, 0);
+  assert.equal(app.__reactionColorsOff(), true);
+});
+
+test('reactionMode=color / count / 旧 showReactions=true: ボタンと色が出る', () => {
+  for (const ds of [{ reactionMode: 'color' }, { reactionMode: 'count' }, { showReactions: true }]) {
+    const { app, ctx } = loadApp();
+    ctx.window.UNIFIED_CONFIG.displaySettings = ds;
+    assert.equal((app.__buildAnswerActionsHtml(rowWith(3), { size: 'card', reactionsOnly: true }).match(/reaction-btn/g) || []).length, 3, JSON.stringify(ds));
+    const card = new ctx.HTMLElement();
+    app.applyReactionStyles(card, rowWith(3));
+    assert.ok(card.classes.has('reaction-bg-like'), JSON.stringify(ds));
+  }
+});
+
+test('授業中は reactionMode=count でも off (授業モードの規則が優先)', () => {
+  const { app, ctx } = loadApp();
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'count' };
+  app.state.lessonPhase = phase;
+  assert.equal(app.__reactionMode(), 'off');
+  assert.equal(app.__inLesson(), true);
+});
+
+test('掲示板で reactionMode=off でも、自分の点 (授業だけの見せ方) は出さない', () => {
+  const { StudyQuestApp } = loadViz();
+  const isMe = StudyQuestApp.prototype.__isMeNode;
+  const boardOff = { state: { viewerEmailHash: 'abc' }, __inLesson: () => false, __reactionsOff: () => true };
+  assert.equal(isMe({ data: { emailHash: 'abc' } }, boardOff), false);
 });

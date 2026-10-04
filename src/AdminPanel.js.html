@@ -7,7 +7,7 @@
    *   - 列マッピング (自動推定 inferColumnRoles + 手動調整)
    *   - 公開 / 非公開 / 再公開 (etag 楽観ロック)
    *   - プロファイル CRUD (切替 / 保存 / 削除 / リネーム / 自動保存)
-   *   - ボード設定 (boardMode / 軸ラベル / 象限ラベル / showNames / showReactions)
+   *   - ボード設定 (boardMode / 軸ラベル / 象限ラベル / showNames / reactionMode)
    *   - レッスン機能 (wizard / 開始 / 進行 / 終了 / 振り返り)
    *
    * gasRun (helper): dispatchAdminOperation を runServer 経由で呼ぶ wrapper。
@@ -784,7 +784,7 @@
       }
     }
 
-    // 4.5) 表示設定の checkbox 群（showNames / showReactions）
+    // 4.5) 表示設定（showNames の checkbox / reactionMode の select）
     //   Why: getDisplaySettings() の save パスは checkbox を読むのに、これまで load パスで
     //   復元していなかった。結果として「公開 → 管理パネル再表示 → checkbox 未チェック →
     //   気付かず再公開 → 設定が OFF にリセット」という silent data loss が起きていた。
@@ -792,8 +792,9 @@
     const ds = config.displaySettings || {};
     const showNamesEl = document.getElementById('show-names');
     if (showNamesEl) showNamesEl.checked = !!ds.showNames;
-    const showReactionsEl = document.getElementById('show-reactions');
-    if (showReactionsEl) showReactionsEl.checked = !!ds.showReactions;
+    // reactionMode が無い旧 config は showReactions から読み替える (サーバの resolveReactionMode と同じ規則)。
+    const reactionModeEl = document.getElementById('reaction-mode-select');
+    if (reactionModeEl) reactionModeEl.value = currentReactionMode(ds);
 
     // 5) numericX/Y セレクトの値設定
     //    （オプションは fillColumnDropdowns 経由で headers から再生成されるが、
@@ -2801,11 +2802,22 @@
     //      未設定なら 'auto' を返し、サーバが列マッピングを見て実モードに解決する。
     const boardModeEl = document.getElementById('board-mode-select');
     const boardMode = boardModeEl && boardModeEl.value ? boardModeEl.value : 'auto';
+    // showReactions (数の表示) は reactionMode から導出する (サーバの sanitize も同じく導出する)。
+    const reactionModeEl = document.getElementById('reaction-mode-select');
+    const reactionMode = reactionModeEl && reactionModeEl.value ? reactionModeEl.value : 'off';
     return {
       showNames: document.getElementById('show-names')?.checked || false,
-      showReactions: document.getElementById('show-reactions')?.checked || false,
+      showReactions: reactionMode === 'count',
+      reactionMode,
       boardMode
     };
+  }
+
+  // displaySettings → リアクションの見せ方。旧 config (reactionMode 無し) は showReactions から読み替える。
+  function currentReactionMode(ds) {
+    const d = ds || {};
+    if (['off', 'private', 'color', 'count'].indexOf(d.reactionMode) >= 0) return d.reactionMode;
+    return d.showReactions === true ? 'count' : 'off';
   }
 
   /**
@@ -3006,8 +3018,11 @@
 
     const showReactionsEl = document.getElementById('current-show-reactions');
     if (showReactionsEl) {
-      showReactionsEl.textContent = ds.showReactions ? '表示': '非表示';
-      showReactionsEl.className = 'text-sm '+ (ds.showReactions ? 'text-theme-accent-cyan': 'text-theme-secondary');
+      const reactionMode = currentReactionMode(ds);
+      const sel = document.getElementById('reaction-mode-select');
+      const opt = sel && Array.from(sel.options).find(o => o.value === reactionMode);
+      showReactionsEl.textContent = opt ? opt.textContent.trim() : reactionMode;
+      showReactionsEl.className = 'text-sm '+ (reactionMode !== 'off' ? 'text-theme-accent-cyan': 'text-theme-secondary');
     }
 
   }

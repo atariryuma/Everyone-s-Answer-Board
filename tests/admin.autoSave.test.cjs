@@ -139,7 +139,7 @@ test('AdminPanel.html: 必須フィールドが data-autosave 属性でマーキ
     'numeric-x-column-select',
     'numeric-y-column-select',
     'show-names',
-    'show-reactions',
+    'reaction-mode-select',
     'board-mode-select',
     'x-min-label', 'x-max-label', 'y-min-label', 'y-max-label',
     'quadrant-lh-label', 'quadrant-hh-label', 'quadrant-ll-label', 'quadrant-hl-label',
