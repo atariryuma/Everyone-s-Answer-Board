@@ -3586,13 +3586,19 @@
       // 優先順は __resolveClassFilter に集約 (fetch と表示がズレないため)。
       //   選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
       const desired = this.__resolveClassFilter(classFilter.value);
+      const hasRows = Array.isArray(rows) && rows.length > 0;
+      // 絞り込んだ結果が 0 件 (自分のクラスがまだ誰も答えていない) のときも、いま効いている
+      //   クラスを選択肢に残す。残さないと select は「すべて」を表示するのに中身は自分の
+      //   クラスで 0 件、という食い違いになる (2026-10-05 の授業ログで 19 台が該当)。
+      if (!hasRows && desired && desired !== 'すべて' && !uniqueClasses.includes(desired)) {
+        uniqueClasses.push(desired);
+      }
       classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escape(c) + '">'+ escape(c) + '</option>').join('');
       classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
       // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
       //   ただし行が 1 件も無いとき (「考える」でまだ答えていない児童など) は判断材料が無いので
       //   降格を覚えない。覚えると自分のクラス既定が「すべて」で上書きされ、以後効かなくなる。
-      const hasRows = Array.isArray(rows) && rows.length > 0;
       if (hasRows && classFilter.value !== desired && typeof this.persistClassFilter === 'function') {
         this.persistClassFilter(classFilter.value);
       }

@@ -1041,7 +1041,8 @@ test('populateClassFilter: 自分のクラスが選択肢にあればそれを�
   const { instance, ctx } = makeFilterInstance({ ownClass: '6年2組' });
   // 「考える」でまだ答えていない: 行が無い → 表示は「すべて」だが sessionStorage には書かない
   instance.populateClassFilter([]);
-  assert.equal(instance.elements.classFilter.value, 'すべて');
+  assert.equal(instance.elements.classFilter.value, '6年2組', '0 件でも効いているクラスを表示する (中身と食い違わない)');
+  assert.match(instance.elements.classFilter.innerHTML, /6年2組/);
   assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null, '既定を「すべて」で上書きしない');
   // 「出会う」で全員分が来た → 自分のクラス
   instance.populateClassFilter([{ class: '6年1組' }, { class: '6年2組' }]);
