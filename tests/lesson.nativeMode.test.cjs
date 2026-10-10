@@ -1038,6 +1038,55 @@ test('getLessonReviewGrid: 1 フェーズしか答えていない児童は last 
   assert.equal(students[students.length - 1].answeredPhases, 1);
 });
 
+// 授業が終わると、どの config も回答シートを指さなくなり openSpreadsheet は拒否 (null) を返す。
+//   以前はこれで見取りグリッドが黙って空になっていた (2026-10-10 本番で確認)。
+test('getLessonReviewGrid: 授業後に通常の検証で開けなくても、所有者は回答を読める', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThreeStudents(h, lessonId);
+  h.context.openSpreadsheet = () => null;
+
+  const res = h.context.getLessonReviewGrid('u1', lessonId);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.students.length, 3);
+});
+
+test('getLessonReviewGrid: 授業後でも管理者は SA pool 経由で読める', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThreeStudents(h, lessonId);
+  h.context.openSpreadsheet = () => null;
+  const realOpenById = h.context.SpreadsheetApp.openById;
+  const opened = [];
+  h.context.openSpreadsheetViaServiceAccount = (id) => {
+    opened.push(id);
+    return realOpenById(id);
+  };
+  // 管理者の openById は使わない (他人の Drive に直接権限を持たない前提)。
+  h.context.SpreadsheetApp.openById = (id) => {
+    if (id === 'native_ss_1') throw new Error('admin must not openById the teacher sheet');
+    return realOpenById(id);
+  };
+  h.setEmail('admin@example.com');
+
+  const res = h.context.getLessonReviewGrid('u1', lessonId);
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.students.length, 3);
+  assert.ok(opened.includes('native_ss_1'));
+});
+
+test('授業中の回答一覧は授業後の経路を使わない (開けなければ空のまま)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThreeStudents(h, lessonId);
+  h.context.openSpreadsheet = () => null;
+  let fallbackUsed = false;
+  h.context.SpreadsheetApp.openById = () => { fallbackUsed = true; return null; };
+
+  h.context.getLessonLiveAnswers('u1', lessonId, {});
+  assert.equal(fallbackUsed, false);
+});
+
 test('getLessonReviewGrid: 所有者以外は取得できない', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

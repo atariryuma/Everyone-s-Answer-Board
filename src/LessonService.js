@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
+/* global openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -2581,7 +2581,8 @@ function getLessonReviewGrid(userId, lessonId) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
-    const change = __buildLessonChangeStudents_((auth.found.lesson.lessonJson) || {}, userId);
+    // ownerReview: 授業が終わっても回答シートを読めるようにする (__openEndedLessonSheet_)。
+    const change = __buildLessonChangeStudents_((auth.found.lesson.lessonJson) || {}, userId, { ownerReview: true });
     return createSuccessResponse(change.phaseCount ? '見取りグリッド' : '入力フェーズなし', change);
   } catch (error) {
     logError_('getLessonReviewGrid', error);
@@ -2595,9 +2596,10 @@ function getLessonReviewGrid(userId, lessonId) {
  *
  * @param {Object} lessonJson
  * @param {string} boardUserId - 授業の所有者 (回答シートの行 cache の version を引く)
+ * @param {Object} [opts] - { ownerReview: 授業後の振り返り (getLessonReviewGrid だけが渡す) }
  * @returns {{students: Array, phaseCount: number}}
  */
-function __buildLessonChangeStudents_(lessonJson, boardUserId) {
+function __buildLessonChangeStudents_(lessonJson, boardUserId, opts) {
   const phases = Array.isArray(lessonJson && lessonJson.phases) ? lessonJson.phases : [];
 
   // 入力フェーズだけを時系列で読む (browse/discuss には投稿が存在しない)。
@@ -2613,7 +2615,7 @@ function __buildLessonChangeStudents_(lessonJson, boardUserId) {
   const byEmail = new Map();
   for (let p = 0; p < inputPhases.length; p++) {
     const def = inputPhases[p].def;
-    const rows = __readAllLessonRows_(def, { boardUserId });
+    const rows = __readAllLessonRows_(def, { boardUserId, ownerReview: Boolean(opts && opts.ownerReview) });
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       if (!row.email) continue;
@@ -2835,7 +2837,8 @@ function __cellToNumOrNull_(cell) {
 
 /**
  * @param {Object} phaseDef - { spreadsheetId, sheetName }
- * @param {Object} opts - { boardUserId: 授業の所有者 (cache の version 用), fresh }
+ * @param {Object} opts - { boardUserId: 授業の所有者 (cache の version 用), fresh,
+ *   ownerReview: 授業後の振り返り。通常の検証で開けなければ __openEndedLessonSheet_ で開く }
  *   boardUserId が無ければ cache を使わない (version で捨てられない cache を作らない)。
  */
 function __readAllLessonRows_(phaseDef, opts) {
@@ -2845,7 +2848,7 @@ function __readAllLessonRows_(phaseDef, opts) {
     const useCache = !(opts && opts.fresh) && Boolean(boardUserId)
       && typeof CacheService !== 'undefined' && typeof getBoardDataVersion_ === 'function';
     if (!useCache) {
-      const direct = __loadLessonRowsFromSheet_(phaseDef);
+      const direct = __loadLessonRowsFromSheet_(phaseDef, opts);
       return direct ? direct : [];
     }
     // 「ふりかえる」に入った瞬間、学級全員 (30〜100 人) が同時に自分の航跡を読みに来る。
@@ -2862,7 +2865,7 @@ function __readAllLessonRows_(phaseDef, opts) {
         const hit = CacheService.getScriptCache().get(cacheKey);
         if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
       } catch (_) { /* 壊れた値は読み直しで回復する */ }
-      const loaded = __loadLessonRowsFromSheet_(phaseDef);
+      const loaded = __loadLessonRowsFromSheet_(phaseDef, opts);
       if (Array.isArray(loaded) && typeof saveToCacheWithSizeCheck === 'function') {
         saveToCacheWithSizeCheck(cacheKey, loaded, LESSON_ROWS_CACHE_TTL_S);
       }
@@ -2871,7 +2874,7 @@ function __readAllLessonRows_(phaseDef, opts) {
     const guarded = withStampedeGuard_({
       key: cacheKey,
       ttl: LESSON_ROWS_CACHE_TTL_S,
-      loader: () => __loadLessonRowsFromSheet_(phaseDef),
+      loader: () => __loadLessonRowsFromSheet_(phaseDef, opts),
       // 見出し行すら読めていない (429 等) は null で返し cache しない。
       //   空を cache すると 60 秒間「回答なし」に見える。
       isCacheable: (v) => Array.isArray(v),
@@ -2887,12 +2890,45 @@ function __readAllLessonRows_(phaseDef, opts) {
 }
 
 /**
+ * 終わった授業の回答シートを、所有者 (教師) か管理者として開く。授業後の見取りグリッド専用。
+ *
+ * Why: 授業中はボードの config がこのシートを指すので openSpreadsheet の検証
+ *   (validateServiceAccountUsage) が通る。授業が終わって config が戻ると、どのユーザーの
+ *   config もこのシートを指さなくなり「Target user not found」で拒否される。その結果、
+ *   教師が授業後に見取りグリッドを開くと、エラーも出ずに「回答なし」になっていた。
+ *
+ * 前提: 呼び出し側が __requireLessonOwner_ を通し、spreadsheetId は lessonJson 由来
+ *   (クライアント入力ではない)。名前が _ で終わるので google.script.run からは呼べない。
+ *
+ * @param {string} spreadsheetId
+ * @returns {{getSheet: function(string): Object}|null}
+ */
+function __openEndedLessonSheet_(spreadsheetId) {
+  try {
+    if (isAdministrator(getCurrentEmail())) {
+      // 管理者は他人の Drive に直接権限を持たないので SA pool 経由 (回答シートは開始時に共有済み)。
+      const proxy = (typeof openSpreadsheetViaServiceAccount === 'function')
+        ? openSpreadsheetViaServiceAccount(spreadsheetId) : null;
+      return proxy ? { getSheet: (name) => proxy.getSheetByName(name) } : null;
+    }
+    // 所有者は回答シートの編集者 (startLesson で addEditor 済み) なので直接開ける。
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    return { getSheet: (name) => ss.getSheetByName(name) };
+  } catch (error) {
+    console.warn('[lesson/review] ended lesson sheet open failed:', error && error.message);
+    return null;
+  }
+}
+
+/**
  * シートから 1 フェーズ分の全行を読んで正規化する (cache を通さない実体)。
+ * @param {Object} [opts] - { ownerReview } (__readAllLessonRows_ と同じ)
  * @returns {Array|null} 行の配列。見出し行すら読めなかった (429 等の読み込み失敗) なら null。
  */
-function __loadLessonRowsFromSheet_(phaseDef) {
+function __loadLessonRowsFromSheet_(phaseDef, opts) {
   try {
-    const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_rows' });
+    let access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_rows' });
+    if (!access && opts && opts.ownerReview) access = __openEndedLessonSheet_(phaseDef.spreadsheetId);
     if (!access) return null;
     const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return null;
