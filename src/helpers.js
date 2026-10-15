@@ -95,6 +95,42 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
 }
 
 /**
+ * 文字列を gzip + base64 にする (ScriptCache の 100KB / value に大きな JSON を収めるため)。
+ *   GAS の Utilities.gzip / base64Encode が無い環境 (test sandbox) では null を返し、
+ *   呼び出し側は圧縮なしで続ける。
+ * @param {string} text
+ * @returns {string|null} base64 文字列、または圧縮できなければ null
+ */
+function gzipTextToBase64_(text) {
+  if (typeof Utilities === 'undefined' || !Utilities) return null;
+  if (typeof Utilities.gzip !== 'function' || typeof Utilities.newBlob !== 'function' ||
+      typeof Utilities.base64Encode !== 'function') return null;
+  try {
+    return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(String(text), 'application/json')).getBytes());
+  } catch (error) {
+    console.warn('gzipTextToBase64_: compress failed (falling back to plain):', error && error.message);
+    return null;
+  }
+}
+
+/**
+ * gzipTextToBase64_ の逆。壊れた値は null (呼び出し側は miss として読み直す)。
+ * @param {string} b64
+ * @returns {string|null}
+ */
+function gunzipBase64ToText_(b64) {
+  if (typeof Utilities === 'undefined' || !Utilities) return null;
+  if (typeof Utilities.ungzip !== 'function' || typeof Utilities.newBlob !== 'function' ||
+      typeof Utilities.base64Decode !== 'function') return null;
+  try {
+    return Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(String(b64)), 'application/x-gzip')).getDataAsString();
+  } catch (error) {
+    console.warn('gunzipBase64ToText_: decompress failed (treated as cache miss):', error && error.message);
+    return null;
+  }
+}
+
+/**
  * cache stampede (thundering herd) を防ぐ cache 読み。
  *
  * Why: version 付き key (board data / users 一覧 / lesson 行) は、書き込み側が version を
@@ -130,6 +166,10 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
  * @param {number} [opts.waitTries=3] - 待つ回数
  * @param {*} [opts.busyValue] - 指定すると「自分で読む」代わりにこの値を返す (flight 中 / 直前の失敗中)
  * @param {number} [opts.failTtl=0] - loader の結果が cache 不可だったことを覚える秒数 (0 = 覚えない)
+ * @param {Function} [opts.pack] - cache に書く直前に loader の結果を変換する (圧縮表現など)。
+ *   戻り値は JSON 化できる値。unpack と対で渡す
+ * @param {Function} [opts.unpack] - cache から読んだ値を loader の結果と同じ形に戻す。
+ *   null を返すと「読めなかった」(miss) として扱う
  * @returns {*} cache hit / 直前の結果 / loader の結果 / busyValue
  */
 function withStampedeGuard_(opts) {
@@ -145,9 +185,15 @@ function withStampedeGuard_(opts) {
   const latestKey = opts.latestKey || null;
   const latestTtl = Number(opts.latestTtl) || 60;
   const isCacheable = typeof opts.isCacheable === 'function' ? opts.isCacheable : (v) => Boolean(v);
+  const pack = typeof opts.pack === 'function' ? opts.pack : (v) => v;
+  const unpack = typeof opts.unpack === 'function' ? opts.unpack : (v) => v;
   const read = (k) => {
-    try { return safeJsonParse_(cache.get(k), null); }
-    catch (_) { return null; /* 壊れた値は読み直しで回復する */ }
+    try {
+      const raw = safeJsonParse_(cache.get(k), null);
+      if (raw === null) return null;
+      const v = unpack(raw);
+      return v === undefined ? null : v;
+    } catch (_) { return null; /* 壊れた値は読み直しで回復する */ }
   };
 
   const hit = read(key);
@@ -206,8 +252,10 @@ function withStampedeGuard_(opts) {
     // flight フラグを外す「前」に key を書く。先に外すと、待っている側が「フラグ無し + key 無し」
     //   の瞬間を見て自分で読みに行き (= 待った意味が無くなり)、30 人分の read が並ぶ。
     if (isCacheable(fresh)) {
-      saveToCacheWithSizeCheck(key, fresh, opts.ttl);
-      if (latestKey) saveToCacheWithSizeCheck(latestKey, fresh, latestTtl);
+      // pack は 1 回だけ (gzip 等のコストを latest の分まで二重に払わない)。
+      const packed = pack(fresh);
+      saveToCacheWithSizeCheck(key, packed, opts.ttl);
+      if (latestKey) saveToCacheWithSizeCheck(latestKey, packed, latestTtl);
     } else if (failKey) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }

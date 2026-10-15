@@ -462,7 +462,9 @@ function checkDataIntegrity() {
       if (Array.isArray(users)) {
         for (const user of users) {
           try {
-            const configResult = getUserConfig(user.userId);
+            // 一覧で読んだ行を渡す (preloadedUser)。渡さないと user ごとに findUserById →
+            //   個別 cache miss → 一覧 cache の線形検索が走り、ユーザー数の 2 乗で遅くなる。
+            const configResult = getUserConfig(user.userId, user);
             if (configResult.success) {
               validConfigs++;
             } else {

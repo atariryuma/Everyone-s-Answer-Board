@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -1077,6 +1077,58 @@ const BOARD_CACHE_KEYS_ = {
   FLIGHT: 'board_data_flight:'      // 「いま誰かが読んでいる」フラグ
 };
 
+// ---- cache 用の行表現 (wire の形は変えない) ----
+// Why: ScriptCache は 1 value 100KB。行には answer と同じ値の opinion、常に false の isEmpty、
+//   timestamp から作れる formattedTimestamp が載っていて、150〜250 行で JSON が 100KB を超え
+//   「cache に入らない → 毎 poll が Sheets を読む」になっていた (2026-10 監査)。cache に書くときは
+//   派生 3 項目を落として gzip+base64 にし、読むときに元の形へ戻す。受け手
+//   (buildSafePublishedDataResult / page.js) は何も変わらない。
+//   gzip が使えない環境 (test sandbox) では派生項目を落とすだけの形で書く。
+function packBoardDataForCache_(res) {
+  if (!res || typeof res !== 'object' || !Array.isArray(res.data)) return res;
+  const rows = res.data.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const out = {};
+    for (const k in item) {
+      if (k === 'opinion' && item.opinion === item.answer) continue;
+      if (k === 'isEmpty' && item.isEmpty === false) continue;
+      if (k === 'formattedTimestamp' && ('timestamp' in item)) continue;
+      out[k] = item[k];
+    }
+    return out;
+  });
+  const slim = Object.assign({}, res, { data: rows });
+  const gz = (typeof gzipTextToBase64_ === 'function') ? gzipTextToBase64_(JSON.stringify(slim)) : null;
+  return gz ? { __boardGz: gz, rows: rows.length } : { __boardSlim: slim };
+}
+
+function unpackBoardDataFromCache_(cached) {
+  if (!cached || typeof cached !== 'object') return cached;
+  let slim = null;
+  if (typeof cached.__boardGz === 'string') {
+    const text = (typeof gunzipBase64ToText_ === 'function') ? gunzipBase64ToText_(cached.__boardGz) : null;
+    slim = text ? safeJsonParse_(text, null) : null;
+    if (!slim) return null; // 読めない値は miss 扱い (次の読みが書き直す)
+  } else if (cached.__boardSlim && typeof cached.__boardSlim === 'object') {
+    slim = cached.__boardSlim;
+  } else {
+    return cached; // 旧形式 (圧縮前のそのままの結果)。TTL 12 秒で自然に消える
+  }
+  if (!Array.isArray(slim.data)) return slim;
+  const canFormat = typeof formatTimestamp === 'function';
+  const rows = slim.data.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const out = Object.assign({}, item);
+    if (!('opinion' in out)) out.opinion = ('answer' in out) ? out.answer : '';
+    if (!('isEmpty' in out)) out.isEmpty = false;
+    if (('timestamp' in out) && !('formattedTimestamp' in out)) {
+      out.formattedTimestamp = canFormat ? formatTimestamp(out.timestamp) : '';
+    }
+    return out;
+  });
+  return Object.assign({}, slim, { data: rows });
+}
+
 function getBoardDataVersion_(userId) {
   if (typeof CacheService === 'undefined') return '0';
   try {
@@ -1163,11 +1215,11 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
     if (!cache) return loader();
     try {
-      const parsed = safeJsonParse_(cache.get(key), null);
+      const parsed = unpackBoardDataFromCache_(safeJsonParse_(cache.get(key), null));
       if (parsed) return parsed;
     } catch (_) { /* 壊れた値は読み直しで回復する */ }
     const fresh = loader();
-    if (isCacheable(fresh)) saveToCacheWithSizeCheck(key, fresh, BOARD_DATA_CACHE_TTL_SEC);
+    if (isCacheable(fresh)) saveToCacheWithSizeCheck(key, packBoardDataForCache_(fresh), BOARD_DATA_CACHE_TTL_SEC);
     return fresh;
   }
 
@@ -1191,7 +1243,9 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     waitMs: 500,
     waitTries: 6,
     failTtl: BOARD_DATA_FAIL_TTL_SEC,
-    busyValue: boardDataBusyResult_()
+    busyValue: boardDataBusyResult_(),
+    pack: packBoardDataForCache_,
+    unpack: unpackBoardDataFromCache_
   });
 }
 

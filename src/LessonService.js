@@ -851,20 +851,19 @@ function getActiveLessonNav(targetUserId) {
     const auth = __requireLessonOwner_(userId, null);
     if (auth.error) return auth.error;
 
-    const listed = listLessons(userId);
-    if (!listed || !listed.success) return listed;
-    const lessons = (listed.data && listed.data.lessons) || [];
+    // 一覧の行は lessonJson を含むので、active の行をそのまま使う。
+    //   Why: 以前は listLessons (lessons シート 1 読み) のあと __findLessonById_ でもう 1 回
+    //   同じシートを読んでいた。教師のボードはこれを polling ごとに呼ぶので、授業中の教師 1 人が
+    //   児童 2 人分の read quota を使っていた (2026-10 監査)。
+    const lessons = __listLessonsForUser_(userId);
     const active = lessons.find(l => l && l.state === 'active');
     if (!active) return createSuccessResponse('no active lesson', null);
-
-    const found = __findLessonById_(active.lessonId);
-    if (!found || !found.lesson) return createSuccessResponse('no active lesson', null);
-    const lessonJson = found.lesson.lessonJson || {};
+    const lessonJson = active.lessonJson || {};
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
 
     return createSuccessResponse('loaded', {
       lessonId: active.lessonId,
-      name: found.lesson.name || '',
+      name: active.name || '',
       activePhaseIndex: __activePhaseIndex_(lessonJson),
       phases: phases.map((p, i) => ({
         index: i,

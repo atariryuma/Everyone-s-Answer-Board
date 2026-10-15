@@ -80,6 +80,9 @@ npm run api -- bulkSetUserConfig \
   --dryRun                              # 影響範囲を先に確認
 
 npm run api -- bulkSetUserConfig --filter '{"emailContains":"naha"}' --patch '...'
+# 100 人超は 6 分制限に当たるので --offset/--limit で区切る。時間切れが近いと途中で返り、
+#   応答の nextOffset (complete:false) を次の --offset に渡して続きを実行する
+npm run api -- bulkSetUserConfig --patch '...' --offset 0 --limit 50
 
 # アクティブ / 公開状態の切替
 npm run api -- toggleUserActive --userId <uuid>            # アクティブ状態切替
@@ -124,6 +127,7 @@ npm run api -- removeServiceAccountFromPool --slot SERVICE_ACCOUNT_CREDS_2  # se
 npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>  # 1 SS に SA pool 全員 editor 追加
 npm run api -- migrateBoardSharing --dryRun true   # 既存ボード一括 cleanup の dry run
 npm run api -- migrateBoardSharing                 # 全ボードに SA pool editor 追加 + domain 共有 revoke
+npm run api -- migrateBoardSharing --offset 50 --limit 50  # 多数のボードは区切る (nextOffset で続き)
 ```
 
 **負荷検証**（CI 対象外、手動）:

@@ -412,3 +412,69 @@ test('fetchSheetsAPIWithRetry: 429 が 3 回続いても sleep は 2 回 (5s, 10
   assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op'), /Quota exceeded/);
   assert.deepEqual(ctx.__sleeps, [5000, 10000]);
 });
+
+// =====================================================================
+// SA pool が残っている間は breaker を開かない (2026-10 監査 / 中優先度 3)
+//   Why: counter は SA 共通。1 つの SA が quota を使い切ると、その SA を掴んでいた同時 request が
+//   一斉に 429 を踏んで 7 を超え、他の SA が健在でも全 Sheets 呼び出しが止まっていた。
+// =====================================================================
+
+function saCreds(email) {
+  return JSON.stringify({ type: 'service_account', client_email: email, private_key: '-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n' });
+}
+
+test('fetchSheetsAPIWithRetry: 他に cooling でない SA が居るなら 7 回目の 429 でも breaker を開かない (圧力は積む)', () => {
+  const cache = makeCache({
+    circuit_breaker_state: JSON.stringify({ consecutiveErrors: 6, circuitOpenUntil: 0 })
+  });
+  const ctx = loadCtx({
+    cache,
+    propsStore: { SERVICE_ACCOUNT_CREDS: saCreds('sa1@x.iam'), SERVICE_ACCOUNT_CREDS_2: saCreds('sa2@x.iam') },
+    fetchSequence: [makeResponse(429, 'quota')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op', 'sa1@x.iam'), /Quota exceeded/);
+
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.equal(state.consecutiveErrors, 7, '圧力は積む');
+  assert.equal(state.circuitOpenUntil, 0, 'sa2 が健在なので開かない');
+  assert.equal(cache._store.get('sa_cooldown:sa1@x.iam'), '1', '429 を踏んだ SA は cooling に入る');
+  // 次の呼び出しは止まらず fetch される
+  const ctx2 = loadCtx({ cache, propsStore: { SERVICE_ACCOUNT_CREDS: saCreds('sa1@x.iam'), SERVICE_ACCOUNT_CREDS_2: saCreds('sa2@x.iam') }, fetchSequence: [makeResponse(200)] });
+  assert.equal(ctx2.fetchSheetsAPIWithRetry('https://x', {}, 'op', 'sa2@x.iam').getResponseCode(), 200);
+});
+
+test('fetchSheetsAPIWithRetry: 全 SA が cooling になった 429 で、積んだ圧力に応じて開く', () => {
+  const cache = makeCache({
+    circuit_breaker_state: JSON.stringify({ consecutiveErrors: 9, circuitOpenUntil: 0 }),
+    'sa_cooldown:sa2@x.iam': '1'
+  });
+  const t0 = Date.now();
+  const ctx = loadCtx({
+    cache,
+    propsStore: { SERVICE_ACCOUNT_CREDS: saCreds('sa1@x.iam'), SERVICE_ACCOUNT_CREDS_2: saCreds('sa2@x.iam') },
+    fetchSequence: [makeResponse(429, 'quota')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op', 'sa1@x.iam'), /Quota exceeded/);
+
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.equal(state.consecutiveErrors, 10);
+  const lockout = state.circuitOpenUntil - t0;
+  assert.ok(lockout >= 59000 && lockout <= 61000, `pool 全滅: 圧力 10 なので 60s lockout (got ${lockout})`);
+});
+
+test('fetchSheetsAPIWithRetry: SA を渡さない呼び出しは従来どおり 7 で開く (切替先が無い)', () => {
+  const cache = makeCache({
+    circuit_breaker_state: JSON.stringify({ consecutiveErrors: 6, circuitOpenUntil: 0 })
+  });
+  const ctx = loadCtx({
+    cache,
+    propsStore: { SERVICE_ACCOUNT_CREDS: saCreds('sa1@x.iam'), SERVICE_ACCOUNT_CREDS_2: saCreds('sa2@x.iam') },
+    fetchSequence: [makeResponse(429, 'quota')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op'), /Quota exceeded/);
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.ok(state.circuitOpenUntil > Date.now(), 'SA 無しの呼び出しは pool に逃げられないので開く');
+});

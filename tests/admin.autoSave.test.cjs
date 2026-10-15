@@ -246,3 +246,34 @@ test('AdminPanel.js: scheduleAutoSave が AI 列判定の完了点から呼ば�
     `scheduleAutoSave の呼び出しが少ない (${occurrences} 件)。AI 判定完了点で漏れている可能性`
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2026-10 監査 (中優先度 4): 公開と自動保存の競合 / 授業ロックの更新漏れ / Form 同期の dead code
+// ─────────────────────────────────────────────────────────────────────────
+
+test('AdminPanel: publishApp は進行中の saveDraft (__saveDraftDone) を待ってから送る', () => {
+  // saveDraft は進行中の保存を Promise で公開する
+  assert.match(ADMIN_JS, /window\.__saveDraftDone\s*=\s*new Promise/, 'saveDraft が __saveDraftDone を立てる');
+  assert.match(ADMIN_JS, /if \(resolveInFlight\) resolveInFlight\(ok\);/, 'finish で resolve する');
+  // publishApp はそれを待ってから startPublish に入る
+  const publishBody = ADMIN_JS.slice(ADMIN_JS.indexOf('function publishApp()'), ADMIN_JS.indexOf('function startPublish()'));
+  assert.match(publishBody, /window\.__saveDraftInFlight && window\.__saveDraftDone/, '進行中の保存を見る');
+  assert.match(publishBody, /pendingSave\.then\(\(\) => startPublish\(\), \(\) => startPublish\(\)\)/, '待ってから公開');
+  // 公開中は自動保存を後ろに並べる
+  assert.match(ADMIN_JS, /window\.__saveDraftInFlight \|\| ClientMutex\.locks\.publishApp/, 'autosave は公開中なら延期');
+});
+
+test('AdminPanel: lesson.start 成功後と popstate で loadLessonList を呼び、ボード設定タブのロックを合わせる', () => {
+  const startBody = ADMIN_JS.slice(ADMIN_JS.indexOf("gasRun('lesson.start'"), ADMIN_JS.indexOf('// 失敗: backend は resumable'));
+  assert.match(startBody, /openLessonRunner\(currentLessonId, res\.data\.lesson\);\s*[\s\S]*?loadLessonList\(\);/, 'start 成功で一覧を読み直す');
+  const popBody = ADMIN_JS.slice(ADMIN_JS.indexOf("window.addEventListener('popstate'"), ADMIN_JS.indexOf('// ---------- Initial bootstrap'));
+  assert.match(popBody, /loadLessonList\(\);/, 'popstate で一覧を読み直す');
+});
+
+test('AdminPanel: 「再投稿を許可」の Form 同期は UNIFIED_CONFIG.formId (存在しない) を見ない', () => {
+  // コメント行 (Why の説明) は除いて、コードとしての参照が無いことを見る。
+  const codeOnly = ADMIN_JS.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.ok(!/UNIFIED_CONFIG\.formId|UNIFIED_CONFIG\.activeFormId/.test(codeOnly), 'createUnifiedConfig に formId は無い (常に空で dead code だった)');
+  const syncBody = ADMIN_JS.slice(ADMIN_JS.indexOf("allowEl.addEventListener('change'"), ADMIN_JS.indexOf("runServer('setFormAllowResubmit'"));
+  assert.match(syncBody, /cfg\.formUrl/, '読み込み済 config の formUrl を使う');
+});

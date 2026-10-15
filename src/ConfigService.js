@@ -866,6 +866,21 @@ function saveUserConfig(userId, config, options = {}) {
       configJson: JSON.stringify(cleanedConfig)
     }, config.etag ? { expectedEtag: config.etag } : {});
 
+    if (updateResult && updateResult.success && updateResult.unchanged) {
+      // 内容が同じ (lastAccessedAt / etag 以外に差分なし) なので DB も cache も触らない。
+      //   client には永続済の etag を返す (新しい etag を返すと次の保存が etag_mismatch になる)。
+      const current = updateResult.currentConfig || persistedConfig || cleanedConfig;
+      return {
+        success: true,
+        message: 'Config unchanged',
+        unchanged: true,
+        data: current,
+        config: current,
+        etag: current.etag || null,
+        userId
+      };
+    }
+
     if (!updateResult || !updateResult.success) {
       if (updateResult && updateResult.error === 'etag_mismatch') {
         return {

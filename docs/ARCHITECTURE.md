@@ -52,9 +52,34 @@ SA pool の shared 設定 (SA pool 全員を editor 追加) は [SharingHelper.j
 
 ## board data cache ([DataApis.js](../src/DataApis.js))
 
-- viewer の `getPublishedSheetData` 結果を 10s ScriptCache
+- viewer の `getPublishedSheetData` 結果を 12s ScriptCache
 - reaction/highlight write 時に `bumpBoardDataVersion_` で即時 stale
 - 効果: 700 viewer × 8s polling = 5,250 req/min → ~700 req/min (~8x 削減)
+- **cache に書く形は圧縮表現** (`packBoardDataForCache_` / `unpackBoardDataFromCache_`): 行から
+  派生 3 項目 (`opinion` = answer / `isEmpty` = false / `formattedTimestamp` = timestamp から復元) を
+  落とし、`Utilities.gzip` + base64 で書く。ScriptCache の 1 value 100KB 制限に 150〜250 行で当たり
+  「cache に入らない → 毎 poll が Sheets を読む」になっていたため (2026-10)。読むときに元の形へ戻す
+  ので wire (受け手) は変わらない。`withStampedeGuard_` の `pack` / `unpack` が差し込み口
+
+---
+
+## circuit breaker ([DatabaseCore.js](../src/DatabaseCore.js) `fetchSheetsAPIWithRetry`)
+
+- 429 ごとに共有 counter (`circuit_breaker_state`) を +1、成功で -1 (net pressure)
+- **開くのは pool 全体が焼けたときだけ**: 429 を踏んだ SA を cooldown に入れたあと、cooling でない
+  SA が他に残っていれば failover に任せて開かない。残っていなければ、積んだ圧力に応じて
+  30s / 60s / 120s 止める。1 つの SA の quota 切れで他の 4 本まで止めていた (2026-10)
+
+---
+
+## users シートの書き込み省略 ([DatabaseCore.js](../src/DatabaseCore.js) `updateUser`)
+
+- 書き込みのたびに `USER_CACHE_VERSION` が上がり、全 viewer の user cache が一斉に落ちる
+  (stampede guard で 1 read には抑えてある)
+- いま読んだ行と内容が同じ (configJson は `lastAccessedAt` / `etag` を除いて比較) なら書かず、
+  `{ success, unchanged: true, currentEtag }` を返す。`saveUserConfig` は永続済の etag を client に返す
+- per-user の cache version は見送り: `all_users_v<ver>` 一覧 (findUserByEmail / findUserBySpreadsheetId
+  が configJson を読む) の鮮度が崩れ、profile 切替直後の児童が古い SS を見る
 
 ---
 

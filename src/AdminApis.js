@@ -769,16 +769,30 @@ function dispatchAdminOperation(operation, params) {
           sample: matched.slice(0, 5).map(u => ({ userId: u.userId, userEmail: u.userEmail }))
         });
       }
+      // 1 ユーザーの patch は users シートの read + write (SA 経由で 2〜4 秒) なので、
+      //   100 人を超えると GAS の 6 分制限に当たる。offset/limit で区切り、時間切れが近づいたら
+      //   途中で返して nextOffset を示す (呼び出し側が続きから再実行する)。
+      const page = __adminLoopPage_(matched, params);
       const results = [];
-      for (const u of matched) {
+      let stoppedAt = null;
+      for (let i = page.offset; i < page.end; i++) {
+        if (__adminLoopOverBudget_(page.deadline)) { stoppedAt = i; break; }
+        const u = matched[i];
         const r = applyConfigPatch_(u.userId, params.patch, { publish: false });
         results.push({ userId: u.userId, userEmail: u.userEmail, success: r.success, message: r.message });
       }
       const okCount = results.filter(r => r.success).length;
-      return createSuccessResponse(`bulkSetUserConfig: ${okCount}/${results.length} succeeded`, {
+      const nextOffset = stoppedAt !== null ? stoppedAt : (page.end < matched.length ? page.end : null);
+      return createSuccessResponse(`bulkSetUserConfig: ${okCount}/${results.length} succeeded` +
+        (nextOffset !== null ? ` (${nextOffset}/${matched.length} まで。--offset ${nextOffset} で続きを実行)` : ''), {
         results,
         appliedTo: okCount,
-        failedCount: results.length - okCount
+        failedCount: results.length - okCount,
+        matchedCount: matched.length,
+        offset: page.offset,
+        processed: results.length,
+        nextOffset,
+        complete: nextOffset === null
       });
     }
 
@@ -1078,7 +1092,7 @@ function dispatchAdminOperation(operation, params) {
         if (typeof migrateBoardSharing !== 'function') {
           return createErrorResponse('migrateBoardSharing not available');
         }
-        return migrateBoardSharing({ dryRun });
+        return migrateBoardSharing({ dryRun, offset: params.offset, limit: params.limit });
       } catch (e) {
         return createExceptionResponse(e);
       }
@@ -1456,6 +1470,31 @@ function redactUserForApi_(user) {
   };
 }
 
+// 管理者専用の全ユーザー / 全ボードのループを GAS の 6 分制限の内側で区切る。
+//   Why: bulkSetUserConfig / migrateBoardSharing は 1 件ごとに Sheets / Drive を数回叩く
+//   (SA 経由で 2〜4 秒)。ユーザーが 100 人を超えると 1 回の実行で終わらず、途中で
+//   タイムアウトして「どこまで反映されたか」が分からなくなる (2026-10 監査)。
+//   offset / limit で範囲を区切り、deadline を過ぎたら途中で返して nextOffset を示す。
+const ADMIN_LOOP_BUDGET_MS_ = 4.5 * 60 * 1000;
+
+/**
+ * @param {Array} items - 全対象
+ * @param {Object} params - offset / limit (文字列でも可)
+ * @returns {{offset:number, end:number, deadline:number}}
+ */
+function __adminLoopPage_(items, params) {
+  const total = Array.isArray(items) ? items.length : 0;
+  const rawOffset = Number(params && params.offset);
+  const rawLimit = Number(params && params.limit);
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.min(Math.floor(rawOffset), total) : 0;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : total;
+  return { offset, end: Math.min(offset + limit, total), deadline: Date.now() + ADMIN_LOOP_BUDGET_MS_ };
+}
+
+function __adminLoopOverBudget_(deadline) {
+  return Date.now() >= deadline;
+}
+
 /**
  * ユーザーフィルタ判定。`bulkSetUserConfig` 用。
  * Why: target を全件か一部に絞るシンプルな機構。複雑な条件は将来追加。
@@ -1558,22 +1597,28 @@ function deepMerge_(target, source) {
  *
  * @param {Object} [options]
  * @param {boolean} [options.dryRun=false] - true なら共有変更なし、 対象 SS リストのみ返す
- * @returns {Object} 結果サマリ
+ * @param {number} [options.offset=0] - 何件目から処理するか (前回の nextOffset)
+ * @param {number} [options.limit] - 1 回で処理する最大件数 (省略は全件。時間切れなら途中で返す)
+ * @returns {Object} 結果サマリ (nextOffset が非 null なら続きがある)
  */
 function migrateBoardSharing(options = {}) {
   const dryRun = options.dryRun === true;
 
   const ssIds = getAllBoardSpreadsheetIds();
   if (ssIds.length === 0) {
-    return createSuccessResponse('No board spreadsheets found', { total: 0, processed: [], dryRun });
+    return createSuccessResponse('No board spreadsheets found', { total: 0, processed: [], dryRun, nextOffset: null, complete: true });
   }
 
   const processed = [];
   let saAddedCount = 0;
   let domainRevokedCount = 0;
   let errorCount = 0;
+  const page = __adminLoopPage_(ssIds, options);
+  let stoppedAt = null;
 
-  for (const ssId of ssIds) {
+  for (let i = page.offset; i < page.end; i++) {
+    if (!dryRun && __adminLoopOverBudget_(page.deadline)) { stoppedAt = i; break; }
+    const ssId = ssIds[i];
     const entry = { spreadsheetId: ssId, saEmails: [], domainRevoked: false, errors: [] };
 
     if (dryRun) {
@@ -1610,9 +1655,12 @@ function migrateBoardSharing(options = {}) {
     processed.push(entry);
   }
 
+  const nextOffset = stoppedAt !== null ? stoppedAt : (page.end < ssIds.length ? page.end : null);
+  const suffix = nextOffset !== null ? ` (${nextOffset}/${ssIds.length} まで。--offset ${nextOffset} で続きを実行)` : '';
   return createSuccessResponse(
-    dryRun ? `Dry run: ${ssIds.length} board SS would be processed` : `${ssIds.length} board SS processed`,
-    { total: ssIds.length, saAddedCount, domainRevokedCount, errorCount, dryRun, processed }
+    (dryRun ? `Dry run: ${processed.length} board SS would be processed` : `${processed.length} board SS processed`) + suffix,
+    { total: ssIds.length, offset: page.offset, processedCount: processed.length, nextOffset, complete: nextOffset === null,
+      saAddedCount, domainRevokedCount, errorCount, dryRun, processed }
   );
 }
 

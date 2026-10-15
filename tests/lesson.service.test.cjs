@@ -1158,3 +1158,24 @@ test('reorderLessonPhases: 順列でない order は reject / 恒等順は no-op
   assert.equal(noop.success, true);
   assert.equal(noop.data.changed, false);
 });
+
+test('getActiveLessonNav: lessons シートを 1 回しか読まない (教師の polling ごとに 2 read していた)', () => {
+  // Why: 以前は listLessons で 1 回、__findLessonById_ でもう 1 回、同じシートを読んでいた。
+  //   教師のボードは polling ごとに呼ぶので、授業中の教師 1 人が児童 2 人分の read quota を使っていた。
+  const { context, lessonsSheet } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.startLesson('u1', lessonId);
+
+  const origGetDataRange = lessonsSheet.getDataRange;
+  let reads = 0;
+  lessonsSheet.getDataRange = () => { reads++; return origGetDataRange(); };
+  const res = context.getActiveLessonNav('u1');
+  lessonsSheet.getDataRange = origGetDataRange;
+
+  assert.equal(res.success, true);
+  assert.equal(res.data.lessonId, lessonId);
+  assert.equal(res.data.phases.length, 3);
+  assert.equal(reads, 1, 'lessons シートの全体読みは 1 回');
+});

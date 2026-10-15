@@ -125,7 +125,10 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         //   Why: 429 は SA 単位の分単位 quota なので、別 SA で投げ直せば即座に通る。ここで 5〜15 秒
         //   眠ると、その間 GAS の同時実行枠 (30) を 1 本塞ぐ。30 人の polling が同時に 429 を踏むと
         //   全員が眠って枠が尽き、新しいリクエストが「Service invoked too many times」で落ちていた。
-        const canSwitchSa = Boolean(authResolver) && hasNonCoolingServiceAccount_(currentSaEmail);
+        // 「この SA 以外に cooling でない SA が居るか」。無ければ pool 全体が焼けている。
+        //   SA を渡さない呼び出し (切替先を持たない) は常に「無い」扱い。
+        const otherSaAvailable = Boolean(currentSaEmail) && hasNonCoolingServiceAccount_(currentSaEmail);
+        const canSwitchSa = Boolean(authResolver) && otherSaAvailable;
         const backoffTime = (willRetry && !canSwitchSa) ? Math.min(5000 + (retryCount * 5000), 15000) : 0;
         console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount}${canSwitchSa ? ', switching SA' : ''})`);
 
@@ -133,7 +136,13 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         //   (関数冒頭の値は古い。30 本が同時に 429 を踏んでも 1 しか増えないと閾値 7 に届かない)。
         const cur = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
         cur.consecutiveErrors++;
-        if (cur.consecutiveErrors >= 7 && cur.circuitOpenUntil <= Date.now()) {
+        // breaker は「pool 全体が焼けた」ときだけ開く (2026-10 監査)。
+        //   Why: counter は SA 共通なので、1 つの SA が分単位 quota を使い切ると、その SA を掴んで
+        //   いた同時 request が一斉に 429 を踏んで 7 を超え、他の 4 本が健在でも全 Sheets 呼び出しが
+        //   30〜120 秒止まっていた。cooling でない SA が残っている間は failover (上の switching) に
+        //   任せ、圧力 (counter) だけ積む。全 SA が cooling になった最初の 429 で、積んだ圧力に
+        //   応じた長さで開く。
+        if (!otherSaAvailable && cur.consecutiveErrors >= 7 && cur.circuitOpenUntil <= Date.now()) {
           const lockoutMs = cur.consecutiveErrors >= 15 ? 120000
             : cur.consecutiveErrors >= 10 ? 60000 : 30000;
           // Date.now() を再取得する。 関数冒頭の `now` は executeWithRetry 突入前の値で、
@@ -2225,6 +2234,23 @@ function updateUser(userId, updates, context = {}) {
           }
         }
 
+        // 内容が同じ書き込みは省く (2026-10 監査)。
+        //   Why: 書き込みのたびに clearDatabaseUserCache が USER_CACHE_VERSION を上げ、児童 30 人分の
+        //   user cache が一斉に落ちて次の poll が users シートを読み直す (stampede guard で 1 read に
+        //   抑えてはいる)。lastAccessedAt / etag しか違わない保存 (同じ内容の再保存、同じ patch の
+        //   再適用) で version を上げる理由は無い。cache 済の user ではなく、いま読んだ行と比べる
+        //   (別インスタンスの 30 秒 memo が古くても、行は現物)。
+        if (__userRowUnchanged_(headers, data[i], updates)) {
+          const cfgIdx = headers.indexOf('configJson');
+          const current = cfgIdx !== -1 ? safeJsonParse_(data[i][cfgIdx], null) : null;
+          return {
+            success: true,
+            unchanged: true,
+            currentEtag: (current && current.etag) || null,
+            currentConfig: current
+          };
+        }
+
         const updateCells = [];
 
         Object.keys(updates).forEach(field => {
@@ -2276,6 +2302,46 @@ function updateUser(userId, updates, context = {}) {
   } finally {
     releaseCacheLock_(lockKey, lockToken);
   }
+}
+
+// updates が、いま読んだ行と内容的に同じか (updateUser の no-op 判定)。
+//   configJson は lastAccessedAt / etag を除いて比較する (保存のたびに必ず変わる 2 項目)。
+//   それ以外の列は文字列として比較。書く列が 1 つも無ければ false (従来どおり lastModified を書く)。
+function __userRowUnchanged_(headers, row, updates) {
+  const fields = Object.keys(updates || {}).filter((f) => headers.indexOf(f) !== -1);
+  if (fields.length === 0) return false;
+  for (const field of fields) {
+    const cur = row[headers.indexOf(field)];
+    const next = updates[field];
+    if (field === 'configJson') {
+      if (!__sameConfigJson_(cur, next)) return false;
+    } else {
+      const asText = (v) => (v === undefined || v === null) ? '' : String(v);
+      if (asText(cur) !== asText(next)) return false;
+    }
+  }
+  return true;
+}
+
+function __sameConfigJson_(a, b) {
+  const pa = safeJsonParse_(a, null);
+  const pb = safeJsonParse_(b, null);
+  if (!pa || !pb || typeof pa !== 'object' || typeof pb !== 'object') return false;
+  const strip = (c) => {
+    const o = Object.assign({}, c);
+    delete o.lastAccessedAt;
+    delete o.etag;
+    return o;
+  };
+  return __stableStringify_(strip(pa)) === __stableStringify_(strip(pb));
+}
+
+// key 順に依らない JSON 文字列 (比較専用)。
+function __stableStringify_(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+  if (Array.isArray(v)) return '[' + v.map(__stableStringify_).join(',') + ']';
+  const keys = Object.keys(v).filter((k) => v[k] !== undefined).sort();
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + __stableStringify_(v[k])).join(',') + '}';
 }
 
 /**
