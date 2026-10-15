@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -155,10 +155,13 @@ function doGet(e) {
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
     return handler(params, currentEmail);
   } catch (error) {
+    // e 自体が無い呼び出し (エディタからの実行等) で catch の中が TypeError を投げると、
+    //   ErrorBoundary ではなく GAS の生エラー画面になる。e?.parameter で守る。
+    const p = (e && e.parameter) || {};
     logError_('doGet', error, {
-      stack: error.stack,
-      mode: e.parameter?.mode,
-      userId: e.parameter?.userId && typeof e.parameter.userId === 'string' ? `${e.parameter.userId.substring(0, 8)}***` : 'N/A'
+      stack: error && error.stack,
+      mode: p.mode,
+      userId: p.userId && typeof p.userId === 'string' ? `${p.userId.substring(0, 8)}***` : 'N/A'
     });
 
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
@@ -467,7 +470,18 @@ function doPostHandleGetData(request, email, action) {
     if (!user) {
       return createUserNotFoundError();
     }
-    return { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+    // 外側の success は内側の結果に揃える。以前は読みが失敗しても success:true で包んでいたので、
+    //   受け手が data.success まで見ないと失敗に気付けなかった。shape (data に結果) は変えない。
+    const result = getUserSheetData(user.userId, request.options || {});
+    const ok = Boolean(result && result.success !== false);
+    // 行の reactions は共有 cache 用に投票者メール一覧 (voters) を持つ。wire に出す前に、
+    //   呼び出し元 1 人分の reacted に変換して voters を落とす (getPublishedSheetData と同じ)。
+    if (ok && result && Array.isArray(result.data) && typeof applyViewerReactions_ === 'function') {
+      result.data = applyViewerReactions_(result.data, email);
+    }
+    return ok
+      ? { success: true, data: result }
+      : createErrorResponse((result && (result.message || result.error)) || 'データ取得に失敗しました', result);
   } catch (error) {
     logError_(action, error);
     return createExceptionResponse(error);
@@ -1164,6 +1178,12 @@ function isRetryableError(errorMessage) {
     'malformed',
     'access denied',
     'authentication failed',
+    // 4xx の恒久エラー (範囲指定ミス等)。retry しても同じ結果で、sleep だけが積まれる。
+    'bad request',
+    'api returned 400',
+    'api returned 401',
+    'api returned 403',
+    'api returned 404',
     // 非冪等 write (例: :append) の失敗。 commit 済か判定不能なため retry すると重複を生む (H3)。
     'non-idempotent'
   ];

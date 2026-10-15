@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
+/* global invalidateSaValidationCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -859,11 +859,23 @@ function saveUserConfig(userId, config, options = {}) {
       : Math.random().toString(36).substring(2, 14);
     cleanedConfig.etag = `${currentTime}_${etagUuid}`;
 
+    // etag 付きの保存は、書く直前 (行 lock の中) にも現物の etag と比べる (compare-and-set)。
+    //   上の比較は cache 済の user を見ているので、同時に走った 2 つの保存 (教師の自動保存と
+    //   フェーズ切替) が同じ etag を見て両方通り、後の書き込みが前の変更を飲み込んでいた。
     const updateResult = updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig)
-    });
+    }, config.etag ? { expectedEtag: config.etag } : {});
 
     if (!updateResult || !updateResult.success) {
+      if (updateResult && updateResult.error === 'etag_mismatch') {
+        return {
+          success: false,
+          error: 'etag_mismatch',
+          message: 'Configuration has been modified by another user',
+          currentConfig: persistedConfig,
+          currentEtag: updateResult.currentEtag || null
+        };
+      }
       return {
         success: false,
         message: updateResult?.message || 'Database update failed'
@@ -872,13 +884,18 @@ function saveUserConfig(userId, config, options = {}) {
 
     clearConfigCache(userId);
 
-    const ssId = user.spreadsheetId || cleanedConfig.spreadsheetId;
-    if (ssId) {
-      try {
-        CacheService.getScriptCache().remove(`sa_validation_${ssId}`);
-      } catch (cacheRemoveError) {
-        console.warn('saveUserConfig: Failed to clear SA validation cache:', cacheRemoveError.message);
-      }
+    // validateServiceAccountUsage の 60 秒 cache は `sa_validation_v<ver>_<ssId>_<email>` という
+    //   key で、version を bump しないと消えない (旧コードの `sa_validation_${ssId}` remove は
+    //   どの key にも当たらない no-op だった)。公開状態以外の変更でも SS が差し替わることがある
+    //   (profile 切替) ので、新旧両方の SS について version を上げる。
+    const ssIds = new Set();
+    if (cleanedConfig.spreadsheetId) ssIds.add(cleanedConfig.spreadsheetId);
+    if (persistedConfig && persistedConfig.spreadsheetId) ssIds.add(persistedConfig.spreadsheetId);
+    if (typeof invalidateSaValidationCache_ === 'function') {
+      ssIds.forEach((id) => {
+        try { invalidateSaValidationCache_(id); }
+        catch (cacheRemoveError) { console.warn('saveUserConfig: Failed to clear SA validation cache:', cacheRemoveError.message); }
+      });
     }
 
     return {

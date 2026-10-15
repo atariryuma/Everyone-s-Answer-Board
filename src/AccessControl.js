@@ -76,12 +76,16 @@ function isBoardCollaborator(targetUser, viewerEmail) {
 }
 
 function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
-  const cache = CacheService.getScriptCache();
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (_) { cache = null; /* cache 不通は機能的に無害 (毎回 Drive を読むだけ) */ }
   const key = 'collab:' + fileId + ':' + __emailHash_(emailNorm);
-  const hit = cache.get(key);
+  let hit = null;
+  try { hit = cache ? cache.get(key) : null; } catch (_) { hit = null; }
   if (hit !== null) return hit === '1';
 
   let ok = false;
+  // 429 / 5xx は一時的な失敗なので「編集者ではない」を 10 分固定しない (transient は cache しない)。
+  let transient = false;
   try {
     const sa = pickServiceAccount_();
     if (!sa) return false;
@@ -94,17 +98,29 @@ function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
       headers: { Authorization: 'Bearer ' + token },
       muteHttpExceptions: true
     });
-    if (response.getResponseCode() === 200) {
+    const code = response.getResponseCode();
+    if (code === 200) {
       const json = JSON.parse(response.getContentText());
       const editors = (json.permissions || [])
         .filter(function (p) { return p.role === 'writer' || p.role === 'owner'; })
         .map(function (p) { return String(p.emailAddress || '').toLowerCase(); });
       ok = editors.indexOf(emailNorm) !== -1;
+    } else {
+      // 黙って false にしない: 403 なら SA token の scope 不足 (drive.readonly が要る) か
+      //   SA がそのファイルの閲覧権を持たない。症状は「共同編集者がハイライトできない」だけで、
+      //   痕跡が無いと原因が追えない。
+      transient = code === 429 || (code >= 500 && code < 600);
+      console.warn('isBoardCollaborator: Drive permissions.list returned', code,
+        transient ? '(transient, not cached)' : '', String(response.getContentText() || '').slice(0, 200));
     }
   } catch (e) {
+    transient = true;
     if (typeof logError_ === 'function') logError_('isBoardCollaborator/drive', e);
   }
-  cache.put(key, ok ? '1' : '0', ok ? COLLABORATOR_CACHE_TTL_OK_SEC : COLLABORATOR_CACHE_TTL_NO_SEC);
+  if (cache && !(transient && !ok)) {
+    try { cache.put(key, ok ? '1' : '0', ok ? COLLABORATOR_CACHE_TTL_OK_SEC : COLLABORATOR_CACHE_TTL_NO_SEC); }
+    catch (_) { /* cache 不通は機能的に無害 (次回 Drive を読み直す) */ }
+  }
   return ok;
 }
 

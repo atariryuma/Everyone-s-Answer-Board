@@ -553,6 +553,9 @@ const __FRONTEND_USER_DISPATCH_OPS = Object.freeze(new Set([
   'lesson.templates', 'lesson.review', 'lesson.liveAnswers', 'lesson.toggleHighlight',
   'lesson.closeForms', 'lesson.updateDraft',
   'lesson.start', 'lesson.advance', 'lesson.end', 'lesson.knownClasses',
+  // reopenLesson は内部で所有者 / 管理者を検証する。allowlist に無いと教師の「再開する」が
+  //   「管理者権限が必要です」で必ず失敗していた。
+  'lesson.reopen',
   'uploadLessonImage'
 ]));
 
@@ -560,6 +563,9 @@ function dispatchAdminOperation(operation, params) {
   if (!operation || typeof operation !== 'string') {
     return createErrorResponse('operation is required', null, { error: 'MISSING_OPERATION' });
   }
+  // params 無し (google.script.run 経由で省略) で `params[key]` が TypeError にならないようにする。
+  //   生の例外は GAS の失敗として画面に出る。
+  if (!isPlainObject(params)) params = {};
 
   const op = operation.trim();
 

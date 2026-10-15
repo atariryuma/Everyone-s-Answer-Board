@@ -1132,6 +1132,10 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { context: 'systemController' });
+    if (!dataAccess || !dataAccess.spreadsheet) {
+      // null を分割代入すると "Cannot destructure property" がそのまま利用者に見える。
+      return createErrorResponse('スプレッドシートにアクセスできません。共有設定と ID を確認してください', null, { error: 'SPREADSHEET_ACCESS_DENIED' });
+    }
     const { spreadsheet } = dataAccess;
 
     const sheets = spreadsheet.getSheets();

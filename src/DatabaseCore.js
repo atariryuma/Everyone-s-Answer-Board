@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -21,6 +21,47 @@
 // 1 API call あたりの試行回数 (executeWithRetry の maxRetries と 429 sleep の判定で共有)。
 const SHEETS_API_MAX_ATTEMPTS_ = 3;
 
+// circuit breaker の共有 state を読む。壊れた値 (部分書込み / 旧 schema / null) は既定値に倒す。
+//   Why: JSON.parse が想定外の値を返すと undefined > 0 が silently false になり、
+//   breaker が機能しない silent bug になる。Number() || 0 で必ず数値にする。
+function readCircuitBreakerState_(cache, key) {
+  const state = { consecutiveErrors: 0, circuitOpenUntil: 0 };
+  let raw = null;
+  try { raw = cache.get(key); } catch (_) { return state; /* cache 不通は「閉じている」扱いで読む */ }
+  if (!raw) return state;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      state.consecutiveErrors = Number(parsed.consecutiveErrors) || 0;
+      state.circuitOpenUntil = Number(parsed.circuitOpenUntil) || 0;
+    }
+  } catch (parseError) {
+    console.warn('Circuit breaker state parse failed, resetting:', parseError.message);
+  }
+  return state;
+}
+
+// 直近の SA proxy 読み取り失敗 (429 で retry を使い切った / breaker open) を実行単位で覚える。
+//   Why: proxy の getValues() は失敗時に例外ではなく [] を返す (多数の呼び出し側がそれを前提に
+//   「空」として扱う)。しかし「空の範囲」と「読めなかった」を区別しないと、DataService の
+//   ボード読みが「回答 0 件」を成功として cache し、児童 30 人全員のボードが最大 60 秒
+//   空になる (2026-10 監査)。GAS は 1 実行 = 1 スレッドなので、グローバル 1 個の slot で
+//   「直前の getValues が失敗したか」を呼び出し側へ安全に伝えられる。
+//   使い方: 読む前に takeProxyReadFailure_() で捨て、読んだ後にもう 1 回呼んで非 null なら失敗。
+let __lastProxyReadFailure_ = null;
+function noteProxyReadFailure_(label, error) {
+  __lastProxyReadFailure_ = {
+    label: String(label || 'read'),
+    message: (error && error.message) ? String(error.message) : String(error || 'read failed'),
+    at: Date.now()
+  };
+}
+function takeProxyReadFailure_() {
+  const f = __lastProxyReadFailure_;
+  __lastProxyReadFailure_ = null;
+  return f;
+}
+
 function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver, fetchOpts) {
   let retryCount = 0;
   let currentOptions = options;
@@ -34,21 +75,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
 
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
-  const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
-  // Why: JSON.parse が想定外の値 (部分書込み、過去 schema、null fields) を返した場合に
-  //   undefined > 0 が silently false になり、 circuit breaker が機能しない silent bug を防ぐ。
-  const circuitState = { consecutiveErrors: 0, circuitOpenUntil: 0 };
-  if (cachedState) {
-    try {
-      const parsed = JSON.parse(cachedState);
-      if (parsed && typeof parsed === 'object') {
-        circuitState.consecutiveErrors = Number(parsed.consecutiveErrors) || 0;
-        circuitState.circuitOpenUntil = Number(parsed.circuitOpenUntil) || 0;
-      }
-    } catch (parseError) {
-      console.warn('Circuit breaker state parse failed, resetting:', parseError.message);
-    }
-  }
+  const circuitState = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
 
   const now = Date.now();
   if (circuitState.circuitOpenUntil > now) {
@@ -94,21 +121,29 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         //   最終試行 (この後 retry しない) では sleep しない: 待っても投げ直さないので無駄。
         if (currentSaEmail) markServiceAccountCoolingDown_(currentSaEmail);
         const willRetry = retryCount + 1 < SHEETS_API_MAX_ATTEMPTS_;
-        const backoffTime = willRetry ? Math.min(5000 + (retryCount * 5000), 15000) : 0;
-        console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount})`);
+        // 別の (cooling でない) SA に切り替えられるなら待たない。待つのは「切替先が無い」ときだけ。
+        //   Why: 429 は SA 単位の分単位 quota なので、別 SA で投げ直せば即座に通る。ここで 5〜15 秒
+        //   眠ると、その間 GAS の同時実行枠 (30) を 1 本塞ぐ。30 人の polling が同時に 429 を踏むと
+        //   全員が眠って枠が尽き、新しいリクエストが「Service invoked too many times」で落ちていた。
+        const canSwitchSa = Boolean(authResolver) && hasNonCoolingServiceAccount_(currentSaEmail);
+        const backoffTime = (willRetry && !canSwitchSa) ? Math.min(5000 + (retryCount * 5000), 15000) : 0;
+        console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount}${canSwitchSa ? ', switching SA' : ''})`);
 
-        circuitState.consecutiveErrors++;
-        if (circuitState.consecutiveErrors >= 7) {
-          const lockoutMs = circuitState.consecutiveErrors >= 15 ? 120000
-            : circuitState.consecutiveErrors >= 10 ? 60000 : 30000;
+        // 並行 request の増分を取りこぼさないよう、書く直前に読み直してから +1 する
+        //   (関数冒頭の値は古い。30 本が同時に 429 を踏んでも 1 しか増えないと閾値 7 に届かない)。
+        const cur = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
+        cur.consecutiveErrors++;
+        if (cur.consecutiveErrors >= 7 && cur.circuitOpenUntil <= Date.now()) {
+          const lockoutMs = cur.consecutiveErrors >= 15 ? 120000
+            : cur.consecutiveErrors >= 10 ? 60000 : 30000;
           // Date.now() を再取得する。 関数冒頭の `now` は executeWithRetry 突入前の値で、
           // ここに到達する頃には 429 backoff の Utilities.sleep (最大 ~60s×複数 retry) が
           // 経過済。 stale な `now` で計算するとロックアウトが実質ほぼ即時失効し、 quota
           // 回復のための circuit pause が機能しない。
-          circuitState.circuitOpenUntil = Date.now() + lockoutMs;
-          console.error(`Circuit breaker activated: ${circuitState.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
+          cur.circuitOpenUntil = Date.now() + lockoutMs;
+          console.error(`Circuit breaker activated: ${cur.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
         }
-        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 120);
+        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(cur), 120);
 
         if (backoffTime > 0) Utilities.sleep(backoffTime);
         retryCount++;
@@ -129,9 +164,16 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
       //   global counter を 0 に戻す」 race で閾値 7 に到達できず breaker が機能しなかった。
       //   decay 方式なら net error pressure が蓄積し、 真の quota 枯渇でのみ開く。 単発の
       //   transient は数回の成功で自然解消する。 (counter は「連続」 ではなく net pressure の意味)
-      circuitState.consecutiveErrors = Math.max(0, circuitState.consecutiveErrors - 1);
-      circuitState.circuitOpenUntil = 0;
-      cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
+      // 書く前に state を読み直す。関数冒頭で読んだ値は、この request が走っている間に別の
+      //   request が breaker を開いていても古いまま。古い値から circuitOpenUntil:0 を書くと、
+      //   開いた直後に「たまたま成功した 1 本」が breaker を閉じ、storm の最中に一度も止まれない。
+      //   開いている breaker はここでは触らない (期限は TTL と時刻で自然に切れる)。
+      const latest = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
+      if (latest.circuitOpenUntil <= Date.now() && latest.consecutiveErrors > 0) {
+        latest.consecutiveErrors = Math.max(0, latest.consecutiveErrors - 1);
+        latest.circuitOpenUntil = 0;
+        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(latest), 60);
+      }
 
       return response;
     },
@@ -172,8 +214,17 @@ const SA_COOLDOWN_TTL_SEC = 30;
 const SA_TOKEN_TTL_SEC_ = 50 * 60;
 const SA_VERIFY_TTL_OK_SEC_ = 600;
 const SA_VERIFY_TTL_NO_SEC_ = 120;
+// SA access token の scope。Sheets (読み書き) + Drive 読み取り (共同編集者判定の permissions.list)。
+const SA_TOKEN_SCOPES_ = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly';
 
 // Cache key prefixes (集約。 scattered string literal を排除)。
+// users シート書き込みの key 単位 lock (acquireCacheLock_ / helpers.js)。
+const USERS_LOCK_KEYS_ = Object.freeze({
+  ROW: 'users_row_lock:',        // + userId : 1 ユーザー行の read-modify-write
+  CREATE: 'users_create_lock:',  // + email  : 同じ email の二重作成防止
+  STRUCT: 'users_struct_lock'    //          : 行削除 (行番号がずれる) 中は誰も書かない
+});
+
 const SA_CACHE_KEYS_ = {
   TOKEN: 'sa_token:',          // SA access token (per client_email, 50min TTL)
   ACCESS: 'sa_access:',         // SS x SA verify result (per ssId+saEmail, 10min ok / 2min no)
@@ -216,13 +267,35 @@ function parseServiceAccountCredsSoft_(raw) {
  * 設定されている SA を全て返す (primary + secondaries, validate 済)。
  * @returns {Object[]} array of SA objects (empty if none configured)
  */
+// parse 済 pool の実行インスタンス内 memo (getCachedProperty と同じ 30 秒)。
+//   Why: openSpreadsheet 1 回で getAllServiceAccounts_ は 3 回呼ばれ (getServiceAccount /
+//   pickServiceAccount_ / openSpreadsheetViaServiceAccount)、毎回 10 slot × JSON.parse (~2.5KB)
+//   を繰り返していた。slot を書く側 (add/remove) は invalidateServiceAccountPoolMemo_ で捨てる。
+let __saPoolMemo_ = null;
+const SA_POOL_MEMO_TTL_MS_ = 30000;
+function invalidateServiceAccountPoolMemo_() { __saPoolMemo_ = null; }
+
 function getAllServiceAccounts_() {
+  const now = Date.now();
+  if (__saPoolMemo_ && (now - __saPoolMemo_.at) < SA_POOL_MEMO_TTL_MS_) return __saPoolMemo_.pool.slice();
   const out = [];
   for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
     const sa = parseServiceAccountCredsSoft_(getCachedProperty(serviceAccountPoolSlotKey_(n)));
     if (sa) out.push(sa);
   }
-  return out;
+  __saPoolMemo_ = { at: now, pool: out };
+  return out.slice();
+}
+
+// 指定 SA 以外に cooling でない SA が pool に居るか (429 時に「待たずに切り替える」判断用)。
+function hasNonCoolingServiceAccount_(excludeEmail) {
+  const pool = getAllServiceAccounts_();
+  for (let i = 0; i < pool.length; i++) {
+    const email = pool[i].client_email;
+    if (email === excludeEmail) continue;
+    if (!isServiceAccountCoolingDown_(email)) return true;
+  }
+  return false;
 }
 
 /** SA pick 回数を 5 分窓カウンタに記録 (admin 可視化用)。 */
@@ -395,18 +468,24 @@ function getServiceAccountAccessToken_(sa) {
 
   // JWT exchange
   const nowSec = Math.floor(now / 1000);
-  const jwt = createServiceAccountJWT(
-    { alg: 'RS256', typ: 'JWT' },
-    {
-      iss: sa.client_email,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: nowSec + 3600,
-      iat: nowSec
-    },
-    sa.private_key
-  );
   try {
+    // JWT 署名も try の中に置く。private_key が "BEGIN PRIVATE KEY" を含むだけの壊れた鍵だと
+    //   computeRsaSha256Signature が throw し、ここで止まると openSpreadsheetViaServiceAccount
+    //   が pool の次の SA に進めず全滅していた。null を返せば呼び出し側は次の SA を試す。
+    // scope: Sheets に加えて Drive 読み取りも要求する。isBoardCollaborator (AccessControl.js) が
+    //   この token で Drive permissions.list を叩く。spreadsheets scope だけだと 403 になり、
+    //   共同編集者のハイライト権限が常に拒否されていた。
+    const jwt = createServiceAccountJWT(
+      { alg: 'RS256', typ: 'JWT' },
+      {
+        iss: sa.client_email,
+        scope: SA_TOKEN_SCOPES_,
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: nowSec + 3600,
+        iat: nowSec
+      },
+      sa.private_key
+    );
     const tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -462,6 +541,9 @@ function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
     const code = resp.getResponseCode();
     const ok = code === 200;
     const isTransient = code === 429 || (code >= 500 && code < 600);
+    // 429 を踏んだ SA は cooldown に入れる (proxy 経路と同じ扱い)。入れないと、焼けている SA を
+    //   次の openSpreadsheet がまた選んで verify から 429 を踏み直す。
+    if (code === 429 && saEmail) markServiceAccountCoolingDown_(saEmail);
     if (cache) {
       try {
         if (ok) cache.put(cacheKey, 'ok', SA_VERIFY_TTL_OK_SEC_);
@@ -503,6 +585,12 @@ function makeProxyAuthResolver_(sheetId, initialToken, initialSaEmail) {
     }
     const freshToken = getServiceAccountAccessToken_(fresh);
     if (!freshToken) return { token: initialToken, saEmail: initialSaEmail };
+    // 切替先の SA がこの SS を開けるか (10 分 cache 済の verify) を確かめる。確かめずに渡すと、
+    //   共有漏れの SA に切り替わった request が 403 (= non-retryable) で児童に失敗を返す。
+    //   開けない SA なら、焼けている初回 SA で投げ直すほうがまだ通る可能性がある。
+    if (!verifyServiceAccountAccess_(sheetId, freshToken, fresh.client_email)) {
+      return { token: initialToken, saEmail: initialSaEmail };
+    }
     return { token: freshToken, saEmail: fresh.client_email };
   };
 }
@@ -638,6 +726,7 @@ function addServiceAccountToPool(saJsonString) {
 
     PropertiesService.getScriptProperties().setProperty(targetSlot, String(saJsonString));
     clearPropertyCache(targetSlot);
+    invalidateServiceAccountPoolMemo_();
 
     // DB 共有 + verify (fail-soft)
     let shared = false;
@@ -784,6 +873,7 @@ function removeServiceAccountFromPool(slotKey) {
     const sa = parseServiceAccountCredsSoft_(existing);
     PropertiesService.getScriptProperties().deleteProperty(key);
     clearPropertyCache(key);
+    invalidateServiceAccountPoolMemo_();
     if (sa && sa.client_email) {
       const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
       invalidateSaCache_(dbId, sa.client_email);
@@ -1071,11 +1161,17 @@ function openSpreadsheetViaServiceAccount(sheetId) {
     if (pool.length === 0) return null;
 
     const preferred = pickServiceAccount_();
-    const startIdx = preferred ? pool.indexOf(preferred) : 0;
+    // client_email で探す。getAllServiceAccounts_ は呼ぶたびに parse し直した別オブジェクトを返す
+    //   ので、参照比較 (indexOf) は常に -1 = 常に SA #1 から始まり、round-robin が一度も効いて
+    //   いなかった (30 人が全員 primary SA に乗り、primary だけが 429 を踏む)。
+    const startIdx = preferred ? pool.findIndex((s) => s.client_email === preferred.client_email) : -1;
     const baseIdx = startIdx >= 0 ? startIdx : 0;
+    const anyNotCooling = pool.length > 1 && pool.some((s) => !isServiceAccountCoolingDown_(s.client_email));
 
     for (let step = 0; step < pool.length; step++) {
       const sa = pool[(baseIdx + step) % pool.length];
+      // cooling 中の SA は、他に冷えていない SA が居る限り飛ばす (全滅なら順に試す)。
+      if (anyNotCooling && isServiceAccountCoolingDown_(sa.client_email)) continue;
       const accessToken = getServiceAccountAccessToken_(sa);
       if (!accessToken) continue;
       if (!verifyServiceAccountAccess_(sheetId, accessToken, sa.client_email)) continue;
@@ -1201,7 +1297,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
     try {
       const auth = resolveAuth();
       const response = fetchSheetsAPIWithRetry(
-        `${baseUrl}?includeGridData=false&fields=sheets(properties(title,gridProperties))`,
+        `${baseUrl}?includeGridData=false&fields=sheets(properties(sheetId,title,gridProperties))`,
         { headers: { 'Authorization': `Bearer ${auth.token}` } },
         `fetchDimensions(${sheetName})`,
         auth.saEmail, resolveAuth
@@ -1211,12 +1307,15 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
       const targetSheet = sheets.find((s) => s.properties && s.properties.title === sheetName);
       cachedDimensions = {
         rowCount: targetSheet?.properties?.gridProperties?.rowCount || 1000,
-        columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26
+        columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26,
+        sheetId: (targetSheet && targetSheet.properties && typeof targetSheet.properties.sheetId === 'number')
+          ? targetSheet.properties.sheetId : null
       };
       return cachedDimensions;
     } catch (error) {
       console.warn(`fetchDimensions failed for ${sheetName}:`, error.message);
-      return { rowCount: 1000, columnCount: 26 };
+      noteProxyReadFailure_(`fetchDimensions(${sheetName})`, error);
+      return { rowCount: 1000, columnCount: 26, sheetId: null };
     }
   }
 
@@ -1244,6 +1343,38 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
     //   無いと key が 'unknown_<シート名>' になり、授業モードの phase1 のように同名のシートを
     //   テナント中で取り違えていた (別の授業の見出し・行数が児童のボードに出る)。
     getParent: () => ({ getId: () => sheetId }),
+    // 行削除 (batchUpdate deleteDimension)。SpreadsheetApp の Sheet#deleteRows(rowPosition, howMany) 互換。
+    //   Why: deleteUser / 授業の削除は DB シートの行を消す。DB は常に SA 経由で開くので、
+    //   proxy にこれが無いと TypeError (deleteRows is not a function) になり、教師 (DB の
+    //   編集権を持たない) は授業を削除できなかった。sheetId は寸法と同じ metadata 読みで得る。
+    deleteRows: (rowPosition, howMany) => {
+      const start = Number(rowPosition);
+      const count = Number(howMany) || 1;
+      if (!(start >= 1) || !(count >= 1)) throw new Error(`deleteRows: invalid range (${rowPosition}, ${howMany})`);
+      const dims = fetchDimensionsOnce();
+      const gridSheetId = (typeof additionalInfo.sheetId === 'number') ? additionalInfo.sheetId : dims.sheetId;
+      if (gridSheetId === null || gridSheetId === undefined) {
+        throw new Error(`deleteRows: sheetId of "${sheetName}" could not be resolved`);
+      }
+      const auth = resolveAuth();
+      return fetchSheetsAPIWithRetry(
+        `${baseUrl}:batchUpdate`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+          payload: JSON.stringify({
+            requests: [{
+              deleteDimension: {
+                range: { sheetId: gridSheetId, dimension: 'ROWS', startIndex: start - 1, endIndex: start - 1 + count }
+              }
+            }]
+          })
+        },
+        `deleteRows(${sheetName}!${start}+${count})`,
+        auth.saEmail, resolveAuth,
+        { idempotent: false }  // 行削除は非冪等 (再実行すると次の行まで消える)
+      );
+    },
     getLastRow: () => {
       if (additionalInfo.rowCount) return additionalInfo.rowCount;
       return fetchDimensionsOnce().rowCount;
@@ -1270,7 +1401,10 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
             const data = JSON.parse(response.getContentText());
             return data.values || [];
           } catch (error) {
+            // [] を返す契約は維持する (多数の呼び出し側が「空」として扱う) が、「読めなかった」事実は
+            //   実行単位の slot に残す。DataService の板読みはこれを見て「空の板」と「失敗」を分ける。
             console.warn('getValues via API failed after retries:', error.message);
+            noteProxyReadFailure_(`getRange.getValues(${range})`, error);
             return [];
           }
         },
@@ -1307,6 +1441,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
             return data.values || [];
           } catch (error) {
             console.warn('getDataRange via API failed after retries:', error.message);
+            noteProxyReadFailure_(`getDataRange(${sheetName})`, error);
             return [];
           }
         },
@@ -1738,7 +1873,11 @@ function findUserByField(fieldName, fieldValue, context = {}) {
  * @returns {Object|null} Created user object
  */
 function createUser(email, initialConfig = {}, context = {}) {
-  const lock = LockService.getScriptLock();
+  // email 単位の lock。別の児童の初回ログインは互いに待たない (30 人の初回ログインが
+  //   1 本ずつ直列になり、10 秒で諦めた児童が「ユーザー登録に失敗」になっていた)。
+  //   同じ email の二重作成 (二重タブ) だけを 1 本に絞る。構造変更 (deleteUser) 中は待つ。
+  let lockKey = null;
+  let lockToken = null;
 
   try {
     if (!email || !validateEmail(email).isValid) {
@@ -1746,13 +1885,19 @@ function createUser(email, initialConfig = {}, context = {}) {
       return null;
     }
 
-    if (!lock.tryLock(10000)) { // 10秒待機
+    lockKey = USERS_LOCK_KEYS_.CREATE + String(email).trim().toLowerCase();
+    lockToken = acquireCacheLock_(lockKey, { ttlSec: 30, waitMs: 10000, blockedBy: [USERS_LOCK_KEYS_.STRUCT] });
+    if (!lockToken) {
       console.warn('createUser: Lock timeout - concurrent user creation detected');
       return null;
     }
 
     const currentEmail = getCurrentEmail();
 
+    // 直前に別インスタンスが同じ email を作っていても、この V8 インスタンスの 30 秒 memo には
+    //   古い USER_CACHE_VERSION が残っている。memo を捨てて最新 version の一覧で存在確認する
+    //   (捨てないと二重タブで同じ児童の行が 2 つできる)。
+    clearPropertyCache('USER_CACHE_VERSION');
     const existingUser = findUserByEmail(email, {
       requestingUser: currentEmail
     });
@@ -1785,8 +1930,11 @@ function createUser(email, initialConfig = {}, context = {}) {
     const data = sheet.getDataRange().getValues();
     // Why: SA proxy の getValues は 429 で retry を使い切ると [] を返す。ここで
     //   headers が undefined のまま進むと TypeError になり、症状 (quota) が消える。
+    //   戻り値の契約は user | null なので、ここで error envelope を返してはいけない
+    //   (呼び出し側の `if (!user)` を通り抜けて「Invalid user data」になっていた)。
     if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
-      return createErrorResponse('users シートを読み取れませんでした (Sheets API quota の可能性)。少し待って再試行してください');
+      console.warn('createUser: users sheet read returned no rows (quota?)', { email: `${String(email).split('@')[0]}@***` });
+      return null;
     }
     const [headers] = data;
     const hasCreatedAtColumn = headers.indexOf('createdAt') !== -1;
@@ -1806,7 +1954,9 @@ function createUser(email, initialConfig = {}, context = {}) {
     if (hasCreatedAtColumn) setCol('createdAt', now);
     setCol('lastModified', now);
 
-    if (sheet.getLastRow() >= 10000) {
+    // 容量判定は読んだ実データ行数で行う。SA proxy の getLastRow はグリッドの行数 (既定 1000、
+    //   追記で拡張される) を返すので、データ行数の代わりにはならない。
+    if (data.length >= 10000) {
       logError_('createUser', new Error('Users sheet at capacity'));
       return null;
     }
@@ -1831,11 +1981,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     logError_('createUser', error);
     return null;
   } finally {
-    try {
-      lock.releaseLock();
-    } catch (unlockError) {
-      console.warn('createUser: Lock release failed:', unlockError.message);
-    }
+    releaseCacheLock_(lockKey, lockToken);
   }
 }
 
@@ -1920,10 +2066,11 @@ function getAllUsers(options = {}, context = {}) {
         loader: loadUsersFromSheet,
         isCacheable,
         flightKey: `all_users_flight_${cacheSuffix}`,
-        flightTtl: 5,
+        flightTtl: 6,
         allowStale: false,
-        waitMs: 400,
-        waitTries: 3
+        // users シートの読みは混雑時 1〜3 秒かかる。1.2 秒で諦めると 29 人が自分で読みに行く。
+        waitMs: 500,
+        waitTries: 6
       });
     }
 
@@ -2001,10 +2148,17 @@ function createUserObjectFromRow(row, headers) {
  * @returns {Object} {success: boolean, message?: string} Operation result
  */
 function updateUser(userId, updates, context = {}) {
-  const lock = LockService.getScriptLock();
+  // userId 単位の lock (ScriptLock 全体ではなく)。
+  //   Why: 以前は ScriptLock を users シートの read → write の間 (1〜3 秒、429 なら 15 秒超) 握って
+  //   いた。ScriptLock はスクリプトで 1 本なので、教師が設定を保存するたびに児童のリアクション
+  //   (同じ ScriptLock を 0.8 秒だけ待つ) が全部「同時リアクション処理中」で落ちていた。
+  //   他ユーザーの更新は別の行を書くので互いに待つ必要がない。
+  const lockKey = USERS_LOCK_KEYS_.ROW + String(userId || '');
+  let lockToken = null;
 
   try {
-    if (!lock.tryLock(5000)) { // 5秒待機
+    lockToken = acquireCacheLock_(lockKey, { ttlSec: 30, waitMs: 5000, blockedBy: [USERS_LOCK_KEYS_.STRUCT] });
+    if (!lockToken) {
       console.warn('updateUser: Lock timeout - concurrent update detected');
       return createErrorResponse('Concurrent update in progress. Please retry.');
     }
@@ -2048,6 +2202,29 @@ function updateUser(userId, updates, context = {}) {
 
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
+        // 楽観ロック (compare-and-set) は lock の「中」で、いま読んだ行に対して行う。
+        //   Why: saveUserConfig は etag を cache 済の user から比べていたので、2 つの保存
+        //   (教師の自動保存とフェーズ切替) が同じ etag を見て両方通り、後の書き込みが前の
+        //   変更を飲み込んでいた。ここで現物の configJson の etag と比べれば、負けた側は
+        //   etag_mismatch を受けて読み直せる。expectedEtag が無い呼び出しは従来どおり。
+        if (context.expectedEtag) {
+          const cfgIdx = headers.indexOf('configJson');
+          const lmIdx = headers.indexOf('lastModified');
+          let currentEtag = null;
+          if (cfgIdx !== -1) {
+            const parsed = safeJsonParse_(data[i][cfgIdx], null);
+            currentEtag = (parsed && parsed.etag) || null;
+          }
+          if (!currentEtag && lmIdx !== -1 && data[i][lmIdx]) currentEtag = String(data[i][lmIdx]);
+          if (currentEtag && String(currentEtag) !== String(context.expectedEtag)) {
+            console.warn('updateUser: etag mismatch at write time (concurrent save)', {
+              userId: `${String(userId).substring(0, 8)}***`
+            });
+            return createErrorResponse('Configuration has been modified by another user', null,
+              { error: 'etag_mismatch', currentEtag });
+          }
+        }
+
         const updateCells = [];
 
         Object.keys(updates).forEach(field => {
@@ -2097,11 +2274,7 @@ function updateUser(userId, updates, context = {}) {
     logError_('updateUser', error);
     return createErrorResponse(error.message || 'Unknown error occurred');
   } finally {
-    try {
-      lock.releaseLock();
-    } catch (unlockError) {
-      console.warn('updateUser: Lock release failed:', unlockError.message);
-    }
+    releaseCacheLock_(lockKey, lockToken);
   }
 }
 
@@ -2207,9 +2380,9 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
  * @returns {Object} Delete operation result
  */
 function deleteUser(userId, reason = '', context = {}) {
-  // Matches create/updateUser concurrency contract: without the lock, a
-  // concurrent updateUser can land on a row index that delete just shifted.
-  const lock = LockService.getScriptLock();
+  // 行削除は行番号をずらすので「構造変更 lock」を取る。createUser / updateUser はこの lock が
+  //   立っている間は書かない (blockedBy)。読んだ行番号に別ユーザーの行を書く事故を防ぐ。
+  let lockToken = null;
 
   try {
     const currentEmail = getCurrentEmail();
@@ -2220,10 +2393,14 @@ function deleteUser(userId, reason = '', context = {}) {
       return createErrorResponse('Insufficient permissions for user deletion');
     }
 
-    if (!lock.tryLock(10000)) {
+    lockToken = acquireCacheLock_(USERS_LOCK_KEYS_.STRUCT, { ttlSec: 60, waitMs: 10000 });
+    if (!lockToken) {
       console.warn('deleteUser: Lock timeout - concurrent user modification detected');
       return createErrorResponse('Concurrent modification in progress. Please retry.');
     }
+    // 進行中の行更新 (lock 取得前に始まったもの) が終わるのを少し待つ。
+    //   更新側は数百 ms〜数秒なので 1.5 秒で十分。
+    if (typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function') Utilities.sleep(1500);
 
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
@@ -2279,10 +2456,6 @@ function deleteUser(userId, reason = '', context = {}) {
     logError_('deleteUser', error);
     return createErrorResponse(error.message);
   } finally {
-    try {
-      lock.releaseLock();
-    } catch (unlockError) {
-      console.warn('deleteUser: Lock release failed:', unlockError.message);
-    }
+    releaseCacheLock_(USERS_LOCK_KEYS_.STRUCT, lockToken);
   }
 }

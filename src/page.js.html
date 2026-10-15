@@ -203,7 +203,11 @@
       this.polling = {
         isActive: false,
         timerId: null,
-        errorCount: 0
+        errorCount: 0,
+        // 世代番号。stop → start の間に進行中だった poll が終わって再スケジュールすると、
+        //   チェーンが 2 本になる (hide/show のたびに 1 本増え、全部止められない)。
+        //   自分の世代が現在と違えば続行しない。
+        gen: 0
       };
 
       const savedCols = localStorage.getItem('boardColumns');
@@ -259,7 +263,10 @@
             delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
           }
 
-          await new Promise(resolve => requestIdleCallback(resolve, { timeout: delay }));
+          // 本当に待つ。requestIdleCallback はブラウザが暇になった瞬間 (数 ms) に呼ばれ、timeout は
+          //   「遅くともこの時間までに」の意味なので、backoff が 0 になっていた。429 のあと 30 台が
+          //   同時に 3 連打して quota 回復を妨げていた。
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
@@ -587,18 +594,17 @@
         if (document.hidden) {
           this.stopSimplePolling();
           this.cleanup();
-        } else if (this.state.initializationComplete) {
+        } else if (this.state.initializationComplete && !this.state.boardClosed) {
           Promise.resolve().then(() => {
             this.startSimplePolling();
           });
-        } else {
         }
       };
       document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
 
       this.handlers.onActivityDetection = () => {
         this.lastActivityTime = Date.now();
-        if (!this.polling.isActive && this.state.initializationComplete) {
+        if (!this.polling.isActive && this.state.initializationComplete && !this.state.boardClosed) {
           this.startSimplePolling();
         }
       };
@@ -608,7 +614,7 @@
       //      即座にスケジュールし直す。生徒の Wi-Fi が不安定な場面で復帰が早い。
       this.handlers.onOnline = () => {
         this.state.isOnline = true;
-        if (this.state.initializationComplete && !this.polling.isActive) {
+        if (this.state.initializationComplete && !this.polling.isActive && !this.state.boardClosed) {
           this.startSimplePolling();
         }
       };
@@ -920,14 +926,16 @@
       this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
     }
     runGas(funcName, ...args) {
-      if (this.activeRequests >= 3) {
-        return Promise.reject(new Error('Too many concurrent requests'));
-      }
-
       const mappedArgs = args;
 
       const cacheKey = funcName + JSON.stringify(mappedArgs);
-      const isStateChanging = ['toggleHighlight', 'addReaction'].includes(funcName);
+      const isStateChanging = ['toggleHighlight', 'addReaction', 'submitLessonAnswer', 'deleteAnswerRow'].includes(funcName);
+
+      // 同時実行の上限は「読み」にだけかける。児童の送信やリアクションは polling と読み直しが重なった
+      //   タイミングだけで落ちていた (英語の 'Too many concurrent requests' がそのまま出る)。
+      if (!isStateChanging && this.activeRequests >= 3) {
+        return Promise.reject(new Error('Too many concurrent requests'));
+      }
 
       if (!isStateChanging) {
         const cached = this.cache.get(cacheKey);
@@ -1108,6 +1116,8 @@
         : `${newItemsCount}件の新しい意見が投稿されました`;
 
       this.elements.newContentText.textContent = message;
+      // 閉じるアニメーションの最中に新着が来たら、閉じ切る予約を取り消す (出した直後に消えない)。
+      if (this.__bannerHideTimer) { clearTimeout(this.__bannerHideTimer); this.__bannerHideTimer = null; }
       this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
       this.elements.newContentBanner.classList.add('notification-banner-enter');
 
@@ -1121,7 +1131,9 @@
 
       this.elements.newContentBanner.classList.remove('notification-banner-enter');
       this.elements.newContentBanner.classList.add('notification-banner-exit');
-      setTimeout(() => {
+      if (this.__bannerHideTimer) clearTimeout(this.__bannerHideTimer);
+      this.__bannerHideTimer = setTimeout(() => {
+        this.__bannerHideTimer = null;
         this.elements.newContentBanner.classList.add('hidden');
         this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
       }, 300);
@@ -1152,7 +1164,7 @@
       if (this.state && this.state.isReviewMode) return;
 
       this.polling.isActive = true;
-      this.polling.errorCount = 0;
+      this.polling.gen = (this.polling.gen || 0) + 1;
 
       this.schedulePollingCheck();
     }
@@ -1162,9 +1174,10 @@
 
       const interval = this.getPollingInterval();
       const timeSinceActivity = Date.now() - this.lastActivityTime;
+      const gen = this.polling.gen;
 
       this.polling.timerId = setTimeout(async () => {
-        if (!this.polling.isActive) return;
+        if (!this.polling.isActive || gen !== this.polling.gen) return;
 
         // Why: Wi-Fi が不安定な教室環境では online=false が発生しやすい。
         //      このとき fetch を叩いても必ずネットワークエラーになるだけ。
@@ -1203,7 +1216,10 @@
             const autoUpdateModes = ['numberline', 'matrix', 'pie'];
             if (autoUpdateModes.includes(mode)) {
               if (typeof this.loadSheetData === 'function') {
-                this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+                // 読み直したら「ここまで見た」を進める。進めないと、サーバは毎回「新着あり」と
+                //   答え、児童 30 人が 5 秒ごとに板を丸ごと読み直して描き直し続けていた。
+                await this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+                if (!this.state.boardReloadPending) this.updateLastSeenTimestamp();
               }
             } else {
               this.showNewContentBanner(response.newItemsCount);
@@ -1259,10 +1275,35 @@
           //   3 回落ちると児童の画面が 5 分間フェーズ切替を検知できず、授業が止まった
           //   (2026-09-08)。失敗が続く間は getPollingInterval が間隔を伸ばす (授業中は最大
           //   20 秒、それ以外は最大 2 分) ので、叩き続けても負荷にはならない。
+          // 例外: 公開終了 / アクセス拒否は叩き続けても戻らない。止めて児童に伝える。
+          if (this.__isTerminalPollError(error)) {
+            this.__handleBoardClosed();
+            return;
+          }
         }
 
+        // 進行中に stop → start されていたら、新しいチェーンに任せる (2 本にしない)。
+        if (gen !== this.polling.gen) return;
         this.schedulePollingCheck();
       }, interval);
+    }
+
+    __isTerminalPollError(error) {
+      const msg = String((error && error.message) || '');
+      return /Access denied|未公開|公開が終了|User not found/.test(msg);
+    }
+
+    // 公開が終わった / 見られなくなったボード。polling を止め、いまの表示は残したまま知らせる。
+    __handleBoardClosed() {
+      this.stopSimplePolling();
+      this.state.boardClosed = true;
+      try {
+        if (window.notifications && typeof window.notifications.banner === 'function') {
+          window.notifications.banner('このボードの公開は終了しました。先生の案内を待ってください', { duration: 0 });
+        } else {
+          this.showNotification('このボードの公開は終了しました', 'info');
+        }
+      } catch (_) { /* 通知が出せなくても polling は止まっている */ }
     }
 
     stopSimplePolling() {
@@ -2406,7 +2447,8 @@
       };
 
       const onFail = (err) => {
-        this.showToast((err && err.message) || '送信に失敗しました');
+        const raw = (err && err.message) || '';
+        this.showToast(/Too many concurrent/.test(raw) ? '通信が混み合っています。もう一度送ってください' : (raw || '送信に失敗しました'));
         // サーバーの拒否は send() 内で報告済み (err.reported)。ここに来る未報告の失敗は通信そのもの。
         if (!(err && err.reported)) {
           this.__reportLessonSubmit('TRANSPORT:' + String((err && err.message) || '').slice(0, 60), phase);
@@ -3256,6 +3298,11 @@
           );
         }
 
+        // 混雑 (BUSY) は失敗ではない。そのまま返して performDataLoad が「いまの表示を保って
+        //   次の poll で読み直す」を選べるようにする。ここで error に畳むと児童 30 人に
+        //   「操作に失敗しました: BUSY」が出て、サーバ側の stampede 対策が無意味になる。
+        if (result && result.busy) return result;
+
         if (result && result.success && Array.isArray(result.data)) {
           if (result.displaySettings) {
             this.updateDisplaySettingsFromAPI(result.displaySettings);
@@ -3393,6 +3440,7 @@
     }
 
     async performDataLoad(config, oldAnswers) {
+      const loadSeq = (this.state.__loadSeq = (this.state.__loadSeq || 0) + 1);
       try {
         const loadConfig = this.buildLoadConfiguration(config);
         this.showLoadingState(loadConfig);
@@ -3411,7 +3459,12 @@
           this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
           return;
         }
-        this.state.boardReloadPending = false;
+        // 古い応答で新しい表示を上書きしない: この読みより後に始まった読みが既に描いていたら捨てる。
+        if (typeof loadSeq === 'number' && loadSeq < (this.state.__lastRenderedLoadSeq || 0)) return;
+        this.state.__lastRenderedLoadSeq = loadSeq;
+        // stale = 1 つ前の版 (他の誰かが読んでいる間の直前の結果)。表示はするが保留は保ち、
+        //   次の poll の version 比較で必ず読み直す。
+        this.state.boardReloadPending = result.stale === true;
 
         const responseData = result.data || [];
 
@@ -3593,7 +3646,9 @@
       if (!hasRows && desired && desired !== 'すべて' && !uniqueClasses.includes(desired)) {
         uniqueClasses.push(desired);
       }
-      classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escape(c) + '">'+ escape(c) + '</option>').join('');
+      // escape() は非 ASCII を %uXXXX にするので日本語のクラス名が化ける。HTML エスケープを使う。
+      const escOpt = (v) => window.sharedUtilities.security.escapeHtml(String(v));
+      classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escOpt(c) + '">'+ escOpt(c) + '</option>').join('');
       classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
       // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
@@ -4180,7 +4235,7 @@
       // v2920: shadow-lg / border-2 / border-cyan-400/80 は虹色枠時代の名残で、
       //   .answer-card 側の border/shadow に後勝ちで潰されていた死んだ指定。
       //   rounded-xl も .answer-card の border-radius と重複するため落とす。
-      card.className = 'relative answer-card glass-panel p-4 flex flex-col justify-between cursor-pointer' + highlightClass;
+      card.className = 'relative answer-card glass-panel p-4 flex flex-col justify-between cursor-pointer' + (highlightClass ? ' ' + String(highlightClass).trim() : '');
       card.dataset.rowIndex = safeData.rowIndex;
       card.setAttribute('role', 'article');
       card.setAttribute('tabindex', '0');
@@ -4419,14 +4474,15 @@
 
       try {
         this.clearCache({ includeReactions: true });
-        await this.loadSheetData({ bypassCache: true, silent: true });
+        // showLoading:false: 全カードをスケルトンに置き換えて板を点滅させない (silent という option は無い)。
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
         return { success: true, level: 1, method: 'cache_clear_reload' };
       } catch (level1Error) {
         console.warn('Level 1 recovery failed:', level1Error.message);
       }
 
       try {
-        const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
+        const localRestoreResult = await this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
         if (localRestoreResult.success) {
           return { success: true, level: 2, method: 'local_restore' };
         }

@@ -11,7 +11,9 @@
 // 35s は通常 process(~200ms-2s)+1 retry を十分カバーしつつ、 6 分で execution が kill
 // された場合でも遠からず自動失効する妥協点。
 const ROW_LOCK_TTL_SECONDS = 35;
-const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間
+const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間 (1 回分)
+const ROW_LOCK_ACQUIRE_ATTEMPTS = 3;      // 取れないときの再試行回数 (合計 ~3 秒まで)
+const ROW_LOCK_RETRY_SLEEP_MS = 200;
 
 // email identity の正規化 (case-insensitive, trim)。 reaction の membership/removal/add/reacted
 //   判定と canonical 保存はすべてこの 1 関数を通すことで「同一投票者」の定義を一致させる
@@ -35,19 +37,39 @@ function acquireRowLock_(cache, lockKey, actorEmail) {
   // Fast path: cache hit → 既に lock 中なので即 reject (ScriptLock 取得すらしない)
   if (cache.get(lockKey)) return false;
 
+  // ScriptLock の critical section は数 ms だが、30 人が同時に押すと取得待ちが並ぶ。1 回で
+  //   諦めると「同じ行の競合」ではないのに「同時リアクション処理中」で落ちる。短く数回試す。
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(ROW_LOCK_ACQUIRE_TIMEOUT_MS)) {
-    // ScriptLock 取れない = 他 row の lock acquire と競合中。 競合は ms オーダーで完了するので
-    // ここで諦めるのではなく、 caller に reject させて user に retry を促す。
-    return false;
+  const canSleep = typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function';
+  for (let attempt = 0; attempt < ROW_LOCK_ACQUIRE_ATTEMPTS; attempt++) {
+    if (lock.tryLock(ROW_LOCK_ACQUIRE_TIMEOUT_MS)) {
+      try {
+        // ScriptLock 配下で再 check → put のアトミック実行
+        if (cache.get(lockKey)) return false;
+        // 値は固定文字列。誰が持つかは要らず、空文字 (falsy) が入ると lock が消えたように見える。
+        cache.put(lockKey, '1', ROW_LOCK_TTL_SECONDS);
+        return true;
+      } finally {
+        try { lock.releaseLock(); } catch (_) { /* ScriptLock は実行終了で必ず解放される */ }
+      }
+    }
+    if (attempt < ROW_LOCK_ACQUIRE_ATTEMPTS - 1 && canSleep) Utilities.sleep(ROW_LOCK_RETRY_SLEEP_MS);
   }
+  // ScriptLock が取れない = 他の critical section と競合し続けた。caller に reject させて retry を促す。
+  return false;
+}
+
+// 見出し行 (1 行目) だけを読む。getDataRange().getValues()[0] はシート全体を読むので、quota が
+//   尽きているときほど重い読みを増やしていた。読めなければ [] (呼び出し側が「一時利用不可」にする)。
+function readHeaderRowOnly_(sheet) {
   try {
-    // ScriptLock 配下で再 check → put のアトミック実行
-    if (cache.get(lockKey)) return false;
-    cache.put(lockKey, actorEmail, ROW_LOCK_TTL_SECONDS);
-    return true;
-  } finally {
-    try { lock.releaseLock(); } catch (_) { /* ignore */ }
+    const lastCol = sheet.getLastColumn();
+    if (!(lastCol > 0)) return [];
+    const rows = sheet.getRange(1, 1, 1, lastCol).getValues() || [];
+    return Array.isArray(rows[0]) ? rows[0] : [];
+  } catch (error) {
+    console.warn('readHeaderRowOnly_: header read failed:', error && error.message);
+    return [];
   }
 }
 
@@ -116,7 +138,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   //      preloadedHeaders 未指定時は従来通りシートから読む（互換動作）。
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
     ? preloadedHeaders
-    : (sheet.getDataRange().getValues()[0] || []);
+    : readHeaderRowOnly_(sheet);
 
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processReactionDirect: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
@@ -275,19 +297,23 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
     }
   }
 
-  // reaction セルのみを個別に write する。
-  // 旧実装は minCol..maxCol の span を 1 回の setValues で書き戻していたため、 reaction 列が
-  // 非連続 (教師が手動で列を並べ替え、 間に name/class 等が挟まる) だと、 read 時点の
-  // 中間列の stale 値で上書きし、 その間に走った非 reaction 経路の更新を飲み込む恐れがあった。
-  // 個別 write なら reaction 3 列以外には一切触れない (最大 3 RPC、 row lock 下で十分軽量)。
-  reactionTypes.forEach(type => {
-    const col = reactionColumns[type];
-    const users = updatedReactions[type];
-    const serialized = Array.isArray(users) && users.length > 0
-      ? users.filter(email => email && email.trim().length > 0).join('|')
-      : '';
-    sheet.getRange(rowNumber, col).setValue(serialized);
-  });
+  // 変わったセルだけを書く。1 回の切替で変わるのは最大 2 セル (外す + 付ける) なので、
+  //   3 列すべてを毎回 PUT していた旧実装 (1 クリック = 3 write) は無駄に quota を使っていた
+  //   (30 人が一斉に押すと 90 write/分 = SA の write quota 60/分を超える)。
+  //   変わった列が隣り合っていれば 1 回の setValues にまとめる。離れていれば個別に書く
+  //   (間の非 reaction 列を read 時点の値で上書きしない)。
+  const serialize = (users) => (Array.isArray(users) && users.length > 0
+    ? users.filter(email => email && email.trim().length > 0).join('|')
+    : '');
+  const changed = reactionTypes
+    .map(type => ({ col: reactionColumns[type], value: serialize(updatedReactions[type]), before: serialize(currentReactions[type]) }))
+    .filter(c => c.value !== c.before)
+    .sort((a, b) => a.col - b.col);
+  if (changed.length === 2 && changed[1].col === changed[0].col + 1) {
+    sheet.getRange(rowNumber, changed[0].col, 1, 2).setValues([[changed[0].value, changed[1].value]]);
+  } else {
+    changed.forEach(c => { sheet.getRange(rowNumber, c.col).setValue(c.value); });
+  }
 
   const reactions = {};
   reactionTypes.forEach(type => {
@@ -313,7 +339,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
 function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
     ? preloadedHeaders
-    : (sheet.getDataRange().getValues()[0] || []);
+    : readHeaderRowOnly_(sheet);
 
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processHighlightDirect: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
@@ -332,6 +358,20 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   //   新規ボードで初回 HIGHLIGHT 押下時に必ず失敗する UX 破壊フロー。
   //   processReactionDirect と同じ方針で missing column を sheet 末尾に append → 続行。
   if (highlightColIndex === -1) {
+    // 10 分 cache の見出しは古いことがある。同時に走ったリアクションが右端に UNDERSTAND/LIKE/CURIOUS
+    //   を足した直後だと、同じ列に HIGHLIGHT を書いて見出しを潰す。書く前に 1 行目を読み直す。
+    const freshHeaders = readHeaderRowOnly_(sheet);
+    if (freshHeaders.length > 0) {
+      const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
+      if (freshIdx !== -1) {
+        highlightColIndex = freshIdx;
+      } else {
+        headers.length = 0;
+        freshHeaders.forEach(h => headers.push(h));
+      }
+    }
+  }
+  if (highlightColIndex === -1) {
     console.warn('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
       currentHeaderCount: headers.length,
       rowNumber
@@ -341,6 +381,10 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
       sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
       headers.push('HIGHLIGHT');
       highlightColIndex = newCol - 1;
+      if (typeof invalidateSheetHeadersCache === 'function') {
+        try { invalidateSheetHeadersCache(sheet.getParent().getId(), sheet.getName()); }
+        catch (_) { /* cache 不通は機能的に無害 (10 分で切れる) */ }
+      }
     } catch (provError) {
       logError_('processHighlightDirect.provisioning', provError);
       throw new Error(`ハイライト列の追加に失敗しました: ${provError.message}`);
@@ -392,7 +436,7 @@ function resolveReactionColumns_(headers) {
  * @param {Object} [precomputedIndices] - {UNDERSTAND,LIKE,CURIOUS} 列 index。未指定なら header 走査。
  * @returns {Object} リアクション情報
  */
-function extractReactions(row, headers, userEmail = null, precomputedIndices = null) {
+function extractReactions(row, headers, userEmail = null, precomputedIndices = null, opts = null) {
   try {
     const reactions = {
       UNDERSTAND: { count: 0, reacted: false },
@@ -403,6 +447,9 @@ function extractReactions(row, headers, userEmail = null, precomputedIndices = n
     const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
     // email identity は case-insensitive (normalizeReactionEmail_ = sameEmail_ と同じ規約 / M1)。
     const viewerNorm = userEmail ? normalizeReactionEmail_(userEmail) : null;
+    // includeVoters: 正規化済の投票者一覧を voters に残す (サーバ内の共有 cache 用。wire に載せる前に
+    //   applyViewerReactions_ が閲覧者ごとの reacted に変換して落とす)。
+    const includeVoters = Boolean(opts && opts.includeVoters);
 
     reactionTypes.forEach(reactionType => {
       const columnIndex = (precomputedIndices && typeof precomputedIndices[reactionType] === 'number')
@@ -419,6 +466,7 @@ function extractReactions(row, headers, userEmail = null, precomputedIndices = n
           count: reactionUsers.length,
           reacted: viewerNorm ? reactionUsers.some(u => normalizeReactionEmail_(u) === viewerNorm) : false
         };
+        if (includeVoters) reactions[reactionType].voters = reactionUsers.map(normalizeReactionEmail_);
       }
     });
 
@@ -431,6 +479,41 @@ function extractReactions(row, headers, userEmail = null, precomputedIndices = n
       CURIOUS: { count: 0, reacted: false }
     };
   }
+}
+
+/**
+ * 共有 cache の行 (voters 付き) を、閲覧者 1 人分の reacted に変換して voters を落とす。
+ *   Why: ボードの読み結果は viewer 間で共有 cache される。読んだ人基準の reacted をそのまま配ると、
+ *   最初に読んだ児童が押した 👍 が 30 人全員の画面で「押した状態」になり、押すと外れる。
+ *   voters (メール一覧) はサーバ内だけに留め、wire には count と自分の reacted だけを載せる。
+ * @param {Array} rows - 行の配列 (mutate しない。voters を持つ行だけ複製する)
+ * @param {string|null} viewerEmail
+ * @returns {Array}
+ */
+function applyViewerReactions_(rows, viewerEmail) {
+  if (!Array.isArray(rows)) return rows;
+  const viewerNorm = viewerEmail ? normalizeReactionEmail_(viewerEmail) : null;
+  const types = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+  return rows.map((item) => {
+    if (!item || typeof item !== 'object' || !item.reactions || typeof item.reactions !== 'object') return item;
+    let touched = false;
+    const reactions = {};
+    for (const type of Object.keys(item.reactions)) {
+      const r = item.reactions[type];
+      if (r && typeof r === 'object' && Array.isArray(r.voters)) {
+        touched = true;
+        reactions[type] = {
+          count: r.voters.length,
+          reacted: viewerNorm ? r.voters.indexOf(viewerNorm) !== -1 : false
+        };
+      } else {
+        reactions[type] = r;
+      }
+    }
+    if (!touched) return item;
+    for (const type of types) if (!(type in reactions)) reactions[type] = { count: 0, reacted: false };
+    return Object.assign({}, item, { reactions });
+  });
 }
 
 /**

@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_ */
+/* global takeProxyReadFailure_, createErrorResponse, formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -308,13 +308,27 @@ function processBatchData(ctx) {
     ? resolveReactionColumns_(headers)
     : null;
 
+  // 読めずに飛ばした行があれば呼び出し側へ伝える (ctx.readFailures)。
+  //   「回答 0 件 / 一部欠け」を成功として cache すると、児童 30 人のボードが最大 60 秒
+  //   空のまま止まる (2026-10 監査)。
+  ctx.readFailures = 0;
+  ctx.truncated = false;
+  const takeProxyFailure = (typeof takeProxyReadFailure_ === 'function') ? takeProxyReadFailure_ : () => null;
+
   for (let startRow = 2; startRow <= lastRow; ) {
     const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors, totalDataRows);
     const endRow = Math.min(startRow + currentBatchSize - 1, lastRow);
     const batchSize = endRow - startRow + 1;
 
     try {
+      takeProxyFailure();   // 以前の失敗を捨て、この読みの結果だけを見る
       const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
+      // SA proxy は失敗時に例外ではなく [] を返す (空のグリッドと区別できない)。実行単位の
+      //   失敗 slot を見て、失敗なら例外に戻して下の catch (429 backoff / skip) に載せる。
+      const proxyFailure = takeProxyFailure();
+      if (proxyFailure) {
+        throw new Error(`sheet read failed (${proxyFailure.label}): ${proxyFailure.message}`);
+      }
       const batchProcessed = processRawDataBatch({
         batchRows, headers, options,
         startOffset: startRow - 2,
@@ -333,14 +347,21 @@ function processBatchData(ctx) {
       // batchError から message 文字列を取り出す。これを忘れると catch 自身が
       // ReferenceError を投げ、429 backoff / 永続エラースキップが一切動かなくなる。
       const errorMessage = batchError && batchError.message ? batchError.message : String(batchError);
-      logError_('DataService.processBatchData', batchError, {
-        startRow,
-        endRow,
-        consecutiveErrors,
-        nextBatchSize: getAdaptiveBatchSize(consecutiveErrors, totalDataRows)
-      });
+      const isQuota = errorMessage.includes('429') || errorMessage.includes('Quota exceeded')
+        || errorMessage.includes('quota') || errorMessage.includes('Circuit breaker');
+      if (isQuota) {
+        // quota は一時的な混雑で原因は明らか。ERROR で積まない (WARN に落として痕跡は残す)。
+        console.warn('DataService.processBatchData: read throttled', { startRow, endRow, consecutiveErrors, errorMessage });
+      } else {
+        logError_('DataService.processBatchData', batchError, {
+          startRow,
+          endRow,
+          consecutiveErrors,
+          nextBatchSize: getAdaptiveBatchSize(consecutiveErrors, totalDataRows)
+        });
+      }
 
-      if (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('quota')) {
+      if (isQuota) {
         const backoffMs = Math.min(1000 * Math.pow(2, consecutiveErrors), 8000);
         // Why: sleep 込みで予算超過するなら、sleep すること自体がリソース浪費。
         //      30 人同時ポーリング時、全員が 14s ブロックして script-runtime quota を圧迫する問題を防ぐ。
@@ -355,6 +376,7 @@ function processBatchData(ctx) {
       const isPermanent = errorMessage.includes('not found') || errorMessage.includes('out of range');
       if (isPermanent || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
         console.warn(`⚠️ バッチスキップ: 行${startRow}-${endRow}（${isPermanent ? '永続エラー' : consecutiveErrors + '回連続エラー'}）`);
+        ctx.readFailures++;
         startRow += batchSize;
       }
     }
@@ -373,6 +395,7 @@ function processBatchData(ctx) {
           processedRows: processedCount,
           totalRows: totalDataRows
         });
+        ctx.truncated = true;
       }
       break;
     }
@@ -401,14 +424,40 @@ function fetchSpreadsheetData(config, options = {}) {
 
   const { sheet } = connectToSpreadsheetSheet(config);
   const { lastRow, lastCol, headers } = getSheetInfo(sheet);
-  const processedData = processBatchData({ sheet, headers, lastRow, lastCol, config, options, startTime });
+  // 見出しが読めていない (429 で [] / 寸法の既定値だけ) なら、このボードを「空」と判定できない。
+  //   回答シートは必ず見出し行を持つ (Form / 授業の両方が作る) ので、空の見出し = 読み込み失敗。
+  //   BUSY (success:false) を返して cache させない。失敗は 8 秒覚えられ、児童は次の poll で読み直す。
+  if (!Array.isArray(headers) || headers.length === 0) {
+    console.warn('DataService.fetchSpreadsheetData: headers unavailable (quota?)', { sheetName: config.sheetName });
+    return busySheetDataResult_(config.sheetName);
+  }
+  const ctx = { sheet, headers, lastRow, lastCol, config, options, startTime };
+  const processedData = processBatchData(ctx);
+
+  // 読めずに飛ばした範囲がある結果は「このボードの中身」ではない。成功として返すと cache に
+  //   乗って全員に配られる。混雑として返し、次の poll で読み直させる。
+  if (ctx.readFailures > 0) {
+    console.warn('DataService.fetchSpreadsheetData: partial read (skipped batches), returning BUSY', {
+      sheetName: config.sheetName, readFailures: ctx.readFailures, rows: processedData.length
+    });
+    return busySheetDataResult_(config.sheetName);
+  }
 
   return {
     success: true,
     data: processedData,
     headers,
-    sheetName: config.sheetName
+    sheetName: config.sheetName,
+    // 時間切れで途中までしか読めていない結果。cache しない (withBoardDataCache_ が見る)。
+    ...(ctx.truncated ? { partial: true } : {})
   };
+}
+
+// 「読めなかった」結果。success:false + busy:true で、受け手 (DataApis / page.js) は失敗でなく
+//   混雑として扱い、いまの表示を保って次の poll で読み直す。
+function busySheetDataResult_(sheetName) {
+  return createErrorResponse('いま混み合っています。数秒後にもう一度読み込みます', [],
+    { error: 'BUSY', busy: true, headers: [], sheetName: sheetName || '', header: '' });
 }
 
 /**
@@ -471,7 +520,10 @@ function processRawDataBatch(ctx) {
           formattedTimestamp: formatTimestamp(tsValue),
           isEmpty: isEmptyRow(row),
 
-          reactions: extractReactions(row, headers, viewerEmail, reactionIndices),
+          // reacted は読んだ人 (viewerEmail) 基準。この結果は viewer 間で共有 cache されるので、
+          //   API 層 (buildSafePublishedDataResult) が voters から閲覧者ごとに reacted を付け直し、
+          //   voters は wire に載せる前に落とす。付け直さないと最初に読んだ児童の 👍 が全員に出る。
+          reactions: extractReactions(row, headers, viewerEmail, reactionIndices, { includeVoters: true }),
           highlight: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIGHLIGHT : null)
         };
 

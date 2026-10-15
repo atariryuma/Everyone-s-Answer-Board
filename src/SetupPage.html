@@ -295,8 +295,13 @@
     }
 
     async function initializeDomainInfo() {
-      const info = await window.sharedUtilities.fetchDomainInfo();
-      window.sharedUtilities.displayDomainInfo(info);
+      // fetchDomainInfo / displayDomainInfo は login.js.html のローカル関数で、sharedUtilities には
+      //   無い。呼ぶと毎回 TypeError (未処理の reject) が Cloud Logging に積まれていた。
+      //   このページにドメイン表示欄は無いので、有るときだけ呼ぶ。
+      const su = window.sharedUtilities;
+      if (!su || typeof su.fetchDomainInfo !== 'function' || typeof su.displayDomainInfo !== 'function') return;
+      const info = await su.fetchDomainInfo();
+      su.displayDomainInfo(info);
     }
 
     window.addEventListener('load', async function () {

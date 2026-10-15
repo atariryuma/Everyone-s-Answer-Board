@@ -329,9 +329,50 @@ test('fetchSheetsAPIWithRetry: 初回呼び出し時 (cache 未設定) はデフ
   const ctx = loadCtx({ cache, fetchSequence: [makeResponse(200)] });
   ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op');
 
-  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  // 圧力 (consecutiveErrors) が 0 の成功は state を書かない (Sheets 1 call ごとの cache put を省く)。
+  //   state が無い = 既定 (閉じている / errors 0) として次の呼び出しが読む。
+  const raw = cache._store.get('circuit_breaker_state');
+  const state = raw ? JSON.parse(raw) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
   assert.equal(state.consecutiveErrors, 0);
   assert.equal(state.circuitOpenUntil, 0);
+});
+
+test('fetchSheetsAPIWithRetry: 成功時は breaker を閉じない (別 request が開いた直後の 1 成功で storm 中に閉じない)', () => {
+  const openUntil = Date.now() + 30000;
+  const cache = makeCache({ circuit_breaker_state: JSON.stringify({ consecutiveErrors: 7, circuitOpenUntil: 0 }) });
+  // 成功 response を返す fetch。関数冒頭で state を読んだ「後」に別 request が breaker を開いた状況を、
+  //   fetch 中に cache を書き換えて再現する。
+  const ctx = loadCtx({
+    cache,
+    fetchSequence: [],
+    UrlFetchApp: {
+      fetch: () => {
+        cache.put('circuit_breaker_state', JSON.stringify({ consecutiveErrors: 8, circuitOpenUntil: openUntil }));
+        return makeResponse(200);
+      }
+    }
+  });
+  ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op');
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.equal(state.circuitOpenUntil, openUntil, '開いている breaker は成功で閉じない');
+  assert.equal(state.consecutiveErrors, 8, '開いている間は圧力も減らさない');
+});
+
+test('fetchSheetsAPIWithRetry: 429 の圧力は書く直前に読み直した値へ +1 する (並行 request の増分を取りこぼさない)', () => {
+  const cache = makeCache({ circuit_breaker_state: JSON.stringify({ consecutiveErrors: 1, circuitOpenUntil: 0 }) });
+  const ctx = loadCtx({
+    cache,
+    UrlFetchApp: {
+      fetch: () => {
+        // 並行 request が先に 3 まで上げた
+        cache.put('circuit_breaker_state', JSON.stringify({ consecutiveErrors: 3, circuitOpenUntil: 0 }));
+        return makeResponse(429, 'quota');
+      }
+    }
+  });
+  assert.throws(() => ctx.fetchSheetsAPIWithRetry('https://x', {}, 'op'), /429/);
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.equal(state.consecutiveErrors, 4);
 });
 
 // =====================================================================

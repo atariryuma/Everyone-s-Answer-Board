@@ -156,10 +156,14 @@ function withStampedeGuard_(opts) {
   const canBeBusy = opts.busyValue !== undefined;
   const failTtl = Number(opts.failTtl) || 0;
   const failKey = failTtl > 0 ? key + ':fail' : null;
+  // 直前の結果 (latestKey) を返すときは stale:true を付ける。受け手 (page.js) はこれを見て
+  //   「読み直しが保留中」を保ち、次の poll で新しい版を読み直す。付けないと、version を
+  //   見た瞬間に古い分布を掴んだ画面が「読んだ」ことになり、次の書き込みまで更新されない。
+  const markStale = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.assign({}, v, { stale: true }) : v;
   const staleOrBusy = () => {
     if (opts.allowStale && latestKey) {
       const stale = read(latestKey);
-      if (stale !== null) return stale;
+      if (stale !== null) return markStale(stale);
     }
     return opts.busyValue;
   };
@@ -179,7 +183,7 @@ function withStampedeGuard_(opts) {
   if (!claimed) {
     if (opts.allowStale && latestKey) {
       const stale = read(latestKey);
-      if (stale !== null) return stale;
+      if (stale !== null) return markStale(stale);
     }
     const waitMs = Number(opts.waitMs) || 0;
     const tries = Number(opts.waitTries) || 3;
@@ -195,20 +199,104 @@ function withStampedeGuard_(opts) {
   }
 
   let fresh;
+  let loaded = false;
   try {
     fresh = loader();
+    loaded = true;
+    // flight フラグを外す「前」に key を書く。先に外すと、待っている側が「フラグ無し + key 無し」
+    //   の瞬間を見て自分で読みに行き (= 待った意味が無くなり)、30 人分の read が並ぶ。
+    if (isCacheable(fresh)) {
+      saveToCacheWithSizeCheck(key, fresh, opts.ttl);
+      if (latestKey) saveToCacheWithSizeCheck(latestKey, fresh, latestTtl);
+    } else if (failKey) {
+      try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
+    }
   } finally {
+    // loader が throw したときもフラグは外す (外さないと flightTtl 秒間、全員が待つ)。
+    if (claimed && !loaded && failKey) {
+      try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
+    }
     if (claimed) {
       try { cache.remove(flightKey); } catch (_) { /* TTL で自然に解ける */ }
     }
   }
-  if (isCacheable(fresh)) {
-    saveToCacheWithSizeCheck(key, fresh, opts.ttl);
-    if (latestKey) saveToCacheWithSizeCheck(latestKey, fresh, latestTtl);
-  } else if (failKey) {
-    try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
-  }
   return fresh;
+}
+
+/**
+ * key 単位の短期 lock (ScriptCache が保持者、ScriptLock は check+put をアトミックにする数 ms だけ)。
+ *
+ * Why: createUser / updateUser は以前 ScriptLock を「users シートの read → write」の間 (SA 経由で
+ *   1〜3 秒、429 なら 15 秒超) ずっと握っていた。ScriptLock はスクリプト全体で 1 本なので、
+ *   その間に来たリアクション (acquireRowLock_ の tryLock 800ms) や授業の操作は全て
+ *   「同時処理中」で失敗していた。教師が設定を保存するたびに児童 30 人の 👍 が落ちる。
+ *   key 単位の lock なら、別ユーザーの更新・別行のリアクションは互いに待たない。
+ *
+ * @param {string} key - lock key (例: 'users_row_lock:<userId>')
+ * @param {Object} [opts]
+ * @param {number} [opts.ttlSec=30] - 保持者が死んでも自然に解ける時間
+ * @param {number} [opts.waitMs=0] - 取れないとき待つ合計時間 (0 = 待たない)
+ * @param {number} [opts.pollMs=150] - 待つときの再試行間隔
+ * @param {string[]} [opts.blockedBy] - これらの key が立っている間は取らない (構造変更中など)
+ * @returns {string|null} 取得できたら token (release に渡す)、できなければ null
+ */
+function acquireCacheLock_(key, opts) {
+  const o = opts || {};
+  const ttlSec = Number(o.ttlSec) > 0 ? Number(o.ttlSec) : 30;
+  const waitMs = Number(o.waitMs) > 0 ? Number(o.waitMs) : 0;
+  const pollMs = Number(o.pollMs) > 0 ? Number(o.pollMs) : 150;
+  const blockedBy = Array.isArray(o.blockedBy) ? o.blockedBy : [];
+  if (typeof CacheService === 'undefined') return 'nolock';
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (_) { return 'nolock'; /* cache 不通なら lock 無しで進む (止まるより書く) */ }
+  const token = String(Date.now()) + '_' + Math.random().toString(36).slice(2, 10);
+  const deadline = Date.now() + waitMs;
+  const canSleep = typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function';
+
+  for (;;) {
+    let busy = false;
+    try {
+      busy = Boolean(cache.get(key)) || blockedBy.some((k) => Boolean(cache.get(k)));
+    } catch (_) { busy = false; }
+    if (!busy) {
+      // check → put をアトミックにするためだけの短い ScriptLock (数 ms)。
+      let lock = null;
+      let held = false;
+      try {
+        if (typeof LockService !== 'undefined' && LockService.getScriptLock) {
+          lock = LockService.getScriptLock();
+          held = lock.tryLock(1500);
+        }
+      } catch (_) { lock = null; }
+      try {
+        if (lock && !held) {
+          busy = true;   // critical section に入れなかった = 混雑。待って再試行。
+        } else {
+          let taken = false;
+          try { taken = Boolean(cache.get(key)) || blockedBy.some((k) => Boolean(cache.get(k))); } catch (_) { taken = false; }
+          if (!taken) {
+            try { cache.put(key, token, ttlSec); } catch (_) { return 'nolock'; }
+            return token;
+          }
+          busy = true;
+        }
+      } finally {
+        if (lock && held) { try { lock.releaseLock(); } catch (_) { /* 解放失敗は TTL 無しの ScriptLock では起きない */ } }
+      }
+    }
+    if (!busy) continue;
+    if (Date.now() >= deadline || !canSleep) return null;
+    Utilities.sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())));
+  }
+}
+
+/** acquireCacheLock_ の対。自分の token のときだけ外す (他人が取り直した lock を消さない)。 */
+function releaseCacheLock_(key, token) {
+  if (!token || token === 'nolock' || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache.get(key) === token) cache.remove(key);
+  } catch (_) { /* 外せなくても TTL で解ける */ }
 }
 
 // オブジェクトを `key:value|key:value` 形式に変換 (JSON.stringify より約 50% 速い、cache key 用)。

@@ -314,13 +314,16 @@
 
   class SecurityUtilities {
     escapeHtml(text) {
-      if (!text) return '';
-      // Why: div.innerHTML から得る出力は <, >, &, " はエスケープするが、ブラウザ実装に
-      //      よっては 'を素通しする。HTML 属性値を build するときに `id='${escapeHtml(x)}'`
-      //      のようなテンプレートが他箇所にあるため、' を明示的に &#39; に置換して XSS を防ぐ。
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML.replace(/'/g, '&#39;');
+      if (text === null || text === undefined || text === '') return '';
+      // Why 手書きか: div.innerHTML (テキストノードの直列化) は & < > しかエスケープしない。
+      //      " と ' は素通りするので、`<option value="${escapeHtml(x)}">` のような属性に
+      //      児童の入力 (クラス名等) を入れると属性から抜けられた。5 文字すべてを置換する。
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     isValidEmail(email) {

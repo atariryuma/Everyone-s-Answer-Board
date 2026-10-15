@@ -73,7 +73,10 @@ function loadCtx(sheet, overrides = {}) {
     safeJsonParse_: (t, fb) => { try { return JSON.parse(t); } catch (_) { return fb === undefined ? null : fb; } },
     sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     simpleHash: (o) => Object.keys(o || {}).sort().map((k) => `${k}:${o[k]}`).join('|'),
-    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; }
+    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    // helpers.js の key 単位 lock (本番は helpers.js が同じ global scope に居る)。
+    acquireCacheLock_: () => 'tok',
+    releaseCacheLock_: () => {}
   };
   Object.assign(context, overrides);
   vm.createContext(context);

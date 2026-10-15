@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
+/* global applyViewerReactions_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -954,7 +954,11 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const includeIdentity = Boolean(
     viewerContext.isAdmin || viewerContext.isOwnBoard || displaySettings.showNames
   );
-  const rows = Array.isArray(result.data) ? result.data : [];
+  // 共有 cache の行は voters (投票者一覧) を持つ。ここで閲覧者ごとの reacted に変換し、voters は落とす。
+  const viewerRows = (typeof applyViewerReactions_ === 'function')
+    ? applyViewerReactions_(Array.isArray(result.data) ? result.data : [], viewerContext.email || null)
+    : (Array.isArray(result.data) ? result.data : []);
+  const rows = Array.isArray(viewerRows) ? viewerRows : [];
 
   // Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡するために
   //      仮名化された emailHash を全モードで wire に乗せる。生メアドは showNames=false なら除去。
@@ -1033,7 +1037,9 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     viewerEmailHash: (viewerContext.email && typeof emailToShortHash === 'function')
       ? (emailToShortHash(viewerContext.email) || null) : null,
     // 授業中の現在フェーズ (null = 授業中でない)。undefined は「判定していない」(review 等)。
-    ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {})
+    ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {}),
+    // stampede guard が「直前の結果」を返した (1 つ前の版)。受け手は読み直し保留を保つ。
+    ...(result.stale === true ? { stale: true } : {})
   };
 }
 
@@ -1148,7 +1154,8 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
   const filter = options.classFilter || '_';
   const sort = options.sortBy || 'newest';
   // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck に集約。
-  const isCacheable = (res) => Boolean(res && res.success);
+  //   partial (時間切れで途中まで) は cache しない: 欠けた板を 12 秒間全員に配ってしまう。
+  const isCacheable = (res) => Boolean(res && res.success && !res.partial);
 
   if (typeof withStampedeGuard_ !== 'function') {
     // test 単独 load (helpers.js 不在) のための素朴な経路。本番は必ず guard を通る。
@@ -1251,11 +1258,24 @@ function resolveViewerBoardAccess_(targetUserId, email, isAdmin) {
  * @param {string} targetUserId - 対象ユーザーID
  * @returns {Object} フロントエンド期待形式のデータ
  */
+// cache key と filter に入る文字列の入口検証。長い / 文字列でない値は cache.put を throw させ
+//   (黙って非 cache になる)、値の種類ごとに別 cache と別 Sheets read を生む。
+const BOARD_SORT_ORDERS_ = Object.freeze(['newest', 'oldest', 'timestamp', 'random', 'score', 'class', 'name']);
+function normalizeClassFilter_(v) {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t || t.length > 50) return null;
+  return t;
+}
+function normalizeSortOrder_(v) {
+  return (typeof v === 'string' && BOARD_SORT_ORDERS_.indexOf(v) !== -1) ? v : 'newest';
+}
+
 function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) {
-  classFilter = classFilter || null;
-  sortOrder = sortOrder || 'newest';
+  classFilter = normalizeClassFilter_(classFilter);
+  sortOrder = normalizeSortOrder_(sortOrder);
   adminMode = adminMode || false;
-  targetUserId = targetUserId || null;
+  targetUserId = (typeof targetUserId === 'string' && targetUserId.trim()) ? targetUserId.trim() : null;
 
   try {
     const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });
@@ -1552,13 +1572,14 @@ function getNotificationUpdate(targetUserId, options = {}) {
 
     // Why: 'すべて' はサーバーにとっては null と同義。生のまま渡すとクラス名として
       //      フィルタされて全件 0 にマッチしなくなる（getPublishedSheetData と同じ正規化）。
-    const classFilter = options.classFilter && options.classFilter !== 'すべて'
-      ? options.classFilter
+    const normalizedFilter = normalizeClassFilter_(options.classFilter);
+    const classFilter = normalizedFilter && normalizedFilter !== 'すべて'
+      ? normalizedFilter
       : undefined;
     const dataOptions = {
       includeTimestamp: true,
       classFilter,
-      sortBy: options.sortOrder || 'newest',
+      sortBy: normalizeSortOrder_(options.sortOrder),
       adminMode: isAdmin || isOwnBoard,
       requestingUser: email,
       targetUserEmail: targetUser.userEmail,
@@ -1626,6 +1647,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     if (userData && userData.busy) {
       return Object.assign(envelope, { hasNewContent: false, boardBusy: true });
     }
+    if (userData && userData.stale) envelope.boardStale = true;
     if (!userData || !userData.success) {
       return createErrorResponse('Data access failed');
     }

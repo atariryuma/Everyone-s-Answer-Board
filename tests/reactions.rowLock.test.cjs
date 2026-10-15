@@ -55,7 +55,8 @@ test('acquireRowLock_: returns true on first acquisition', () => {
   const ctx = loadReactionCtx();
   const ok = ctx.acquireRowLock_(ctx._cache, 'reaction_ss-1_5', 'a@x.com');
   assert.equal(ok, true);
-  assert.equal(ctx._cache.get('reaction_ss-1_5'), 'a@x.com');
+  // 値は固定 '1' (誰が持つかは要らず、空文字が入ると lock が消えたように見えるため)
+  assert.equal(ctx._cache.get('reaction_ss-1_5'), '1');
 });
 
 test('acquireRowLock_: rejects when same row is already locked (fast path)', () => {

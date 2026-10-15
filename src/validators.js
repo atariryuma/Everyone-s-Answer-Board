@@ -236,6 +236,22 @@ function validateUrl(url) {
  * @param {Object} options - オプション
  * @returns {Object} 検証結果
  */
+// Sheets のシート名を原文のまま検証する (entity 変換・空白圧縮をしない)。
+function validateSheetNameRaw_(value, maxLength) {
+  const result = { isValid: false, sanitized: '', errors: [], warnings: [], metadata: {} };
+  if (typeof value !== 'string') {
+    result.errors.push('有効なテキスト文字列が必要です');
+    return result;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) { result.errors.push('シート名が空です'); return result; }
+  if (trimmed.length > maxLength) { result.errors.push(`${maxLength}文字以下である必要があります`); return result; }
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) { result.errors.push('シート名に制御文字は使えません'); return result; }
+  result.isValid = true;
+  result.sanitized = trimmed;
+  return result;
+}
+
 function validateText(text, options = {}) {
     const {
       maxLength = 8192,
@@ -459,7 +475,10 @@ function validateConfig(config) {
     const fields = {
       spreadsheetId: { validator: validateSpreadsheetId, required: false },
       formUrl: { validator: validateUrl, required: false },
-      sheetName: { validator: (v) => validateText(v, { maxLength: 100 }), required: false }
+      // シート名は HTML ではなく Sheets 上の識別子。validateText の entity 変換 (& → &amp; 等) を通すと
+      //   「Q&A」「3'組」のような名前が別名で保存され、getSheetByName が null になってボードが
+      //   「シートが見つかりません」で止まる。長さと制御文字だけを見て原文のまま返す。
+      sheetName: { validator: (v) => validateSheetNameRaw_(v, 100), required: false }
     };
 
     for (const [field, { validator, required }] of Object.entries(fields)) {

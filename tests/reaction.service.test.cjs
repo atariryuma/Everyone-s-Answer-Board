@@ -134,8 +134,9 @@ test('processReactionDirect: adds LIKE when user has no prior reaction', () => {
   assert.equal(result.reactions.LIKE.count, 1);
   assert.equal(result.reactions.LIKE.reacted, true);
   assert.equal(result.reactions.UNDERSTAND.count, 0);
-  // reaction 3 列を個別 setValue する (span setValues 廃止: 非連続列で中間列を stale 上書きしないため)
-  assert.equal(sheet._writes.length, 3);
+  // 変わったセル (LIKE) だけを書く。変わっていない UNDERSTAND / CURIOUS は PUT しない
+  //   (1 クリック = 3 write だと 30 人同時で SA の write quota 60/分を超える)。
+  assert.equal(sheet._writes.length, 1);
   assert.equal(sheet._data[1][2], 'actor@example.com'); // LIKE column (0-based index 2)
   assert.equal(sheet._data[1][1], ''); // UNDERSTAND 未変更
   assert.equal(sheet._data[1][3], ''); // CURIOUS 未変更
@@ -622,7 +623,7 @@ test('addReaction: happy path returns success and writes to sheet', () => {
   assert.equal(result.success, true);
   assert.equal(result.action, 'added');
   assert.equal(result.reactions.LIKE.count, 1);
-  assert.equal(sheet._writes.length, 3); // reaction 3 列を個別 write
+  assert.equal(sheet._writes.length, 1); // 変わった LIKE 列だけを write
 });
 
 test('addReaction: releases lock and removes cache key on success', () => {

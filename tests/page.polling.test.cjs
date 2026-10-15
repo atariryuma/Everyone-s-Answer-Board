@@ -1216,3 +1216,53 @@ test('__handleBoardVersion: boardReloadPending なら version が同じでも読
   assert.equal(instance.__handleBoardVersion({ boardVersion: 5, hasNewContent: false }, false), false, '保留が無ければ従来どおり');
   assert.equal(calls.length, 1);
 });
+
+// =====================================================================
+// polling の世代番号 — stop → start の間に終わった poll がチェーンを増やさない
+// =====================================================================
+
+test('schedulePollingCheck: 進行中の poll の最中に stop → start しても polling チェーンは 1 本のまま', async () => {
+  const { instance, timers } = makeInstance({ lastActivityTime: Date.now() });
+  instance.state.lastSeenTimestamp = 0;
+  instance.state.initializationComplete = true;
+  let release;
+  instance.runGas = () => new Promise((resolve) => { release = resolve; });
+
+  instance.startSimplePolling();
+  const first = Array.from(timers.values()).pop();
+  const inFlight = first.fn();                 // poll 開始 (runGas は未解決)
+
+  // タブを隠して戻す (visibilitychange と同じ経路)
+  instance.stopSimplePolling();
+  instance.startSimplePolling();
+  const restarted = Array.from(timers.values()).pop();
+  const countAfterRestart = timers.size;
+
+  release({ success: true, hasNewContent: false });
+  await inFlight;                               // 古い世代の poll が終わる
+
+  assert.equal(timers.size, countAfterRestart, '古い世代は再スケジュールしない (チェーンが 2 本にならない)');
+  assert.ok(timers.has([...timers.keys()].pop()) && Array.from(timers.values()).pop() === restarted);
+});
+
+test('startSimplePolling: errorCount は再開でリセットしない (タブ切替で backoff が消えない)', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() });
+  instance.polling.errorCount = 2;
+  instance.startSimplePolling();
+  assert.equal(instance.polling.errorCount, 2);
+});
+
+test('schedulePollingCheck: 公開終了 (Access denied) は polling を止めて児童に知らせる', async () => {
+  const { instance, timers, ctx } = makeInstance({ lastActivityTime: Date.now() });
+  instance.state.lastSeenTimestamp = 0;
+  const banners = [];
+  ctx.window.notifications = { banner: (msg) => banners.push(msg) };
+  instance.runGas = async () => ({ success: false, message: 'Access denied' });
+  instance.polling.isActive = true;
+  instance.schedulePollingCheck();
+  const scheduled = Array.from(timers.values()).pop();
+  await scheduled.fn();
+  assert.equal(instance.polling.isActive, false, '叩き続けない');
+  assert.equal(instance.state.boardClosed, true);
+  assert.equal(banners.length, 1);
+});

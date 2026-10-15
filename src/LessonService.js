@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -261,14 +261,18 @@ function __readLessonsTable_() {
 function __findLessonById_(lessonId) {
   try {
     const table = __readLessonsTable_();
-    if (!table || !table.rows.length) return null;
+    // 表が読めなかった (sheet 無し / 429 で見出しすら無い) は null = 「分からない」。
+    if (!table || !table.cols || Object.keys(table.cols).length === 0) return null;
     const idCol = table.cols.lessonId != null ? table.cols.lessonId : 0;
     for (let i = 0; i < table.rows.length; i++) {
       if (table.rows[i][idCol] === lessonId) {
         return { rowIndex: i + 2, lesson: __rowToLesson_(table.rows[i], table.cols), cols: table.cols, sheet: table.sheet };
       }
     }
-    return null;
+    // 表は読めたが居ない = 削除済。「分からない」(null) と区別して返す。
+    //   Why: config.activeLessonId が消えた授業を指したままだと、児童の poll ごとに
+    //   「行が無い → cache しない → lessons シートを丸ごと読む」が続き、quota を焼いていた。
+    return { notFound: true, lesson: null };
   } catch (error) {
     logError_('__findLessonById_', error);
     return null;
@@ -285,8 +289,17 @@ function __findLessonById_(lessonId) {
 //   2 回に 1 回 miss し、そのたびに lessons シート全体を読んでいた。
 const LESSON_RECORD_CACHE_TTL_S = 60;
 const LESSON_RECORD_LATEST_TTL_S = 120;
+// key に版番号を含める (board data cache と同じ方式)。
+//   Why remove だけでは足りないか: 教師の setValues の直前に読み始めた児童の loader が、
+//   remove の「後」に古い行を put し直すと、古いフェーズが 60 秒固定される (投稿が前の
+//   フェーズのシートに受理される)。版を上げれば古い loader が書く key は誰も読まない。
+function __lessonRecordVersion_(lessonId) {
+  if (typeof CacheService === 'undefined') return '0';
+  try { return String(CacheService.getScriptCache().get('lesson_rec_ver_' + lessonId) || '0'); }
+  catch (_) { return '0'; }
+}
 function __lessonRecordCacheKey_(lessonId) {
-  return 'lesson_rec_' + lessonId;
+  return 'lesson_rec_' + lessonId + ':v' + __lessonRecordVersion_(lessonId);
 }
 
 // lesson 行を書いた側が呼ぶ (__updateLessonRow_ / __deleteLessonRow_ に集約済)。
@@ -294,9 +307,12 @@ function __invalidateLessonRecord_(lessonId) {
   if (!lessonId || typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    cache.remove(__lessonRecordCacheKey_(lessonId));
-    cache.remove(__lessonRecordCacheKey_(lessonId) + ':latest');
-  } catch (_) { /* cache 不通は機能的に無害 (TTL 15 秒で切れる) */ }
+    const key = __lessonRecordCacheKey_(lessonId);
+    cache.remove(key);
+    cache.remove(key + ':latest');
+    const cur = Number(cache.get('lesson_rec_ver_' + lessonId) || 0);
+    cache.put('lesson_rec_ver_' + lessonId, String(cur + 1), 21600);
+  } catch (_) { /* cache 不通は機能的に無害 (TTL 60 秒で切れる) */ }
 }
 
 /**
@@ -313,6 +329,7 @@ function __findLessonByIdCached_(lessonId, opts) {
   if (!lessonId) return null;
   const load = () => {
     const found = __findLessonById_(lessonId);
+    if (found && found.notFound) return { lesson: null, notFound: true };   // 削除済 (cache する)
     return found && found.lesson ? { lesson: found.lesson } : null;
   };
   if (typeof withStampedeGuard_ !== 'function') return load();
@@ -322,7 +339,8 @@ function __findLessonByIdCached_(lessonId, opts) {
     ttl: LESSON_RECORD_CACHE_TTL_S,
     loader: load,
     // parse に失敗した行は cache しない (壊れた lessonJson を 15 秒固定しない)。
-    isCacheable: (v) => Boolean(v && v.lesson && !v.lesson.parseError),
+    //   「居ない」(notFound) は cache する: 消した授業を 30 人が 5 秒ごとに探し続けない。
+    isCacheable: (v) => Boolean(v && ((v.lesson && !v.lesson.parseError) || v.notFound)),
     latestKey: key + ':latest',
     latestTtl: LESSON_RECORD_LATEST_TTL_S,
     allowStale: !(opts && opts.noStale),
@@ -400,7 +418,7 @@ function __withLessonLock_(fn) {
 function __updateLessonRow_(lessonId, patch, expectedEtag) {
   return __withLessonLock_(() => {
     const found = __findLessonById_(lessonId);
-    if (!found) return createErrorResponse('lesson not found', null, { error: 'LESSON_NOT_FOUND' });
+    if (!found || !found.lesson) return createErrorResponse('lesson not found', null, { error: 'LESSON_NOT_FOUND' });
     if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
       // Why lowercase: ConfigService.saveUserConfig / AdminApis.__applyPublishStateChange と
       //   同じ 'etag_mismatch' code に統一。frontend (AdminPanel.js.html) も 1 種類の
@@ -464,15 +482,24 @@ function __deleteLessonRow_(lessonId) {
   return __withLessonLock_(() => {
     try {
       const found = __findLessonById_(lessonId);
-      if (!found) return createErrorResponse('LESSON_NOT_FOUND');
-      // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
-      //   SpreadsheetApp 経由で直接削除する。
-      const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
-      if (!dbId) return createErrorResponse('DATABASE_NOT_CONFIGURED');
-      const ss = SpreadsheetApp.openById(dbId);
-      const sheet = ss.getSheetByName('lessons');
-      if (!sheet) return createErrorResponse('LESSONS_SHEET_NOT_FOUND');
-      sheet.deleteRow(found.rowIndex);
+      if (!found || !found.lesson) return createErrorResponse('LESSON_NOT_FOUND');
+      // DB は SA 経由で開いている (found.sheet は SA proxy)。proxy の deleteRows (batchUpdate) で消す。
+      //   Why: 旧コードは SpreadsheetApp.openById(DB) を呼び出し元の権限で開いていた。DB シートの
+      //   編集権を持つのは管理者だけなので、教師 (所有者) の「削除」は毎回権限エラーになっていた。
+      const proxySheet = found.sheet;
+      if (proxySheet && typeof proxySheet.deleteRows === 'function') {
+        proxySheet.deleteRows(found.rowIndex, 1);
+      } else if (proxySheet && typeof proxySheet.deleteRow === 'function') {
+        proxySheet.deleteRow(found.rowIndex);
+      } else {
+        // 旧経路 (admin が DB の editor のときだけ通る)
+        const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
+        if (!dbId) return createErrorResponse('DATABASE_NOT_CONFIGURED');
+        const ss = SpreadsheetApp.openById(dbId);
+        const sheet = ss.getSheetByName('lessons');
+        if (!sheet) return createErrorResponse('LESSONS_SHEET_NOT_FOUND');
+        sheet.deleteRow(found.rowIndex);
+      }
       __invalidateLessonRecord_(lessonId);
       return { success: true };
     } catch (error) {
@@ -521,7 +548,7 @@ function __requireLessonOwner_(userId, lessonId, options) {
   const found = (options && options.cachedLesson)
     ? __findLessonByIdCached_(lessonId)
     : __findLessonById_(lessonId);
-  if (!found) return { error: createErrorResponse('lesson が見つかりません') };
+  if (!found || !found.lesson) return { error: createErrorResponse('lesson が見つかりません') };
   if (found.lesson.userId !== userId) {
     return { error: createErrorResponse('lesson の所有者が一致しません') };
   }
@@ -831,7 +858,7 @@ function getActiveLessonNav(targetUserId) {
     if (!active) return createSuccessResponse('no active lesson', null);
 
     const found = __findLessonById_(active.lessonId);
-    if (!found) return createSuccessResponse('no active lesson', null);
+    if (!found || !found.lesson) return createSuccessResponse('no active lesson', null);
     const lessonJson = found.lesson.lessonJson || {};
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
 
@@ -1065,7 +1092,16 @@ function deleteLesson(userId, lessonId) {
       return createErrorResponse('実行中の lesson は削除できません。先に「終了」してください。');
     }
     const result = __deleteLessonRow_(lessonId);
-    if (!result.success) return createErrorResponse(result.error || 'delete failed');
+    if (!result.success) return createErrorResponse(result.message || result.error || 'delete failed', null, result.error ? { error: result.error } : null);
+    // config がこの授業を指したままなら外す。残すと児童の poll が「無い授業」を探し続ける。
+    try {
+      const cfg = getConfigOrDefault(userId);
+      if (cfg && cfg.activeLessonId === lessonId && typeof applyConfigPatch_ === 'function') {
+        applyConfigPatch_(userId, { activeLessonId: null, currentLessonStartedAt: null }, { publish: false });
+      }
+    } catch (markerErr) {
+      console.warn('deleteLesson: activeLessonId marker clear failed:', markerErr && markerErr.message);
+    }
     __invalidateViewerLessonPhase_(userId);
     return createSuccessResponse('deleted', { lessonId });
   } catch (error) {
@@ -1483,9 +1519,19 @@ function startLesson(userId, lessonId) {
     }
 
     // double-click 6-form 防止 lock。失敗時は LESSON_BUSY を返す。
+    //   授業 (lessonId) 単位の cache lock を使う。Form を N 個作る間 (数十秒) スクリプト全体の
+    //   ScriptLock を握ると、同じテナントの別の教師の「次へ」「終了」が全部 LOCK_TIMEOUT になる。
     let lock = null;
+    let startLockKey = null;
+    let startLockToken = null;
     try {
-      if (typeof LockService !== 'undefined' && LockService.getScriptLock) {
+      if (typeof acquireCacheLock_ === 'function') {
+        startLockKey = 'lesson_start_lock:' + lessonId;
+        startLockToken = acquireCacheLock_(startLockKey, { ttlSec: 180, waitMs: 0 });
+        if (!startLockToken) {
+          return createErrorResponse('LESSON_BUSY: 別の startLesson 処理が実行中です。少し待ってから再試行してください。');
+        }
+      } else if (typeof LockService !== 'undefined' && LockService.getScriptLock) {
         lock = LockService.getScriptLock();
         if (!lock.tryLock(LESSON_START_LOCK_TIMEOUT_MS)) {
           return createErrorResponse('LESSON_BUSY: 別の startLesson 処理が実行中です。少し待ってから再試行してください。');
@@ -1619,6 +1665,7 @@ function startLesson(userId, lessonId) {
       __invalidateViewerLessonPhase_(userId);
       return createSuccessResponse('lesson 開始しました', { lesson: finalResult.lesson });
     } finally {
+      if (startLockKey && typeof releaseCacheLock_ === 'function') releaseCacheLock_(startLockKey, startLockToken);
       if (lock && lock.releaseLock) {
         try { lock.releaseLock(); } catch (_) { /* lock は TTL で自動解放される */ }
       }
@@ -1699,7 +1746,9 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     //   etag_mismatch で失敗すると「config は次 phase・lessonJson は前 phase」 の不整合が残り
     //   __activePhaseIndex_ がズレた。 row write を concurrency gate にし、 成功後に
     //   *冪等な* 副作用 (Form open/close, config patch — 二重適用しても無害) を適用する。
-    const result = __updateLessonRow_(lessonId, { lessonJson });
+    // 読んだときの etag を渡す (compare-and-set)。二重クリックや別タブ、unpublish の自動終了と
+    //   同時に走ったとき、後の書き込みが前の snapshots / 遷移履歴を飲み込まないようにする。
+    const result = __updateLessonRow_(lessonId, { lessonJson }, found.lesson.etag || undefined);
     if (!result.success) {
       // Why error preservation: __updateLessonRow_ は 'etag_mismatch' を error フィールドで返す。
       //   旧来は createErrorResponse(message || error) のみで wrap し error code を捨てて
@@ -1778,7 +1827,7 @@ function reopenLesson(userId, lessonId) {
     if (phases.length === 0) return createErrorResponse('phase が定義されていません');
     const idx = Math.min(__activePhaseIndex_(lessonJson), phases.length - 1);
 
-    const result = __updateLessonRow_(lessonId, { state: 'active', endedAt: '', lessonJson });
+    const result = __updateLessonRow_(lessonId, { state: 'active', endedAt: '', lessonJson }, found.lesson.etag || undefined);
     if (!result.success) {
       return createErrorResponse(result.message || result.error, null,
         result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
@@ -1843,7 +1892,7 @@ function endLesson(userId, lessonId) {
       state: 'completed',
       endedAt,
       lessonJson
-    });
+    }, found.lesson.etag || undefined);
     if (!result.success) {
       // Why: etag_mismatch などの error code を捨てず propagate (Error envelope audit F4)
       return createErrorResponse(result.message || result.error, null,
@@ -2308,6 +2357,8 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
     if (!lessonId) return null;
 
     const found = __findLessonByIdCached_(lessonId, { noStale: Boolean(opts && opts.fresh) });
+    // 表は読めたが行が無い = 削除済の授業を config が指している。「授業なし」(null, 10 秒 cache)。
+    if (found && found.notFound) return null;
     // config が授業を指しているのに行が引けない = lessons シートの読み込み失敗 (429 等)。
     if (!found || !found.lesson) return undefined;
     if (found.lesson.state !== 'active') return null;
@@ -2372,6 +2423,9 @@ function __findOwnLessonRow_(sheet, actorEmail) {
     const target = String(actorEmail || '').trim().toLowerCase();
     // 同じ児童の行が複数あれば最後の行 (最新の送信) を採用する。読む側 (__readOwnLessonAnswer_) と
     //   揃える。復旧で行を移した直後など、重複行が残っていても置き直しが最新に当たるように。
+    // 見出し行すら無い = 読めなかった (SA proxy は 429 で [] を返す)。「自分の行は無い」と混同して
+    //   appendRow すると、既に送っていた児童の行が 2 つになる (分布に点が 2 つ出る)。
+    if (data.length === 0) return LESSON_ROW_READ_FAILED;
     let found = -1;
     for (let i = 1; i < data.length; i++) {
       const email = (data[i] || [])[LESSON_NATIVE_COL_EMAIL - 1];
@@ -2380,9 +2434,10 @@ function __findOwnLessonRow_(sheet, actorEmail) {
     return found;
   } catch (error) {
     logError_('__findOwnLessonRow_', error);
-    return -1;
+    return LESSON_ROW_READ_FAILED;
   }
 }
+const LESSON_ROW_READ_FAILED = -2;
 
 /**
  * 児童の投稿を受け付ける (doPost: submitLessonAnswer)。
@@ -2463,6 +2518,9 @@ function submitLessonAnswer(targetUserId, payload) {
     ];
 
     const existingRow = __findOwnLessonRow_(sheet, actorEmail);
+    if (existingRow === LESSON_ROW_READ_FAILED) {
+      return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
+    }
     let writtenRow = existingRow;
     if (existingRow > 0) {
       sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);

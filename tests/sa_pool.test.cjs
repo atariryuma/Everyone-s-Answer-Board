@@ -255,11 +255,77 @@ test('makeProxyAuthResolver_: switches to fresh SA when initial is cooling', () 
   });
   // Pre-cache sa2 token so resolver doesn't need JWT exchange.
   ctx._cache.put('sa_token:sa2@x.iam', 'tok2', 3000);
+  // 切替先は access verify (10 分 cache) を通る。verify 済として cache に置く。
+  ctx._cache.put('sa_access:ss-x:sa2@x.iam', 'ok', 600);
   ctx.markServiceAccountCoolingDown_('sa1@x.iam');
   const resolver = ctx.makeProxyAuthResolver_('ss-x', 'tok1', 'sa1@x.iam');
   const auth = resolver();
   assert.equal(auth.saEmail, 'sa2@x.iam', 'must swap to non-cooling SA');
   assert.equal(auth.token, 'tok2');
+});
+
+test('makeProxyAuthResolver_: 切替先の SA がこの SS を開けない (verify no) なら初回 SA に留まる', () => {
+  const ctx = loadCtx({
+    propsStore: {
+      SERVICE_ACCOUNT_CREDS: makeSaJson('sa1@x.iam', 1),
+      SERVICE_ACCOUNT_CREDS_2: makeSaJson('sa2@x.iam', 2)
+    }
+  });
+  ctx._cache.put('sa_token:sa2@x.iam', 'tok2', 3000);
+  ctx._cache.put('sa_access:ss-x:sa2@x.iam', 'no', 120);
+  ctx.markServiceAccountCoolingDown_('sa1@x.iam');
+  const resolver = ctx.makeProxyAuthResolver_('ss-x', 'tok1', 'sa1@x.iam');
+  const auth = resolver();
+  assert.equal(auth.saEmail, 'sa1@x.iam', '共有漏れの SA に切り替えて 403 を返すより、元 SA で投げ直す');
+});
+
+test('openSpreadsheetViaServiceAccount: round-robin の pick が実際に使われる (client_email で探す)', () => {
+  const ctx = loadCtx({
+    propsStore: {
+      SERVICE_ACCOUNT_CREDS: makeSaJson('sa1@x.iam', 1),
+      SERVICE_ACCOUNT_CREDS_2: makeSaJson('sa2@x.iam', 2),
+      SERVICE_ACCOUNT_CREDS_3: makeSaJson('sa3@x.iam', 3)
+    }
+  });
+  for (const e of ['sa1@x.iam', 'sa2@x.iam', 'sa3@x.iam']) {
+    ctx._cache.put('sa_token:' + e, 'tok-' + e, 3000);
+    ctx._cache.put('sa_access:ss-x:' + e, 'ok', 600);
+  }
+  // round-robin counter を 1 にしておく → 次の pick は pool[1] = sa2
+  ctx._cache.put('sa_rr_counter', '1', 600);
+  const proxy = ctx.openSpreadsheetViaServiceAccount('ss-x');
+  assert.ok(proxy, 'proxy が返る');
+  // proxy が握っている SA は、pick 結果 (sa2) であること。indexOf の参照比較では常に sa1 になっていた。
+  assert.equal(ctx._cache.get('sa_pick:sa2@x.iam'), '1');
+  const sheet = proxy.getSheetByName('Sheet1');
+  // getSheetByName → resolveAuth() は初回 SA を返す。cooling でない限り sa2 のまま。
+  ctx.UrlFetchApp.fetch = (url, opts) => {
+    assert.equal(opts.headers.Authorization, 'Bearer tok-sa2@x.iam');
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ values: [['a']] }) };
+  };
+  assert.equal(JSON.stringify(sheet.getRange(1, 1, 1, 1).getValues()), JSON.stringify([['a']]));
+});
+
+test('openSpreadsheetViaServiceAccount: cooling 中の SA は飛ばす (他に冷えていない SA が居るとき)', () => {
+  const ctx = loadCtx({
+    propsStore: {
+      SERVICE_ACCOUNT_CREDS: makeSaJson('sa1@x.iam', 1),
+      SERVICE_ACCOUNT_CREDS_2: makeSaJson('sa2@x.iam', 2)
+    }
+  });
+  for (const e of ['sa1@x.iam', 'sa2@x.iam']) {
+    ctx._cache.put('sa_token:' + e, 'tok-' + e, 3000);
+    ctx._cache.put('sa_access:ss-x:' + e, 'ok', 600);
+  }
+  ctx.markServiceAccountCoolingDown_('sa1@x.iam');
+  ctx._cache.put('sa_rr_counter', '0', 600);
+  const proxy = ctx.openSpreadsheetViaServiceAccount('ss-x');
+  const sheet = proxy.getSheetByName('Sheet1');
+  ctx.UrlFetchApp.fetch = (url, opts) => {
+    assert.equal(opts.headers.Authorization, 'Bearer tok-sa2@x.iam', '焼けている sa1 は使わない');
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ values: [] }) };
+  };
+  sheet.getRange(1, 1, 1, 1).getValues();
 });
 
 // =====================================================================

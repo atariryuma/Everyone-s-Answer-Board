@@ -1484,10 +1484,13 @@ test('lesson 行 cache: 教師がフェーズを進めると cache が捨てら�
 
   // 児童の polling が cache を温める
   assert.equal(h.context.__getViewerLessonPhase_('u1').screenRole, 'input');
+  const keyBefore = h.context.__lessonRecordCacheKey_(lessonId);
 
   // 教師が「出会う」へ
   advanceAsTeacher(h, lessonId, 1);
-  assert.ok(ops.includes('remove:lesson_rec_' + lessonId), '__updateLessonRow_ が lesson 行 cache を捨てる');
+  assert.ok(ops.includes('remove:' + keyBefore), '__updateLessonRow_ が lesson 行 cache を捨てる');
+  // 版も上がる: 書き込みの直前に読み始めた古い loader が put し直しても、新しい key は別物。
+  assert.notEqual(h.context.__lessonRecordCacheKey_(lessonId), keyBefore, 'lesson 行 cache の版が上がる');
 
   // 古い画面 (phaseIndex 0) からの投稿はサーバが拒否する
   const stale = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'late' });
@@ -1503,7 +1506,7 @@ test('lesson 行 cache: 他が読んでいる間 (flight 中) の polling は直
 
   // 1 回読んで latest を作る
   assert.ok(h.context.__findLessonByIdCached_(lessonId).lesson);
-  const key = 'lesson_rec_' + lessonId;
+  const key = h.context.__lessonRecordCacheKey_(lessonId);
   assert.ok(store.has(key + ':latest'));
   // version が上がった (key は消え、latest だけ残り、誰かが読んでいる) 状況を作る
   store.delete(key);

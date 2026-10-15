@@ -403,6 +403,8 @@
           if (result && result.success) {
             showSuccess(result.message || 'ボードを非公開にしました');
             systemState.config.isPublished = false;
+            // server は新しい etag を返す。取り込まないと次の保存 / 公開が etag_mismatch になる。
+            if (result.etag) systemState.config.etag = result.etag;
             updatePublishStatus('unpublished');
             updateFooterDisplay({ ...currentBoardInfo, isPublished: false });
           } else {
@@ -2237,9 +2239,12 @@
   }
 
   function setupDropdownEventListeners(dropdowns) {
+    // fillColumnDropdowns は接続 / 解析 / 復帰のたびに呼ばれる。listener を毎回足すと
+    //   change 1 回で handleDropdownChange が N 回走り、リセットの toast も N 回出る。1 回だけ付ける。
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
-      if (!dropdown) return;
+      if (!dropdown || dropdown.__changeBound) return;
+      dropdown.__changeBound = true;
 
       dropdown.addEventListener('change', function () {
         handleDropdownChange(columnType, this);
@@ -2247,7 +2252,8 @@
     });
 
     const resetButton = document.getElementById('reset-to-ai');
-    if (resetButton) {
+    if (resetButton && !resetButton.__clickBound) {
+      resetButton.__clickBound = true;
       resetButton.addEventListener('click', function () {
         resetToAIDetection();
       });
@@ -2498,13 +2504,23 @@
       if (config) {
         // Why: etag は保存成功で必ず更新されるので hash から除外。含めると毎回 hash mismatch
         //   になり、無変更でも server 往復が発生する (autosave 多発の真因)。
-        const { etag: _etag, ...hashable } = config;
+        // verifiedAt は getValidatedConfig が毎回 now() で入れ直すので、含めると必ず hash が変わり
+        //   「無変更なら skip」が一度も効かなかった (キー入力ごとに server 往復 + 全児童の user cache が落ちる)。
+        const { etag: _etag, verifiedAt: _verifiedAt, ...hashable } = config;
         const hash = JSON.stringify(hashable);
         if (hash === lastSavedHash) {
           setAutoSaveStatus('', 'info');
           return;
         }
         lastSavedHash = hash;
+      }
+      // 前の保存がまだ飛んでいる (mutex 保持中) なら、失敗にせず少し後にもう一度。
+      //   900ms のデバウンスより GAS 往復 (1〜3 秒) が長いので、連続入力の 2 回目が消えていた。
+      if (window.__saveDraftInFlight) {
+        lastSavedHash = null;
+        setAutoSaveStatus('保存予定…', 'info');
+        window.sharedUtilities.debounce.debounce(autoSaveDraft, 'auto-save-draft', DEBOUNCE_MS);
+        return;
       }
       setAutoSaveStatus('保存中…', 'info');
       saveDraft({
@@ -2550,6 +2566,7 @@
 
     function finish(ok) {
       if (!silent) window.setLoading(false);
+      window.__saveDraftInFlight = false;
       ClientMutex.release('saveDraft');
       if (onComplete) onComplete(ok);
     }
@@ -2564,6 +2581,7 @@
       if (onComplete) onComplete(false);
       return;
     }
+    window.__saveDraftInFlight = true;
 
     try {
       const { config, validationError } = getValidatedConfig();
@@ -2583,7 +2601,7 @@
       finish(false);
     }
 
-    function executeDraftSave(finalConfig) {
+    function executeDraftSave(finalConfig, retried) {
       runServer('saveConfig', finalConfig, { isDraft: true }).then((result) => {
         if (result && result.success) {
           if (!silent) showSuccess('下書きを保存しました');
@@ -2594,6 +2612,20 @@
             systemState.config.etag = result.etag || result.config.etag;
           }
           finish(true);
+        } else if (result && result.error === 'etag_mismatch' && !retried) {
+          // 授業の開始 / 切替 / 終了や別タブの保存で server 側の etag が進むと、この画面の etag は
+          //   古いまま。以前は「保存失敗」のまま以後の自動保存が全部落ちていた。最新の etag を
+          //   取り直して 1 回だけやり直す (内容は今の画面のまま)。
+          //   画面のフォームは触らない (loadAndApplyCurrentConfig は入力中の値を server の値で
+          //   上書きする)。server が返す現在の etag だけを取り込む。
+          const currentEtag = result.currentEtag || (result.currentConfig && result.currentConfig.etag) || null;
+          if (!currentEtag) {
+            if (!silent) showError('設定が他で更新されました。画面を更新してください');
+            finish(false);
+            return;
+          }
+          systemState.config.etag = currentEtag;
+          executeDraftSave({ ...finalConfig, etag: currentEtag }, true);
         } else {
           if (!silent) showError(window.serverMessage(result, '設定の保存に失敗しました'));
           finish(false);
@@ -3536,6 +3568,9 @@
 
     function openLessonWizard(lessonId, preloaded) {
       loadLessonThen(lessonId, preloaded, (lesson) => {
+        // 前の授業の「作成して開始」が成功して disabled のままだと、2 つ目の授業を始められない。
+        const startBtn = document.getElementById('lesson-start-btn');
+        if (startBtn) { startBtn.disabled = false; startBtn.textContent = startBtn.dataset.label || startBtn.textContent.replace(/^⏳.*$/, 'すべて作成して開始'); }
         document.body.classList.add('mode-create-lesson');
         document.body.classList.remove('mode-run-lesson');
         history.pushState({ lesson: lessonId, mode: 'create'}, '', '#lesson/' + lessonId);
@@ -3551,6 +3586,11 @@
       currentLessonEtag = null;
       history.pushState({}, '', window.location.pathname + window.location.search);
       loadLessonList();
+      // 授業の開始 / 切替 / 終了は server 側で config を書き換える (etag が進む)。ボード設定タブに
+      //   戻ったあとの自動保存が古い etag で落ちないよう、静かに読み直す。
+      if (typeof loadAndApplyCurrentConfig === 'function') {
+        try { loadAndApplyCurrentConfig({ silent: true }); } catch (_) { /* 次の保存時に etag_mismatch の retry が拾う */ }
+      }
     }
     window.exitLessonCreateMode = exitLessonCreateMode;
 
@@ -4640,10 +4680,11 @@
               renderConfirmStep(res.data.lesson.lessonJson);
             } else if (res && res.error === 'etag_mismatch') {
               // 直列化していれば原則発生しないが、念のため refetch & 1 回 retry。
-              gasRun('lesson.review', { userId, lessonId: currentLessonId }).then((r2) => {
+              //   retry の Promise を返して、次の項目の保存がこの retry と重ならないようにする。
+              return gasRun('lesson.review', { userId, lessonId: currentLessonId }).then((r2) => {
                 if (r2 && r2.success) {
                   currentLessonEtag = r2.data.lesson.etag;
-                  gasRun('lesson.updateDraft', {
+                  return gasRun('lesson.updateDraft', {
                     userId, lessonId: currentLessonId, fieldPath,
                     value: batch[fieldPath], expectedEtag: currentLessonEtag
                   }).then((r3) => {
@@ -4654,6 +4695,8 @@
                     } else if (indicator) indicator.textContent = '保存失敗';
                   });
                 }
+                if (indicator) indicator.textContent = '保存失敗';
+                return undefined;
               });
             } else if (indicator) {
               indicator.textContent = '保存失敗';
@@ -4682,7 +4725,7 @@
       if (!currentLessonId) return;
       const btn = document.getElementById('lesson-start-btn');
       const errBox = document.getElementById('lesson-start-error');
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ 作成中...'; }
+      if (btn) { if (!btn.dataset.label) btn.dataset.label = btn.textContent; btn.disabled = true; btn.textContent = '⏳ 作成中...'; }
       if (errBox) { errBox.hidden = true; errBox.innerHTML = ''; }
       gasRun('lesson.start', { userId, lessonId: currentLessonId }).then((res) => {
         if (res && res.success) {
@@ -4995,7 +5038,7 @@
 
       const d = live.data;
       if (!d) {
-        body.innerHTML = LIVE_LOADING_HTML;
+        body.innerHTML = LIVE_LOADING_HTML; // lint-disable-line no-inner-html-assignment-with-variable -- 補間の無い定数文字列
         return;
       }
       if (!d.supported) {
@@ -5038,7 +5081,7 @@
         return;
       }
       if (!rows.length) {
-        body.innerHTML = LIVE_EMPTY_HTML;
+        body.innerHTML = LIVE_EMPTY_HTML; // lint-disable-line no-inner-html-assignment-with-variable -- 補間の無い定数文字列
         return;
       }
       const src = (d.phase && d.phase.sourceSheetName) || '';
