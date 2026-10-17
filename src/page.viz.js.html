@@ -41,6 +41,10 @@
       const key = String(mode || '?');
       if (_vizHeartbeatSeen.has(key)) return;
       _vizHeartbeatSeen.add(key);
+      // 教師の画面か ?debug=1 のときだけ送る (児童 30 人分の同時実行を使わない)。
+      const app = window.studyQuestApp;
+      const telemetryOn = (app && app.state && app.state.isEditor === true) || /[?&]debug=1(&|$)/.test(window.location.search);
+      if (!telemetryOn) return;
       if (window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
         window.ClientErrorReporter.report({
           level: 'log',

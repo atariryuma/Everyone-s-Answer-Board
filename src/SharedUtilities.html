@@ -852,6 +852,14 @@
   var _cachedWebAppUrl = '';
   window.onDOMReady(function () {
     try {
+      // 描画時にページへ埋め込まれていれば RPC を呼ばない。
+      //   Why: 30 人が同時に開くと、この先読みだけで 30 実行が走り同時実行枠 (30) を一瞬埋めていた。
+      var meta = document.querySelector('meta[name="app-web-url"]');
+      var injected = meta && meta.getAttribute('content');
+      if (injected && /^https:\/\/script\.google\.com\//.test(injected) && injected.indexOf('/exec') !== -1) {
+        _cachedWebAppUrl = injected;
+        return;
+      }
       if (typeof google !== 'undefined' && google.script?.run) {
         google.script.run
           .withSuccessHandler(function (url) { if (url) _cachedWebAppUrl = url; })

@@ -288,6 +288,7 @@ function handleViewMode_(params, currentEmail) {
     template.editorName = '';
     template.userId = targetUserId;
     template.boardUrl = '';
+    template.webAppUrl = getWebAppUrl() || '';
     return template.evaluate().setTitle('未公開');
   }
 
@@ -311,12 +312,15 @@ function handleViewMode_(params, currentEmail) {
     const template = HtmlService.createTemplateFromFile('Unpublished.html');
     template.editorName = targetUser.userName || targetUser.userEmail || '';
     template.userId = targetUserId;
+    template.webAppUrl = getWebAppUrl() || '';
     return template.evaluate().setTitle('未公開');
   }
 
   const template = HtmlService.createTemplateFromFile('Page.html');
   template.userId = targetUserId;
   template.userEmail = targetUser.userEmail;
+  // 画面側が getWebAppUrl を RPC で先読みしなくて済むよう、描画時に埋め込む (児童 1 人 1 実行を省く)。
+  template.webAppUrl = getWebAppUrl() || '';
   template.questionText = '読み込み中...';
   template.boardTitle = targetUser.userEmail || '回答ボード';
   template.isEditor = isEditor;
@@ -363,6 +367,7 @@ function handleReviewMode_(params, currentEmail) {
   const template = HtmlService.createTemplateFromFile('Page.html');
   template.userId = targetUserId;
   template.userEmail = currentEmail;
+  template.webAppUrl = getWebAppUrl() || '';
   // Why: heading は hydrate 完了後、client が選択中 phase の question で上書きする
   //   (__buildReviewPhaseResult が result.header として返し、performDataLoad が反映)。
   //   banner 側で lesson 名を出すので、heading にレッスン名を入れると重複する。
@@ -503,7 +508,7 @@ function doPostHandleAddReaction(request) {
   if (typeof request.reactionType !== 'string') {
     return createErrorResponse('Reaction type required');
   }
-  return addReaction(request.userId, request.rowId, request.reactionType);
+  return addReaction(request.userId, request.rowId, request.reactionType, isPlainObject(request.expect) ? request.expect : undefined);
 }
 
 /**
@@ -518,7 +523,7 @@ function doPostHandleToggleHighlight(request) {
   if (!isValidRowIdPayload(request.rowId)) {
     return createErrorResponse('Target row ID must be a positive integer or "row_<n>" string');
   }
-  return toggleHighlight(request.userId, request.rowId);
+  return toggleHighlight(request.userId, request.rowId, isPlainObject(request.expect) ? request.expect : undefined);
 }
 
 /**

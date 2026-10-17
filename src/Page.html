@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
   <title>みんなの回答ボード</title>
+  <!-- SharedUtilities が getWebAppUrl の RPC の代わりに読む (児童 1 人あたり 1 実行を省く) -->
+  <meta name="app-web-url" content="<?= typeof webAppUrl !== 'undefined' ? webAppUrl : '' ?>">
   <?!= include('SharedPageHead'); ?>
 
   <script>

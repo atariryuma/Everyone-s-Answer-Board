@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -2079,7 +2079,11 @@ function getAllUsers(options = {}, context = {}) {
         allowStale: false,
         // users シートの読みは混雑時 1〜3 秒かかる。1.2 秒で諦めると 29 人が自分で読みに行く。
         waitMs: 500,
-        waitTries: 6
+        waitTries: 6,
+        // 一覧は gzip で書く。利用者が 30〜50 人になると素の JSON が 100KB を超えて cache に
+        //   入らなくなり、その日から全員の poll が users シートを読む (人数増加で突然遅くなる)。
+        pack: (typeof packJsonForCache_ === 'function') ? packJsonForCache_ : undefined,
+        unpack: (typeof unpackJsonFromCache_ === 'function') ? unpackJsonFromCache_ : undefined
       });
     }
 

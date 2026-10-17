@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_, resolveReactionMode */
+/* global resolveColumnIndex, emailToShortHash, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_, resolveReactionMode */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -57,6 +57,50 @@ function acquireRowLock_(cache, lockKey, actorEmail) {
   }
   // ScriptLock が取れない = 他の critical section と競合し続けた。caller に reject させて retry を促す。
   return false;
+}
+
+/**
+ * 押した側が送る「行の正体」を、どの列をどう比べるかに解決する。
+ *   - { column, value }            : 列番号 (1-based) の文字列一致 (授業モードの email 列など、サーバ内の呼び出し)
+ *   - { field: 'email', hash }     : 児童の画面が持つ emailHash (塩入りハッシュ) と、その行の email 列のハッシュを比べる
+ *   - { field: 'timestamp', value }: email 列が無いボード用。timestamp 列を時刻として比べる
+ *   列が見出しから解決できなければ null (照合しない = 従来どおり A 列の空判定だけ)。
+ *   Why 生メールを送らせないか: 児童の画面には他の児童のメールが無い (emailHash だけ)。
+ * @returns {{column:number, kind:string, matches:function(*):boolean}|null}
+ */
+function resolveRowIdentity_(rowIdentity, headers, config) {
+  if (!rowIdentity || typeof rowIdentity !== 'object') return null;
+  const norm = (v) => String(v === null || v === undefined ? '' : v).trim().toLowerCase();
+  if (typeof rowIdentity.column === 'number' && rowIdentity.column >= 1 && rowIdentity.value) {
+    return { column: rowIdentity.column, kind: 'column', matches: (actual) => norm(actual) === norm(rowIdentity.value) };
+  }
+  if (!Array.isArray(headers) || headers.length === 0) return null;
+  const mapping = (config && config.columnMapping) || {};
+  if (rowIdentity.field === 'email' && typeof rowIdentity.hash === 'string' && rowIdentity.hash) {
+    if (typeof resolveColumnIndex !== 'function' || typeof emailToShortHash !== 'function') return null;
+    const idx = resolveColumnIndex(headers, 'email', mapping).index;
+    if (!(idx >= 0)) return null;
+    return {
+      column: idx + 1, kind: 'emailHash',
+      matches: (actual) => {
+        const h = emailToShortHash(String(actual || ''));
+        // 行に email が無い (匿名回答) ときは判定できないので通す
+        return !h || h === rowIdentity.hash;
+      }
+    };
+  }
+  if (rowIdentity.field === 'timestamp' && rowIdentity.value) {
+    const idx = headers.findIndex(h => /^(timestamp|タイムスタンプ)$/i.test(String(h || '').trim()));
+    if (!(idx >= 0)) return null;
+    const cmp = (v) => {
+      if (v === null || v === undefined || v === '') return '';
+      if (v instanceof Date) return String(v.getTime());
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? String(v).trim() : String(d.getTime());
+    };
+    return { column: idx + 1, kind: 'timestamp', matches: (actual) => cmp(actual) === cmp(rowIdentity.value) };
+  }
+  return null;
 }
 
 // 見出し行 (1 行目) だけを読む。getDataRange().getValues()[0] はシート全体を読むので、quota が
@@ -562,13 +606,14 @@ function __isLessonReactionsOff_(targetUserId) {
   }
 }
 
-function addReaction(targetUserId, rowIndex, reactionType) {
+function addReaction(targetUserId, rowIndex, reactionType, expect) {
   if (__isLessonReactionsOff_(targetUserId)) {
     return createErrorResponse('授業中はリアクションを使えません', null, { error: 'LESSON_ACTIVE' });
   }
   return executeBoardRowOperation({
     targetUserId,
     rowIndex,
+    expect,
     lockKeyPrefix: 'reaction',
     label: 'addReaction',
     openContext: 'reaction_processing',
@@ -758,18 +803,16 @@ function executeBoardRowOperation(options) {
         console.warn(`${label}: target row is empty (stale rowIndex?)`, { targetUserId, rowNumber });
         return createErrorResponse('ROW_CHANGED: 対象の回答が見つかりません。画面を読み込み直してください');
       }
-      const identity = expect.rowIdentity;
-      if (identity && identity.column >= 1 && identity.value) {
+      const identity = resolveRowIdentity_(expect.rowIdentity, preloadedHeaders, config);
+      if (identity && identity.column >= 1) {
         const identityRow = (sheet.getRange(rowNumber, identity.column, 1, 1).getValues() || [])[0];
         if (!identityRow) {
           console.warn(`${label}: identity cell read failed (quota?)`, { targetUserId, rowNumber });
           return createErrorResponse('いま混み合っています。少し待ってからもう一度押してください', null, { error: 'BUSY', busy: true });
         }
-        const actual = identityRow[0];
-        const norm = (v) => String(v || '').trim().toLowerCase();
-        if (norm(actual) !== norm(identity.value)) {
-          console.warn(`${label}: row identity mismatch (row shifted?)`, { targetUserId, rowNumber });
-          return createErrorResponse('ROW_CHANGED: 対象の回答が変わりました。画面を読み込み直してください');
+        if (!identity.matches(identityRow[0])) {
+          console.warn(`${label}: row identity mismatch (row shifted?)`, { targetUserId, rowNumber, kind: identity.kind });
+          return createErrorResponse('ROW_CHANGED: 対象の回答が変わりました。画面を読み込み直してください', null, { error: 'ROW_CHANGED' });
         }
       }
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);

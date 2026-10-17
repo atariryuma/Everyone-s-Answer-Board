@@ -3755,7 +3755,10 @@
         try {
           if (!this._renderedHeartbeats) this._renderedHeartbeats = new Set();
           const beaconKey = mode;
-          if (!this._renderedHeartbeats.has(beaconKey) &&
+          // 教師の画面 (電子黒板) か ?debug=1 のときだけ送る。児童 30 人が同時に開くと、この
+          //   心拍だけで 30 実行が走り同時実行枠を一瞬埋めていた。教師 1 台で「描けた」は分かる。
+          const telemetryOn = this.state.isEditor === true || /[?&]debug=1(&|$)/.test(window.location.search);
+          if (telemetryOn && !this._renderedHeartbeats.has(beaconKey) &&
               window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
             this._renderedHeartbeats.add(beaconKey);
             window.ClientErrorReporter.report({
@@ -4845,9 +4848,29 @@
       });
     }
 
+    /**
+     * 押した行の「正体」をサーバに添える (行番号のずれ防御)。
+     *   教師が回答を削除すると行番号が繰り上がり、次の poll までの数秒間、児童の画面の
+     *   行番号は隣の回答を指す。サーバは行番号ではなく email のハッシュ (無ければ timestamp)
+     *   で同じ回答か確かめ、違えば書かずに ROW_CHANGED を返す。
+     */
+    __rowExpectation(rowIndex) {
+      try {
+        const item = (this.state.currentAnswers || []).find(i => i.rowIndex == rowIndex);
+        if (!item) return undefined;
+        const expect = {};
+        if (typeof item.emailHash === 'string' && item.emailHash) {
+          expect.rowIdentity = { field: 'email', hash: item.emailHash };
+        } else if (item.timestamp) {
+          expect.rowIdentity = { field: 'timestamp', value: String(item.timestamp) };
+        }
+        return Object.keys(expect).length ? expect : undefined;
+      } catch (_) { return undefined; /* 照合情報は任意。無くても従来どおり書ける */ }
+    }
+
     async sendReactionToServer(rowIndex, reaction) {
       try {
-        const response = await this.runGas('addReaction', this.state.userId, rowIndex, reaction);
+        const response = await this.runGas('addReaction', this.state.userId, rowIndex, reaction, this.__rowExpectation(rowIndex));
 
         if (!response) {
           throw new Error('サーバーからの応答がありません');
@@ -5174,12 +5197,17 @@
       try {
         const res = await this.executeWithRetry(async (attempt) => {
 
-          const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex);
+          const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex, this.__rowExpectation(numericRowIndex));
 
           if (response && response.success === true) {
             return response;
           } else {
-            throw new Error(response?.message || 'ハイライトの処理に失敗しました');
+            const msg = response?.message || 'ハイライトの処理に失敗しました';
+            // 行がずれていた: 書かずに返ってきたので、表示を読み直して正しい行に揃える。
+            if (/ROW_CHANGED|PHASE_CHANGED/.test(msg) && typeof this.loadSheetData === 'function') {
+              this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+            }
+            throw new Error(msg);
           }
         }, {
           maxRetries: 2,

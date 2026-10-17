@@ -29,6 +29,7 @@
     <div class="card p-8">
       <h1 class="text-4xl font-bold mb-4 text-theme-status-warning">現在は準備中です</h1>
       <p class="text-theme-muted mb-4">先生が回答ボードを設定中です。しばらくお待ちください。</p>
+      <p id="auto-check-note" class="text-xs text-theme-muted mb-4" aria-live="polite">公開されると自動でひらきます。</p>
 
       <? if (typeof editorName !== 'undefined' && editorName) { ?>
       <p class="text-xs text-theme-muted mb-4">管理者:
@@ -56,12 +57,15 @@
       const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
       const refreshBtn = document.getElementById('refresh-btn');
 
-      let webAppUrl;
-      try {
-        webAppUrl = await runServer('getWebAppUrl');
-      } catch (error) {
-        console.error('URL prefetch failed:', error);
-        return;
+      // 描画時に埋め込まれた URL を優先 (RPC を 1 回省く)。無いときだけサーバに聞く。
+      let webAppUrl = '<?= typeof webAppUrl !== "undefined" ? webAppUrl : "" ?>';
+      if (!webAppUrl) {
+        try {
+          webAppUrl = await runServer('getWebAppUrl');
+        } catch (error) {
+          console.error('URL prefetch failed:', error);
+          return;
+        }
       }
 
       // 無効なURLパターンを検証（OAuth初期化中のURL）
@@ -77,6 +81,52 @@
         refreshBtn.classList.remove('is-disabled');
         refreshBtn.classList.add('btn-primary');
       }
+      scheduleAutoCheck(webAppUrl + '?mode=view&userId=' + userId);
+    }
+
+    /**
+     * 公開されたら自動でボードを開く。
+     *   Why: 先生が公開しても、先に開いていた児童の画面は「準備中」のまま変わらず、
+     *   授業中に「更新を押して」と言って回る手間になっていた。
+     *   仕組み: 20 秒 (±20%、30 台の位相を揃えない) ごとに軽い問い合わせをし、公開されたら
+     *   ボードの URL へ遷移する。画面が隠れている間は問い合わせない。
+     *   問い合わせ先は getNotificationUpdate (公開前は Access denied で success:false)。
+     *   公開されると success:true になる。ページ全体を読み直すより軽い。
+     */
+    function scheduleAutoCheck(boardUrl) {
+      const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+      if (!userId || typeof runServer !== 'function') return;
+      const note = document.getElementById('auto-check-note');
+      let failures = 0;
+      let timer = null;
+      const next = () => {
+        const base = failures > 3 ? 60000 : 20000;
+        const delay = Math.round(base * (0.8 + Math.random() * 0.4));
+        timer = setTimeout(tick, delay);
+      };
+      const tick = async () => {
+        timer = null;
+        if (document.hidden) { next(); return; }
+        try {
+          const res = await runServer('getNotificationUpdate', userId, {});
+          if (res && res.success) {
+            if (note) note.textContent = '公開されました。ひらいています…';
+            // GAS の iframe から親ページごと移動する (更新ボタンの target=_top と同じ)。
+            try { window.top.location.href = boardUrl; }
+            catch (_) { window.location.href = boardUrl; }
+            return;
+          }
+          failures = 0;
+        } catch (_) {
+          failures++;   // 通信エラーは静かに間隔を伸ばす
+        }
+        next();
+      };
+      next();
+      document.addEventListener('visibilitychange', () => {
+        // 画面に戻ってきたら、次の予定を待たずにすぐ確かめる
+        if (!document.hidden && timer) { clearTimeout(timer); timer = setTimeout(tick, 500); }
+      });
     }
 
     // ページ読み込み時にURLをプリフェッチ

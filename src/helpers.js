@@ -131,6 +131,25 @@ function gunzipBase64ToText_(b64) {
 }
 
 /**
+ * JSON 値を gzip+base64 の圧縮表現にする (withStampedeGuard_ の pack / unpack 用)。
+ *   gzip が使えない環境 (test sandbox) ではそのまま返す。
+ *   Why: ScriptCache は 1 value 100KB。users 一覧 (1 人数 KB の configJson × 人数) は
+ *   30〜50 人で超え、超えた日から cache に入らず全員の poll が users シートを読む。
+ */
+function packJsonForCache_(value) {
+  const gz = (typeof gzipTextToBase64_ === 'function') ? gzipTextToBase64_(JSON.stringify(value)) : null;
+  return gz ? { __gz: gz } : value;
+}
+function unpackJsonFromCache_(cached) {
+  if (cached && typeof cached === 'object' && typeof cached.__gz === 'string') {
+    const text = (typeof gunzipBase64ToText_ === 'function') ? gunzipBase64ToText_(cached.__gz) : null;
+    if (!text) return null;   // 読めない値は miss 扱い (次の読みが書き直す)
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+  return cached;
+}
+
+/**
  * cache stampede (thundering herd) を防ぐ cache 読み。
  *
  * Why: version 付き key (board data / users 一覧 / lesson 行) は、書き込み側が version を

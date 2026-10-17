@@ -3246,7 +3246,18 @@
     const userId = (window.UNIFIED_CONFIG && (window.UNIFIED_CONFIG.targetUserId || window.UNIFIED_CONFIG.userId)) || '';
 
     function gasRun(operation, params) {
-      return runServer('dispatchAdminOperation', operation, params);
+      // 通信そのものの失敗 (ネットワーク断 / GAS の ScriptError) も success:false の応答に揃える。
+      //   Why: 呼び出し側 22 か所のうち半分は .catch を持たず、通信エラーのときは何も表示されず
+      //   「押したのに反応がない」になっていた。応答に揃えれば各所の失敗分岐が同じ文言で拾う。
+      return runServer('dispatchAdminOperation', operation, params).catch((err) => {
+        const detail = (err && err.message) ? String(err.message).slice(0, 120) : '';
+        console.error('[gasRun] transport failure:', operation, detail);
+        return {
+          success: false,
+          error: 'TRANSPORT_ERROR',
+          message: '通信に失敗しました。' + (detail ? ' (' + detail + ')' : '') + ' もう一度お試しください'
+        };
+      });
     }
 
     // ---------- Lesson list (常時表示の一覧) ----------
