@@ -4826,6 +4826,8 @@
 
       const trans = (lesson.lessonJson && lesson.lessonJson.profileTransitions) || [];
       const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
+      // 一覧の polling が「授業はもう別のフェーズ」と知ったときの比較用 (liveSyncRunnerPhase)。
+      live.runnerPhaseIndex = activeIdx;
       const container = document.getElementById('lesson-runner-phases');
       if (container) {
         // カードは押せるステッパー: 隣以外へも直接ジャンプできる (サーバは targetIndex 対応済)。
@@ -5003,6 +5005,7 @@
         }
         // 変化が無くても描き直す (NEW の期限切れを落とすため。30 枚程度なので軽い)。
         liveRender();
+        liveSyncRunnerPhase(d.phase);
       }).catch((err) => {
         live.errors += 1;
         const src = document.getElementById('lesson-live-source');
@@ -5012,6 +5015,30 @@
         if (live.refetch) { live.refetch = false; live.sig = ''; liveFetch(); return; }
         if (liveRunning()) liveSchedule(live.errors ? Math.min(LIVE_POLL_MS * (1 + live.errors), 30000) : LIVE_POLL_MS);
       });
+    }
+
+    /**
+     * 授業がこの画面の外 (ボードの「次へ」・別の端末) で進んだら、上のステッパーと
+     *   ステータスバーを追従させる。
+     *   Why: ステッパーは開いたとき / この画面で送ったときにしか描き直しておらず、ボードで
+     *   進めると一覧 (10 秒ごとに最新) は「ふりかえる」、上は「出会う」のように食い違った。
+     *   etag も古いままだと次の操作が etag_mismatch で失敗するので、lesson ごと読み直す。
+     */
+    function liveSyncRunnerPhase(phase) {
+      if (!phase || typeof phase.index !== 'number') return;
+      if (typeof live.runnerPhaseIndex !== 'number' || phase.index === live.runnerPhaseIndex) return;
+      if (live.runnerSyncing || !currentLessonId) return;
+      live.runnerSyncing = true;
+      live.runnerPhaseIndex = phase.index;   // 読み直しが失敗しても毎回は叩かない
+      const lessonId = currentLessonId;
+      gasRun('lesson.review', { userId, lessonId }).then((res) => {
+        if (lessonId !== currentLessonId || !liveRunning()) return;
+        if (!res || !res.success || !res.data || !res.data.lesson) return;
+        currentLessonEtag = res.data.lesson.etag;
+        renderRunner(res.data.lesson);
+        loadLessonList();               // ステータスバー「授業名 · フェーズ」と授業ロック表示
+      }).catch(() => { /* 次にフェーズが変わったとき、または画面を開き直したときに揃う */ })
+        .finally(() => { live.runnerSyncing = false; });
     }
 
     function liveNoteArrivals(rows) {

@@ -1266,3 +1266,10 @@ test('schedulePollingCheck: 公開終了 (Access denied) は polling を止め�
   assert.equal(instance.state.boardClosed, true);
   assert.equal(banners.length, 1);
 });
+
+test('__isTerminalPollError: 非公開 (Access denied) は止める / User not found (users 読めず = 一時的) は止めない', () => {
+  const { instance } = makeInstance();
+  assert.equal(instance.__isTerminalPollError(new Error('Access denied')), true);
+  assert.equal(instance.__isTerminalPollError(new Error('User not found')), false);
+  assert.equal(instance.__isTerminalPollError(new Error('Quota exceeded (429)')), false);
+});

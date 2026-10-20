@@ -744,6 +744,13 @@ html, body {
 /* ハイライト (先生の注目) は点・カード枠・星・管理パネルの一覧まで --brand-highlight 1 色に揃える
    (押下済みの枠・背景は上の .answer-action-btn.reacted が currentColor から作る) */
 .answer-action-btn.highlight-btn { color: var(--brand-highlight); }
+/* ハイライト処理中は、押したもの以外の ★ も押せない (1 つずつ確定させる)。 */
+body.highlight-busy .highlight-btn:not(.loading) {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: progress;
+}
+.highlight-btn.loading { cursor: progress; }
 .delete-answer-btn:hover {
   border-color: var(--theme-status-error-strong);
   background: var(--theme-status-error-soft);

@@ -1290,7 +1290,10 @@
 
     __isTerminalPollError(error) {
       const msg = String((error && error.message) || '');
-      return /Access denied|未公開|公開が終了|User not found/.test(msg);
+      // "User not found" は含めない: 非公開は "Access denied" で返るようになったので、
+      //   いま "User not found" が来るのは users シートが読めなかった (429) ときだけ = 一時的。
+      //   止めると quota が戻っても児童の画面が二度と追従しなくなる。
+      return /Access denied|未公開|公開が終了/.test(msg);
     }
 
     // 公開が終わった / 見られなくなったボード。polling を止め、いまの表示は残したまま知らせる。
@@ -5176,6 +5179,11 @@
       if (this.pendingReactions.has(highlightKey)) {
         return;
       }
+      // 別の ★ を処理中なら受け付けない (CSS でも押せなくしてある。キーボード操作の保険)。
+      if (typeof document !== 'undefined' && document.body && document.body.classList
+          && document.body.classList.contains && document.body.classList.contains('highlight-busy')) {
+        return;
+      }
 
       this.pendingReactions.set(highlightKey, { type: 'highlight', rowIndex: numericRowIndex, timestamp: Date.now() });
       if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
@@ -5192,7 +5200,12 @@
       btns.forEach(btn => {
         btn.classList.add('loading');
         btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
       });
+      // 処理中は他の ★ も押せなくする (1 つずつ確定させる)。
+      //   Why: 新しいボードで初めて押すと、サーバはシートに HIGHLIGHT 列を作ってから書くので
+      //   数秒かかる。その間に別の ★ を押すと、押せたのか / 効いたのかが分からなかった。
+      this.__setHighlightBusy(true);
 
       try {
         const res = await this.executeWithRetry(async (attempt) => {
@@ -5229,6 +5242,11 @@
           () => this.applyUpdates([item])
         ]);
 
+        // 初回だけ: シートに HIGHLIGHT 列を作ったことを知らせる (以後は ★ の塗りだけで分かる)。
+        if (res.provisioned) {
+          this.showNotification('ハイライトの準備ができました。★ を付けました', 'success');
+        }
+
         if (!this.elements.answerModalContainer.classList.contains('hidden')) {
           // updateModalContent は左右両カードを横断して numericRowIndex を表示中の側のみ
           // 更新するように refactor 済 (data.rowIndex 一致を内部で確認)。
@@ -5252,9 +5270,17 @@
         btns.forEach(btn => {
           btn.classList.remove('loading');
           btn.disabled = false;
+          btn.removeAttribute('aria-busy');
         });
+        this.__setHighlightBusy(false);
         this.pendingReactions.delete(highlightKey);
       }
+    }
+
+    // ハイライト処理中の全体ロック。描き直された ★ にも効くよう body の class で表す (CSS 側で無効化)。
+    __setHighlightBusy(on) {
+      try { document.body.classList.toggle('highlight-busy', Boolean(on)); }
+      catch (_) { /* DOM が無い環境 (テスト) では何もしない */ }
     }
 
     async verifyHighlightSync(rowIndex, expectedHighlight) {

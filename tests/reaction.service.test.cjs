@@ -341,10 +341,14 @@ test('processHighlightDirect: graceful degradation on empty headers', () => {
     getRange: () => ({ getValues: () => [[]], setValues: () => {} })
   };
 
-  const result = ctx.processHighlightDirect(sheet, 2);
+  // 失敗として投げる (以前は success:true +「解除しました」に包まれ、何も起きないのに成功扱いだった)。
+  assert.throws(() => ctx.processHighlightDirect(sheet, 2), /一時的/);
+});
 
-  assert.equal(result.highlighted, false);
-  assert.match(result.message, /一時的/);
+test('processHighlightDirect: 列が既にあれば provisioned=false (画面は ★ の塗りだけで知らせる)', () => {
+  const ctx = loadReactionContext();
+  const sheet = createMockSheet({ headers: ['Q1', 'HIGHLIGHT'], rows: [['answer-a', '']] });
+  assert.equal(ctx.processHighlightDirect(sheet, 2).provisioned, false);
 });
 
 test('processHighlightDirect: lazy-provisions missing HIGHLIGHT column (new behavior)', () => {
@@ -358,6 +362,7 @@ test('processHighlightDirect: lazy-provisions missing HIGHLIGHT column (new beha
   // 不足 HIGHLIGHT 列が auto-append され、トグルが成功する
   const result = ctx.processHighlightDirect(sheet, 2);
   assert.equal(result.highlighted, true);
+  assert.equal(result.provisioned, true, '初回は列を作ったことを画面に知らせる');
 });
 
 // =====================================================================

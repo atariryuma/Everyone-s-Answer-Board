@@ -111,3 +111,25 @@ test('canAccessTargetUser: 本人はメールの大文字小文字が違って�
     true
   );
 });
+
+// =====================================================================
+// applyUserAccessControl の accessProbe: 「居ない」と「見せられない」を呼び出し元が区別できる
+// =====================================================================
+
+test('applyUserAccessControl: 非公開ボードを児童が開くと probe.denied が立ち、WARN は出さない', () => {
+  const warns = [];
+  const ctx = loadCtx({ console: { log: () => {}, warn: (...a) => warns.push(a), error: () => {} } });
+  const probe = {};
+  const out = ctx.applyUserAccessControl(target({ published: false }), { ...viewerCtx, accessProbe: probe }, 'findUserById');
+  assert.equal(out, null, '中身は返さない');
+  assert.equal(probe.denied, true);
+  assert.equal(warns.length, 0, '非公開は異常ではないので WARN にしない');
+});
+
+test('applyUserAccessControl: 公開閲覧以外の拒否 (他人の管理操作) は従来どおり WARN を残す', () => {
+  const warns = [];
+  const ctx = loadCtx({ console: { log: () => {}, warn: (...a) => warns.push(a), error: () => {} } });
+  const out = ctx.applyUserAccessControl(target({ published: true }), { requestingUser: 'viewer@example.com' }, 'findUserById');
+  assert.equal(out, null);
+  assert.equal(warns.length, 1);
+});

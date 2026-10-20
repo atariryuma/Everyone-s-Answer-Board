@@ -1645,6 +1645,17 @@ function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
     return user;
   }
 
+  // 呼び出し元が「居ない」と「見せられない」を区別できるように印を付ける (中身は渡さない)。
+  //   Why: 公開ボードの閲覧経路は null しか受け取れず、非公開にしただけのボードが
+  //   "Target user not found" (ERROR) / 児童の画面は「ユーザーエラー」になっていた (2026-10-19)。
+  if (context.accessProbe && typeof context.accessProbe === 'object') {
+    context.accessProbe.denied = true;
+  }
+
+  // 公開ボードの閲覧経路 (allowPublishedRead) での拒否は「非公開 / 無効化されたボードを開いた」
+  //   だけで、異常ではない。授業の直前まで非公開にする運用では毎回出るので WARN にしない。
+  if (context.allowPublishedRead === true) return null;
+
   const requestingUser = resolveRequestingUser(context);
   const maskedRequester = requestingUser ? `${requestingUser.split('@')[0]}@***` : 'N/A';
   const maskedTarget = user.userEmail ? `${String(user.userEmail).split('@')[0]}@***` : 'unknown';

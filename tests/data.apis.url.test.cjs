@@ -1282,3 +1282,42 @@ test('buildSheetDataErrorResult_: BUSY はそのまま通す (受け手が busy 
   assert.equal(busy.error, 'BUSY');
   assert.equal(ctx.buildSheetDataErrorResult_({ message: 'x' }).data.length, 0);
 });
+
+// =====================================================================
+// 非公開ボード: "Target user not found" ではなく「未公開」を返す (2026-10-19 の ERROR / ユーザーエラー)
+// =====================================================================
+
+function contextWithProbe({ denied }) {
+  const logs = [];
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'child@example.com',
+    logError_: (fn, err) => logs.push(fn + ': ' + (err && err.message)),
+    findPublishedBoardOwner: (_id, _email, extra = {}) => {
+      if (denied && extra.accessProbe) extra.accessProbe.denied = true;
+      return null;
+    }
+  });
+  return { ctx, logs };
+}
+
+test('getPublishedSheetData: 非公開ボードは「未公開」で返し、ERROR を残さない', () => {
+  const { ctx, logs } = contextWithProbe({ denied: true });
+  const res = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(res.success, false);
+  assert.equal(res.header, '未公開');
+  assert.equal(logs.length, 0);
+});
+
+test('getPublishedSheetData: 本当に居ない (users が読めない等) ときは従来どおり not found', () => {
+  const { ctx, logs } = contextWithProbe({ denied: false });
+  const res = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(res.header, 'ユーザーエラー');
+  assert.equal(logs.length, 1);
+});
+
+test('getNotificationUpdate: 非公開ボードは Access denied (児童の画面が「公開終了」に切り替わる)', () => {
+  const { ctx } = contextWithProbe({ denied: true });
+  const res = ctx.getNotificationUpdate('u1', {});
+  assert.equal(res.success, false);
+  assert.match(res.message, /Access denied/);
+});

@@ -390,11 +390,12 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
       rowNumber,
       context: 'graceful-degradation'
     });
-    return {
-      highlighted: false,
-      message: 'ハイライト機能が一時的に利用できません。しばらくしてから再度お試しください。'
-    };
+    // 失敗として投げる。以前は { highlighted:false } を返していて、呼び出し側が success:true +
+    //   「ハイライトを解除しました」に包むため、教師の画面では何も起きないのに成功扱いだった。
+    throw new Error('ハイライト機能が一時的に利用できません。しばらくしてから再度お試しください。');
   }
+
+  let provisioned = false;
 
   let highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
@@ -416,7 +417,8 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
     }
   }
   if (highlightColIndex === -1) {
-    console.warn('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
+    // 新しいボードで初めて ★ を押したときの正常な動き (WARN にしない)。
+    console.log('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
       currentHeaderCount: headers.length,
       rowNumber
     });
@@ -425,6 +427,7 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
       sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
       headers.push('HIGHLIGHT');
       highlightColIndex = newCol - 1;
+      provisioned = true;
       if (typeof invalidateSheetHeadersCache === 'function') {
         try { invalidateSheetHeadersCache(sheet.getParent().getId(), sheet.getName()); }
         catch (_) { /* cache 不通は機能的に無害 (10 分で切れる) */ }
@@ -448,7 +451,9 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   highlightRange.setValues([[newValue]]);
 
   return {
-    highlighted: newValue === 'TRUE'
+    highlighted: newValue === 'TRUE',
+    // 初回だけ列を作った。画面が「準備できた」ことを知らせるのに使う。
+    provisioned
   };
 }
 
@@ -659,6 +664,7 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
     formatSuccess: (result) => ({
       success: true,
       highlighted: result.highlighted,
+      provisioned: Boolean(result.provisioned),
       message: result.highlighted ? 'ハイライトしました' : 'ハイライトを解除しました'
     })
   });

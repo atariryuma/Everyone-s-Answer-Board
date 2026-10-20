@@ -1296,8 +1296,11 @@ function prewarmBoardDataCache_(userId, teacherEmail, classes) {
  * @returns {{ok:true, targetUser:Object, config:Object, isOwnBoard:boolean} | {ok:false, reason:('not_found'|'denied')}}
  */
 function resolveViewerBoardAccess_(targetUserId, email, isAdmin) {
-  const targetUser = findPublishedBoardOwner(targetUserId, email, { preloadedAuth: { email, isAdmin } });
-  if (!targetUser) return { ok: false, reason: 'not_found' };
+  // accessProbe: 見つかったが見せられない (非公開 / 無効化) ときに denied が立つ。
+  //   null の理由を分けるだけで、拒否したユーザーの中身は受け取らない。
+  const accessProbe = {};
+  const targetUser = findPublishedBoardOwner(targetUserId, email, { preloadedAuth: { email, isAdmin }, accessProbe });
+  if (!targetUser) return { ok: false, reason: accessProbe.denied ? 'denied' : 'not_found' };
   const config = getConfigOrDefault(targetUser.userId, targetUser);
   const isOwnBoard = sameEmail_(targetUser.userEmail, email);
   if (!isAdmin && !isOwnBoard && !config.isPublished) return { ok: false, reason: 'denied' };
