@@ -1321,3 +1321,16 @@ test('getNotificationUpdate: 非公開ボードは Access denied (児童の画�
   assert.equal(res.success, false);
   assert.match(res.message, /Access denied/);
 });
+
+test('getNotificationUpdate: 児童の「新着あり」は対象クラスの回答だけで数える', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'child@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({ success: true, data: [{ timestamp: '2026-10-20T05:00:00Z', class: '6年4組', email: 'x@example.com' }] }),
+    __getViewerLessonPhase_: () => ({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年1組'] })
+  });
+  const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
+  assert.equal(res.success, true);
+  assert.equal(res.hasNewContent, false, '他の学級の投稿では新着にしない');
+});

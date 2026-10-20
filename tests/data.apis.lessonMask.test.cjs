@@ -148,3 +148,51 @@ test('buildSafePublishedDataResult: 閲覧者自身の仮名 (viewerEmailHash) �
   const noEmail = ctx.buildSafePublishedDataResult(result, { displaySettings: {} }, {});
   assert.equal(noEmail.viewerEmailHash, null);
 });
+
+// =====================================================================
+// 授業の対象クラス: 児童には今日の学級の回答だけを返す (__limitRowsToLessonClasses_)
+// =====================================================================
+
+const CLASS_ROWS = {
+  success: true,
+  data: [
+    { email: 'child1@example.com', class: '6年1組', reason: '自分' },
+    { email: 'child2@example.com', class: '6年1組', reason: '同じ学級' },
+    { email: 'other4@example.com', class: '6年4組', reason: '前日の学級' },
+    { email: 'blank@example.com', class: '', reason: 'クラス不明' }
+  ]
+};
+
+test('対象クラス: 児童には対象クラスの回答だけを返す (他の学級・クラス不明は返さない)', () => {
+  const ctx = loadContext(null);
+  const phase = { screenRole: 'browse', classes: ['6年1組'] };
+  const out = ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'child1@example.com', false, false, phase);
+  assert.deepEqual(out.data.map(r => r.email).join(','), 'child1@example.com,child2@example.com');
+});
+
+test('対象クラス: 自分の行は対象クラス外でも返す', () => {
+  const ctx = loadContext(null);
+  const phase = { screenRole: 'browse', classes: ['6年1組'] };
+  const out = ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'other4@example.com', false, false, phase);
+  assert.ok(out.data.some(r => r.email === 'other4@example.com'));
+  assert.equal(out.data.filter(r => r.class === '6年4組').length, 1, '他の 6年4組の行は増えない');
+});
+
+test('対象クラス: 教師 / 管理者には全学級を返す', () => {
+  const ctx = loadContext(null);
+  const phase = { screenRole: 'browse', classes: ['6年1組'] };
+  assert.equal(ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 't@example.com', true, false, phase).data.length, 4);
+  assert.equal(ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'a@example.com', false, true, phase).data.length, 4);
+});
+
+test('対象クラス: 授業中でない / クラス一覧が空なら何もしない (掲示板モードは無変更)', () => {
+  const ctx = loadContext(null);
+  assert.equal(ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'child1@example.com', false, false, null).data.length, 4);
+  assert.equal(ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'child1@example.com', false, false, { screenRole: 'browse', classes: [] }).data.length, 4);
+});
+
+test('対象クラス: 複数クラスを対象にすれば、その複数クラス分を返す', () => {
+  const ctx = loadContext(null);
+  const phase = { screenRole: 'browse', classes: ['6年1組', '6年4組'] };
+  assert.equal(ctx.__limitRowsToLessonClasses_(CLASS_ROWS, 'child1@example.com', false, false, phase).data.length, 3);
+});

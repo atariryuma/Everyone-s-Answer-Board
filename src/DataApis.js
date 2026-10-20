@@ -949,6 +949,44 @@ function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnB
   }
 }
 
+/**
+ * 授業モード (native) の児童には、授業の対象クラスの回答だけを返す。
+ *
+ * Why: 1 つの授業・1 組の回答シートに 4 学級分がたまる運用で、児童はクラス選択で他の学級の
+ *   位置と理由を見られた。後の学級は自分の授業の前に答えを見られ、「出会う」では議論の相手で
+ *   ない 100 人分の多数派が見えた。見る範囲は児童の選択ではなくアプリが決める (見せない順序)。
+ *   対象クラスは授業のクラス一覧 (ランナーで授業中にも直せる) を「今日の学級」として使う。
+ *
+ * 規則:
+ *   - 教師 (own board) / 管理者には全学級を返す (見取り・投影はこれまでどおり)
+ *   - 授業中でない / Form 経由の授業 / クラス一覧が空なら何もしない (掲示板モードは無変更)
+ *   - 自分の行は対象クラス外でも返す (自分の記録が消えたように見せない)
+ *   - クラス欄が空の行は返さない (どの学級のものか分からない回答を見せない)
+ *
+ * cache から取り出したあとに viewer ごとにかける (__maskOthersDuringInputPhase_ と同じ位置)。
+ *   Sheets への読み取りは増えない。
+ */
+function __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isAdmin, phase) {
+  try {
+    if (isOwnBoard || isAdmin) return result;
+    if (!result || !phase) return result;
+    const classes = Array.isArray(phase.classes) ? phase.classes.map(c => String(c).trim()).filter(Boolean) : [];
+    if (classes.length === 0) return result;
+    const rows = Array.isArray(result.data) ? result.data : [];
+    const me = String(viewerEmail || '').trim().toLowerCase();
+    const kept = rows.filter((r) => {
+      if (!r) return false;
+      if (me && String(r.email || '').trim().toLowerCase() === me) return true;
+      return classes.indexOf(String(r.class || '').trim()) >= 0;
+    });
+    return Object.assign({}, result, { data: kept });
+  } catch (error) {
+    // 判定できないときは元のまま通す (__maskOthersDuringInputPhase_ と同じ方針。掲示板を壊さない)。
+    logError_('__limitRowsToLessonClasses_', error);
+    return result;
+  }
+}
+
 function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
@@ -1394,7 +1432,9 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       return buildSafePublishedDataResult(
         __applyLessonHeader_(
-          __maskOthersDuringInputPhase_(result, targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
+          __maskOthersDuringInputPhase_(
+            __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
+            targetUser.userId, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
           targetUser.userId,
           lessonPhase
         ),
@@ -1710,7 +1750,9 @@ function getNotificationUpdate(targetUserId, options = {}) {
     }
 
     const lastUpdate = new Date(options.lastUpdateTime || 0);
-    const newItems = (userData.data || []).filter(item => {
+    // 児童の「新着あり」も対象クラスの回答だけで数える (他の学級の投稿で読み直しを起こさない)。
+    const visibleData = __limitRowsToLessonClasses_(userData, email, isOwnBoard, isAdmin, lessonPhase).data || [];
+    const newItems = visibleData.filter(item => {
       const itemTime = new Date(item.timestamp || 0);
       return itemTime > lastUpdate;
     });
