@@ -792,12 +792,14 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
     if (auth.error) return auth.error;
     const { found } = auth;
 
-    // 実行中でも直してよい項目: 授業モード (native) の classes。
+    // 実行中でも直してよい項目: 授業モード (native) の classes と、各フェーズの問いの文。
     //   Why: native の classes は児童がクラスを選ぶための選択肢で、回答シートや Form の
-    //   構造には関わらない (シートは授業ごと、クラス列は文字列)。Form 経由の授業は
-    //   Form 作成時にクラス選択肢を焼き込むので、開始後の変更は Form に届かない = 従来どおり draft のみ。
+    //   構造には関わらない (シートは授業ごと、クラス列は文字列)。問いの文も児童画面が
+    //   phase 応答のたびに lessonJson から読むだけで、回答の列や集計には関わらない。
+    //   複数学級で 1 つの授業を回すとき、1 学級目の反省で次の学級の問いを直せるようにする。
+    //   Form 経由の授業は Form 作成時に焼き込むので、開始後の変更は Form に届かない = 従来どおり draft のみ。
     const activeEditable = found.lesson.state === 'active'
-      && fieldPath === 'classes'
+      && (fieldPath === 'classes' || /^phases(?:\.|\[)\d+\]?\.question$/.test(String(fieldPath)))
       && __isNativePhase_({}, found.lesson.lessonJson || {});
     if (found.lesson.state !== 'draft' && !activeEditable) {
       return createErrorResponse('FORBIDDEN_STATE: draft 状態でのみ編集できます');
@@ -824,7 +826,7 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
     const patch = isNameField ? { lessonJson, name: newName } : { lessonJson };
     const result = __updateLessonRow_(lessonId, patch, expectedEtag);
     if (!result.success) return createErrorResponse(result.message || result.error, null, { error: result.error });
-    // 実行中の classes 変更は児童の phase 応答 (classes) に載るので、cache を捨てて次の polling で届ける。
+    // 実行中の classes・問いの変更は児童の phase 応答に載るので、cache を捨てて次の polling で届ける。
     if (activeEditable) __invalidateViewerLessonPhase_(userId);
     return createSuccessResponse('updated', { lesson: result.lesson });
   } catch (error) {

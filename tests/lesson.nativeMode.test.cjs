@@ -694,6 +694,24 @@ test('updateLessonDraft: 授業モードの classes は実行中でも直せて�
   assert.match(other.message, /draft/);
 });
 
+test('updateLessonDraft: 授業モードの問いの文は実行中でも直せて、児童画面に届く (他の項目は draft のみ)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const q = '自由に言葉を送り合えるからこそ、あなたが大切にしたいことは何だろう。';
+  const res = h.context.updateLessonDraft('u1', lessonId, 'phases.0.question', q);
+  assert.equal(res.success, true, res.message);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  assert.equal(h.context.__getViewerLessonPhase_('u1').question, q);
+  // bracket 表記も同じ扱い
+  assert.equal(h.context.updateLessonDraft('u1', lessonId, 'phases[0].question', q + '？').success, true);
+  // 問い以外のフェーズ設定 (座標系・画面の役割) は実行中に変えない
+  for (const path of ['phases.0.formTemplate', 'phases.0.screenRole', 'phases.0.question.extra', 'phases']) {
+    const r = h.context.updateLessonDraft('u1', lessonId, path, 'x');
+    assert.equal(r.success, false, path);
+    assert.match(r.message, /draft/);
+  }
+});
+
 test('数直線の授業モード: 最初の入力フェーズの形式が全フェーズに揃い、児童は横の値だけで送れる', () => {
   const h = loadContext();
   const draft = h.context.createLessonDraft('u1', 'ロレンゾ (数直線)', 'dialogue-2phase');
