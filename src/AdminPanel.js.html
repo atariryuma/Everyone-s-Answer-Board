@@ -3579,6 +3579,8 @@
     //   onLoaded(lesson) を実行。 setLoading / 成功チェック / etag セット / load 失敗の
     //   error handling を集約。 openLessonWizard (CREATE) / openLessonRunner (RUN) で共通。
     function loadLessonThen(lessonId, preloaded, onLoaded) {
+      // 開いていた授業の書きかけは、その授業へ先に送る (送り先が切り替わらないように)。
+      flushLessonSaves();
       currentLessonId = lessonId;
       if (!preloaded) window.setLoading(true, 'レッスンを読込中...');
       const loader = preloaded
@@ -3612,6 +3614,7 @@
     }
 
     function exitLessonCreateMode() {
+      flushLessonSaves();
       document.body.classList.remove('mode-create-lesson');
       document.body.classList.remove('mode-run-lesson');
       currentLessonId = null;
@@ -4682,48 +4685,66 @@
       return el.value;
     }
 
+    // ---- lesson autosave: begin ----
     // すべての lesson save を 1 本の Promise チェーンに直列化する。
     //   field 別の debounce key だと、name と phases が ~同時に fire したとき同じ etag を
     //   見て送信 → 2 番目が etag_mismatch で落ちる。saveQueue で順次実行することで
     //   後続の save は必ず直前の save 完了後の最新 etag を読む。
+    // 送り先は「編集したときの授業」(pendingLessonId) に固定する。
+    //   Why: 送り先を flush 時の currentLessonId で決めていたため、ある授業を編集した直後
+    //   (debounce の 600ms 以内) に別の授業を開くと、その変更が開いた先の授業に保存された。
+    //   etag_mismatch の retry も開いた先の etag を読み直して通してしまっていた
+    //   (2026-10-21、実行中の「会話のゆくえ」の学級が「6年1組」だけになり、学級の選択欄が消えた)。
     let saveQueue = Promise.resolve();
     let pendingFields = {}; // fieldPath → 最新 value (debounce-fire 時の snapshot)
+    let pendingLessonId = null; // pendingFields を編集した授業
+    const lessonEtags = {}; // 開いていない授業へ送るときの etag (開いている授業は currentLessonEtag)
+
+    function etagFor(lessonId) {
+      return lessonId === currentLessonId ? currentLessonEtag : lessonEtags[lessonId];
+    }
+    function noteSavedEtag(lessonId, lesson) {
+      lessonEtags[lessonId] = lesson.etag;
+      if (lessonId !== currentLessonId) return;
+      currentLessonEtag = lesson.etag;
+      renderConfirmStep(lesson.lessonJson);
+    }
 
     function flushLessonSaves() {
       const indicator = document.getElementById('lesson-autosave-indicator');
       const fields = Object.keys(pendingFields);
-      if (!fields.length || !currentLessonId) return;
+      const lessonId = pendingLessonId;
+      if (!fields.length || !lessonId) return;
       const batch = pendingFields;
       pendingFields = {};
+      pendingLessonId = null;
+      if (lessonId === currentLessonId) lessonEtags[lessonId] = currentLessonEtag;
       if (indicator) indicator.textContent = '保存中...';
       fields.forEach((fieldPath) => {
         saveQueue = saveQueue.then(() => new Promise((resolve) => {
-          if (!currentLessonId) return resolve();
           gasRun('lesson.updateDraft', {
             userId,
-            lessonId: currentLessonId,
+            lessonId,
             fieldPath,
             value: batch[fieldPath],
-            expectedEtag: currentLessonEtag
+            expectedEtag: etagFor(lessonId)
           }).then((res) => {
             if (res && res.success) {
-              currentLessonEtag = res.data.lesson.etag;
+              noteSavedEtag(lessonId, res.data.lesson);
               if (indicator) indicator.textContent = '自動保存';
-              renderConfirmStep(res.data.lesson.lessonJson);
             } else if (res && res.error === 'etag_mismatch') {
               // 直列化していれば原則発生しないが、念のため refetch & 1 回 retry。
               //   retry の Promise を返して、次の項目の保存がこの retry と重ならないようにする。
-              return gasRun('lesson.review', { userId, lessonId: currentLessonId }).then((r2) => {
+              //   読み直すのも保存するのも、編集した授業 (lessonId)。
+              return gasRun('lesson.review', { userId, lessonId }).then((r2) => {
                 if (r2 && r2.success) {
-                  currentLessonEtag = r2.data.lesson.etag;
                   return gasRun('lesson.updateDraft', {
-                    userId, lessonId: currentLessonId, fieldPath,
-                    value: batch[fieldPath], expectedEtag: currentLessonEtag
+                    userId, lessonId, fieldPath,
+                    value: batch[fieldPath], expectedEtag: r2.data.lesson.etag
                   }).then((r3) => {
                     if (r3 && r3.success) {
-                      currentLessonEtag = r3.data.lesson.etag;
+                      noteSavedEtag(lessonId, r3.data.lesson);
                       if (indicator) indicator.textContent = '自動保存';
-                      renderConfirmStep(r3.data.lesson.lessonJson);
                     } else if (indicator) indicator.textContent = '保存失敗';
                   });
                 }
@@ -4743,6 +4764,9 @@
 
     function scheduleLessonFieldSave(el) {
       if (!currentLessonId) return;
+      // 別の授業の書きかけが残っていたら、その授業へ先に送る (混ぜない)。
+      if (pendingLessonId && pendingLessonId !== currentLessonId) flushLessonSaves();
+      pendingLessonId = currentLessonId;
       const fieldPath = el.dataset.lessonField;
       pendingFields[fieldPath] = parseFieldValue(el); // 上書き = coalesce
       const indicator = document.getElementById('lesson-autosave-indicator');
@@ -4750,6 +4774,7 @@
       // 単一キー debounce → 全フィールドの編集が落ち着いてから 1 回だけ flush。
       window.sharedUtilities.debounce.debounce(flushLessonSaves, 'lesson-save', FIELD_DEBOUNCE_MS);
     }
+    // ---- lesson autosave: end ----
     window.__scheduleLessonFieldSave = scheduleLessonFieldSave;
 
     // ---------- Start ----------
@@ -5513,6 +5538,7 @@
         // history で AdminPanel に戻った
         document.body.classList.remove('mode-create-lesson');
         document.body.classList.remove('mode-run-lesson');
+        flushLessonSaves();
         currentLessonId = null;
         // 授業の開始 / 終了を経て戻ってきたかもしれない。一覧を読み直してロック状態を合わせる。
         loadLessonList();
