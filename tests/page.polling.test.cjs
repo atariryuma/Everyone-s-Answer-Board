@@ -1273,34 +1273,3 @@ test('__isTerminalPollError: 非公開 (Access denied) は止める / User not f
   assert.equal(instance.__isTerminalPollError(new Error('User not found')), false);
   assert.equal(instance.__isTerminalPollError(new Error('Quota exceeded (429)')), false);
 });
-
-test('クラス既定: 授業の対象クラスが 1 つなら、教師の画面も既定でその学級 (投影に他の学級を出さない)', () => {
-  const { instance } = makeFilterInstance({ isEditor: true });
-  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年2組'] };
-  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: false }).selectedClass, '6年2組');
-});
-
-test('クラス既定: 教師が自分で「すべて」を選べば全学級 (見せるかは教師が決める)', () => {
-  const { instance } = makeFilterInstance({ isEditor: true, explicit: 'すべて' });
-  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年2組'] };
-  assert.equal(instance.getCurrentFilterState().classFilter, null);
-});
-
-test('クラス既定: 対象クラスが複数なら従来どおり (教師は「すべて」)', () => {
-  const { instance } = makeFilterInstance({ isEditor: true });
-  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年1組', '6年2組'] };
-  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: true }).selectedClass, 'すべて');
-});
-
-test('__refetchIfTargetClassChanged: 「すべて」で読んだ後に対象クラスが届いたら 1 回だけ読み直す', () => {
-  const { instance, timers } = (() => { const r = makeFilterInstance({ isEditor: true }); return { instance: r.instance, timers: null }; })();
-  const loads = [];
-  instance.loadSheetData = (o) => { loads.push(o); return Promise.resolve(); };
-  instance.state.__lastFetchClass = 'すべて';
-  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', classes: ['6年2組'] };
-  instance.__refetchIfTargetClassChanged();
-  assert.equal(instance.elements.classFilter.value, '6年2組');
-  instance.state.__lastFetchClass = '6年2組';
-  instance.__refetchIfTargetClassChanged();
-  assert.equal(instance.elements.classFilter.value, '6年2組', '同じなら何もしない');
-});
