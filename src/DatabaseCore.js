@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -104,6 +104,8 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
       try {
         response = UrlFetchApp.fetch(url, currentOptions);
       } catch (fetchError) {
+        // 利用者の許可不足なら印を残す (呼び出し元が「混み合っています」ではなく直し方を返せるように)。
+        if (typeof noteAuthorizationScopeFailure_ === 'function') noteAuthorizationScopeFailure_(fetchError);
         // 非冪等 write が network/socket で落ちた場合、 commit 済か判定不能 → retry 禁止。
         if (!idempotent) {
           throw new Error(`non-idempotent write aborted (no retry): ${fetchError && fetchError.message ? fetchError.message : fetchError}`);

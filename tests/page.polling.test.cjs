@@ -638,17 +638,19 @@ test('populateClassFilter: keeps previous selection when present in new data', (
   assert.equal(cf.value, '4組');
 });
 
-test('populateClassFilter: falls back to すべて when selection missing + syncs sessionStorage', () => {
+test('populateClassFilter: 選択肢は「これまでに見えた学級」から作る (絞り込んで読んでも他の学級を選べる)', () => {
   const { instance } = makeInstance();
   const cf = makeFilterMock();
-  cf.value = '4組';
-  let persisted = null;
   instance.elements = { classFilter: cf };
-  instance.loadPersistedClassFilter = () => '4組';
-  instance.persistClassFilter = (v) => { persisted = v; };
-  instance.populateClassFilter([{ class: '1組' }, { class: '2組' }]);
-  assert.equal(cf.value, 'すべて');
-  assert.equal(persisted, 'すべて', 'sessionStorage も同期されて次回 fetch も整合');
+  instance.state.lessonPhase = null;
+  // 1 回目: 全学級で読んだ
+  instance.populateClassFilter([{ class: '1組' }, { class: '2組' }, { class: '4組' }]);
+  // 2 回目: 1 組で絞って読んだ (行は 1 組だけ) → 選択肢には 2 組・4 組も残る
+  cf.value = '1組';
+  instance.__explicitClassFilter = () => '1組';
+  instance.populateClassFilter([{ class: '1組' }]);
+  assert.equal(cf.value, '1組');
+  ['すべて', '1組', '2組', '4組'].forEach(c => assert.match(cf.innerHTML, new RegExp(c)));
 });
 
 
@@ -1037,7 +1039,7 @@ test('クラス既定: 教師 (編集者) は従来どおり「すべて」', ()
   assert.equal(instance.buildLoadConfiguration({ isInitialLoad: true }).selectedClass, 'すべて');
 });
 
-test('populateClassFilter: 自分のクラスが選択肢にあればそれを選ぶ。行が無いときは降格を覚えない', () => {
+test('populateClassFilter: 自分のクラスを選ぶ。0 件でも、他の学級だけでも「すべて」に変えない', () => {
   const { instance, ctx } = makeFilterInstance({ ownClass: '6年2組' });
   // 「考える」でまだ答えていない: 行が無い → 表示は「すべて」だが sessionStorage には書かない
   instance.populateClassFilter([]);
@@ -1047,10 +1049,10 @@ test('populateClassFilter: 自分のクラスが選択肢にあればそれを�
   // 「出会う」で全員分が来た → 自分のクラス
   instance.populateClassFilter([{ class: '6年1組' }, { class: '6年2組' }]);
   assert.equal(instance.elements.classFilter.value, '6年2組');
-  // 自分のクラスの行が無いフェーズ → 「すべて」に降格し、それを覚える (空結果を引き続けない)
+  // 効いているクラスは勝手に「すべて」へ変えない (表示と読み込みの中身を食い違わせない)
   instance.populateClassFilter([{ class: '6年1組' }]);
-  assert.equal(instance.elements.classFilter.value, 'すべて');
-  assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), 'すべて');
+  assert.equal(instance.elements.classFilter.value, '6年2組');
+  assert.equal(ctx.sessionStorage.getItem('classFilter_u1_phase1'), null);
 });
 
 test('clearPersistedClassFilter: フェーズ切替のリセット後は既定から決め直す', () => {
@@ -1272,4 +1274,49 @@ test('__isTerminalPollError: 非公開 (Access denied) は止める / User not f
   assert.equal(instance.__isTerminalPollError(new Error('Access denied')), true);
   assert.equal(instance.__isTerminalPollError(new Error('User not found')), false);
   assert.equal(instance.__isTerminalPollError(new Error('Quota exceeded (429)')), false);
+});
+
+// =====================================================================
+// 教師のボード: 対象クラスが 1 つなら既定でその学級 (投影に他の学級を出さない) — 選択肢は全学級
+// =====================================================================
+
+test('クラス既定: 対象クラスが 1 つなら教師の画面もその学級。選択肢には前に見えた学級も残る', () => {
+  const { instance } = makeFilterInstance({ isEditor: true });
+  // 初回 (フェーズ情報が届く前) は全学級で読んでいる
+  instance.populateClassFilter([{ class: '6年1組' }, { class: '6年4組' }]);
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年2組'] };
+  assert.equal(instance.buildLoadConfiguration({ isInitialLoad: false }).selectedClass, '6年2組');
+  instance.populateClassFilter([]);   // 6年2組で読んだ結果 (まだ 0 件)
+  const html = instance.elements.classFilter.innerHTML;
+  ['すべて', '6年1組', '6年2組', '6年4組'].forEach(c => assert.match(html, new RegExp(c)));
+  assert.equal(instance.elements.classFilter.value, '6年2組');
+});
+
+test('クラス既定: 教師が自分で「すべて」を選べば全学級 (見せるかは教師が決める)', () => {
+  const { instance } = makeFilterInstance({ isEditor: true, explicit: 'すべて' });
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年2組'] };
+  assert.equal(instance.getCurrentFilterState().classFilter, null);
+});
+
+test('__refetchIfTargetClassChanged: 対象クラスが届いたら 1 回だけ読み直し、同じなら何もしない', () => {
+  const { instance } = makeFilterInstance({ isEditor: true });
+  instance.state.__lastFetchClass = 'すべて';
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 0, screenRole: 'input', classes: ['6年2組'] };
+  instance.loadSheetData = () => Promise.resolve();
+  instance.__refetchIfTargetClassChanged();
+  assert.equal(instance.elements.classFilter.value, '6年2組');
+  instance.elements.classFilter.value = 'x';
+  instance.state.__lastFetchClass = '6年2組';
+  instance.__refetchIfTargetClassChanged();
+  assert.equal(instance.elements.classFilter.value, 'x', '同じなら触らない');
+});
+
+test('__noticeAuthorizationMissing: AUTH_REQUIRED のときだけ 1 度知らせる', () => {
+  const { instance, ctx } = makeInstance();
+  const banners = [];
+  ctx.window.notifications = { banner: (m) => banners.push(m) };
+  assert.equal(instance.__noticeAuthorizationMissing({ message: 'Data access failed' }), false);
+  assert.equal(instance.__noticeAuthorizationMissing({ success: false, error: 'AUTH_REQUIRED', message: '許可がそろっていません' }), true);
+  instance.__noticeAuthorizationMissing(new Error('このアプリの許可がそろっていません'));
+  assert.equal(banners.length, 1);
 });

@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -2384,7 +2384,8 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
       // 児童が自分のクラスを選ぶための選択肢。1 つなら画面は聞かずに自動で入れる。
       //   Why: 児童の画面はボードのクラスフィルタが入力画面の下に隠れていて選べず、
       //   全員がクラス空欄で記録されていた (教師のクラス絞り込みが効かない)。
-      classes: Array.isArray(lessonJson.classes) ? lessonJson.classes.map(String) : []
+      // 対象クラス。児童のボードで見せる範囲 (__limitRowsToLessonClasses_) もこれで決まる。
+      classes: __lessonTargetClasses_(lessonJson)
     };
   } catch (error) {
     logError_('__computeViewerLessonPhase_', error);
@@ -2452,6 +2453,19 @@ const LESSON_ROW_READ_FAILED = -2;
  * @param {string} targetUserId
  * @param {Object} payload - { lessonId, phaseIndex, numericX, numericY, reason, addedInsight, class, name }
  */
+/**
+ * 投稿に記録するクラス。対象クラスが 1 つの授業では、端末の申告ではなくサーバがそれを入れる。
+ *
+ * Why: 見せる範囲 (対象クラスの行だけ) はこの class 列で決まる。端末の localStorage に前の授業の
+ *   クラスが残っていたり、送信時に空だったりすると、その児童の回答が自分の学級の分布から消える。
+ *   対象が複数のときだけ、児童が選んだ値 (画面で選ばせている) を使う。
+ */
+function __resolveSubmitClass_(clientClass, lessonJson) {
+  const targets = __lessonTargetClasses_(lessonJson);
+  if (targets.length === 1) return targets[0];
+  return __sanitizeLessonText_(clientClass, 50);
+}
+
 function submitLessonAnswer(targetUserId, payload) {
   const startedAt = Date.now();
   // 断った送信は必ず 1 行残す (2026-09-29 の「送ったのに届かない」で、断った理由がどこにも無く
@@ -2510,7 +2524,7 @@ function submitLessonAnswer(targetUserId, payload) {
     const row = [
       new Date().toISOString(),
       actorEmail,
-      __sanitizeLessonText_(p.class, 50),
+      __resolveSubmitClass_(p.class, lessonJson),
       __sanitizeLessonText_(p.name, 50),
       x,
       (y === null) ? '' : y,
@@ -2520,6 +2534,10 @@ function submitLessonAnswer(targetUserId, payload) {
 
     const existingRow = __findOwnLessonRow_(sheet, actorEmail);
     if (existingRow === LESSON_ROW_READ_FAILED) {
+      // 読めなかった理由が許可不足なら、待っても直らない。直し方を返す (2026-10-21/22 に児童 1〜2 人)。
+      if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
+        return refuse('AUTH_REQUIRED', AUTH_SCOPE_GUIDANCE);
+      }
       return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
     }
     let writtenRow = existingRow;
@@ -2741,6 +2759,31 @@ function __buildLessonChangeStudents_(lessonJson, boardUserId, opts) {
  * @param {Object} [options] - { sinceSig: 前回の sig, includeChange: ● → ★ も返す }
  * @returns {Object} { supported, sig, unchanged?, phase, axis, rows, pending, change }
  */
+/**
+ * 授業の「いまの対象クラス」(lessonJson.classes) を正規化して返す。空なら [] (= 絞らない)。
+ *
+ * 対象クラスは見せる範囲の唯一の定義: 児童のボード (__limitRowsToLessonClasses_) も、
+ * 教師の回答一覧 (getLessonLiveAnswers) も、ここから決める。
+ * Why 1 か所か: 2026-10-22、児童のボードは対象クラスに絞れていたのに、管理パネルの回答一覧と
+ *   「未提出」は全学級を出していた。見せる範囲を場所ごとに決めると、こうしたずれが場所の数だけ出る。
+ */
+function __lessonTargetClasses_(lessonJson) {
+  const list = (lessonJson && Array.isArray(lessonJson.classes)) ? lessonJson.classes : [];
+  const out = [];
+  list.forEach((c) => {
+    const v = String(c == null ? '' : c).trim();
+    if (v && out.indexOf(v) < 0) out.push(v);
+  });
+  return out;
+}
+
+// 対象クラスに入る行だけ (classes が空なら全行)。行の class は児童が送ったときの値。
+function __rowsInClasses_(rows, classes) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!Array.isArray(classes) || classes.length === 0) return list;
+  return list.filter(r => r && classes.indexOf(String(r.class || '').trim()) >= 0);
+}
+
 function getLessonLiveAnswers(userId, lessonId, options) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true, cachedLesson: true });
@@ -2758,7 +2801,19 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
     const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
     const source = { spreadsheetId: patch.spreadsheetId, sheetName: patch.sheetName };
-    const rows = __readAllLessonRows_(source, { boardUserId: userId });
+    const allRows = __readAllLessonRows_(source, { boardUserId: userId });
+    // 既定は対象クラスだけ。教師が「すべてのクラス」を選んだときだけ全学級 (options.allClasses)。
+    //   回答シートは学級をまたいで共有なので、絞らないと前の学級の回答と「未提出」が混ざる。
+    const targetClasses = __lessonTargetClasses_(lessonJson);
+    const allClasses = Boolean(options && options.allClasses);
+    const scopeClasses = allClasses ? [] : targetClasses;
+    const rows = __rowsInClasses_(allRows, scopeClasses);
+    // 選択肢用: データに出てくる学級 + 対象クラス (まだ誰も答えていない対象クラスも選べるように)。
+    const classesInData = targetClasses.slice();
+    allRows.forEach((r) => {
+      const c = String(r.class || '').trim();
+      if (c && classesInData.indexOf(c) < 0) classesInData.push(c);
+    });
 
     // 未提出: 2 回目以降の入力フェーズだけ分かる (名簿は持たないので、前の入力フェーズに
     //   答えた児童を母集団にする)。最初の入力フェーズでは null = 「分からない」。
@@ -2774,7 +2829,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       }
       if (prevInput) {
         const answered = new Set(rows.map(r => r.email));
-        pending = __readAllLessonRows_(prevInput, { boardUserId: userId })
+        pending = __rowsInClasses_(__readAllLessonRows_(prevInput, { boardUserId: userId }), scopeClasses)
           .filter(r => !answered.has(r.email))
           .map(r => ({ name: r.name, email: r.email, class: r.class }));
       }
@@ -2782,7 +2837,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
     // 変化の検出用 sig。行の追加・置き直し・ハイライトのどれでも変わるよう、中身ごと hash する
     //   (timestamp だけだと同じ時刻の置き直しを見落とす。30 行 × 500 字でも hash は一瞬)。
-    const rowsSig = (source.sheetName + '|' + phaseIndex + '|' + rows
+    const rowsSig = (source.sheetName + '|' + phaseIndex + '|' + scopeClasses.join(',') + '|' + rows
       .map(r => [r.rowIndex, r.timestamp, r.name, r.class, r.numericX, r.numericY,
         r.reason, r.addedInsight, r.highlight ? 1 : 0].join('\u0001')).join('\u0002')
       + '|' + (pending ? pending.map(p => p.email).join(',') : '-'));
@@ -2797,7 +2852,10 @@ function getLessonLiveAnswers(userId, lessonId, options) {
     };
     // ● → ★ を開いているときだけ、入力フェーズ全部を読んで児童ごとの変化を足す
     //   (どの読みも行 cache 越し。「もう一度考える」は pending で既に前のシートを読んでいる)。
-    const change = (options && options.includeChange) ? __buildLessonChangeStudents_(lessonJson, userId) : null;
+    const changeAll = (options && options.includeChange) ? __buildLessonChangeStudents_(lessonJson, userId) : null;
+    const change = changeAll
+      ? Object.assign({}, changeAll, { students: __rowsInClasses_(changeAll.students, scopeClasses) })
+      : null;
     const sig = __liveAnswersSig_(rowsSig + (change ? '|' + JSON.stringify(change.students) : '|-'));
     if (options && options.sinceSig && options.sinceSig === sig) {
       return createSuccessResponse('変更なし', { supported: true, unchanged: true, sig, phase: phaseInfo });
@@ -2815,7 +2873,10 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       supported: true,
       sig,
       phase: phaseInfo,
-      classes: Array.isArray(lessonJson.classes) ? lessonJson.classes.map(String) : [],
+      classes: targetClasses,
+      // 管理パネルのクラス選択用。対象クラス以外も含む (教師が他の学級を見ると決めたとき用)。
+      classesInData,
+      allClasses,
       axis,
       rows,
       pending,

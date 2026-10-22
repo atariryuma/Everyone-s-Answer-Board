@@ -1280,12 +1280,32 @@
             this.__handleBoardClosed();
             return;
           }
+          // 許可不足は待っても直らない。直し方を 1 度だけ出す (polling は backoff で続ける)。
+          this.__noticeAuthorizationMissing(error);
         }
 
         // 進行中に stop → start されていたら、新しいチェーンに任せる (2 本にしない)。
         if (gen !== this.polling.gen) return;
         this.schedulePollingCheck();
       }, interval);
+    }
+
+    /**
+     * サーバが「許可がそろっていない」(AUTH_REQUIRED) と返したときに、直し方を 1 度だけ出す。
+     *   Why: 許可の項目を外した児童は、読み込みも送信も黙って失敗していた (2026-10-21/22)。
+     *   開く前に判定する方式は誤判定で全員を止めたので、実際に失敗したときだけ知らせる。
+     */
+    __noticeAuthorizationMissing(errorOrResponse) {
+      const msg = String((errorOrResponse && (errorOrResponse.message || errorOrResponse.error)) || '');
+      if (!/許可がそろっていません|AUTH_REQUIRED/.test(msg)) return false;
+      if (this.state.__authNoticeShown) return true;
+      this.state.__authNoticeShown = true;
+      try {
+        if (window.notifications && typeof window.notifications.banner === 'function') {
+          window.notifications.banner('このアプリの許可がそろっていません。ブラウザを閉じてから開き直し、許可の画面ですべての項目にチェックしてください', { duration: 0 });
+        }
+      } catch (_) { /* 知らせられなくても、送信時のメッセージで同じ直し方が出る */ }
+      return true;
     }
 
     __isTerminalPollError(error) {
@@ -1616,6 +1636,7 @@
         || prev.phaseIndex !== phase.phaseIndex
         || prev.lessonId !== phase.lessonId;
       this.state.lessonPhase = phase || null;
+      this.__refetchIfTargetClassChanged();
 
       // 教師: ヘッダ / 待機画面の操作面を、いま届いたフェーズに合わせる。
       //   管理パネルで進めた・授業をあとから始めた・終了した、のどれでもボードが追従する。
@@ -3459,6 +3480,7 @@
           return;
         }
         if (!result || !result.success) {
+          if (this.__noticeAuthorizationMissing(result)) return;
           this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
           return;
         }
@@ -3593,6 +3615,8 @@
             sortOrder: 'newest'
           }
         : this.getCurrentFilterState();
+      // 読み込みに使ったクラス。対象クラスが後から届いたときの読み直し判定に使う。
+      this.state.__lastFetchClass = filterState.rawClassFilter || 'すべて';
 
       return {
         isInitialLoad,
@@ -3637,29 +3661,31 @@
     populateClassFilter(rows) {
       const classFilter = this.elements.classFilter;
       if (!classFilter) return;
-      const escape = window.sharedUtilities.security.escapeHtml;
-      const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
-      // 優先順は __resolveClassFilter に集約 (fetch と表示がズレないため)。
-      //   選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
+      // 選択肢は「この画面でこれまでに見えた学級」+ 授業の対象クラスから作る。
+      //   Why: 以前は直前に読んだ行だけから作っていた。対象クラスで絞って読むと行も対象クラスだけに
+      //   なり、選択肢が「すべて・6年2組」だけになって他の学級を直接選べなくなった (2026-10-22)。
+      const known = this.__rememberClasses(rows);
       const desired = this.__resolveClassFilter(classFilter.value);
-      const hasRows = Array.isArray(rows) && rows.length > 0;
-      // 絞り込んだ結果が 0 件 (自分のクラスがまだ誰も答えていない) のときも、いま効いている
-      //   クラスを選択肢に残す。残さないと select は「すべて」を表示するのに中身は自分の
-      //   クラスで 0 件、という食い違いになる (2026-10-05 の授業ログで 19 台が該当)。
-      if (!hasRows && desired && desired !== 'すべて' && !uniqueClasses.includes(desired)) {
-        uniqueClasses.push(desired);
-      }
-      // escape() は非 ASCII を %uXXXX にするので日本語のクラス名が化ける。HTML エスケープを使う。
+      const options = ['すべて'].concat(known);
+      // 効いているクラスは、まだ誰も答えていなくても選択肢に残す (表示と中身を食い違わせない)。
+      if (desired && desired !== 'すべて' && options.indexOf(desired) < 0) options.push(desired);
+      // HTML エスケープを使う (escape() は日本語のクラス名を %uXXXX にして化けさせる)。
       const escOpt = (v) => window.sharedUtilities.security.escapeHtml(String(v));
-      classFilter.innerHTML = uniqueClasses.map(c => '<option value="'+ escOpt(c) + '">'+ escOpt(c) + '</option>').join('');
-      classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
+      classFilter.innerHTML = options.map(c => '<option value="'+ escOpt(c) + '">'+ escOpt(c) + '</option>').join('');
+      classFilter.value = desired || 'すべて';
       classFilter.classList.remove('hidden');
-      // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
-      //   ただし行が 1 件も無いとき (「考える」でまだ答えていない児童など) は判断材料が無いので
-      //   降格を覚えない。覚えると自分のクラス既定が「すべて」で上書きされ、以後効かなくなる。
-      if (hasRows && classFilter.value !== desired && typeof this.persistClassFilter === 'function') {
-        this.persistClassFilter(classFilter.value);
-      }
+    }
+
+    // 読み込んだ行と授業の対象クラスに出てきた学級を覚えて、並べた一覧を返す (画面を開いている間だけ)。
+    __rememberClasses(rows) {
+      const known = Array.isArray(this.state.__knownClasses) ? this.state.__knownClasses : [];
+      const add = (c) => { const v = String(c || '').trim(); if (v && known.indexOf(v) < 0) known.push(v); };
+      (Array.isArray(rows) ? rows : []).forEach(r => add(r && r.class));
+      const phase = this.state.lessonPhase;
+      (phase && Array.isArray(phase.classes) ? phase.classes : []).forEach(add);
+      known.sort((a, b) => a.localeCompare(b, 'ja'));
+      this.state.__knownClasses = known;
+      return known.slice();
     }
 
     applyReactionStyles(element, data) {
@@ -5070,11 +5096,39 @@
     __resolveClassFilter(domValue) {
       const explicit = this.__explicitClassFilter();
       if (explicit) return explicit;
+      // 授業の対象クラスが 1 つなら、教師の画面も既定でその学級だけにする。
+      //   Why: 教師のボードは電子黒板に映る。全学級のままだと、児童にはサーバで隠している
+      //   他の学級の分布と送信人数が投影で見えてしまう (2026-10-22 の 6年2組で確認)。
+      //   全学級を見せたいときは教師がクラス選択で「すべて」を選ぶ (見せるかどうかを教師が決める)。
+      const target = this.__lessonTargetClass();
+      if (target) return target;
       if (this.state && this.state.isEditor !== true) {
         const own = this.__lessonStoredClass();
         if (own) return own;
       }
       return domValue || 'すべて';
+    }
+
+    // 実行中の授業の対象クラスが 1 つならその名前、それ以外は null。
+    __lessonTargetClass() {
+      const phase = this.state && this.state.lessonPhase;
+      const classes = (phase && Array.isArray(phase.classes)) ? phase.classes.filter(Boolean) : [];
+      return classes.length === 1 ? String(classes[0]) : null;
+    }
+
+    // 対象クラスが届いて、使うべきクラスが直前の読み込みと変わったら 1 回だけ読み直す。
+    //   初回表示はフェーズ情報より先に (対象クラスを知らずに) 読んでいるため、ここで揃える。
+    //   同じ値なら何もしないので、polling のたびに読み直すループにはならない。
+    __refetchIfTargetClassChanged() {
+      try {
+        const want = this.__resolveClassFilter(this.elements && this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+        const used = this.state.__lastFetchClass;
+        if (!used || want === used || this.state.isReviewMode) return;
+        if (this.elements && this.elements.classFilter) this.elements.classFilter.value = want;
+        if (typeof this.loadSheetData === 'function') {
+          setTimeout(() => this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false }), 0);
+        }
+      } catch (_) { /* 揃えられなくても次の読み込みで揃う */ }
     }
 
     /**

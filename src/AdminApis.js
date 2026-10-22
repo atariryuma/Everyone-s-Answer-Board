@@ -1394,7 +1394,9 @@ function dispatchAdminOperation(operation, params) {
       { const e = reqStr('userId'); if (e) return e; }
       { const e = reqStr('lessonId'); if (e) return e; }
       const sinceSig = typeof params.sinceSig === 'string' ? params.sinceSig.slice(0, 64) : '';
-      return getLessonLiveAnswers(params.userId, params.lessonId, { sinceSig, includeChange: params.includeChange === true });
+      return getLessonLiveAnswers(params.userId, params.lessonId, {
+        sinceSig, includeChange: params.includeChange === true, allClasses: params.allClasses === true
+      });
     }
     case 'lesson.toggleHighlight': {
       { const e = reqStr('userId'); if (e) return e; }

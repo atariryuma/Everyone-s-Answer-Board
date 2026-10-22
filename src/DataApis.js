@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -881,6 +881,10 @@ function validateHeaderIntegrity(targetUserId) {
 // getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
 //   複数の read 経路で同一だったのを集約。
 function buildSheetDataErrorResult_(result) {
+  // 読めなかった理由が利用者の許可不足なら、BUSY (待てば直る) ではなく直し方を返す。
+  if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
+    return createErrorResponse(AUTH_SCOPE_GUIDANCE, [], { error: 'AUTH_REQUIRED', sheetName: '', header: '許可が必要です' });
+  }
   if (result && result.busy) return result;   // BUSY はそのまま (受け手が busy で見分ける)
   return {
     success: false,
@@ -970,15 +974,17 @@ function __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isAdmin, p
   try {
     if (isOwnBoard || isAdmin) return result;
     if (!result || !phase) return result;
+    // phase.classes は __lessonTargetClasses_ で正規化済み (対象クラスの唯一の定義)。
     const classes = Array.isArray(phase.classes) ? phase.classes.map(c => String(c).trim()).filter(Boolean) : [];
     if (classes.length === 0) return result;
     const rows = Array.isArray(result.data) ? result.data : [];
     const me = String(viewerEmail || '').trim().toLowerCase();
-    const kept = rows.filter((r) => {
-      if (!r) return false;
-      if (me && String(r.email || '').trim().toLowerCase() === me) return true;
-      return classes.indexOf(String(r.class || '').trim()) >= 0;
-    });
+    const isMine = (r) => Boolean(r && me && String(r.email || '').trim().toLowerCase() === me);
+    // 対象クラスの行 (教師の回答一覧と同じ __rowsInClasses_) + 自分の行。順序は元のまま保つ。
+    const inScope = new Set(typeof __rowsInClasses_ === 'function'
+      ? __rowsInClasses_(rows, classes)
+      : rows.filter(r => r && classes.indexOf(String(r.class || '').trim()) >= 0));
+    const kept = rows.filter(r => r && (inScope.has(r) || isMine(r)));
     return Object.assign({}, result, { data: kept });
   } catch (error) {
     // 判定できないときは元のまま通す (__maskOthersDuringInputPhase_ と同じ方針。掲示板を壊さない)。
@@ -1746,6 +1752,9 @@ function getNotificationUpdate(targetUserId, options = {}) {
     }
     if (userData && userData.stale) envelope.boardStale = true;
     if (!userData || !userData.success) {
+      if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
+        return createErrorResponse(AUTH_SCOPE_GUIDANCE, null, { error: 'AUTH_REQUIRED' });
+      }
       return createErrorResponse('Data access failed');
     }
 

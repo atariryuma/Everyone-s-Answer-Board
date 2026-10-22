@@ -1157,6 +1157,32 @@ function executeWithRetry(operation, options = {}) {
  * @param {string} errorMessage - Error message to analyze
  * @returns {boolean} True if error is retryable
  */
+/**
+ * 利用者の許可不足 (OAuth scope が一部だけ) による失敗か。
+ *
+ * Why 判定ではなく「起きた失敗」で見るか: 2026-10-22 に、開く前に許可の有無を判定する方式
+ *   (getAuthorizationInfo) を入れたら、使わない項目を外しているだけの児童 9 人を誤って止めた。
+ *   ここは実際に UrlFetch 等が権限エラーで落ちたときだけ true になるので、誤判定で止めない。
+ * @param {*} error - Error か文字列
+ */
+function isAuthorizationScopeError_(error) {
+  const msg = String((error && error.message) || error || '');
+  return /権限がありません|承認が必要|script\.external_request|Authorization is required/i.test(msg);
+}
+
+// この実行の中で許可不足の失敗が起きたか (読み込みが空になった理由を、画面へ伝えるため)。
+//   GAS は 1 リクエスト = 1 実行なので、実行をまたいで残ることはない。
+let AUTH_SCOPE_FAILURE_SEEN_ = false;
+function noteAuthorizationScopeFailure_(error) {
+  if (isAuthorizationScopeError_(error)) AUTH_SCOPE_FAILURE_SEEN_ = true;
+}
+function authorizationScopeFailureSeen_() {
+  return AUTH_SCOPE_FAILURE_SEEN_;
+}
+
+// 児童に見せる直し方 (サーバのどこから返しても同じ文にする)。
+const AUTH_SCOPE_GUIDANCE = 'このアプリの許可がそろっていません。ブラウザを閉じてから開き直し、出てきた許可の画面ですべての項目にチェックしてください';
+
 function isRetryableError(errorMessage) {
   if (!errorMessage || typeof errorMessage !== 'string') {
     return false;
@@ -1190,7 +1216,11 @@ function isRetryableError(errorMessage) {
     'api returned 403',
     'api returned 404',
     // 非冪等 write (例: :append) の失敗。 commit 済か判定不能なため retry すると重複を生む (H3)。
-    'non-idempotent'
+    'non-idempotent',
+    // 利用者の許可不足 (granular consent で項目を外した)。待っても直らない。
+    //   GAS は日本語で返すので英語の 'permission' に当たらず、3 回 sleep して投げ直していた。
+    '権限がありません',
+    '承認が必要'
   ];
 
   const lowerMessage = errorMessage.toLowerCase();

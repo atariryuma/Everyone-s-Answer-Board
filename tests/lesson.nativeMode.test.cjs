@@ -1794,3 +1794,79 @@ test('advanceLessonPhase: prewarm が落ちても切替は成功する', () => {
   const res = advanceAsTeacher(h, lessonId, 1);
   assert.equal(res.data.activePhaseIndex, 1);
 });
+
+// =====================================================================
+// 対象クラス (lessonJson.classes) が見せる範囲の唯一の定義 — 教師の回答一覧も同じ範囲 (2026-10-22)
+// =====================================================================
+
+function seedTwoClasses(h, lessonId) {
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  // 前日の学級 (6年4組) が答えたあと、今日の学級 (6年1組) に切り替えた状況を作る。
+  h.setEmail('teacher@example.com');
+  h.context.updateLessonDraft('u1', lessonId, 'classes', ['6年4組']);
+  submitAs(h, 'prev1@example.com', { lessonId, phaseIndex: 0, numericX: 1, numericY: 1, reason: 'a' });
+  submitAs(h, 'prev2@example.com', { lessonId, phaseIndex: 0, numericX: 2, numericY: 2, reason: 'b' });
+  h.setEmail('teacher@example.com');
+  h.context.updateLessonDraft('u1', lessonId, 'classes', ['6年1組']);
+  submitAs(h, 'today1@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: 'c' });
+  h.setEmail('teacher@example.com');
+}
+
+test('対象クラス: 投稿のクラスは、対象が 1 つならサーバが入れる (端末の申告に頼らない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedTwoClasses(h, lessonId);
+  const res = h.context.getLessonLiveAnswers('u1', lessonId, { allClasses: true });
+  const byEmail = {};
+  Array.from(res.data.rows).forEach(r => { byEmail[r.email] = r.class; });
+  assert.equal(byEmail['prev1@example.com'], '6年4組');
+  assert.equal(byEmail['today1@example.com'], '6年1組');
+});
+
+test('教師の回答一覧: 既定は対象クラスだけ。「すべてのクラス」で全学級。選択肢には前の学級も出る', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedTwoClasses(h, lessonId);
+  const scoped = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.deepEqual(Array.from(scoped.data.rows).map(r => r.email), ['today1@example.com']);
+  assert.deepEqual(Array.from(scoped.data.classes), ['6年1組']);
+  assert.ok(Array.from(scoped.data.classesInData).includes('6年4組'), '選択肢用に前の学級も返す');
+  assert.equal(scoped.data.allClasses, false);
+  const all = h.context.getLessonLiveAnswers('u1', lessonId, { allClasses: true });
+  assert.equal(Array.from(all.data.rows).length, 3);
+  assert.notEqual(scoped.data.sig, all.data.sig, '範囲が違えば sig も違う (切替直後に「変更なし」にしない)');
+});
+
+test('教師の回答一覧: 「未提出」も対象クラスだけで数える (前の学級を未提出に出さない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedTwoClasses(h, lessonId);
+  advanceAsTeacher(h, lessonId, 3); // もう一度考える
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  const pending = Array.from(res.data.pending || []).map(p => p.email);
+  assert.deepEqual(pending, ['today1@example.com']);
+});
+
+test('submitLessonAnswer: シートが読めなかった理由が許可不足なら、混み合いではなく直し方を返す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  h.context.authorizationScopeFailureSeen_ = () => true;
+  h.context.AUTH_SCOPE_GUIDANCE = '許可がそろっていません。すべての項目にチェックしてください';
+  // 行の読み取りを失敗させる (許可不足で UrlFetch が落ちると SA proxy は [] を返す)
+  h.nativeSheets.forEach((sh) => { sh.getDataRange = () => ({ getValues: () => [] }); });
+  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'AUTH_REQUIRED');
+  assert.match(res.message, /すべての項目にチェック/);
+});
+
+test('submitLessonAnswer: 許可不足でない読み取り失敗は、従来どおり「混み合っています」', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  h.context.authorizationScopeFailureSeen_ = () => false;
+  h.nativeSheets.forEach((sh) => { sh.getDataRange = () => ({ getValues: () => [] }); });
+  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
+  assert.equal(res.error, 'SHEET_READ_FAILED');
+});

@@ -4932,6 +4932,9 @@
       view: 'position',                 // position | arrival | change
       hideNames: false,
       classFilter: '',
+      // 対象クラス以外も読む (教師が「すべてのクラス」を選んだとき)。既定は対象クラスだけ。
+      //   サーバが絞るので、未提出 / ● → ★ も同じ範囲になる。
+      allClasses: false,
       sig: '',
       data: null,
       timer: null,
@@ -4986,6 +4989,7 @@
         live.lessonId = lesson.lessonId;
         live.data = null;
         live.classFilter = '';
+        live.allClasses = false;
         live.firstSeen.clear();
         live.seenEmails.clear();
         live.expanded.clear();
@@ -5014,7 +5018,7 @@
       const lessonId = live.lessonId;
       // ● → ★ を開いているときだけ、児童ごとの変化もまとめて返してもらう (同じ polling に乗せる)。
       const includeChange = live.view === 'change';
-      gasRun('lesson.liveAnswers', { userId, lessonId, sinceSig: live.sig, includeChange }).then((res) => {
+      gasRun('lesson.liveAnswers', { userId, lessonId, sinceSig: live.sig, includeChange, allClasses: live.allClasses }).then((res) => {
         if (lessonId !== live.lessonId) return;
         if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を読み込めませんでした'));
         live.errors = 0;
@@ -5096,24 +5100,48 @@
         namesBtn.textContent = live.hideNames ? '名前を表示' : '名前を隠す';
       }
       const sel = document.getElementById('lesson-live-class');
-      const classes = (live.data && Array.isArray(live.data.classes)) ? live.data.classes : [];
+      const target = (live.data && Array.isArray(live.data.classes)) ? live.data.classes : [];
+      const inData = (live.data && Array.isArray(live.data.classesInData)) ? live.data.classesInData : target;
       if (sel) {
-        // 授業は 1 クラスで行うのが普通なので、複数あるときだけ選ばせる。
-        sel.classList.toggle('hidden', classes.length < 2);
-        const sig = classes.join('\u0001');
+        // 選べる学級が 1 つしかなければ出さない (今日の学級だけの授業で、前の学級の回答も無い)。
+        sel.classList.toggle('hidden', inData.length < 2);
+        const sig = target.join('\u0001') + '|' + inData.join('\u0001');
         if (sel.dataset.sig !== sig) {
           sel.dataset.sig = sig;
           sel.innerHTML = '';
-          [''].concat(classes).forEach((c) => {
+          const opts = [];
+          // 既定 = 対象クラス。名前を出して「いま何を見ているか」を明示する。
+          if (target.length) opts.push({ v: '', t: '対象クラス（' + target.join('・') + '）' });
+          opts.push({ v: LIVE_ALL_CLASSES, t: 'すべてのクラス' });
+          inData.forEach((c) => opts.push({ v: c, t: c }));
+          opts.forEach((o) => {
             const opt = document.createElement('option');
-            opt.value = c;
-            opt.textContent = c || 'すべてのクラス';
+            opt.value = o.v;
+            opt.textContent = o.t;
             sel.appendChild(opt);
           });
         }
-        if (live.classFilter && classes.indexOf(live.classFilter) < 0) live.classFilter = '';
-        sel.value = live.classFilter;
+        sel.value = liveSelectValue(target);
       }
+    }
+
+    // クラス選択の値 ⇄ (allClasses, classFilter)。サーバの範囲 (allClasses) と画面内の絞り込み
+    //   (classFilter) を 1 つの選択で表す。対象クラスの 1 つを選んだときは対象範囲のまま絞る。
+    const LIVE_ALL_CLASSES = '__all__';
+    function liveSelectValue(target) {
+      if (live.classFilter) return live.classFilter;
+      if (live.allClasses || !target.length) return LIVE_ALL_CLASSES;
+      return '';
+    }
+    function liveApplySelectValue(v) {
+      const target = (live.data && Array.isArray(live.data.classes)) ? live.data.classes : [];
+      const prevAll = live.allClasses;
+      if (v === '') { live.allClasses = false; live.classFilter = ''; }
+      else if (v === LIVE_ALL_CLASSES) { live.allClasses = true; live.classFilter = ''; }
+      else { live.classFilter = v; live.allClasses = target.indexOf(v) < 0; }
+      // 範囲が変わったら読み直す (サーバが絞るので、手元の行だけでは足りない)。
+      if (prevAll !== live.allClasses) { live.sig = ''; liveFetch(); }
+      liveRender();
     }
 
     function liveRender() {
@@ -5186,7 +5214,14 @@
     function liveRenderFilterNote(shown, total) {
       const el = document.getElementById('lesson-live-filter-note');
       if (!el) return;
-      if (!live.classFilter) { el.classList.add('hidden'); el.textContent = ''; return; }
+      if (!live.classFilter) {
+        // 対象クラス以外も出しているときだけ知らせる (既定の対象クラス表示では何も出さない)。
+        if (live.allClasses) {
+          el.textContent = '対象クラス以外の学級の回答も表示しています。';
+          el.classList.remove('hidden');
+        } else { el.classList.add('hidden'); el.textContent = ''; }
+        return;
+      }
       const hidden = Math.max(0, total - shown);
       el.textContent = '「' + live.classFilter + '」だけを表示しています（' + shown + '人）。' +
         (hidden > 0 ? '他のクラスの ' + hidden + '人は隠しています。' : '他のクラスの回答はありません。') +
@@ -5460,7 +5495,7 @@
         }
       });
       const sel = document.getElementById('lesson-live-class');
-      if (sel) sel.addEventListener('change', () => { live.classFilter = sel.value; liveRender(); });
+      if (sel) sel.addEventListener('change', () => liveApplySelectValue(sel.value));
       // タブに戻ってきたら、待たずに最新を読む (隠れている間は止めている)。
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && liveRunning()) liveFetch();
