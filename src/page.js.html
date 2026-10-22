@@ -1616,6 +1616,7 @@
         || prev.phaseIndex !== phase.phaseIndex
         || prev.lessonId !== phase.lessonId;
       this.state.lessonPhase = phase || null;
+      this.__refetchIfTargetClassChanged();
 
       // 教師: ヘッダ / 待機画面の操作面を、いま届いたフェーズに合わせる。
       //   管理パネルで進めた・授業をあとから始めた・終了した、のどれでもボードが追従する。
@@ -3593,6 +3594,8 @@
             sortOrder: 'newest'
           }
         : this.getCurrentFilterState();
+      // 読み込みに使ったクラス。フェーズ情報 (対象クラス) が後から届いたときの読み直し判定に使う。
+      this.state.__lastFetchClass = filterState.rawClassFilter || 'すべて';
 
       return {
         isInitialLoad,
@@ -5070,11 +5073,39 @@
     __resolveClassFilter(domValue) {
       const explicit = this.__explicitClassFilter();
       if (explicit) return explicit;
+      // 授業の対象クラスが 1 つなら、教師の画面も既定でその学級だけにする。
+      //   Why: 教師のボードは電子黒板に映る。全学級のままだと、児童にはサーバで隠している
+      //   他の学級の分布と送信人数が投影で見えてしまう (2026-10-22 の 6年2組で確認)。
+      //   全学級を見たいときは教師がクラス選択で「すべて」を選ぶ (見せるかどうかを教師が決める)。
+      const target = this.__lessonTargetClass();
+      if (target) return target;
       if (this.state && this.state.isEditor !== true) {
         const own = this.__lessonStoredClass();
         if (own) return own;
       }
       return domValue || 'すべて';
+    }
+
+    // 対象クラスが届いて、使うべきクラスが直前の読み込みと変わったら 1 回だけ読み直す。
+    //   初回表示はフェーズ情報より先に「すべて」で読んでいるため、ここで揃える。
+    //   同じ値なら何もしないので、polling のたびに読み直すループにはならない。
+    __refetchIfTargetClassChanged() {
+      try {
+        const want = this.__resolveClassFilter(this.elements && this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
+        const used = this.state.__lastFetchClass;
+        if (!used || want === used || this.state.isReviewMode) return;
+        if (this.elements && this.elements.classFilter) this.elements.classFilter.value = want;
+        if (typeof this.loadSheetData === 'function') {
+          setTimeout(() => this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false }), 0);
+        }
+      } catch (_) { /* 揃えられなくても次の読み込みで揃う */ }
+    }
+
+    // 実行中の授業の対象クラスが 1 つならその名前、それ以外は null。
+    __lessonTargetClass() {
+      const phase = this.state && this.state.lessonPhase;
+      const classes = (phase && Array.isArray(phase.classes)) ? phase.classes.filter(Boolean) : [];
+      return classes.length === 1 ? String(classes[0]) : null;
     }
 
     /**
