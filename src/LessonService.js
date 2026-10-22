@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, getMissingAuthorization_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -2463,6 +2463,12 @@ function submitLessonAnswer(targetUserId, payload) {
     const actorEmail = getCurrentEmail();
     ctx.actor = actorEmail;
     if (!actorEmail) return refuse('NO_EMAIL', 'ユーザー認証が必要です');
+
+    // 許可が一部だけだと、この先のシート読み書きが必ず失敗する (SHEET_READ_FAILED で 10 回断った 2026-10-21)。
+    //   開いたままの画面から送った児童にも、何をすれば直るかを返す。
+    if (typeof getMissingAuthorization_ === 'function' && getMissingAuthorization_()) {
+      return refuse('AUTH_REQUIRED', 'このアプリの許可がそろっていません。ページを読み込み直し、出てきた画面ですべての項目にチェックしてください');
+    }
 
     const phase = __getViewerLessonPhase_(targetUserId, { fresh: true });
     if (!phase) return refuse('NO_ACTIVE_LESSON', 'この授業はいま投稿を受け付けていません');

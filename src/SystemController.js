@@ -11,7 +11,7 @@
  * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_, clearDatabaseUserCache, clearPropertyCache */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_, clearDatabaseUserCache, clearPropertyCache, getMissingAuthorization_ */
 
 /**
  * キャッシュ期間 (秒)
@@ -300,6 +300,20 @@ function testSystemDiagnosis() {
         error: error.message,
         critical: true
       });
+    }
+
+    // 呼び出し元の許可がそろっているか (doGet の再許可ページと同じ判定)。
+    //   ここが REQUIRED になるなら、判定そのものが誤っていて全員が再許可ページで止まる恐れがある。
+    try {
+      const missing = (typeof getMissingAuthorization_ === 'function') ? getMissingAuthorization_() : null;
+      diagnostics.push({
+        test: 'Caller Authorization',
+        status: missing ? 'FAIL' : 'PASS',
+        details: missing ? 'authorization REQUIRED for the caller' : 'all scopes granted (or check unavailable)',
+        critical: false
+      });
+    } catch (error) {
+      diagnostics.push({ test: 'Caller Authorization', status: 'ERROR', error: error.message, critical: false });
     }
 
     try {
