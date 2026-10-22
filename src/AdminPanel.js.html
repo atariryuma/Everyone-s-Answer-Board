@@ -4946,6 +4946,10 @@
       baselineDone: false,              // 最初の読み込みで見えた分は NEW にしない
       expanded: new Set(),              // 理由を全文表示中のカード (rowIndex)
       pendingHl: new Set(),             // ハイライト送信中の rowIndex (連打防止)
+      // 押した ★ の値を、サーバの読み込みで確かめられるまで上書きで保つ (key = シート:行)。
+      //   Why: 押す前に始まった polling が古い行を持って帰り、★ を消していた。確定の応答も
+      //   入れ替わる前の行に書いていたので、次の読み込み (最大 10 秒) まで ★ が消えたままだった。
+      hlOverride: new Map(),            // key → { value, until }
       hasChangeView: false,
       sheetPhaseNames: {}               // sheetName → フェーズ名 (「出会う」が何の回答を見ているか)
     };
@@ -4990,6 +4994,7 @@
         live.data = null;
         live.classFilter = '';
         live.allClasses = false;
+        live.hlOverride.clear();
         live.firstSeen.clear();
         live.seenEmails.clear();
         live.expanded.clear();
@@ -5031,6 +5036,7 @@
           live.data = d;
           live.sig = d.sig || '';
           liveNoteArrivals(d.rows || []);
+          liveApplyHighlightOverrides();
         }
         // 変化が無くても描き直す (NEW の期限切れを落とすため。30 枚程度なので軽い)。
         liveRender();
@@ -5421,6 +5427,28 @@
       '</span>';
     }
 
+    // サーバの行に、押したばかりの ★ を重ねる。読み込みが同じ値を返したら上書きを外す (確定)。
+    //   30 秒たっても確定しなければ外す (サーバの値を正とする。押した結果は通知で伝えている)。
+    function liveApplyHighlightOverrides() {
+      const d = live.data;
+      if (!d || !live.hlOverride.size) return;
+      const src = (d.phase && d.phase.sourceSheetName) || '';
+      const now = Date.now();
+      const apply = (a, sheetName) => {
+        if (!a || !Number.isInteger(a.rowIndex)) return;
+        const key = liveRowKey(sheetName, a.rowIndex);
+        const o = live.hlOverride.get(key);
+        if (!o) return;
+        if (o.until < now) { live.hlOverride.delete(key); return; }
+        if (o.confirmed && Boolean(a.highlight) === o.value) { live.hlOverride.delete(key); return; }
+        a.highlight = o.value;
+      };
+      (d.rows || []).forEach(r => apply(r, src));
+      if (d.change) {
+        (d.change.students || []).forEach(st => [st.first, st.last].forEach(a => apply(a, a && a.sheetName)));
+      }
+    }
+
     function liveToggleHighlight(btn) {
       const rowIndex = Number(btn.dataset.liveHl);
       const d = live.data;
@@ -5435,26 +5463,35 @@
       }
       if (!targets.length) return;
       const prev = Boolean(targets[0].highlight);
-      const setAll = (v) => targets.forEach((t) => { t.highlight = v; });
-      // 楽観更新: 押した瞬間に一覧を切り替える。ボードへは数秒で届く。
-      setAll(!prev);
+      const key = liveRowKey(src, rowIndex);
+      const email = String(targets[0].email || '');
+      // 楽観更新: 押した瞬間に一覧を切り替え、確定するまで上書きで保つ (polling の古い行で消さない)。
+      live.hlOverride.set(key, { value: !prev, until: Date.now() + 30000, confirmed: false });
+      liveApplyHighlightOverrides();
       live.pendingHl.add(rowIndex);
       liveRender();
       gasRun('lesson.toggleHighlight', {
         userId, lessonId: live.lessonId, rowIndex, sheetName: src,
         // 行ロックの中で「その行がこの児童か」を照合してもらう (削除で行番号がずれていたら書かない)。
-        expectedEmail: String(targets[0].email || '')
+        expectedEmail: email
       }).then((res) => {
         if (!res || !res.success) throw new Error(window.serverMessage(res, 'ハイライトを切り替えられませんでした'));
-        setAll(typeof res.highlighted === 'boolean' ? res.highlighted : !prev);
-        live.sig = '';   // 次の polling で確定値を取り直す
+        const value = typeof res.highlighted === 'boolean' ? res.highlighted : !prev;
+        // サーバが書いた値で上書きを確定させる。次の読み込みが同じ値を返したら上書きは外れる。
+        live.hlOverride.set(key, { value, until: Date.now() + 30000, confirmed: true });
+        window.notifications.success(value ? 'ハイライトしました。ボードにも数秒で出ます' : 'ハイライトを外しました', { duration: 2500 });
+        // 待たずに読み直して確かめる (今の読み込み中なら、終わり次第もう 1 回)。
+        live.sig = '';
+        liveFetch();
       }).catch((err) => {
-        setAll(prev);
+        live.hlOverride.delete(key);
         const msg = (err && err.message) || 'ハイライトを切り替えられませんでした';
         window.notifications.error(msg.replace(/^(PHASE|ROW)_CHANGED:\s*/, ''));
-        if (/^(PHASE|ROW)_CHANGED/.test(msg)) { live.sig = ''; liveFetch(); }
+        live.sig = '';
+        liveFetch();
       }).finally(() => {
         live.pendingHl.delete(rowIndex);
+        liveApplyHighlightOverrides();
         liveRender();
       });
     }
