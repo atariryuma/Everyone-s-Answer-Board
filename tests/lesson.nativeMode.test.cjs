@@ -1794,14 +1794,3 @@ test('advanceLessonPhase: prewarm が落ちても切替は成功する', () => {
   const res = advanceAsTeacher(h, lessonId, 1);
   assert.equal(res.data.activePhaseIndex, 1);
 });
-
-test('submitLessonAnswer: 許可が一部だけの児童には AUTH_REQUIRED と直し方を返す (シートに触らない)', () => {
-  const h = loadContext();
-  const lessonId = startNativeLesson(h);
-  h.context.getConfigOrDefault = withActiveLesson(lessonId);
-  h.context.getMissingAuthorization_ = () => ({ authUrl: 'https://accounts.example/auth' });
-  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
-  assert.equal(res.success, false);
-  assert.equal(res.error, 'AUTH_REQUIRED');
-  assert.match(res.message, /すべての項目にチェック/);
-});

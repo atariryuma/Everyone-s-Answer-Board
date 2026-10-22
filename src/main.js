@@ -100,53 +100,6 @@ function evaluateDomainRestriction(email) {
  * @param {string} message - 表示メッセージ
  * @returns {HtmlOutput} 制限ページ
  */
-/**
- * 呼び出し元がこのアプリの許可 (OAuth scope) をすべて与えているかを調べる。
- *
- * Why: Google は許可を項目ごとに選べる (granular consent)。児童が初回の許可画面で
- *   「外部サービスへの接続」等のチェックを外すと、ボードは開くのに読み込みも送信も
- *   "UrlFetchApp.fetch を呼び出す権限がありません" で失敗し続け、画面には何も出ない
- *   (2026-10-21 に児童 2 人)。GAS は一部でも許可があれば許可画面を出し直さないので、
- *   アプリが気づいて許可し直す導線を出す。
- *
- * 判定できない (API が無い / 例外) ときは「足りている」に倒す。誤って全員を止めない。
- * @returns {{authUrl:string}|null} 足りなければ許可し直す URL、足りていれば null
- */
-function getMissingAuthorization_() {
-  try {
-    if (typeof ScriptApp === 'undefined' || typeof ScriptApp.getAuthorizationInfo !== 'function') return null;
-    const info = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
-    if (!info || info.getAuthorizationStatus() !== ScriptApp.AuthorizationStatus.REQUIRED) return null;
-    return { authUrl: String(info.getAuthorizationUrl() || '') };
-  } catch (error) {
-    console.warn('getMissingAuthorization_: check failed (treated as authorized):', error && error.message);
-    return null;
-  }
-}
-
-/** 許可が足りないときに出すページ。児童が読む前提の言葉で書く。 */
-function createAuthorizationRequiredPage_(authUrl, reloadUrl) {
-  const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const link = authUrl
-    ? '<p><a class="btn" href="' + esc(authUrl) + '" target="_blank" rel="noopener">許可し直す</a></p>'
-    : '';
-  const html =
-    '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>許可が必要です</title>' +
-    '<style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1.25rem;line-height:1.8}' +
-    'h1{font-size:1.4rem}.btn{display:inline-block;padding:.75rem 1.5rem;border-radius:999px;border:2px solid currentColor;' +
-    'text-decoration:none;font-weight:700}ol{padding-left:1.25rem}</style></head><body>' +
-    '<h1>このアプリを使うための許可が、まだそろっていません</h1>' +
-    '<ol><li>下の「許可し直す」をおします。</li>' +
-    '<li>出てきた画面で、<strong>すべての項目にチェック</strong>を入れて「続行」をおします。</li>' +
-    '<li>この画面にもどって、ページを読み込み直します。</li></ol>' +
-    link +
-    (reloadUrl ? '<p><a href="' + esc(reloadUrl) + '" target="_top">読み込み直す</a></p>' : '') +
-    '</body></html>';
-  return HtmlService.createHtmlOutput(html).setTitle('許可が必要です');
-}
-
 function createAccessRestrictedTemplate(email, isAppDisabled = false, message = '') {
   const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
   template.isAdministrator = email ? isAdministrator(email) : false;
@@ -169,20 +122,6 @@ function doGet(e) {
   try {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
-
-    // 許可が一部だけのまま使うと、読み込みも送信も黙って失敗する。開いた時点で知らせる。
-    const missingAuth = getMissingAuthorization_();
-    if (missingAuth) {
-      console.warn('doGet: authorization incomplete, showing re-consent page', { mode });
-      // 読み込み直すと同じボードに戻れるよう、開いた URL (クエリ込み) を渡す。
-      let reloadUrl = '';
-      try {
-        const base = (typeof getWebAppUrl === 'function' ? getWebAppUrl() : '') || '';
-        const qs = Object.keys(params || {}).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
-        reloadUrl = base ? (qs ? base + '?' + qs : base) : '';
-      } catch (_) { /* 読み込み直しリンクが出せなくても、ブラウザの再読み込みで戻れる */ }
-      return createAuthorizationRequiredPage_(missingAuth.authUrl, reloadUrl);
-    }
 
     const currentEmail = getCurrentEmail();
 
