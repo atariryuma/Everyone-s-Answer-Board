@@ -5188,7 +5188,8 @@
         const srcName = live.sheetPhaseNames[ph.sourceSheetName] || '';
         const classes = Array.isArray(d.classes) ? d.classes : [];
         const parts = [];
-        if (classes.length === 1) parts.push(classes[0]);
+        // 「すべてのクラス」を見ているときは学級名を付けない (付けると対象クラスだけに見える)。
+        if (!live.allClasses && classes.length === 1) parts.push(classes[0]);
         parts.push(isInput || !srcName ? '「' + (ph.name || '') + '」の回答'
           : '「' + (ph.name || '') + '」中 · ボードに出ている「' + srcName + '」の回答');
         parts.push('10 秒ごとに更新');
@@ -5197,7 +5198,11 @@
       liveRenderPending(pendEl, d.pending, rows.length);
 
       const axis = d.axis || { boardMode: 'matrix', min: 1, max: 5, x: {}, y: {} };
-      const showClass = !live.classFilter && Array.isArray(d.classes) && d.classes.length > 1;
+      // 複数の学級が並ぶときだけクラス名を出す。「すべてのクラス」では対象が 1 つでも学級が混ざる。
+      const shownClasses = live.allClasses
+        ? (Array.isArray(d.classesInData) ? d.classesInData : [])
+        : (Array.isArray(d.classes) ? d.classes : []);
+      const showClass = !live.classFilter && shownClasses.length > 1;
       if (live.view === 'change') {
         body.innerHTML = liveRenderChange(d, axis, showClass, esc);
         return;

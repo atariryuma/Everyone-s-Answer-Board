@@ -632,7 +632,8 @@ test('populateClassFilter: keeps previous selection when present in new data', (
   const cf = makeFilterMock();
   cf.value = '4組';
   instance.elements = { classFilter: cf };
-  instance.loadPersistedClassFilter = () => '4組';
+  // 利用者が選んだ値はタブの sessionStorage (explicit) に入っている
+  instance.__explicitClassFilter = () => '4組';
   instance.persistClassFilter = () => {};
   instance.populateClassFilter([{ class: '4組' }, { class: '5組' }]);
   assert.equal(cf.value, '4組');
@@ -1319,4 +1320,16 @@ test('__noticeAuthorizationMissing: AUTH_REQUIRED のときだけ 1 度知らせ
   assert.equal(instance.__noticeAuthorizationMissing({ success: false, error: 'AUTH_REQUIRED', message: '許可がそろっていません' }), true);
   instance.__noticeAuthorizationMissing(new Error('このアプリの許可がそろっていません'));
   assert.equal(banners.length, 1);
+});
+
+test('クラス既定: 授業が終わったら (対象クラスが消えたら) 教師のボードは「すべて」に戻る', () => {
+  const { instance } = makeFilterInstance({ isEditor: true });
+  instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 4, screenRole: 'reflect', classes: ['6年2組'] };
+  instance.elements.classFilter.value = '6年2組';
+  instance.state.__lastFetchClass = '6年2組';
+  instance.state.lessonPhase = null;   // 授業終了
+  instance.loadSheetData = () => Promise.resolve();
+  instance.__refetchIfTargetClassChanged();
+  assert.equal(instance.elements.classFilter.value, 'すべて');
+  assert.equal(instance.getCurrentFilterState().classFilter, null);
 });

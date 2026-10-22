@@ -5106,7 +5106,11 @@
         const own = this.__lessonStoredClass();
         if (own) return own;
       }
-      return domValue || 'すべて';
+      // 既定は「すべて」。select の現在値には戻らない: 利用者が選んだ値は explicit に保存されるので、
+      //   ここに来る select の値は画面が自分で入れた値 (前の授業の対象クラス等) だけ。それに従うと、
+      //   授業が終わったあとも教師のボードが前の学級に絞られたままになる。
+      void domValue;
+      return 'すべて';
     }
 
     // 実行中の授業の対象クラスが 1 つならその名前、それ以外は null。
