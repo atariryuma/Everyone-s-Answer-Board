@@ -28,10 +28,13 @@ const SHEETS_API_MAX_ATTEMPTS_ = 3;
  * Sheets 呼び出しの breaker が開いている残り時間 (ms)。閉じていれば 0。
  * 混雑を返すときに「何 ms 後に来てほしいか」(Retry-After 相当) を添えるために使う。
  */
+// Sheets 呼び出しの breaker の状態を置く ScriptCache の key (書く側と読む側で共有する唯一の定義)。
+const SHEETS_CIRCUIT_BREAKER_KEY_ = 'circuit_breaker_state';
+
 function sheetsCircuitRetryAfterMs_() {
   try {
     if (typeof CacheService === 'undefined') return 0;
-    const st = readCircuitBreakerState_(CacheService.getScriptCache(), 'circuit_breaker_state');
+    const st = readCircuitBreakerState_(CacheService.getScriptCache(), SHEETS_CIRCUIT_BREAKER_KEY_);
     return Math.max(0, st.circuitOpenUntil - Date.now());
   } catch (_) { return 0; /* 分からなければ「閉じている」(画面はいつもの間隔で来る) */ }
 }
@@ -86,7 +89,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
   const idempotent = !(fetchOpts && fetchOpts.idempotent === false);
 
   const cache = CacheService.getScriptCache();
-  const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
+  const CIRCUIT_BREAKER_KEY = SHEETS_CIRCUIT_BREAKER_KEY_;
   const circuitState = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
 
   const now = Date.now();

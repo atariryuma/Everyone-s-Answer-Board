@@ -496,3 +496,12 @@ test('fetchSheetsAPIWithRetry: SA を渡さない呼び出しは従来どおり 
   const state = JSON.parse(cache._store.get('circuit_breaker_state'));
   assert.ok(state.circuitOpenUntil > Date.now(), 'SA 無しの呼び出しは pool に逃げられないので開く');
 });
+
+test('sheetsCircuitRetryAfterMs_: breaker を書く側と同じ key を読み、開いている残り時間を返す', () => {
+  const cache = makeCache();
+  const ctx = loadCtx({ cache });
+  assert.equal(ctx.sheetsCircuitRetryAfterMs_(), 0, '閉じていれば 0');
+  cache._store.set('circuit_breaker_state', JSON.stringify({ consecutiveErrors: 9, circuitOpenUntil: Date.now() + 30000 }));
+  const ms = ctx.sheetsCircuitRetryAfterMs_();
+  assert.ok(ms > 29000 && ms <= 30000, `残り時間: ${ms}`);
+});

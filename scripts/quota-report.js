@@ -119,8 +119,14 @@ function main() {
     start = new Date(new Date(args.day + 'T00:00:00Z').getTime() - JST_MS);
     end = new Date(start.getTime() + 24 * 3600 * 1000);
   } else {
-    end = new Date();
-    start = new Date(end.getTime() - args.days * 24 * 3600 * 1000);
+    // 区切りを JST の 0 時と時計の分に揃える。Monitoring の 1 分の箱は開始時刻から刻まれるので、
+    //   「今から 168 時間前」で始めると箱が 00 秒からずれ、実行するたびに 1 分最大が変わる
+    //   (最初の日も途中からになる)。
+    const MIN_MS = 60 * 1000;
+    end = new Date(Math.floor(Date.now() / MIN_MS) * MIN_MS);
+    const todayJst = new Date(end.getTime() + JST_MS).toISOString().slice(0, 10);
+    const todayStartUtc = new Date(todayJst + 'T00:00:00Z').getTime() - JST_MS;
+    start = new Date(todayStartUtc - (args.days - 1) * 24 * 3600 * 1000);
   }
   // 1 日ずつ取る。1 分粒度で数十日を 1 回で取ると応答が大きすぎて読み切れない。
   const series = [];
