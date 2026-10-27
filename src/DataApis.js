@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE, sheetsCircuitRetryAfterMs_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -1287,6 +1287,9 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     waitMs: 500,
     waitTries: 6,
     failTtl: BOARD_DATA_FAIL_TTL_SEC,
+    // 読んだ児童の許可不足で落ちたなら、ボードが混んでいるわけではない。覚えると、その 1 人の
+    //   せいで他の全員が 8 秒 busy になる (許可不足の児童が先に読みに来た回だけ起きる)。
+    isSharedFailure: () => !(typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()),
     busyValue: boardDataBusyResult_(),
     pack: packBoardDataForCache_,
     unpack: unpackBoardDataFromCache_
@@ -1745,16 +1748,24 @@ function getNotificationUpdate(targetUserId, options = {}) {
           { allowStale: isViewerOnly })
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
 
+    // 読めなかった理由が利用者の許可不足なら、「混雑」として黙らず直し方を返す (待っても直らない)。
+    //   busy より先に見る: 許可不足の読み取り失敗は BUSY (一部読めず) の形でも届く。
+    if ((!userData || !userData.success || userData.busy)
+        && typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
+      return createErrorResponse(AUTH_SCOPE_GUIDANCE, null, { error: 'AUTH_REQUIRED' });
+    }
     // 混んでいる間は「新着なし」で返す (lessonPhase / boardVersion は届ける)。失敗にすると
     //   児童の polling が backoff に入り、フェーズ切替の通知まで遅れる。
     if (userData && userData.busy) {
-      return Object.assign(envelope, { hasNewContent: false, boardBusy: true });
+      // 何 ms 後に来てほしいかを添える (HTTP の Retry-After 相当。google.script.run は
+      //   ヘッダを渡せないので応答の項目で返す)。直前の失敗を覚えている間 (8 秒) や breaker が
+      //   開いている間に来ても、読まずに busy を返すだけなので、その間は問い合わせを控えてもらう。
+      const retryAfterMs = Math.max(BOARD_DATA_FAIL_TTL_SEC * 1000,
+        (typeof sheetsCircuitRetryAfterMs_ === 'function') ? sheetsCircuitRetryAfterMs_() : 0);
+      return Object.assign(envelope, { hasNewContent: false, boardBusy: true, retryAfterMs });
     }
     if (userData && userData.stale) envelope.boardStale = true;
     if (!userData || !userData.success) {
-      if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
-        return createErrorResponse(AUTH_SCOPE_GUIDANCE, null, { error: 'AUTH_REQUIRED' });
-      }
       return createErrorResponse('Data access failed');
     }
 

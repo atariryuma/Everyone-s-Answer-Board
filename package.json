@@ -24,6 +24,7 @@
     "logs:tail": "node scripts/logs.js --tail",
     "logs:summary": "node scripts/logs.js --summary --hours 3 --limit 500 --severity WARNING",
     "logs:errors": "node scripts/logs.js --summary --hours 24 --limit 1000 --severity ERROR",
+    "quota:report": "node scripts/quota-report.js",
     "check": "npm test && node scripts/admin-api.js systemDiagnosis",
     "smoke": "node scripts/smoke-prod.js",
     "smoke:open": "node scripts/smoke-prod.js --env open",

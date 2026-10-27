@@ -984,7 +984,12 @@
           this.activeRequests--;
         }
       }, {
-        maxRetries: isStateChanging ? 1 : 2, // State-changing operations get fewer retries
+        // 自動の再送は冪等な呼び出しだけ (読み取り 2 回、送信 1 回)。押すたびに反転する操作
+        //   (ハイライト / リアクション) と削除は再送しない: 最初の送信が実は届いていた場合、
+        //   再送で元に戻る / 別の行を消す。業界標準 (AWS Builders' Library / Google Cloud の
+        //   retry strategy) も「副作用のある API は冪等でなければ再送しない」。
+        //   送信 (submitLessonAnswer) は 1 児童 1 フェーズ 1 行の上書きなので、再送しても行は増えない。
+        maxRetries: this.__retryBudgetFor(funcName),
         baseDelay: 500,
         maxDelay: 5000, // Reduced max delay for faster failure
         context: `GAS API (${funcName || 'unknown'})`,
@@ -996,7 +1001,9 @@
 
           const retryableErrors = [
             'network', 'temporarily unavailable',
-            'script runtime', 'service invoked'
+            'script runtime', 'service invoked',
+            // GAS の一時的な内部エラーは日本語で返る (2026-10-19/20/22 にログで確認)。
+            'サーバーエラーが発生しました', 'サービスに接続できなくなりました', '予期しないエラーが発生しました'
           ];
           const shouldRetry = retryableErrors.some(errorType => error.message.toLowerCase().includes(errorType)
           );
@@ -1006,6 +1013,13 @@
       });
 
       return promise;
+    }
+
+    // 自動再送の回数。冪等でない (反転・削除) 呼び出しは 0。
+    __retryBudgetFor(funcName) {
+      if (['toggleHighlight', 'addReaction', 'deleteAnswerRow'].includes(funcName)) return 0;
+      if (funcName === 'submitLessonAnswer') return 1;
+      return 2;
     }
 
     enhanceError(error, funcName, args) {
@@ -1257,6 +1271,8 @@
             this.__applyLessonPhase(response.lessonPhase);
           }
 
+          // 混雑中の応答に添えられた「何 ms 後に来てほしいか」を次の 1 回に使う。
+          this.polling.retryAfterMs = Number(response.retryAfterMs) || 0;
           this.polling.errorCount = 0;
 
         } catch (error) {
@@ -1342,7 +1358,13 @@
     }
 
     getPollingInterval() {
-      return this.__withPollJitter(this.__basePollingInterval());
+      // サーバが「混雑中。この時間は来ないで」(retryAfterMs) と言っていたら、1 回だけそれに従う。
+      //   揺らぎは足す方向にだけかける (指定より早く来ない)。
+      const hint = Number(this.polling.retryAfterMs) || 0;
+      this.polling.retryAfterMs = 0;
+      const base = this.__withPollJitter(this.__basePollingInterval());
+      if (hint > base) return Math.round(hint * (1 + Math.random() * 0.2));
+      return base;
     }
 
     // 間隔を ±20% ばらけさせる。
@@ -5284,13 +5306,13 @@
           maxRetries: 2,
           baseDelay: 300,
           context: `ハイライト処理 (${highlightKey})`,
+          // 投げ直すのは「サーバが書いていない」と分かっている失敗だけ (行ロック待ち / 混雑)。
+          //   ハイライトは押すたびに反転するので、通信エラーやタイムアウトで投げ直すと、最初の
+          //   送信が届いていた場合に元へ戻ってしまう。分からない失敗は投げ直さず、下の catch で
+          //   ボードを読み直して実際の状態に揃える。
           retryCondition: (error) => {
-            if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
-              return false;
-            }
-            const retryableErrors = ['network', 'timeout', 'server error', 'temporarily unavailable'];
-            return retryableErrors.some(errorType => error.message.toLowerCase().includes(errorType)
-            );
+            const m = String((error && error.message) || '');
+            return /同時ハイライト処理中|いま混み合っています/.test(m);
           }
         });
 
@@ -5323,6 +5345,11 @@
           this.showNotification('権限エラー: ボード編集者のみ利用可能です', 'error');
         } else {
           this.showNotification('ハイライトに失敗しました', 'error');
+          // 通信エラー等では、サーバが書いたかどうか分からない。投げ直さず、ボードを読み直して
+          //   実際の状態 (★ の有無) を画面に出す。
+          if (typeof this.loadSheetData === 'function') {
+            this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+          }
         }
       } finally {
         btns.forEach(btn => {

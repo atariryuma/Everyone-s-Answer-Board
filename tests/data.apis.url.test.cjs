@@ -1334,3 +1334,33 @@ test('getNotificationUpdate: 児童の「新着あり」は対象クラスの回
   assert.equal(res.success, true);
   assert.equal(res.hasNewContent, false, '他の学級の投稿では新着にしない');
 });
+
+test('getNotificationUpdate: 許可不足で読めなかったときは「混雑」で黙らず直し方を返す (busy より先に見る)', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'child@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({ success: false, busy: true }),
+    authorizationScopeFailureSeen_: () => true,
+    AUTH_SCOPE_GUIDANCE: '許可がそろっていません',
+    getBoardDataVersion_: () => '1'
+  });
+  const res = ctx.getNotificationUpdate('u1', {});
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'AUTH_REQUIRED');
+});
+
+test('getNotificationUpdate: 許可不足でない混雑は従来どおり「新着なし」(boardBusy) で返す', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'child@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({ success: false, busy: true }),
+    authorizationScopeFailureSeen_: () => false,
+    getBoardDataVersion_: () => '1'
+  });
+  const res = ctx.getNotificationUpdate('u1', {});
+  assert.equal(res.success, true);
+  assert.equal(res.boardBusy, true);
+  assert.ok(res.retryAfterMs >= 8000, '混雑中は「何 ms 後に来てほしいか」を添える (失敗を覚えている 8 秒以上)');
+});

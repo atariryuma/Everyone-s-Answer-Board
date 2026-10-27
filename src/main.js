@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_ */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -1117,10 +1117,10 @@ function executeWithRetry(operation, options = {}) {
           const is429Error = errorMessage.includes('429') || errorMessage.includes('Quota exceeded');
           const baseDelay = is429Error ? initialDelay * 2 : initialDelay;
 
-          const delay = Math.min(
-            baseDelay * Math.pow(2, retryCount - 1),
-            maxDelay
-          );
+          // 指数 + Full Jitter (同時に失敗した実行が同時に投げ直さない)。
+          const delay = (typeof fullJitterBackoffMs_ === 'function')
+            ? fullJitterBackoffMs_(retryCount - 1, baseDelay, maxDelay)
+            : Math.min(baseDelay * Math.pow(2, retryCount - 1), maxDelay);
           if (retryCount === 1 || retryCount === maxRetries - 1) {
             console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay${is429Error ? ' (429 quota)' : ''}`);
           }

@@ -150,6 +150,36 @@ function unpackJsonFromCache_(cached) {
 }
 
 /**
+ * 再試行の待ち時間 (指数バックオフ + ジッタ)。サーバの再試行はすべてここで決める。
+ *
+ * Why: 待ち時間が固定 (5/10/15 秒) だと、30 人が同じ瞬間に 429 を踏んだとき、全員が同じ瞬間に
+ *   投げ直してまた同時に踏む。揺らぎ (ジッタ) を入れて投げ直しの時刻を散らすのが業界標準。
+ *
+ * sheetsApiBackoffMs_: Sheets API の 429 / 5xx 用。Google が Sheets API の使用量上限のページで
+ *   文書化している式 min(2^n 秒 + 1 秒以内の乱数, 上限) をそのまま使う (提供元の指示を優先)。
+ *   https://developers.google.com/workspace/sheets/api/limits
+ * fullJitterBackoffMs_: それ以外の一時エラー用。乱数で 0〜上限 (AWS Architecture Blog
+ *   "Exponential Backoff And Jitter" の Full Jitter。比較した方式の中で総仕事量が最小)。
+ *
+ * @param {number} attempt - 0 から始まる再試行の回数
+ * @param {number} capMs / baseMs - 上限 / 1 回目の上限 (ms)
+ * @param {Function} [random] - テスト用 (既定 Math.random)
+ * @returns {number} 待つ ms (整数)
+ */
+function sheetsApiBackoffMs_(attempt, capMs, random) {
+  const rnd = typeof random === 'function' ? random : Math.random;
+  const n = Math.max(0, Number(attempt) || 0);
+  return Math.round(Math.min(Math.pow(2, n) * 1000 + rnd() * 1000, Number(capMs) || 0));
+}
+
+function fullJitterBackoffMs_(attempt, baseMs, capMs, random) {
+  const rnd = typeof random === 'function' ? random : Math.random;
+  const n = Math.max(0, Number(attempt) || 0);
+  const ceiling = Math.min(Number(capMs) || 0, (Number(baseMs) || 0) * Math.pow(2, n));
+  return Math.round(rnd() * ceiling);
+}
+
+/**
  * cache stampede (thundering herd) を防ぐ cache 読み。
  *
  * Why: version 付き key (board data / users 一覧 / lesson 行) は、書き込み側が version を
@@ -185,6 +215,8 @@ function unpackJsonFromCache_(cached) {
  * @param {number} [opts.waitTries=3] - 待つ回数
  * @param {*} [opts.busyValue] - 指定すると「自分で読む」代わりにこの値を返す (flight 中 / 直前の失敗中)
  * @param {number} [opts.failTtl=0] - loader の結果が cache 不可だったことを覚える秒数 (0 = 覚えない)
+ * @param {Function} [opts.isSharedFailure] - 失敗を「全員の失敗」として覚えてよいか (default: 常に true)。
+ *   呼び出した人だけの理由 (許可不足など) の失敗を覚えると、他の全員まで failTtl 秒 busy になる
  * @param {Function} [opts.pack] - cache に書く直前に loader の結果を変換する (圧縮表現など)。
  *   戻り値は JSON 化できる値。unpack と対で渡す
  * @param {Function} [opts.unpack] - cache から読んだ値を loader の結果と同じ形に戻す。
@@ -204,6 +236,7 @@ function withStampedeGuard_(opts) {
   const latestKey = opts.latestKey || null;
   const latestTtl = Number(opts.latestTtl) || 60;
   const isCacheable = typeof opts.isCacheable === 'function' ? opts.isCacheable : (v) => Boolean(v);
+  const isSharedFailure = typeof opts.isSharedFailure === 'function' ? opts.isSharedFailure : () => true;
   const pack = typeof opts.pack === 'function' ? opts.pack : (v) => v;
   const unpack = typeof opts.unpack === 'function' ? opts.unpack : (v) => v;
   const read = (k) => {
@@ -275,12 +308,12 @@ function withStampedeGuard_(opts) {
       const packed = pack(fresh);
       saveToCacheWithSizeCheck(key, packed, opts.ttl);
       if (latestKey) saveToCacheWithSizeCheck(latestKey, packed, latestTtl);
-    } else if (failKey) {
+    } else if (failKey && isSharedFailure(fresh)) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }
   } finally {
     // loader が throw したときもフラグは外す (外さないと flightTtl 秒間、全員が待つ)。
-    if (claimed && !loaded && failKey) {
+    if (claimed && !loaded && failKey && isSharedFailure(undefined)) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }
     if (claimed) {

@@ -192,3 +192,59 @@ test('withStampedeGuard_: busyValue も failTtl も無い呼び出しは従来�
   });
   assert.equal(store.has('k1:fail'), false);
 });
+
+// =====================================================================
+// 再試行の待ち時間: Sheets API は Google の文書の式、その他は Full Jitter
+// =====================================================================
+
+test('sheetsApiBackoffMs_: Google の式 min(2^n 秒 + 1 秒以内の乱数, 上限)', () => {
+  const { context } = loadContext();
+  const lo = () => 0;
+  const hi = () => 0.999999;
+  assert.equal(context.sheetsApiBackoffMs_(0, 15000, lo), 1000);
+  assert.equal(context.sheetsApiBackoffMs_(0, 15000, hi), 2000);
+  assert.equal(context.sheetsApiBackoffMs_(1, 15000, lo), 2000);
+  assert.equal(context.sheetsApiBackoffMs_(2, 15000, hi), 5000);
+  assert.equal(context.sheetsApiBackoffMs_(5, 15000, lo), 15000, '上限で止まる');
+});
+
+test('fullJitterBackoffMs_: 0〜min(上限, base×2^n) の一様乱数', () => {
+  const { context } = loadContext();
+  assert.equal(context.fullJitterBackoffMs_(0, 2000, 20000, () => 0), 0);
+  assert.equal(context.fullJitterBackoffMs_(0, 2000, 20000, () => 0.5), 1000);
+  assert.equal(context.fullJitterBackoffMs_(3, 2000, 20000, () => 0.999999), 16000);
+  assert.equal(context.fullJitterBackoffMs_(9, 2000, 20000, () => 0.999999), 20000, '上限で止まる');
+});
+
+test('待ち時間は 30 回呼ぶと散らばる (全員が同じ瞬間に投げ直さない)', () => {
+  const { context } = loadContext();
+  const a = new Set(); const b = new Set();
+  for (let i = 0; i < 30; i++) { a.add(context.sheetsApiBackoffMs_(1, 15000)); b.add(context.fullJitterBackoffMs_(2, 2000, 20000)); }
+  assert.ok(a.size > 10 && b.size > 10, `ばらつき ${a.size} / ${b.size}`);
+});
+
+// =====================================================================
+// isSharedFailure: 呼び出した人だけの理由の失敗は、全員の失敗として覚えない
+// =====================================================================
+
+test('withStampedeGuard_: isSharedFailure が false なら失敗を覚えない (他の人を busy にしない)', () => {
+  const { context, store } = loadContext();
+  const out = context.withStampedeGuard_({
+    key: 'k1', ttl: 10, failTtl: 8, busyValue: { busy: true },
+    isCacheable: (v) => Boolean(v && v.success),
+    isSharedFailure: () => false,
+    loader: () => ({ success: false })
+  });
+  assert.equal(out.success, false);
+  assert.equal(store.has('k1:fail'), false);
+});
+
+test('withStampedeGuard_: 既定 (共有の失敗) なら従来どおり失敗を覚える', () => {
+  const { context, store } = loadContext();
+  context.withStampedeGuard_({
+    key: 'k1', ttl: 10, failTtl: 8, busyValue: { busy: true },
+    isCacheable: (v) => Boolean(v && v.success),
+    loader: () => ({ success: false })
+  });
+  assert.equal(store.has('k1:fail'), true);
+});

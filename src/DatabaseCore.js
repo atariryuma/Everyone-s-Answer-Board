@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_, sheetsApiBackoffMs_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -24,6 +24,18 @@ const SHEETS_API_MAX_ATTEMPTS_ = 3;
 // circuit breaker の共有 state を読む。壊れた値 (部分書込み / 旧 schema / null) は既定値に倒す。
 //   Why: JSON.parse が想定外の値を返すと undefined > 0 が silently false になり、
 //   breaker が機能しない silent bug になる。Number() || 0 で必ず数値にする。
+/**
+ * Sheets 呼び出しの breaker が開いている残り時間 (ms)。閉じていれば 0。
+ * 混雑を返すときに「何 ms 後に来てほしいか」(Retry-After 相当) を添えるために使う。
+ */
+function sheetsCircuitRetryAfterMs_() {
+  try {
+    if (typeof CacheService === 'undefined') return 0;
+    const st = readCircuitBreakerState_(CacheService.getScriptCache(), 'circuit_breaker_state');
+    return Math.max(0, st.circuitOpenUntil - Date.now());
+  } catch (_) { return 0; /* 分からなければ「閉じている」(画面はいつもの間隔で来る) */ }
+}
+
 function readCircuitBreakerState_(cache, key) {
   const state = { consecutiveErrors: 0, circuitOpenUntil: 0 };
   let raw = null;
@@ -131,7 +143,14 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         //   SA を渡さない呼び出し (切替先を持たない) は常に「無い」扱い。
         const otherSaAvailable = Boolean(currentSaEmail) && hasNonCoolingServiceAccount_(currentSaEmail);
         const canSwitchSa = Boolean(authResolver) && otherSaAvailable;
-        const backoffTime = (willRetry && !canSwitchSa) ? Math.min(5000 + (retryCount * 5000), 15000) : 0;
+        // 待つのは切替先が無いときだけ。長さは Google が Sheets API に推奨する式
+        //   (2^n 秒 + 1 秒以内の乱数、上限 15 秒)。30 人が同じ瞬間に踏んでも投げ直しが散る。
+        //   長く眠らない: 眠っている間、その児童の画面の google.script.run の枠 (10 本) を 1 本塞ぐ。
+        const backoffTime = (willRetry && !canSwitchSa)
+          ? (typeof sheetsApiBackoffMs_ === 'function'
+            ? sheetsApiBackoffMs_(retryCount, 15000)
+            : Math.min(5000 + (retryCount * 5000), 15000))
+          : 0;
         console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount}${canSwitchSa ? ', switching SA' : ''})`);
 
         // 並行 request の増分を取りこぼさないよう、書く直前に読み直してから +1 する

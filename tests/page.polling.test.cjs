@@ -1333,3 +1333,25 @@ test('クラス既定: 授業が終わったら (対象クラスが消えたら)
   assert.equal(instance.elements.classFilter.value, 'すべて');
   assert.equal(instance.getCurrentFilterState().classFilter, null);
 });
+
+// =====================================================================
+// 自動再送は冪等な呼び出しだけ (反転・削除は再送しない)
+// =====================================================================
+
+test('__retryBudgetFor: ハイライト / リアクション / 削除は 0、送信は 1、読み取りは 2', () => {
+  const { instance } = makeInstance();
+  assert.equal(instance.__retryBudgetFor('toggleHighlight'), 0);
+  assert.equal(instance.__retryBudgetFor('addReaction'), 0);
+  assert.equal(instance.__retryBudgetFor('deleteAnswerRow'), 0);
+  assert.equal(instance.__retryBudgetFor('submitLessonAnswer'), 1);
+  assert.equal(instance.__retryBudgetFor('getNotificationUpdate'), 2);
+});
+
+test('getPollingInterval: サーバの retryAfterMs (混雑中) に 1 回だけ従い、指定より早く来ない', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() });
+  instance.polling.retryAfterMs = 8000;
+  const first = instance.getPollingInterval();
+  assert.ok(first >= 8000 && first <= 9600, `指定以上 (+20% 以内): ${first}`);
+  const second = instance.getPollingInterval();
+  assert.ok(second <= 6000, `次からはいつもの間隔: ${second}`);
+});

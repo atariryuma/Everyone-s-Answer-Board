@@ -33,6 +33,20 @@ npm run logs:open                              # open 環境用
 は `reportClientError` doPost アクション経由で Cloud Logging に流れる。
 `[client/error]` / `[client/warn]` プレフィックスで識別。
 
+#### Sheets API の利用量と上限に対する余裕（Cloud Monitoring）
+
+```bash
+npm run quota:report                    # 直近 7 日: 日ごとの合計 / 429 / 1 分最大 (対上限 %)
+npm run quota:report -- --days 30
+npm run quota:report -- --day 2026-10-22   # その日 (JST) の 1 分ごとの上位 10
+```
+
+上限は読み取り・書き込みとも **300 回/分/プロジェクト・60 回/分/ユーザー**（サービスアカウントは
+1 つ = 1 ユーザー）。SA を同じ GCP project に足しても 300/分 で頭打ち。Google は上限超過を
+2026 年後半から課金対象にする予定と明記している（[Sheets API の使用量上限](https://developers.google.com/workspace/sheets/api/limits)）。
+授業の後に 1 分最大が上限の何 % だったかを見て、余裕が減っていないかを確かめる。
+同じ project に同居する別アプリの分も合計に入る（credential ごとの値で見分ける）。
+
 #### `?debug=1` でフロントの console.log/warn も収集
 
 児童・教師が問題を再現するとき、URL に `?debug=1` を付けて開いてもらうと、
