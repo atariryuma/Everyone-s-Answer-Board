@@ -1415,6 +1415,65 @@ svg.lesson-quiet-icon {
   margin: 0;
 }
 
+/* 「まだ送れていません」案内: 画面の下に固定する 1 枚 (出会うは授業用の画面が外れるので、その中に置けない)。
+   授業用の画面 (z-index 60) より上。出ている間は下に余白を足し、送るボタンや最後のカードを隠さない。 */
+.lesson-unsent-note {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 65;
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--space-4));
+  max-width: 34rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--theme-bg-surface);
+  border: 1px solid var(--theme-border-subtle);
+  border-left: 4px solid var(--status-warning);
+  box-shadow: var(--elevation-2);
+}
+.lesson-unsent-title,
+.lesson-unsent-body {
+  grid-column: 1;
+  margin: 0;
+}
+.lesson-unsent-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  text-wrap: balance;
+}
+.lesson-unsent-body {
+  font-size: var(--font-size-xs);
+  color: var(--theme-text-secondary);
+}
+.lesson-unsent-close {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--theme-border-subtle);
+  color: var(--theme-text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.lesson-unsent-close:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+body.lesson-has-note,
+body.lesson-has-note .lesson-screen {
+  padding-bottom: calc(var(--space-20) * 2);
+}
+
 /* ふりかえり: 自分の航跡と自分の言葉だけ。学級の分布は出さない。 */
 .lesson-trajectory {
   display: flex;

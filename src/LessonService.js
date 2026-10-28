@@ -2586,7 +2586,9 @@ function submitLessonAnswer(targetUserId, payload) {
       return refuse('LESSON_MISMATCH', 'PHASE_CHANGED: 授業が切り替わりました。画面を読み込み直してください');
     }
     if (p.phaseIndex !== undefined && p.phaseIndex !== null && Number(p.phaseIndex) !== phase.phaseIndex) {
-      return refuse('PHASE_MISMATCH', 'PHASE_CHANGED: フェーズが切り替わりました。画面を読み込み直してください');
+      // 読み込み直しても前のフェーズには送れないので、読み込み直しは促さない
+      //   (児童の画面はこの code で「書いたことは端末に残っている」と伝える)。
+      return refuse('PHASE_MISMATCH', 'PHASE_CHANGED: 送る前にフェーズが進んだので、送れませんでした');
     }
     if (LESSON_INPUT_ROLES.indexOf(phase.screenRole) < 0) {
       return refuse('NOT_INPUT_PHASE', 'いまは考えを送る時間ではありません');

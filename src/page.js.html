@@ -1667,6 +1667,8 @@
       if (!phase) {
         // 授業が終わった / 掲示板モードに戻った
         this.__teardownLessonScreen();
+        this.state.lessonUnsentNote = null;
+        this.__renderLessonUnsentNote();
         if (prev) this.__pruneLessonDrafts(prev.lessonId);
         return;
       }
@@ -1676,9 +1678,10 @@
       //   書きかけ自体は端末 (localStorage) に残っていて、教師が同じフェーズに戻せば復元される。
       //   Why: 教師が進めた瞬間に送った児童が拒否され、書き直しになった (2026-09-30)。
       //   教師はその場でフェーズを戻して回収するので、戻ったときに続きから送れればよい。
-      if (prev && this.state.isEditor !== true && this.__hasUnsentLessonDraft(prev)) {
-        this.showToast('書きかけは残しています');
-      }
+      // 送っていない書きかけがあったことは、次の画面に残る案内で伝える (__renderLessonUnsentNote)。
+      //   Why トーストでないか: 直後の「〜に進みました」が同じ表示場所を上書きし、
+      //   誰にも見えていなかった (2026-10-28 の理科で、送る前に進んだ児童が気づけなかった)。
+      this.state.lessonUnsentNote = this.__nextLessonUnsentNote(prev, phase);
       this.state.lessonDraft = null;
       this.state.lessonPrevPoint = null;
       this.state.lessonSent = null;
@@ -1860,6 +1863,7 @@
      */
     __renderLessonScreen() {
       const phase = this.state.lessonPhase;
+      this.__renderLessonUnsentNote();
       if (!phase) { this.__clearLessonFocus(); return this.__teardownLessonScreen(); }
 
       // 教師 (編集者) は答える側ではなく、分布を映す側。入力画面はかぶせない。
@@ -2474,7 +2478,17 @@
         if (!res || !res.success) {
           // サーバーが断った (理由コードは res.error)。サーバー側にも同じ記録が残る。
           this.__reportLessonSubmit('REFUSED:' + ((res && res.error) || 'UNKNOWN'), phase);
-          const refused = new Error((res && res.message) || '送信に失敗しました');
+          // 送る前にフェーズが進んでいた。読み込み直しても前のフェーズには送れないので、
+          //   書いたことが端末に残っている (位置もことばも入力のたびに保存済み) ことを伝える。
+          //   置き直しは戻っても復元されない (「送りました」画面になる) ので、届いている方を伝える。
+          const s = this.state.lessonSent;
+          const replacing = Boolean(s && s.lessonId === phase.lessonId && s.phaseIndex === phase.phaseIndex);
+          const message = (res && res.error === 'PHASE_MISMATCH')
+            ? (replacing
+              ? '送る前に次へ進んだので、置き直しは送れませんでした。前に送った考えは届いています'
+              : '送る前に次へ進んだので、送れませんでした。書いたことは、この端末に残っています')
+            : String((res && res.message) || '送信に失敗しました').replace(/^[A-Z_]+:\s*/, '');
+          const refused = new Error(message);
           refused.reported = true;   // onFail で二重に報告しない
           throw refused;
         }
@@ -2582,6 +2596,77 @@
       if (sent && sent.lessonId === prevPhase.lessonId && sent.phaseIndex === prevPhase.phaseIndex && !this.state.lessonEditing) return false;
       const d = this.__restoreLessonDraft(prevPhase);
       return Boolean(d && (d.numericX || String(d.reason || '').trim()));
+    }
+
+    /**
+     * フェーズが変わったときの「まだ送れていません」案内の状態を決める (児童だけ)。
+     *   - 前のフェーズに送っていない書きかけがあれば、そのフェーズの案内にする
+     *   - 書く画面 (input / reinput) に入ったら外す。新しく書く時間であり、
+     *     案内したフェーズに戻ったのなら書きかけは画面に復元されている
+     *   - それ以外 (出会う → 議論する 等) は持ち越す。まだ送れていないことは変わらない
+     */
+    __nextLessonUnsentNote(prev, phase) {
+      if (this.state.isEditor === true || !phase) return null;
+      if (prev && this.__hasUnsentLessonDraft(prev)) {
+        const s = this.state.lessonSent;
+        return {
+          lessonId: prev.lessonId,
+          phaseIndex: prev.phaseIndex,
+          phaseName: prev.phaseName || '',
+          // 送ったあとの置き直しだけが送れていない (前に送った考えは届いている)
+          replaced: Boolean(s && s.lessonId === prev.lessonId && s.phaseIndex === prev.phaseIndex)
+        };
+      }
+      const note = this.state.lessonUnsentNote;
+      if (!note || note.lessonId !== phase.lessonId) return null;
+      if (['input', 'reinput'].indexOf(phase.screenRole) >= 0) return null;
+      return note;
+    }
+
+    /**
+     * 「まだ送れていません」案内。フェーズの画面とは別の 1 枚で、画面の下に固定する。
+     *   Why 別の 1 枚か: 出会うは授業用の画面を外して通常のボードを見せるので、その中に置けない。
+     *   伝えるのは事実 (送れていない / 書いたことは端末にある) だけ。教師の次の操作は予告しない
+     *   (戻すかどうかは教師が決める。予告は教師の判断しだいで嘘になる)。
+     */
+    __renderLessonUnsentNote() {
+      const note = this.state.lessonUnsentNote;
+      let el = document.getElementById('lessonUnsentNote');
+      if (!note) {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        document.body.classList.remove('lesson-has-note');
+        return;
+      }
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'lessonUnsentNote';
+        el.className = 'lesson-unsent-note';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+      }
+      const where = note.phaseName ? '「' + note.phaseName + '」' : '前の時間';
+      const title = document.createElement('p');
+      title.className = 'lesson-unsent-title';
+      title.textContent = where + (note.replaced ? 'の置き直しは、まだ送れていません' : 'の考えは、まだ送れていません');
+      const body = document.createElement('p');
+      body.className = 'lesson-unsent-body';
+      // 置き直しは端末に残しても復元されない (戻ると「送りました」画面になる) ので、残っているとは言わない。
+      body.textContent = note.replaced
+        ? '送る前に次へ進みました。前に送った考えは届いています。'
+        : '送る前に次へ進みました。書いたことは、この端末に残っています。';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'lesson-unsent-close';
+      close.textContent = 'とじる';
+      close.addEventListener('click', () => {
+        this.state.lessonUnsentNote = null;
+        this.__renderLessonUnsentNote();
+      });
+      el.textContent = '';
+      el.appendChild(title);
+      el.appendChild(body);
+      el.appendChild(close);
+      document.body.classList.add('lesson-has-note');
     }
 
     // 授業が終わったら、その授業の書きかけを端末から消す。
