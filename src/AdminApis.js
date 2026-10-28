@@ -1360,12 +1360,13 @@ function dispatchAdminOperation(operation, params) {
       { const e = reqStr('userId'); if (e) return e; }
       { const e = reqStr('lessonId'); if (e) return e; }
       { const e = reqStr('direction'); if (e) return e; }
-      return advanceLessonPhase(params.userId, params.lessonId, params.direction, params.targetIndex);
+      return advanceLessonPhase(params.userId, params.lessonId, params.direction, params.targetIndex,
+        { switchBoard: params.switchBoard === true });
     }
     case 'lesson.end': {
       { const e = reqStr('userId'); if (e) return e; }
       { const e = reqStr('lessonId'); if (e) return e; }
-      return endLesson(params.userId, params.lessonId);
+      return endLesson(params.userId, params.lessonId, { switchBoard: params.switchBoard === true });
     }
     case 'lesson.list': {
       { const e = reqStr('userId'); if (e) return e; }

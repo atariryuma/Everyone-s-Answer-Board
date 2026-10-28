@@ -79,6 +79,7 @@ function loadContext(overrides = {}) {
   const cacheBumps = [];
   // ボードの data version (DataApis の bump/get と同じ働き)。回答シートの行 cache の key に入る。
   const boardVersions = new Map();
+  const boardConfig = {};
   let uuidCounter = 0;
   let currentEmail = overrides.currentEmail || 'teacher@example.com';
 
@@ -130,7 +131,9 @@ function loadContext(overrides = {}) {
       ? { userId: 'u1', userEmail: email } : { userId: 'stu', userEmail: email },
     findUserById: (id) => id === 'u1' ? { userId: 'u1', userEmail: 'teacher@example.com' } : null,
     createTemplateForm: () => ({ success: true, formId: 'f1', formUrl: 'https://forms.example/1', spreadsheetId: 'ss1', sheetName: 'フォームの回答 1' }),
-    applyConfigPatch_: () => ({ success: true }),
+    // ボードの config は patch を積んで持つ (どの授業がボードにつながっているかを LessonService が読む)。
+    applyConfigPatch_: (uid, patch) => { Object.assign(boardConfig, patch); return { success: true }; },
+    getUserConfig: () => ({ success: true, config: boardConfig }),
     getPublishedSheetData: () => ({ success: true, data: [] }),
     getAllUsers: () => [],
     getConfigOrDefault: overrides.getConfigOrDefault || (() => ({})),
@@ -152,7 +155,7 @@ function loadContext(overrides = {}) {
   vm.runInContext(REACTION_SOURCE, context, { filename: 'ReactionService.js' });
 
   return {
-    context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps, editorsAdded,
+    context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps, editorsAdded, boardConfig,
     setEmail: (e) => { currentEmail = e; }
   };
 }

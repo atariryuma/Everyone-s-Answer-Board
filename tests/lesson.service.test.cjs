@@ -93,6 +93,7 @@ function loadLessonContext(overrides = {}) {
   const formCreations = [];
   const formCloses = [];
   const configPatches = [];
+  const boardConfig = {};
 
   let uuidCounter = 0;
   const context = {
@@ -126,10 +127,16 @@ function loadLessonContext(overrides = {}) {
         sheetName: 'フォームの回答 1'
       };
     }),
-    applyConfigPatch_: overrides.applyConfigPatch_ || ((userId, patch) => {
-      configPatches.push({ userId, patch });
-      return { success: true };
-    }),
+    // ボードの config は成功した patch を積んで持つ (どの授業がボードにつながっているかを
+    //   LessonService が getUserConfig で読む)。
+    applyConfigPatch_: (userId, patch, opts) => {
+      const res = overrides.applyConfigPatch_
+        ? overrides.applyConfigPatch_(userId, patch, opts)
+        : (configPatches.push({ userId, patch }), { success: true });
+      if (res && res.success) Object.assign(boardConfig, patch);
+      return res;
+    },
+    getUserConfig: overrides.getUserConfig || (() => ({ success: true, config: boardConfig })),
     // Phase 2: snapshot capture が呼ぶ。デフォルトは empty rows。
     getPublishedSheetData: overrides.getPublishedSheetData || (() => ({
       success: true,
@@ -173,7 +180,7 @@ function loadLessonContext(overrides = {}) {
   vm.createContext(context);
   vm.runInContext(LESSON_SOURCE, context, { filename: 'LessonService.js' });
 
-  return { context, lessonsSheet, responsesSheet, formCreations, formCloses, configPatches };
+  return { context, lessonsSheet, responsesSheet, formCreations, formCloses, configPatches, boardConfig };
 }
 
 // =====================================================================
@@ -1178,4 +1185,138 @@ test('getActiveLessonNav: lessons シートを 1 回しか読まない (教師�
   assert.equal(res.data.lessonId, lessonId);
   assert.equal(res.data.phases.length, 3);
   assert.equal(reads, 1, 'lessons シートの全体読みは 1 回');
+});
+
+// ── ボードにつながっている授業だけを操作する (2026-10-28) ──
+//   開始中の授業が 2 つあるとき、つながっていない方を送るとボードがそちらへ移り (理科の授業中に
+//   道徳を送り、児童の画面が 10 分道徳になった)、しかも記録 (snapshot) にはボードが映している
+//   別の授業の回答が入る作りだった。
+
+// 道徳 → 理科 の順に開始する (ボードは後に開始した理科につながる)。
+//   記録の中身で「どの授業の回答を写したか」が分かるよう、ボードのデータは
+//   その時点でつながっている授業の id を答えに持つ。
+function startTwoLessons(overrides = {}) {
+  let h = null;
+  h = loadLessonContext(Object.assign({
+    getPublishedSheetData: () => ({
+      success: true,
+      data: [{ rowIndex: 2, answer: 'board=' + h.boardConfig.activeLessonId }]
+    })
+  }, overrides));
+  const ids = ['道徳', '理科'].map((name) => {
+    const id = h.context.createLessonDraft('u1', name, 'doutoku-3phase').data.lesson.lessonId;
+    h.context.updateLessonDraft('u1', id, 'classes', ['6-1']);
+    h.context.startLesson('u1', id);
+    return id;
+  });
+  return { h, moral: ids[0], science: ids[1] };
+}
+
+test('advanceLessonPhase: ボードにつながっていない授業は送らない (ボードも記録も動かない)', () => {
+  const { h, moral, science } = startTwoLessons();
+  assert.equal(h.boardConfig.activeLessonId, science);
+
+  const res = h.context.advanceLessonPhase('u1', moral, 'next');
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'NOT_ON_BOARD');
+  assert.match(res.message, /「理科」につながっています/);
+  assert.equal(h.boardConfig.activeLessonId, science, 'ボードは理科のまま');
+
+  const lj = h.context.getLessonForReview('u1', moral).data.lesson.lessonJson;
+  assert.equal(lj.profileTransitions.length, 1, '遷移は開始の 1 件だけ');
+  assert.equal((lj.snapshots || []).length, 0, '理科の回答を道徳の記録にしない');
+
+  // 同じフェーズを押す (= 再適用) も、明示しなければボードを移さない
+  assert.equal(h.context.advanceLessonPhase('u1', moral, null, 0).error, 'NOT_ON_BOARD');
+  assert.equal(h.boardConfig.activeLessonId, science);
+});
+
+test('advanceLessonPhase: 同じフェーズ + switchBoard が「この授業にボードを切り替える」', () => {
+  const { h, moral, science } = startTwoLessons();
+  let bumps = 0;
+  h.context.bumpBoardDataVersion_ = () => { bumps++; };
+
+  const res = h.context.advanceLessonPhase('u1', moral, null, 0, { switchBoard: true });
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(res.data.reapplied, true);
+  assert.equal(res.data.switchedBoard, true);
+  assert.equal(h.boardConfig.activeLessonId, moral);
+  assert.equal(bumps, 1, '前の授業の回答が cache から返らないよう捨てる');
+  assert.equal(
+    h.context.getLessonForReview('u1', moral).data.lesson.lessonJson.profileTransitions.length, 1,
+    '切り替えはフェーズの遷移ではない');
+
+  // 今度は理科がつながっていない
+  assert.equal(h.context.advanceLessonPhase('u1', science, 'next').error, 'NOT_ON_BOARD');
+});
+
+test('advanceLessonPhase: switchBoard で別のフェーズへ送るときは、つないでから記録を取る', () => {
+  const { h, moral } = startTwoLessons();
+  const res = h.context.advanceLessonPhase('u1', moral, 'next', undefined, { switchBoard: true });
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(h.boardConfig.activeLessonId, moral);
+
+  const snaps = h.context.getLessonForReview('u1', moral).data.lesson.lessonJson.snapshots;
+  assert.equal(snaps.length, 1);
+  assert.equal(snaps[0].phaseIndex, 0);
+  assert.equal(snaps[0].rows[0].answer, 'board=' + moral, '記録は道徳の回答 (理科の回答ではない)');
+});
+
+test('endLesson: ボードにつながっていない授業は、切り替えを明示しないと終了しない', () => {
+  const { h, moral } = startTwoLessons();
+  const res = h.context.endLesson('u1', moral);
+  assert.equal(res.error, 'NOT_ON_BOARD');
+  assert.equal(h.context.getLessonForReview('u1', moral).data.lesson.state, 'active');
+
+  const ok = h.context.endLesson('u1', moral, { switchBoard: true });
+  assert.equal(ok.success, true, JSON.stringify(ok));
+  const lesson = h.context.getLessonForReview('u1', moral).data.lesson;
+  assert.equal(lesson.state, 'completed');
+  assert.equal(lesson.lessonJson.snapshots[0].rows[0].answer, 'board=' + moral);
+});
+
+test('getActiveLessonNav: 新しい方ではなく、ボードにつながっている授業を返す', () => {
+  const { h, moral, science } = startTwoLessons();
+  assert.equal(h.context.getActiveLessonNav('u1').data.lessonId, science);
+
+  h.context.advanceLessonPhase('u1', moral, null, 0, { switchBoard: true });
+  assert.equal(h.context.getActiveLessonNav('u1').data.lessonId, moral);
+
+  // つながっている授業を終えたら、つながっていない授業のフェーズ表示は出さない
+  //   (ボードの表示から送ると、映っていない授業が動いてしまう)。
+  h.context.endLesson('u1', moral);
+  const nav = h.context.getActiveLessonNav('u1');
+  assert.equal(nav.success, true);
+  assert.ok(!nav.data);
+});
+
+test('listLessons: ボードにつながっている授業に onBoard を付ける', () => {
+  const { h, moral, science } = startTwoLessons();
+  const res = h.context.listLessons('u1');
+  assert.equal(res.data.boardLessonId, science);
+  const byId = Object.fromEntries(res.data.lessons.map(l => [l.lessonId, l.onBoard]));
+  assert.equal(byId[science], true);
+  assert.equal(byId[moral], false);
+});
+
+test('ボードの config を読めないときは送らず、フェーズ表示は従来どおり出す', () => {
+  const h = loadLessonContext({ getUserConfig: () => ({ success: false, message: 'quota' }) });
+  const id = h.context.createLessonDraft('u1', '理科', 'doutoku-3phase').data.lesson.lessonId;
+  h.context.updateLessonDraft('u1', id, 'classes', ['6-1']);
+  h.context.startLesson('u1', id);
+
+  const res = h.context.advanceLessonPhase('u1', id, 'next');
+  assert.equal(res.success, false);
+  assert.match(res.message, /読めませんでした/);
+  assert.equal(h.context.getActiveLessonNav('u1').data.lessonId, id);
+  assert.equal(h.context.listLessons('u1').data.boardLessonId, null);
+});
+
+test('recaptureLessonArchive: ボードがこの授業のそのフェーズを映していなければ焼き直さない', () => {
+  const { h, moral, science } = startTwoLessons();
+  assert.equal(h.context.recaptureLessonArchive('u1', moral, 0).error, 'NOT_ON_BOARD');
+  // つながっていても、映しているフェーズと違うフェーズは焼き直さない
+  h.context.advanceLessonPhase('u1', science, 'next');
+  assert.equal(h.context.recaptureLessonArchive('u1', science, 0).error, 'NOT_ON_BOARD');
+  assert.equal(h.context.recaptureLessonArchive('u1', science, 1).success, true);
 });

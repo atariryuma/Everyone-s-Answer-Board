@@ -3240,6 +3240,11 @@
   (function setupLessonWorkspace() {
     let currentLessonId = null;          // 編集中 or 実行中の lesson ID
     let currentLessonEtag = null;        // 楽観ロック (2 タブ race 防止)
+    // 開いている授業が児童のボードにつながっているか (true / false / null = 分からない)。
+    //   開始中の授業が 2 つあるとき、つながっていない方は送れない (サーバも NOT_ON_BOARD で断る)。
+    let currentLessonOnBoard = null;
+    let currentRunnerLesson = null;      // 切替に失敗したとき描き直すため
+    let lastLessonList = [];             // ボードにつながっている授業の名前を出すため
     const FIELD_DEBOUNCE_MS = 600;
     // Why: AdminPanel では UNIFIED_CONFIG.userId は空。実 owner ID は targetUserId にある
     //   (createUnifiedConfig は CONFIG empty + pageDefaults.targetUserId のみ受け取る)。
@@ -3313,6 +3318,7 @@
           return;
         }
         const lessons = (res.data && res.data.lessons) || [];
+        lastLessonList = lessons;
         if (countEl) countEl.textContent = `(${lessons.length})`;
         // Why first-time hint: 「初見ユーザーは empty-state を first-onboarding として読む」(UX 研究結果)。
         //   授業が 0 件のときだけ「ここから始めよう」hint を出す。
@@ -3322,14 +3328,19 @@
           hintEl.classList.toggle('hidden', lessons.length !== 0);
         }
         // 実行中の授業があれば、ボード設定タブをロックする (授業が config を管理している)。
-        try { setBoardTabLock(lessons.find(l => l && l.state === 'active') || null); } catch (_) { /* ロック表示は best-effort */ }
+        //   2 つ開始中なら、ロックの案内はボードにつながっている方を指す。
+        const activeLessons = lessons.filter(l => l && l.state === 'active');
+        try { setBoardTabLock(activeLessons.find(l => l.onBoard) || activeLessons[0] || null); } catch (_) { /* ロック表示は best-effort */ }
         if (lessons.length === 0) {
           listEl.innerHTML = '<li class="text-theme-muted italic">まだ授業がありません。「新しい授業をつくる」から始めましょう。</li>';
           return;
         }
         listEl.innerHTML = lessons.map(l => {
+          // 開始中が 2 つ以上のときだけ、どちらがボードに出ているかを書く (1 つなら自明)。
+          const boardNote = (l.state === 'active' && activeLessons.length >= 2)
+            ? (l.onBoard ? ' · ボードに表示中' : ' · ボードに出ていません') : '';
           const stateLabel = l.state === 'draft'? '下書き'
-            : l.state === 'active'? ('実行中' + (l.currentPhaseName ? ' · ' + window.sharedUtilities.security.escapeHtml(l.currentPhaseName) : ''))
+            : l.state === 'active'? ('実行中' + (l.currentPhaseName ? ' · ' + window.sharedUtilities.security.escapeHtml(l.currentPhaseName) : '') + boardNote)
             : '完了';
           const dateStr = l.createdAt ? l.createdAt.slice(0, 10) : '';
           const safeName = window.sharedUtilities.security.escapeHtml(l.name || '無題');
@@ -3593,7 +3604,7 @@
           return;
         }
         currentLessonEtag = res.data.lesson.etag;
-        onLoaded(res.data.lesson);
+        onLoaded(res.data.lesson, res.data);
       }).catch((err) => {
         if (!preloaded) window.setLoading(false);
         window.showError((err && err.message) || 'レッスン読み込み失敗');
@@ -3619,6 +3630,7 @@
       document.body.classList.remove('mode-run-lesson');
       currentLessonId = null;
       currentLessonEtag = null;
+      currentLessonOnBoard = null;
       history.pushState({}, '', window.location.pathname + window.location.search);
       loadLessonList();
       // 授業の開始 / 切替 / 終了は server 側で config を書き換える (etag が進む)。ボード設定タブに
@@ -4833,7 +4845,9 @@
 
     // ---------- Runner (実行中) ----------
     function openLessonRunner(lessonId, preloaded) {
-      loadLessonThen(lessonId, preloaded, (lesson) => {
+      loadLessonThen(lessonId, preloaded, (lesson, data) => {
+        // 開始した直後 (preloaded) はボードがこの授業につながっている。
+        currentLessonOnBoard = preloaded ? true : boardLinkOf(lessonId, data);
         document.body.classList.remove('mode-create-lesson');
         document.body.classList.add('mode-run-lesson');
         history.pushState({ lesson: lessonId, mode: 'run'}, '', '#lesson/' + lessonId);
@@ -4841,13 +4855,41 @@
       });
     }
 
+    // ---- lesson board link: begin ----
+    // lesson.review の応答から「この授業はボードにつながっているか」を読む (null = 分からない)。
+    function boardLinkOf(lessonId, data) {
+      if (!data || data.boardLessonId === undefined || data.boardLessonId === null) return null;
+      return data.boardLessonId === lessonId;
+    }
+
+    // ボードにつながっていない授業を開いたときの案内。フェーズも終了も、切り替えるまで押せない。
+    function renderRunnerBoardLink(lesson) {
+      const box = document.getElementById('lesson-runner-board-link');
+      const text = document.getElementById('lesson-runner-board-link-text');
+      const off = currentLessonOnBoard === false;
+      if (box) box.classList.toggle('hidden', !off);
+      if (off && text) {
+        const onBoard = lastLessonList.find(l => l && l.onBoard && l.lessonId !== lesson.lessonId);
+        text.textContent = (onBoard
+          ? '児童のボードはいま「' + (onBoard.name || '別の授業') + '」を映しています。'
+          : '児童のボードはいま、この授業を映していません。') +
+          'この授業のフェーズを送る・終了するには、先にボードをこの授業に切り替えてください。';
+      }
+      const endBtn = document.getElementById('lesson-runner-end');
+      if (endBtn) endBtn.disabled = off;
+    }
+    // ---- lesson board link: end ----
+
     function renderRunner(lesson) {
+      currentRunnerLesson = lesson;
       const nameEl = document.getElementById('lesson-runner-name');
       if (nameEl) nameEl.textContent = lesson.name || '授業中';
       const native = Boolean(lesson.lessonJson && lesson.lessonJson.inputMode === 'native');
       currentLessonNative = native;
       const phases = (lesson.lessonJson && lesson.lessonJson.phases) || [];
       renderRunnerClasses(lesson);
+      renderRunnerBoardLink(lesson);
+      const offBoard = currentLessonOnBoard === false;
 
       const trans = (lesson.lessonJson && lesson.lessonJson.profileTransitions) || [];
       const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
@@ -4862,8 +4904,8 @@
           const marker = i < activeIdx ? '': i === activeIdx ? '▶': '';
           const current = i === activeIdx;
           return `<button type="button" class="lesson-phase-card ${cls}" data-phase-jump="${i}"
-            ${current ? 'disabled aria-current="true"' : ''}
-            title="${current ? '現在のフェーズ' : 'このフェーズに切替える'}">
+            ${current ? 'disabled aria-current="true"' : (offBoard ? 'disabled' : '')}
+            title="${current ? '現在のフェーズ' : (offBoard ? 'ボードをこの授業に切り替えると送れます' : 'このフェーズに切替える')}">
             <div class="phase-number">${marker} フェーズ ${i + 1}</div>
             <div class="phase-name">${window.sharedUtilities.security.escapeHtml(p.name || '')}</div>
             <div class="phase-meta">${window.sharedUtilities.security.escapeHtml(native ? roleLabel(p.screenRole) : ((PHASE_TEMPLATE_OPTIONS.find(o => o.value === p.formTemplate) || {}).label || p.formTemplate))}</div>
@@ -4977,9 +5019,12 @@
       return live.hideNames ? '（名前を隠しています）' : (x.name || x.email || '（名前なし）');
     }
 
+    // ボードにつながっていない授業は読まない: その授業のシートは SA 検証で読めず
+    //   (「Target user not found」)、10 秒ごとに失敗して警告を積むだけになる。
     function liveRunning() {
       return document.body.classList.contains('mode-run-lesson')
-        && Boolean(live.lessonId) && live.lessonId === currentLessonId;
+        && Boolean(live.lessonId) && live.lessonId === currentLessonId
+        && currentLessonOnBoard !== false;
     }
 
     // renderRunner から呼ぶ (開いたとき / フェーズを送ったとき)。
@@ -5070,6 +5115,9 @@
         if (lessonId !== currentLessonId || !liveRunning()) return;
         if (!res || !res.success || !res.data || !res.data.lesson) return;
         currentLessonEtag = res.data.lesson.etag;
+        // 別の画面でボードが切り替わっていれば、ここで知る (null = 分からないときは今の表示のまま)。
+        const link = boardLinkOf(lessonId, res.data);
+        if (link !== null) currentLessonOnBoard = link;
         renderRunner(res.data.lesson);
         loadLessonList();               // ステータスバー「授業名 · フェーズ」と授業ロック表示
       }).catch(() => { /* 次にフェーズが変わったとき、または画面を開き直したときに揃う */ })
@@ -5157,6 +5205,15 @@
       const pendEl = document.getElementById('lesson-live-pending');
       if (!body) return;
       liveSyncControls();
+
+      if (currentLessonOnBoard === false) {
+        if (countEl) countEl.textContent = '';
+        if (srcEl) srcEl.textContent = '';
+        if (pendEl) pendEl.classList.add('hidden');
+        body.innerHTML = '<p class="lesson-live-empty">この授業はいま児童のボードに出ていないので、回答は表示しません。' +
+          '上の「この授業にボードを切り替える」を押すと表示されます。</p>';
+        return;
+      }
 
       const d = live.data;
       if (!d) {
@@ -5554,9 +5611,10 @@
       const task = () => gasRun('lesson.advance', params).then((res) => {
         if (res && res.success) {
           currentLessonEtag = res.data.lesson.etag;
+          currentLessonOnBoard = true;   // 送れた = この授業がボードにつながっている
           renderRunner(res.data.lesson);
         } else {
-          window.showError((res && res.message) || 'フェーズ切替失敗');
+          showRunnerFailure(res, 'フェーズ切替失敗');
         }
       });
       if (btn && window.sharedUtilities && window.sharedUtilities.buttons) {
@@ -5566,6 +5624,50 @@
       }
     }
     window.lessonAdvance = lessonAdvance;
+
+    // 送る・終了するが断られたとき。別の画面でボードが切り替わっていた (NOT_ON_BOARD) なら、
+    //   案内を出して押せない状態に描き直す。
+    function showRunnerFailure(res, fallback) {
+      if (res && res.error === 'NOT_ON_BOARD') {
+        currentLessonOnBoard = false;
+        loadLessonList();
+        if (currentRunnerLesson) renderRunner(currentRunnerLesson);
+      }
+      window.showError(window.serverMessage(res, fallback));
+    }
+
+    // 「この授業にボードを切り替える」= いまのフェーズを、ボードの切替を明示して再適用する。
+    (function initRunnerBoardSwitch() {
+      const btn = document.getElementById('lesson-runner-board-switch');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const lesson = currentRunnerLesson;
+        if (!currentLessonId || !lesson) return;
+        const onBoard = lastLessonList.find(l => l && l.onBoard && l.lessonId !== currentLessonId);
+        window.modals.confirm(
+          '児童のボードを「' + (lesson.name || 'この授業') + '」に切り替えます。' +
+          (onBoard ? 'いま「' + (onBoard.name || '別の授業') + '」を開いている児童の画面も、この授業に変わります。' : ''),
+          { title: 'ボードを切り替える', okLabel: '切り替える' }
+        ).then((ok) => {
+          if (!ok) return;
+          const trans = (lesson.lessonJson && lesson.lessonJson.profileTransitions) || [];
+          const activeIdx = trans.length > 0 ? Number(trans[trans.length - 1].to) || 0 : 0;
+          const task = () => gasRun('lesson.advance', {
+            userId, lessonId: currentLessonId, direction: 'next', targetIndex: activeIdx, switchBoard: true
+          }).then((res) => {
+            if (res && res.success) {
+              currentLessonOnBoard = true;
+              loadLessonList();
+              renderRunner(lesson);
+              window.notifications.success('ボードをこの授業に切り替えました');
+            } else {
+              window.showError(window.serverMessage(res, 'ボードを切り替えられませんでした'));
+            }
+          });
+          window.sharedUtilities.buttons.withBusy(btn, task, { busyText: '切替中...' });
+        });
+      });
+    })();
 
     // Runner ヘッダーのボード導線。URL は決定的 (mode=view&userId) なので都度組み立てる。
     (function initRunnerBoardActions() {
@@ -5598,7 +5700,7 @@
             window.showSuccess('授業を保存しました。レッスン一覧から振り返り画面を開けます。');
             exitLessonCreateMode();
           } else {
-            window.showError((res && res.message) || '終了失敗');
+            showRunnerFailure(res, '終了失敗');
           }
         }).catch((err) => {
           window.setLoading(false);

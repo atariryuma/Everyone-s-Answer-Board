@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -858,7 +858,13 @@ function getActiveLessonNav(targetUserId) {
     //   同じシートを読んでいた。教師のボードはこれを polling ごとに呼ぶので、授業中の教師 1 人が
     //   児童 2 人分の read quota を使っていた (2026-10 監査)。
     const lessons = __listLessonsForUser_(userId);
-    const active = lessons.find(l => l && l.state === 'active');
+    // ボードのフェーズ表示が操作するのは、ボードにつながっている授業だけ。開始中の授業が
+    //   2 つあるとき「新しい方」を返すと、ボードが映す授業と違う授業を送ってしまう。
+    //   config を読めないときだけ従来どおり新しい方を返す (表示を消さない。送ればサーバが断る)。
+    const boardLessonId = __boardLessonId_(userId);
+    const active = (boardLessonId === null)
+      ? lessons.find(l => l && l.state === 'active')
+      : lessons.find(l => l && l.state === 'active' && l.lessonId === boardLessonId);
     if (!active) return createSuccessResponse('no active lesson', null);
     const lessonJson = active.lessonJson || {};
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
@@ -888,6 +894,8 @@ function listLessons(userId) {
     if (access.error) return access.error;
 
     const lessons = __listLessonsForUser_(userId);
+    // 開始中の授業が 2 つあるとき、どちらがボードにつながっているかを一覧で見せる (null = 不明)。
+    const boardLessonId = __boardLessonId_(userId);
     // 軽量化: 一覧では heavy な snapshots / profileTransitions は除外。
     const summaries = lessons.map(l => ({
       lessonId: l.lessonId,
@@ -906,9 +914,10 @@ function listLessons(userId) {
         const cur = ph[__activePhaseIndex_(l.lessonJson || {})];
         return (cur && cur.name) || '';
       })(),
+      onBoard: boardLessonId !== null && l.state === 'active' && l.lessonId === boardLessonId,
       etag: l.etag
     }));
-    return createSuccessResponse('listed', { lessons: summaries });
+    return createSuccessResponse('listed', { lessons: summaries, boardLessonId });
   } catch (error) {
     logError_('listLessons', error);
     return createExceptionResponse(error);
@@ -952,7 +961,11 @@ function getLessonForReview(userId, lessonId) {
     // active / completed どちらも review 可。draft は wizard で開く方が自然。
     // アーカイブ行はポインタ経由で読み戻す (クライアントは rows が埋まった snapshot を期待する)。
     __hydrateLessonSnapshots_(auth.found.lesson);
-    return createSuccessResponse('loaded', { lesson: auth.found.lesson });
+    // 授業中の画面 (管理パネル) が「この授業はボードにつながっているか」を出すため (null = 不明)。
+    return createSuccessResponse('loaded', {
+      lesson: auth.found.lesson,
+      boardLessonId: auth.found.lesson.state === 'active' ? __boardLessonId_(userId) : null
+    });
   } catch (error) {
     logError_('getLessonForReview', error);
     return createExceptionResponse(error);
@@ -1112,6 +1125,62 @@ function deleteLesson(userId, lessonId) {
 }
 
 // ----- Lifecycle: startLesson / advanceLessonPhase / endLesson -----
+
+// ----- ボードにつながっている授業 -----
+//
+// 児童のボードが映す授業は config.activeLessonId の 1 つだけ。開始中 (active) の授業は 2 つ以上
+//   あってよい (1 つの授業を学級ごとに日を分けて使い、その間に別の授業をする) が、フェーズを
+//   送る・終了するのはボードにつながっている授業だけにする。
+// Why: つながっていない授業を送ると、その授業へボードがつなぎ直され、児童の画面が知らせなく
+//   別の授業に変わる (2026-10-28、理科の授業中に道徳の授業を送り、ボードが 10 分道徳になった)。
+//   しかも送るときの記録 (__captureSnapshot_) はボードが映しているデータを写すので、
+//   つながっていない授業の記録が別の授業の回答で上書きされる。
+// 切り替えるときは options.switchBoard で明示させ、記録を取る前にボードをつなぎ直す。
+
+/**
+ * @returns {string|null} ボードにつながっている lessonId。'' = どれにもつながっていない、
+ *   null = config を読めなかった (呼び出し側が「分からない」として扱う)
+ */
+function __boardLessonId_(userId) {
+  try {
+    const cur = getUserConfig(userId);
+    if (!cur || !cur.success) return null;
+    return String((cur.config && cur.config.activeLessonId) || '');
+  } catch (error) {
+    console.warn('__boardLessonId_: config を読めませんでした:', error && error.message);
+    return null;
+  }
+}
+
+// つながっていない授業を操作しようとしたときの応答。
+function __notOnBoardResponse_(boardLessonId) {
+  if (boardLessonId === null) {
+    return createErrorResponse('ボードの設定を読めませんでした。少し待ってから、もう一度押してください');
+  }
+  const found = boardLessonId ? __findLessonByIdCached_(boardLessonId) : null;
+  const name = (found && found.lesson && found.lesson.state === 'active') ? found.lesson.name : '';
+  const message = name
+    ? `児童のボードはいま「${name}」につながっています。この授業を操作するには、先に「この授業にボードを切り替える」を押してください`
+    : '児童のボードはこの授業につながっていません。先に「この授業にボードを切り替える」を押してください';
+  return createErrorResponse(message, null, { error: 'NOT_ON_BOARD', boardLessonId: boardLessonId || null });
+}
+
+// ボードを、この授業のいまのフェーズにつなぐ (= そのフェーズの config を再適用する)。
+//   切り替えたときは掲示板データの cache も捨てる。cache の key はボード単位でシートを含まないので、
+//   残すと最大 10 秒、前の授業の回答が返る (直後に記録を取ると、それが記録に入る)。
+function __attachBoardToLessonPhase_(userId, lessonId, lessonJson, phaseIdx, switched) {
+  const phase = (lessonJson.phases || [])[phaseIdx];
+  __setFormAcceptingResponses_(phase, true);
+  const result = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phase, lessonJson, lessonId), { publish: false });
+  if (!result.success) return result;
+  if (switched && typeof bumpBoardDataVersion_ === 'function') {
+    try { bumpBoardDataVersion_(userId); } catch (e) {
+      console.warn('[lesson/board] 切替後の cache 破棄に失敗 (最大 10 秒、前の授業の回答が見える):', e && e.message);
+    }
+  }
+  __invalidateViewerLessonPhase_(userId);
+  return result;
+}
 
 /**
  * phase の Form を開く。開けなければ null。
@@ -1681,8 +1750,10 @@ function startLesson(userId, lessonId) {
  * フェーズを 1 つ進める/戻す。
  *   - 累積回答は削除しない (= 戻して再進行で同じ Form が再開する)
  *   - publishApp は呼ばず applyConfigPatch_ で user config を直接書き換える
+ *   - ボードにつながっていない授業は送らない。options.switchBoard なら先につなぎ直す
+ *     (「ボードにつながっている授業」の Why)
  */
-function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
+function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
@@ -1705,32 +1776,42 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex) {
     if (targetIndex !== undefined && targetIndex !== null && targetIndex !== '') {
       toIdx = Number(targetIndex);
       if (!Number.isInteger(toIdx)) return createErrorResponse('targetIndex が不正です');
-      if (toIdx === fromIdx) {
-        // 同じフェーズへの切替 = config の再適用 (自己修復)。
-        //   Why: 切替は「lesson row を先に確定 → config patch」の順で、row 成功後に
-        //   config patch が落ちる (429 で users シートが読めない等) と、授業は次フェーズ、
-        //   ボード config は前フェーズのまま止まる。教師がもう一度同じフェーズを押したとき
-        //   「既にそのフェーズです」で弾くと、直す手段が無くなる。冪等なので再適用でよい。
-        if (toIdx < 0 || toIdx >= phases.length) return createErrorResponse('targetIndex が不正です');
-        const same = phases[toIdx];
-        __setFormAcceptingResponses_(same, true);
-        const reapply = applyConfigPatch_(userId, __buildPhaseConfigPatch_(same, lessonJson, lessonId), { publish: false });
-        if (!reapply.success) {
-          return createErrorResponse(`フェーズ設定の再適用に失敗しました: ${reapply.message || 'unknown'}`);
-        }
-        __invalidateViewerLessonPhase_(userId);
-        return createSuccessResponse(`フェーズ ${toIdx + 1}: ${same.name} の設定を再適用しました`, {
-          lesson: found.lesson,
-          activePhaseIndex: toIdx,
-          reapplied: true
-        });
-      }
     } else {
       toIdx = direction === 'previous' ? fromIdx - 1 : fromIdx + 1;
     }
+    // 同じフェーズへの切替 = config の再適用 (自己修復)。
+    //   Why: 切替は「lesson row を先に確定 → config patch」の順で、row 成功後に
+    //   config patch が落ちる (429 で users シートが読めない等) と、授業は次フェーズ、
+    //   ボード config は前フェーズのまま止まる。教師がもう一度同じフェーズを押したとき
+    //   「既にそのフェーズです」で弾くと、直す手段が無くなる。冪等なので再適用でよい。
+    const isReapply = toIdx === fromIdx;
+    if (isReapply) {
+      if (toIdx < 0 || toIdx >= phases.length) return createErrorResponse('targetIndex が不正です');
+    } else {
+      if (toIdx < 0) return createErrorResponse('既に最初のフェーズです');
+      if (toIdx >= phases.length) return createErrorResponse('既に最後のフェーズです (終了するには「⏹ 終了」を押してください)');
+    }
 
-    if (toIdx < 0) return createErrorResponse('既に最初のフェーズです');
-    if (toIdx >= phases.length) return createErrorResponse('既に最後のフェーズです (終了するには「⏹ 終了」を押してください)');
+    const boardLessonId = __boardLessonId_(userId);
+    const onBoard = boardLessonId === lessonId;
+    if (!onBoard && !(options && options.switchBoard)) return __notOnBoardResponse_(boardLessonId);
+
+    // つながっていなければ、記録 (snapshot) を取る前にボードをこの授業へつなぎ直す。
+    //   記録はボードが映しているデータを写すので、先に取ると別の授業の回答が入る。
+    if (isReapply || !onBoard) {
+      const reapply = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, fromIdx, !onBoard);
+      if (!reapply.success) {
+        return createErrorResponse(`フェーズ設定の再適用に失敗しました: ${reapply.message || 'unknown'}`);
+      }
+      if (isReapply) {
+        return createSuccessResponse(`フェーズ ${toIdx + 1}: ${phases[toIdx].name} の設定を再適用しました`, {
+          lesson: found.lesson,
+          activePhaseIndex: toIdx,
+          reapplied: true,
+          switchedBoard: !onBoard
+        });
+      }
+    }
 
     // Why: 移行 *前* に outgoing phase の rows を freeze する。順序を逆にすると
     //   user config が次 phase の columnMapping を指した状態で capture することになり、
@@ -1865,7 +1946,7 @@ function reopenLesson(userId, lessonId) {
  *   - 現フェーズの rows を snapshots[currentPhase] に保存
  *   - user config の formUrl 等は触らない (viewer URL は引き続き読める)
  */
-function endLesson(userId, lessonId) {
+function endLesson(userId, lessonId, options) {
   try {
     const auth = __requireLessonOwner_(userId, lessonId);
     if (auth.error) return auth.error;
@@ -1877,13 +1958,24 @@ function endLesson(userId, lessonId) {
 
     const lessonJson = deepClone(found.lesson.lessonJson || {});
     const phases = lessonJson.phases || [];
+    const currentIdx = __activePhaseIndex_(lessonJson);
+
+    // 終了のときも現フェーズの記録を取るので、ボードにつながっている授業だけにする
+    //   (advanceLessonPhase と同じ。つながっていない授業の記録は別の授業の回答になる)。
+    const boardLessonId = __boardLessonId_(userId);
+    if (boardLessonId !== lessonId) {
+      if (!(options && options.switchBoard)) return __notOnBoardResponse_(boardLessonId);
+      const attached = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, currentIdx, true);
+      if (!attached.success) {
+        return createErrorResponse(`ボードの切替に失敗しました: ${attached.message || 'unknown'}`);
+      }
+    }
 
     // 全 phase Form を close (締切)
     phases.forEach(p => __setFormAcceptingResponses_(p, false));
 
     // 現フェーズの rows を freeze して snapshots に upsert。capture 失敗時は reason 付き空 snapshot
     //   が積まれ、endLesson 自体は成功する (lesson は必ず completed に遷移する原則)。
-    const currentIdx = __activePhaseIndex_(lessonJson);
     if (__shouldSnapshotPhase_(lessonJson, currentIdx)) {
       __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx, lessonId));
     }
@@ -2226,6 +2318,11 @@ function recaptureLessonArchive(userId, lessonId, phaseIndex) {
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
     if (!Number.isInteger(idx) || idx < 0 || idx >= phases.length) {
       return createErrorResponse('phaseIndex が不正です');
+    }
+    // 記録はボードが映しているデータを写すので、ボードがこの授業のこのフェーズを映している
+    //   ときだけ焼き直す。それ以外で取ると、別の授業・別のフェーズの回答が記録になる。
+    if (__boardLessonId_(userId) !== lessonId || idx !== __activePhaseIndex_(lessonJson)) {
+      return createErrorResponse('焼き直しは、ボードがこの授業のそのフェーズを映しているときだけできます', null, { error: 'NOT_ON_BOARD' });
     }
     const snapshot = __captureSnapshot_(userId, lessonJson, idx, lessonId);
     if (snapshot.reason) {

@@ -161,6 +161,12 @@
       <button type="button" id="lesson-runner-classes-cancel" class="btn btn-secondary text-xs">やめる</button>
     </div>
   </div>
+  <!-- 開始中の授業が 2 つあるとき、ボードにつながっていない方を開いたら出す。
+       フェーズを送る・終了するのはボードにつながっている授業だけ (サーバも断る)。 -->
+  <div id="lesson-runner-board-link" class="box box-warning mb-3 hidden" role="status">
+    <p id="lesson-runner-board-link-text" class="text-sm"></p>
+    <button type="button" id="lesson-runner-board-switch" class="btn btn-primary text-xs mt-2">この授業にボードを切り替える</button>
+  </div>
   <!-- フェーズカード横並び -->
   <div class="flex items-center gap-3 mb-4 overflow-x-auto" id="lesson-runner-phases">
     <!-- JS が動的生成 -->
@@ -203,7 +209,7 @@
   <!-- 切替はフェーズカードを押す (唯一の手段)。ここに残す操作は「授業終了」だけ。
        終了の意味 (受付を締め切って保存) は確認ダイアログが伝える。 -->
   <div class="flex items-center justify-end mt-4">
-    <button type="button" class="btn btn-danger"
+    <button type="button" id="lesson-runner-end" class="btn btn-danger"
       onclick="lessonEnd()"><svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg> 授業終了</button>
   </div>
 </section>
