@@ -2891,6 +2891,19 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       // Form 経由の授業は列の意味が授業ごとに違うので、この一覧は出さない。
       return createSuccessResponse('授業モードではありません', { supported: false });
     }
+    // ボードにつながっていない授業のシートは読まない (読めない)。
+    //   Why: その授業の回答シートはどのボードの config にも入っていないので、SA の検証で
+    //   「Target user not found」になる。管理パネルは授業を開いた時点の判定で回答一覧を
+    //   10 秒ごとに読み続けるため、開いたあとに授業がボードから外れる (切り替え / 終了) と、
+    //   失敗と警告を積み続けていた (2026-10-28 の理科、約 13 秒おきに 2 時間半)。
+    //   サーバが「つながっていない」と返せば、画面は読み込みをやめて案内を出す。
+    //   config を読めない (null) ときは従来どおり読みにいく (止める根拠が無い)。
+    const boardLessonId = __boardLessonId_(userId);
+    if (boardLessonId !== null && boardLessonId !== lessonId) {
+      return createSuccessResponse('この授業はボードにつながっていません', {
+        supported: true, onBoard: false, boardLessonId: boardLessonId || null
+      });
+    }
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
     const phaseIndex = __activePhaseIndex_(lessonJson);
     const phase = phases[phaseIndex];

@@ -1873,3 +1873,33 @@ test('submitLessonAnswer: 許可不足でない読み取り失敗は、従来ど
   const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
   assert.equal(res.error, 'SHEET_READ_FAILED');
 });
+
+// =====================================================================
+// 回答一覧: ボードにつながっていない授業のシートは読まない (2026-10-28 の理科、13 秒おきに失敗)
+// =====================================================================
+
+test('getLessonLiveAnswers: ボードが別の授業につながっていれば、シートを読まずに onBoard:false を返す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  let reads = 0;
+  h.nativeSheets.forEach((sh) => { const orig = sh.getDataRange; sh.getDataRange = function () { reads++; return orig.apply(this, arguments); }; });
+  h.context.getUserConfig = () => ({ success: true, config: { activeLessonId: 'lesson_other' } });
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(res.success, true);
+  assert.equal(res.data.onBoard, false);
+  assert.equal(res.data.boardLessonId, 'lesson_other');
+  assert.equal(reads, 0, '回答シートを読まない');
+});
+
+test('getLessonLiveAnswers: ボードにつながっていれば従来どおり読む / config が読めないときも読む', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getUserConfig = () => ({ success: true, config: { activeLessonId: lessonId } });
+  const on = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.equal(on.success, true);
+  assert.notEqual(on.data.onBoard, false);
+  assert.ok(Array.isArray(on.data.rows));
+  h.context.getUserConfig = () => ({ success: false });
+  const unknown = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.notEqual(unknown.data.onBoard, false, '分からないときは止めない');
+});

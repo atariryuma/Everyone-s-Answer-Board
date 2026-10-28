@@ -5010,6 +5010,7 @@
 
     const LIVE_LOADING_HTML = '<p class="lesson-live-empty">読み込み中...</p>';
     const LIVE_EMPTY_HTML = '<p class="lesson-live-empty">まだ回答がありません。届くと、ここに自動で出ます。</p>';
+    const LIVE_OFF_BOARD_HTML = '<p class="lesson-live-empty">この授業はいま児童のボードにつながっていないので、回答一覧を読んでいません。</p>';
 
     // クラスの絞り込みと名前の隠し方は、カード・● → ★・未提出のどこでも同じ規則にする。
     function liveInClass(x) {
@@ -5073,6 +5074,15 @@
         if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を読み込めませんでした'));
         live.errors = 0;
         const d = res.data || {};
+        // 開いたあとに授業がボードから外れた (別の画面で切り替えた / 終了した)。読み込みをやめ、
+        //   「この授業にボードを切り替える」の案内を出す (開いた時点の判定は古くなっている)。
+        if (d.onBoard === false) {
+          currentLessonOnBoard = false;
+          if (currentRunnerLesson) renderRunner(currentRunnerLesson);
+          const body = document.getElementById('lesson-live-body');
+          if (body) body.innerHTML = LIVE_OFF_BOARD_HTML; // lint-disable-line no-inner-html-assignment-with-variable -- 補間の無い定数文字列
+          return;
+        }
         if (!d.supported) {
           live.data = { supported: false };
         } else if (d.unchanged && live.data && live.data.supported) {
