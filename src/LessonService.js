@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -158,8 +158,9 @@ function __writeArchiveRows_(lessonId, phaseIndex, projectedRows) {
     (typeof r.numericX === 'number') ? r.numericX : '',
     (typeof r.numericY === 'number') ? r.numericY : ''
   ]);
-  // 行を決めて書く間だけ key の lock を取る (フェーズ送りと終了が重なっても範囲がかぶらない)。
-  //   ScriptLock にしないのは、呼び出し側が __withLessonLock_ の中にいることがあるため (入れ子にしない)。
+  // 行を決めて書く間だけ key の lock を取る (フェーズ送り・終了・取り直しが重なっても範囲がかぶらない)。
+  //   __withLessonLock_ (ScriptLock) の中からは呼ばないこと: acquireCacheLock_ も check+put のために
+  //   ScriptLock を一瞬取って外すので、外側の ScriptLock まで外れてしまう。
   const lockToken = (typeof acquireCacheLock_ === 'function')
     ? acquireCacheLock_(LESSON_RESPONSES_APPEND_LOCK_, { ttlSec: 30, waitMs: 10000 })
     : 'nolock';
@@ -188,7 +189,7 @@ function __getLessonsSheet_(opts) {
     if (!opts || !opts.createIfMissing) return null;
     // Lazy bootstrap: DB に lessons sheet が無いとき、初回 write 時に作る。
     try {
-      const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
+      const dbId = typeof getCachedProperty_ === 'function' ? getCachedProperty_('DATABASE_SPREADSHEET_ID') : null;
       if (!dbId) return null;
       const ss = SpreadsheetApp.openById(dbId);
       const newSheet = ss.insertSheet('lessons');
@@ -1154,7 +1155,7 @@ function __notOnBoardResponse_(boardLessonId) {
 function __attachBoardToLessonPhase_(userId, lessonId, lessonJson, phaseIdx, switched) {
   const phase = (lessonJson.phases || [])[phaseIdx];
   __setFormAcceptingResponses_(phase, true);
-  const result = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phase, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+  const result = applyConfigPatch_(userId, __boardPatchForPhase_(phase, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
   if (!result.success) return result;
   if (switched && typeof bumpBoardDataVersion_ === 'function') {
     try { bumpBoardDataVersion_(userId); } catch (e) {
@@ -1247,7 +1248,7 @@ function __templateToBoardMode_(formTemplate) {
  * @returns {{spreadsheetId:string, sheetName:string}|null}
  */
 function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
-  const ssId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+  const ssId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
   if (!ssId) return null;
   const ss = SpreadsheetApp.openById(ssId);
   lessonJson.nativeSpreadsheetId = ssId;
@@ -1318,6 +1319,29 @@ function __nativeAxisPhase_(lessonJson) {
     if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(phases[i])) >= 0) return phases[i];
   }
   return null;
+}
+
+/**
+ * ボードにかける (applyConfigPatch_ に渡す) ためのフェーズの patch。
+ *
+ * フォームのフェーズは、列の割り当てをそのときの回答シートから決め直してから組み立てる
+ *   (getColumnAnalysis: 作ったフォームなら書き添えた種類、先生が質問を変えていれば推定)。
+ *   Why: 開始時に覚えた割り当てをそのまま使うと、あとで customizeForm でフォームを変えたときに
+ *   別の列を理由や軸として読む。決め直せないとき (読めない / 推定で answer が決まらない) は
+ *   覚えた割り当てを使う。授業モードのシートは列が決まっているので決め直さない。
+ */
+function __boardPatchForPhase_(phase, lessonJson, lessonId) {
+  if (!__isNativePhase_(phase, lessonJson) && phase && phase.spreadsheetId && phase.sheetName
+      && typeof getColumnAnalysis === 'function') {
+    try {
+      const analysis = getColumnAnalysis(phase.spreadsheetId, phase.sheetName);
+      const mapping = analysis && analysis.success ? analysis.mapping : null;
+      if (mapping && mapping.answer !== undefined) phase.columnMapping = mapping;
+    } catch (error) {
+      console.warn('__boardPatchForPhase_: 列を決め直せませんでした (覚えた割り当てを使う):', error && error.message);
+    }
+  }
+  return __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
 }
 
 function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
@@ -1681,7 +1705,7 @@ function startLesson(userId, lessonId) {
 
       // Phase 0 を user config に反映 → 既存 view 経路で即座に board 表示可能。
       //   publishApp を呼ばず applyConfigPatch_ で直接 merge (高速 + lifecycle 干渉なし)。
-      const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phases[0], lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+      const patchResult = applyConfigPatch_(userId, __boardPatchForPhase_(phases[0], lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
       if (!patchResult.success) {
         // Patch 失敗時も Form は既に作成済み。state は draft のまま、lessonJson は最新で書く。
         __updateLessonRow_(lessonId, { lessonJson });
@@ -1821,7 +1845,7 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
 
     // user config を次フェーズに切替 (board が即座に新フェーズに対応; 冪等)
     const target = phases[toIdx];
-    const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+    const patchResult = applyConfigPatch_(userId, __boardPatchForPhase_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
     if (!patchResult.success) {
       // 授業 (lesson row) は既に次フェーズ。もう一度同じフェーズを押せば config だけ再適用される。
       return createErrorResponse(
@@ -1896,7 +1920,7 @@ function reopenLesson(userId, lessonId) {
     // config を再開 phase に合わせる + auto-archive の safety net marker を立てる
     //   (通常は publishApp が立てるが、再開はボード公開済みのまま行われうる)。
     const patch = Object.assign(
-      __buildPhaseConfigPatch_(phases[idx], lessonJson, lessonId),
+      __boardPatchForPhase_(phases[idx], lessonJson, lessonId),
       { currentLessonStartedAt: new Date().toISOString() }
     );
     const patchResult = applyConfigPatch_(userId, patch, { publish: false, replaceKeys: ['columnMapping'] });
@@ -2116,10 +2140,17 @@ function __isManualEndLesson_(lessonId) {
  *   marker のクリアは applyConfigPatch_ 経由で行う。
  */
 function dailyLessonArchiveSweep() {
+  // 時刻のトリガー (先生が作ったもの) からだけ走らせる。名前が _ で終わらないので画面からも呼べるが、
+  //   先生以外が呼ぶと授業中にアーカイブの取り込みと印の消去を何度でも起こせてしまう。
+  const caller = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
+  if (caller && !isAdministrator(caller)) {
+    console.warn('dailyLessonArchiveSweep: 先生以外からの呼び出しを断りました');
+    return;
+  }
   const summary = { scanned: 0, archived: 0, skipped: 0, errors: 0 };
   try {
-    if (typeof getAllUsers !== 'function') return summary;
-    const users = getAllUsers({ activeOnly: false }, { systemLookup: true });
+    if (typeof getAllUsers_ !== 'function') return summary;
+    const users = getAllUsers_({ activeOnly: false }, { systemLookup: true });
     const staleThresholdMs = LESSON_DAILY_STALE_HOURS * 60 * 60 * 1000;
     const now = Date.now();
 
@@ -3121,7 +3152,7 @@ function __loadLessonRowsFromSheet_(phaseDef, opts) {
     // 全行を 1 回で読む。
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     if (data.length === 0) return null;
-    // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect) ので、
+    // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect_) ので、
     //   固定 index ではなくヘッダー名で探す。値の読み方はボードと同じ extractHighlight に任せる。
     const header = data[0] || [];
     const highlightCol = header.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');

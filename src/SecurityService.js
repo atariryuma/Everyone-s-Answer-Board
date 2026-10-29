@@ -6,7 +6,7 @@
  * 入力検証は validators.js、 認可は main.js requireAdmin / DatabaseCore.js checkSpreadsheetAccess_。
  */
 
-/* global getCachedProperty, hasCoreSystemProps */
+/* global getCachedProperty_, hasCoreSystemProps */
 
 /**
  * 安全にメールアドレスからドメインを抽出する
@@ -83,7 +83,7 @@ function validateDomainAccess(email, options = {}) {
     };
   }
 
-  const adminEmail = getCachedProperty('ADMIN_EMAIL');
+  const adminEmail = getCachedProperty_('ADMIN_EMAIL');
   const adminDomain = adminEmail ? extractDomainSafely(adminEmail) : null;
   if (!adminDomain) {
     return {

@@ -12,7 +12,7 @@ function loadSecurityContext(overrides = {}) {
         getProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null
       })
     },
-    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     hasCoreSystemProps: () => true,
     openSpreadsheet: () => null,
     getCurrentEmail: () => 'user@example.com',
@@ -89,7 +89,7 @@ test('validateDomainAccess: invalid email format', () => {
 
 test('validateDomainAccess: admin unconfigured with allowIfAdminUnconfigured=true', () => {
   const ctx = loadSecurityContext({
-    getCachedProperty: () => null
+    getCachedProperty_: () => null
   });
   const result = ctx.validateDomainAccess('user@example.com', { allowIfAdminUnconfigured: true });
   assert.equal(result.allowed, true);
@@ -98,7 +98,7 @@ test('validateDomainAccess: admin unconfigured with allowIfAdminUnconfigured=tru
 
 test('validateDomainAccess: admin unconfigured with allowIfAdminUnconfigured=false', () => {
   const ctx = loadSecurityContext({
-    getCachedProperty: () => null
+    getCachedProperty_: () => null
   });
   const result = ctx.validateDomainAccess('user@example.com', { allowIfAdminUnconfigured: false });
   assert.equal(result.allowed, false);

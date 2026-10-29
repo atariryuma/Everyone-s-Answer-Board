@@ -35,7 +35,7 @@ function loadConfigContext(overrides = {}) {
       theme: 'default',
       pageSize: 20
     },
-    getCachedProperty: (k) => (overrides.props && k in overrides.props) ? overrides.props[k] : null,
+    getCachedProperty_: (k) => (overrides.props && k in overrides.props) ? overrides.props[k] : null,
     getWebAppUrl: () => 'https://example.com',
     validateConfig: () => ({ isValid: true, errors: [], sanitized: {} }),
     validateUrl: () => ({ isValid: true }),
@@ -43,7 +43,7 @@ function loadConfigContext(overrides = {}) {
     findUserByEmail: () => null,
     findUserById: () => null,
     findUserBySpreadsheetId: () => null,
-    updateUser: () => ({ success: true }),
+    updateUser_: () => ({ success: true }),
     getCurrentEmail: () => 'admin@test.com',
     isAdministrator: () => true,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
@@ -324,7 +324,7 @@ function loadSaveContext(overrides = {}) {
   return loadConfigContext({
     findUserById: overrides.findUserById
       || (() => ({ userId: 'u1', userEmail: 'owner@example.com', configJson: '{}' })),
-    updateUser: overrides.updateUser || (() => ({ success: true })),
+    updateUser_: overrides.updateUser_ || (() => ({ success: true })),
     validateConfig: overrides.validateConfig
       || (() => ({ isValid: true, errors: [], sanitized: {} })),
     validatePublishConfig: overrides.validatePublishConfig
@@ -380,7 +380,7 @@ test('saveUserConfig: proceeds when etag matches', () => {
       userEmail: 'owner@example.com',
       configJson: JSON.stringify({ etag: 'v1' })
     }),
-    updateUser: () => { updateCalled = true; return { success: true }; }
+    updateUser_: () => { updateCalled = true; return { success: true }; }
   });
   const result = context.saveUserConfig('u1', { etag: 'v1', spreadsheetId: 'ss' });
   assert.equal(result.success, true);
@@ -391,7 +391,7 @@ test('saveUserConfig: proceeds when etag absent (no etag enforcement)', () => {
   let updateCalled = false;
   const { context } = loadSaveContext({
     findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com', configJson: '{}' }),
-    updateUser: () => { updateCalled = true; return { success: true }; }
+    updateUser_: () => { updateCalled = true; return { success: true }; }
   });
   const result = context.saveUserConfig('u1', { spreadsheetId: 'ss' });
   assert.equal(result.success, true);
@@ -401,7 +401,7 @@ test('saveUserConfig: proceeds when etag absent (no etag enforcement)', () => {
 test('saveUserConfig: fresh etag is generated and stored', () => {
   let capturedUpdate = null;
   const { context } = loadSaveContext({
-    updateUser: (_id, fields) => { capturedUpdate = fields; return { success: true }; }
+    updateUser_: (_id, fields) => { capturedUpdate = fields; return { success: true }; }
   });
   context.saveUserConfig('u1', { spreadsheetId: 'ss' });
   assert.ok(capturedUpdate.configJson);
@@ -419,9 +419,9 @@ test('saveUserConfig: validation errors are returned verbatim', () => {
   assert.ok(result.errors.includes('bad answer column'));
 });
 
-test('saveUserConfig: updateUser failure propagates', () => {
+test('saveUserConfig: updateUser_ failure propagates', () => {
   const { context } = loadSaveContext({
-    updateUser: () => ({ success: false, message: 'database write failed' })
+    updateUser_: () => ({ success: false, message: 'database write failed' })
   });
   const result = context.saveUserConfig('u1', { spreadsheetId: 'ss' });
   assert.equal(result.success, false);

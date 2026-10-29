@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -40,6 +40,7 @@ function uploadLessonImage(base64Data, filename) {
   try {
     const email = getCurrentEmail();
     if (!email) return createAuthError();
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
     if (typeof base64Data !== 'string' || base64Data.length === 0) {
       return createErrorResponse('画像データが指定されていません');
     }
@@ -136,6 +137,7 @@ function moveFileToFolder_(file, folder) {
  */
 function getForms() {
   try {
+    { const denied = teacherOnlyError_(); if (denied) return Object.assign(denied, { forms: [] }); }
     const files = DriveApp.getFilesByType('application/vnd.google-apps.form');
     const forms = [];
 
@@ -207,6 +209,7 @@ function createTemplateForm(templateType, templateOptions) {
   try {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) return createAuthError();
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
 
     const type = TEMPLATE_LABELS[templateType] ? templateType : 'board';
     const opts = (templateOptions && typeof templateOptions === 'object') ? templateOptions : {};
@@ -481,7 +484,7 @@ function readTemplateColumnMapping_(spreadsheet, headers) {
  * 既存 Form の「1 回答制限」を toggle する。
  *   再投稿許可 (= allowResubmit=true) なら setLimitOneResponsePerUser(false)。
  *   AdminPanel の「再投稿を許可（揺らぎを追跡）」チェックボックスから呼ばれる。
- *   Why 別関数: customizeForm は項目全削除を伴う破壊的 API。設定の 1 bit だけ
+ *   Why 別関数: customizeForm_ は項目全削除を伴う破壊的 API。設定の 1 bit だけ
  *     触りたいケースでは使わない。回答が既に入っている Form でも安全に呼べる。
  * @param {string} formIdOrUrl
  * @param {boolean} allowResubmit
@@ -497,6 +500,7 @@ function __openFormByIdOrUrl_(formIdOrUrl) {
 
 function setFormAllowResubmit(formIdOrUrl, allowResubmit) {
   try {
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
     if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
       return createErrorResponse('formId or formUrl is required');
     }
@@ -517,7 +521,7 @@ function setFormAllowResubmit(formIdOrUrl, allowResubmit) {
   }
 }
 
-function customizeForm(formIdOrUrl, schema) {
+function customizeForm_(formIdOrUrl, schema) {
   try {
     if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
       return createErrorResponse('formId or formUrl is required');
@@ -665,7 +669,7 @@ function customizeForm(formIdOrUrl, schema) {
     }
 
     // ヘッダーキャッシュ無効化（新 SS のキャッシュは未作成だが、安全のため旧キャッシュも消す）
-    // Why (fail-soft): cache invalidation 失敗は customizeForm 全体を止める理由にならない。
+    // Why (fail-soft): cache invalidation 失敗は customizeForm_ 全体を止める理由にならない。
     //   destination spreadsheet が trash 済 / アクセス権無し / cache 未初期化のいずれかが原因。
     //   次回 fetch 時にどちらにせよ headers は実際の sheet から取り直されるので無害。
     try {
@@ -706,6 +710,7 @@ function customizeForm(formIdOrUrl, schema) {
  */
 function processFormUrlInput(formUrl) {
   try {
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
     // 1. URL検証
     if (!formUrl || typeof formUrl !== 'string') {
       return createErrorResponse('GoogleフォームのURLを入力してください');
@@ -1768,32 +1773,6 @@ function getNotificationUpdate(targetUserId, options = {}) {
 }
 
 /**
- * 呼び出し元が当該スプレッドシートへの正当なアクセス権を持つか検証する。
- *
- * Web app は executeAs=USER_ACCESSING で動作するため、 SpreadsheetApp は **呼び出し元自身の
- * OAuth** で実行される。 呼び出し元が自分の権限で openById できる = その SS への正当な
- * アクセス権を Drive 上で持っている。 開けなければ別人の SS。
- *
- * これがないと、 setup 系エンドポイント (getColumnAnalysis / connectDataSource) に任意の
- * spreadsheetId を渡すだけで、 (1) 他人の公開ボード SS のヘッダ + サンプル 10 行 (email 列含む
- * 生データ) を読める、 という情報漏えいが起きる。 admin (先生) は自分の SS を扱うので例外。
- *
- * @param {string} spreadsheetId
- * @returns {boolean}
- */
-function callerCanAccessSpreadsheet_(spreadsheetId) {
-  if (!spreadsheetId || typeof spreadsheetId !== 'string') return false;
-  try {
-    if (typeof SpreadsheetApp === 'undefined' || typeof SpreadsheetApp.openById !== 'function') {
-      return false;
-    }
-    return Boolean(SpreadsheetApp.openById(spreadsheetId));
-  } catch (_) {
-    return false;
-  }
-}
-
-/**
  * Connect to data source - API Gateway function for DataService
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
@@ -1808,13 +1787,9 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       return createAuthError();
     }
 
-    // 所有者検証: 呼び出し元が自分の OAuth で開けない SS への接続は拒否 (admin は例外)。
-    //   これで他人の SS への SA 共有強制適用 / サンプルデータ読み取りを防ぐ。
-    if (!isAdministrator(email) && !callerCanAccessSpreadsheet_(spreadsheetId)) {
-      console.warn('connectDataSource: caller lacks access to spreadsheet:', `${email.split('@')[0]}@***`);
-      return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
-    }
-
+    // 先生だけ: 先生として実行するので、呼び出し元を確かめないと児童の画面からも先生の
+    //   スプレッドシートに列を足したり中身を読んだりできてしまう。
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
 
     if (batchOperations && Array.isArray(batchOperations)) {
       return processDataSourceOperations(spreadsheetId, sheetName, batchOperations);
@@ -1910,12 +1885,9 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
       return createAuthError();
     }
 
-    // 所有者検証: 列分析は setup/owner 操作。 任意 SS の生サンプル (email 列含む) を
-    //   非所有者が読めてしまう穴を塞ぐ。 admin (先生) は自分の SS を分析するので通す。
-    if (!isAdministrator(email) && !callerCanAccessSpreadsheet_(spreadsheetId)) {
-      console.warn('getColumnAnalysis: caller lacks access to spreadsheet:', `${email.split('@')[0]}@***`);
-      return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
-    }
+    // 先生だけ: 列分析は設定の操作。任意の SS の見出しと生のサンプル (email 列含む) を読むので、
+    //   先生として実行する配置では呼び出し元を確かめないと児童からも読めてしまう。
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
 
     let dataAccess;
     try {
@@ -1976,7 +1948,7 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     let resultHeaders = headers;
     let columnsAdded = [];
     try {
-      const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
+      const columnSetupResult = setupReactionAndHighlightColumns_(spreadsheetId, sheetName, headers);
       if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
         columnsAdded = columnSetupResult.columnsAdded;
         resultHeaders = [...headers, ...columnsAdded];
@@ -2009,11 +1981,11 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
  * @param {Array} currentHeaders - 現在のヘッダー配列
  * @returns {Object} 追加結果
  */
-function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeaders = []) {
+function setupReactionAndHighlightColumns_(spreadsheetId, sheetName, currentHeaders = []) {
   try {
     const requiredColumns = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
 
-    // Why strict equality: processReactionDirect looks up reaction columns with
+    // Why strict equality: processReactionDirect_ looks up reaction columns with
     //   `header.trim() === 'UNDERSTAND'` etc. If this existence check is looser
     //   (e.g. substring), the two sides disagree and reactions break silently.
     const currentHeadersNormalized = currentHeaders.map(h => String(h || '').toUpperCase().trim());

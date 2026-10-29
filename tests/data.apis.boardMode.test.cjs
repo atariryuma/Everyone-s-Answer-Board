@@ -29,7 +29,7 @@ function loadDataApisContext(overrides = {}) {
     CACHE_DURATION: { SHORT: 10, MEDIUM: 30, LONG: 300, DATABASE_LONG: 600, FORM_DATA: 30 },
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: 'viewer@example.com', isAdmin: false }),
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     saveToCacheWithSizeCheck: () => true,
     emailToShortHash: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),

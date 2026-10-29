@@ -61,13 +61,13 @@ function loadMainContext(overrides = {}, errorSink) {
         return bytes;
       }
     },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     dispatchAdminOperation: () => ({ success: false }),
     timingSafeEqual: (a, b) => a === b
   };
   Object.assign(context, overrides);
-  if (!context.setCachedProperty) {
-    context.setCachedProperty = (key, value) => {
+  if (!context.setCachedProperty_) {
+    context.setCachedProperty_ = (key, value) => {
       try { context.PropertiesService.getScriptProperties().setProperty(key, value); } catch (_) {}
     };
   }

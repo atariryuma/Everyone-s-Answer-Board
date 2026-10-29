@@ -3,7 +3,7 @@
  *
  * Why: users に居ない児童の findUserByEmail が毎回 users シートを直接読み、
  *   validateServiceAccountUsage の skipCache が users 一覧の cache まで飛ばし、
- *   updateUser が同じ行を 2 回読んで 429 で落ちていた。どれも「読まなくてよい read」。
+ *   updateUser_ が同じ行を 2 回読んで 429 で落ちていた。どれも「読まなくてよい read」。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -65,8 +65,8 @@ function loadCtx(sheet, overrides = {}) {
     Utilities: { sleep: () => {} },
     getCurrentEmail: () => 'child@example.com',
     isAdministrator: (e) => e === 'admin@example.com',
-    getCachedProperty: (k) => (k === 'USER_CACHE_VERSION' ? '0' : null),
-    clearPropertyCache: () => {},
+    getCachedProperty_: (k) => (k === 'USER_CACHE_VERSION' ? '0' : null),
+    clearPropertyCache_: () => {},
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
     validateEmail: (e) => ({ isValid: /.+@.+/.test(String(e || '')), sanitized: e, errors: [] }),
@@ -118,7 +118,7 @@ test('updateUser: 同じ行を 2 回読まず、既読の行を下敷きに書�
   const short = ['u1', 'owner@example.com', '', true, JSON.stringify({ isPublished: true })];
   const sheet = makeUsersSheet([short]);
   const { ctx } = loadCtx(sheet, { getCurrentEmail: () => 'owner@example.com' });
-  const res = ctx.updateUser('u1', { configJson: JSON.stringify({ isPublished: false }) }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { configJson: JSON.stringify({ isPublished: false }) }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true, res.message);
   assert.equal(sheet.calls.getRangeValues, 0, '行の再読みをしない');
   assert.equal(sheet.calls.setValues.length, 1);
@@ -134,7 +134,7 @@ test('updateUser: 更新しない列が範囲に挟まるときも既読の値�
   const sheet = makeUsersSheet([row]);
   const { ctx } = loadCtx(sheet, { getCurrentEmail: () => 'owner@example.com' });
   // userEmail (2) と configJson (5) を更新 → 範囲は 2..6、googleId / isActive は既存値のまま
-  const res = ctx.updateUser('u1', { userEmail: 'new@example.com', configJson: '{"a":2}' }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { userEmail: 'new@example.com', configJson: '{"a":2}' }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true, res.message);
   const w = sheet.calls.setValues[0];
   assert.equal(w.col, 2);

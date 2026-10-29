@@ -117,7 +117,7 @@ function loadReactionContext(overrides = {}) {
 }
 
 // =====================================================================
-// processReactionDirect — core logic (pure, no external calls)
+// processReactionDirect_ — core logic (pure, no external calls)
 // =====================================================================
 
 test('processReactionDirect: adds LIKE when user has no prior reaction', () => {
@@ -127,7 +127,7 @@ test('processReactionDirect: adds LIKE when user has no prior reaction', () => {
     rows: [['answer-a', '', '', '', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.action, 'added');
   assert.equal(result.userReaction, 'LIKE');
@@ -150,7 +150,7 @@ test('processReactionDirect: removes LIKE when user toggles same reaction', () =
     rows: [['answer-a', '', 'actor@example.com', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.action, 'removed');
   assert.equal(result.userReaction, null);
@@ -167,7 +167,7 @@ test('processReactionDirect: case-insensitive toggle removes own mixed-case reac
     rows: [['answer-a', '', 'Actor@Example.com', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.action, 'removed', 'mixed-case stored email must be recognized as own reaction');
   assert.equal(result.reactions.LIKE.count, 0);
@@ -181,7 +181,7 @@ test('processReactionDirect: stores canonical (lowercased) email on add (M1)', (
     headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
     rows: [['answer-a', '', '', '']]
   });
-  ctx.processReactionDirect(sheet, 2, 'LIKE', 'Actor@Example.com');
+  ctx.processReactionDirect_(sheet, 2, 'LIKE', 'Actor@Example.com');
   assert.equal(sheet._data[1][2], 'actor@example.com', 'added email is normalized to lowercase');
 });
 
@@ -192,7 +192,7 @@ test('processReactionDirect: switches reaction from LIKE to CURIOUS', () => {
     rows: [['answer-a', '', 'actor@example.com', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'CURIOUS', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'CURIOUS', 'actor@example.com');
 
   assert.equal(result.action, 'added');
   assert.equal(result.userReaction, 'CURIOUS');
@@ -209,7 +209,7 @@ test('processReactionDirect: preserves other users reactions', () => {
     rows: [['answer-a', '', 'other@example.com|third@example.com', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.reactions.LIKE.count, 3);
   assert.equal(result.reactions.LIKE.reacted, true);
@@ -228,7 +228,7 @@ test('processReactionDirect: rejects invalid reaction type', () => {
   });
 
   assert.throws(
-    () => ctx.processReactionDirect(sheet, 2, 'INVALID', 'actor@example.com'),
+    () => ctx.processReactionDirect_(sheet, 2, 'INVALID', 'actor@example.com'),
     /Invalid reaction type/
   );
 });
@@ -240,7 +240,7 @@ test('processReactionDirect: graceful degradation when headers unavailable', () 
     getRange: () => ({ getValues: () => [[]], setValues: () => {} })
   };
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.action, 'unavailable');
   assert.equal(result.userReaction, null);
@@ -258,7 +258,7 @@ test('processReactionDirect: lazy-provisions missing reaction columns (new behav
   });
 
   // 不足列が auto-append され、リアクションが成功する
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
   assert.equal(result.action, 'added');
   assert.equal(result.reactions.LIKE.count, 1);
 });
@@ -270,7 +270,7 @@ test('processReactionDirect: handles header case and whitespace', () => {
     rows: [['answer-a', '', '', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   assert.equal(result.action, 'added');
   assert.equal(result.reactions.LIKE.count, 1);
@@ -283,7 +283,7 @@ test('processReactionDirect: filters empty entries from pipe-serialized users', 
     rows: [['answer-a', '', '|actor@example.com||other@example.com|', '']]
   });
 
-  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  const result = ctx.processReactionDirect_(sheet, 2, 'LIKE', 'actor@example.com');
 
   // actor is toggling off. Should be removed, other preserved.
   assert.equal(result.action, 'removed');
@@ -292,7 +292,7 @@ test('processReactionDirect: filters empty entries from pipe-serialized users', 
 });
 
 // =====================================================================
-// processHighlightDirect
+// processHighlightDirect_
 // =====================================================================
 
 test('processHighlightDirect: toggles FALSE → TRUE', () => {
@@ -302,7 +302,7 @@ test('processHighlightDirect: toggles FALSE → TRUE', () => {
     rows: [['answer-a', '', '', '', 'FALSE']]
   });
 
-  const result = ctx.processHighlightDirect(sheet, 2);
+  const result = ctx.processHighlightDirect_(sheet, 2);
 
   assert.equal(result.highlighted, true);
   assert.equal(sheet._data[1][4], 'TRUE');
@@ -315,7 +315,7 @@ test('processHighlightDirect: toggles TRUE → FALSE', () => {
     rows: [['answer-a', 'TRUE']]
   });
 
-  const result = ctx.processHighlightDirect(sheet, 2);
+  const result = ctx.processHighlightDirect_(sheet, 2);
 
   assert.equal(result.highlighted, false);
   assert.equal(sheet._data[1][1], 'FALSE');
@@ -328,7 +328,7 @@ test('processHighlightDirect: empty cell treated as FALSE, toggles to TRUE', () 
     rows: [['answer-a', '']]
   });
 
-  const result = ctx.processHighlightDirect(sheet, 2);
+  const result = ctx.processHighlightDirect_(sheet, 2);
 
   assert.equal(result.highlighted, true);
   assert.equal(sheet._data[1][1], 'TRUE');
@@ -342,13 +342,13 @@ test('processHighlightDirect: graceful degradation on empty headers', () => {
   };
 
   // 失敗として投げる (以前は success:true +「解除しました」に包まれ、何も起きないのに成功扱いだった)。
-  assert.throws(() => ctx.processHighlightDirect(sheet, 2), /一時的/);
+  assert.throws(() => ctx.processHighlightDirect_(sheet, 2), /一時的/);
 });
 
 test('processHighlightDirect: 列が既にあれば provisioned=false (画面は ★ の塗りだけで知らせる)', () => {
   const ctx = loadReactionContext();
   const sheet = createMockSheet({ headers: ['Q1', 'HIGHLIGHT'], rows: [['answer-a', '']] });
-  assert.equal(ctx.processHighlightDirect(sheet, 2).provisioned, false);
+  assert.equal(ctx.processHighlightDirect_(sheet, 2).provisioned, false);
 });
 
 test('processHighlightDirect: lazy-provisions missing HIGHLIGHT column (new behavior)', () => {
@@ -360,7 +360,7 @@ test('processHighlightDirect: lazy-provisions missing HIGHLIGHT column (new beha
   });
 
   // 不足 HIGHLIGHT 列が auto-append され、トグルが成功する
-  const result = ctx.processHighlightDirect(sheet, 2);
+  const result = ctx.processHighlightDirect_(sheet, 2);
   assert.equal(result.highlighted, true);
   assert.equal(result.provisioned, true, '初回は列を作ったことを画面に知らせる');
 });
@@ -650,7 +650,7 @@ test('addReaction: releases lock on processing error', () => {
     headers: ['Q1', 'UNDERSTAND', 'CURIOUS'], // missing LIKE → provisioning attempted
     rows: [['answer-a', '', '']]
   });
-  // setValues を強制失敗させて processReactionDirect 内の lazy-provisioning を失敗させる
+  // setValues を強制失敗させて processReactionDirect_ 内の lazy-provisioning を失敗させる
   const originalGetRange = sheet.getRange;
   sheet.getRange = function (row, col, numRows, numCols) {
     const range = originalGetRange.call(sheet, row, col, numRows, numCols);
@@ -762,7 +762,7 @@ test('addReaction: uses cached headers from getSheetHeaders and avoids per-call 
 
   // Sheet returns EMPTY headers via getDataRange to prove we're NOT using that path.
   // If the new cached-header optimization works, this test still succeeds because
-  // processReactionDirect falls back to the preloadedHeaders.
+  // processReactionDirect_ falls back to the preloadedHeaders.
   let dataRangeCalls = 0;
   const sheet = {
     getName: () => 'Sheet1',

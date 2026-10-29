@@ -9,7 +9,7 @@ const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
 // PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
-function getCachedProperty(key) {
+function getCachedProperty_(key) {
   const now = Date.now();
   const cached = RUNTIME_PROPERTIES_CACHE[key];
 
@@ -42,20 +42,20 @@ function getCachedProperty(key) {
  */
 function ensureDeploymentBootstrap_() {
   if (typeof DEPLOY_ADMIN_EMAIL === 'undefined' || !DEPLOY_ADMIN_EMAIL || !DEPLOY_DATABASE_SPREADSHEET_ID) return;
-  if (getCachedProperty('ADMIN_EMAIL') && getCachedProperty('DATABASE_SPREADSHEET_ID')) return;
+  if (getCachedProperty_('ADMIN_EMAIL') && getCachedProperty_('DATABASE_SPREADSHEET_ID')) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return;   // 同時に開いた別の人がそろえている。次の呼び出しで済んでいる
   try {
     const props = PropertiesService.getScriptProperties();
     if (!props.getProperty('ADMIN_EMAIL') && DEPLOY_ADMIN_EMAIL) {
-      setCachedProperty('ADMIN_EMAIL', String(DEPLOY_ADMIN_EMAIL).trim().toLowerCase());
+      setCachedProperty_('ADMIN_EMAIL', String(DEPLOY_ADMIN_EMAIL).trim().toLowerCase());
     }
     if (!props.getProperty('DATABASE_SPREADSHEET_ID') && DEPLOY_DATABASE_SPREADSHEET_ID) {
       const ss = SpreadsheetApp.openById(DEPLOY_DATABASE_SPREADSHEET_ID);
       __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
       __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
       __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
-      setCachedProperty('DATABASE_SPREADSHEET_ID', DEPLOY_DATABASE_SPREADSHEET_ID);
+      setCachedProperty_('DATABASE_SPREADSHEET_ID', DEPLOY_DATABASE_SPREADSHEET_ID);
     }
   } finally {
     lock.releaseLock();
@@ -82,7 +82,7 @@ function timingSafeEqual(a, b) {
  * メモリキャッシュをクリア（テスト用・設定変更時用）
  * @param {string} key - クリアするキー（省略時は全クリア）
  */
-function clearPropertyCache(key = null) {
+function clearPropertyCache_(key = null) {
   if (key) {
     delete RUNTIME_PROPERTIES_CACHE[key];
   } else {
@@ -95,7 +95,7 @@ function clearPropertyCache(key = null) {
  * @param {string} key - プロパティキー
  * @param {string} value - プロパティ値
  */
-function setCachedProperty(key, value) {
+function setCachedProperty_(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, value);
   delete RUNTIME_PROPERTIES_CACHE[key];
 }
@@ -352,7 +352,7 @@ function withStampedeGuard_(opts) {
 /**
  * key 単位の短期 lock (ScriptCache が保持者、ScriptLock は check+put をアトミックにする数 ms だけ)。
  *
- * Why: createUser / updateUser は以前 ScriptLock を「users シートの read → write」の間 (当時は
+ * Why: createUser_ / updateUser_ は以前 ScriptLock を「users シートの read → write」の間 (当時は
  *   1〜3 秒、429 なら 15 秒超) ずっと握っていた。ScriptLock はスクリプト全体で 1 本なので、
  *   その間に来たリアクション (acquireRowLock_ の tryLock 800ms) や授業の操作は全て
  *   「同時処理中」で失敗していた。教師が設定を保存するたびに児童 30 人の 👍 が落ちる。
@@ -580,6 +580,18 @@ function requireAdmin() {
 }
 
 /**
+ * 管理パネルの処理の入口で呼ぶ。先生 (管理者) でなければエラー応答を返す (先生なら null)。
+ *
+ * Why: 先生として実行するので、どの処理も先生の権限で動く。Apps Script は名前が _ で終わらない
+ *   関数をすべて google.script.run から呼べるため、呼び出し元を確かめないと、児童の画面からも
+ *   先生の Drive・フォームを操作できてしまう (2026-10-29 のレビュー)。
+ * @returns {Object|null}
+ */
+function teacherOnlyError_() {
+  return requireAdmin() ? null : createAdminRequiredError();
+}
+
+/**
  * getUserConfig 結果から config を安全に取得
  *
  * 失敗時は空オブジェクトを返す（caller が壊れないことを優先）が、
@@ -638,7 +650,7 @@ function emailToShortHash(email) {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) return null;
 
-  let salt = getCachedProperty('EMAIL_HASH_SALT');
+  let salt = getCachedProperty_('EMAIL_HASH_SALT');
   if (!salt) {
     // Why: salt 未設定なら自動生成。スクリプト全体で 1 回だけ生成、以後同じ salt を使う。
     //      乱数源は Utilities.getUuid()（GAS 提供の crypto-grade UUID）。
@@ -653,11 +665,11 @@ function emailToShortHash(email) {
       lock = null; // lock 取れなくても下で生成は試みる (劣化動作)
     }
     try {
-      salt = getCachedProperty('EMAIL_HASH_SALT'); // lock 取得中に他 request が確定済みかも
+      salt = getCachedProperty_('EMAIL_HASH_SALT'); // lock 取得中に他 request が確定済みかも
       if (!salt) {
         salt = Utilities.getUuid().replace(/-/g, '');
         try {
-          setCachedProperty('EMAIL_HASH_SALT', salt);
+          setCachedProperty_('EMAIL_HASH_SALT', salt);
         } catch (e) {
           console.warn('emailToShortHash: failed to persist salt, using ephemeral value:', e.message);
         }

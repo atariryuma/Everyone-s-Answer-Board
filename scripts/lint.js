@@ -72,7 +72,7 @@ const RULES = [
   {
     id: 'no-direct-property-fetch',
     severity: 'warn',
-    message: 'PropertiesService を直接呼ばず getCachedProperty() / setCachedProperty() を使用（30s メモリキャッシュ）。',
+    message: 'PropertiesService を直接呼ばず getCachedProperty_() / setCachedProperty_() を使用（30s メモリキャッシュ）。',
     patterns: [/PropertiesService\s*\.\s*getScriptProperties\s*\(\s*\)\s*\.\s*getProperty\s*\(/g],
     filter: (filepath) => filepath.endsWith('.js') && !filepath.includes('/tests/')
       // helpers.js 自身の実装は許可

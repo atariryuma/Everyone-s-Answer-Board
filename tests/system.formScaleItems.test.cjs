@@ -42,11 +42,11 @@ function loadCtx(formAppOverrides) {
     SYSTEM_LIMITS: { CONFIG_JSON_MAX_CHARS: 32000 },
     getCurrentEmail: () => null,
     isAdministrator: () => false,
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     findUserByEmail: () => null,
     saveToCacheWithSizeCheck: () => true,
     openSpreadsheet: () => null,
-    detectFormConnection: () => ({}),
+    detectFormConnection_: () => ({}),
     createErrorResponse: (msg) => ({ success: false, message: msg }),
     createSuccessResponse: (msg, data) => ({ success: true, message: msg, data })
   };

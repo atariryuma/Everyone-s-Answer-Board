@@ -170,7 +170,7 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
  * @param {string} actorEmail
  * @param {Array} [preloadedHeaders] - 呼び出し側でキャッシュ済みなら渡す（再取得を回避）
  */
-function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders) {
+function processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders) {
   const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
   if (!reactionTypes.includes(reactionType)) {
@@ -185,7 +185,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
     : readHeaderRowOnly_(sheet);
 
   if (!headers || headers.length === 0) {
-    console.warn(`⚠️ processReactionDirect: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
+    console.warn(`⚠️ processReactionDirect_: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
       rowNumber,
       reactionType,
       context: 'graceful-degradation'
@@ -221,7 +221,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   });
 
   // Why (scope): 「現在の操作に必要な列」だけを provision する。HIGHLIGHT は
-  //   processHighlightDirect 側で別途 lazy-provision するので、ここでは reaction 3 種のみ。
+  //   processHighlightDirect_ 側で別途 lazy-provision するので、ここでは reaction 3 種のみ。
   //   余計な provisioning は test の sheet._writes 期待値を壊し、生産現場でも不必要な書込み。
   const missingForProvision = missingTypes.slice();
 
@@ -380,13 +380,13 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
  * @param {number} rowNumber
  * @param {Array} [preloadedHeaders]
  */
-function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
+function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
     ? preloadedHeaders
     : readHeaderRowOnly_(sheet);
 
   if (!headers || headers.length === 0) {
-    console.warn(`⚠️ processHighlightDirect: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
+    console.warn(`⚠️ processHighlightDirect_: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
       rowNumber,
       context: 'graceful-degradation'
     });
@@ -401,7 +401,7 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
 
   // Why (lazy provisioning): 旧来は throw して教師にデータソース再接続を強制していたが、
   //   新規ボードで初回 HIGHLIGHT 押下時に必ず失敗する UX 破壊フロー。
-  //   processReactionDirect と同じ方針で missing column を sheet 末尾に append → 続行。
+  //   processReactionDirect_ と同じ方針で missing column を sheet 末尾に append → 続行。
   if (highlightColIndex === -1) {
     // 10 分 cache の見出しは古いことがある。同時に走ったリアクションが右端に UNDERSTAND/LIKE/CURIOUS
     //   を足した直後だと、同じ列に HIGHLIGHT を書いて見出しを潰す。書く前に 1 行目を読み直す。
@@ -629,7 +629,7 @@ function addReaction(targetUserId, rowIndex, reactionType, expect) {
       ? createErrorResponse('このボードではリアクションを使いません', null, { error: 'REACTIONS_OFF' })
       : null,
     process: (sheet, rowNumber, actorEmail, preloadedHeaders) =>
-      processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders),
+      processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders),
     formatSuccess: (result) => ({
       success: true,
       reactions: result.reactions,
@@ -660,7 +660,7 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
     //      サーバー側で editor 限定のゲートを張る。
     requireEditor: true,
     process: (sheet, rowNumber, _actorEmail, preloadedHeaders) =>
-      processHighlightDirect(sheet, rowNumber, preloadedHeaders),
+      processHighlightDirect_(sheet, rowNumber, preloadedHeaders),
     formatSuccess: (result) => ({
       success: true,
       highlighted: result.highlighted,
@@ -751,7 +751,7 @@ function executeBoardRowOperation(options) {
     if (!sheet) return createErrorResponse('Target sheet not found');
 
     // Load sheet headers outside the lock using the cached helper.
-    // Why: processReactionDirect / processHighlightDirect previously called
+    // Why: processReactionDirect_ / processHighlightDirect_ previously called
     //      sheet.getDataRange().getValues() every invocation — that reads the
     //      entire sheet just to get the header row. By resolving headers here
     //      (via getSheetHeaders, 10-minute cache) we pay that cost at most

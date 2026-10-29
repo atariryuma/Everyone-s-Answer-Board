@@ -18,11 +18,11 @@
  *   - 元の本体のデータは消さない (写すだけ)
  */
 
-/* global getCachedProperty, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __nativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
+/* global getCachedProperty_, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __nativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
 
 // 引っ越し先の持ち主 (この配置の先生)。登録がまだなら先に管理パネルを開いてもらう。
 function __migrationOwner_() {
-  const adminEmail = getCachedProperty('ADMIN_EMAIL');
+  const adminEmail = getCachedProperty_('ADMIN_EMAIL');
   const user = adminEmail ? findUserByEmail(adminEmail, { requestingUser: adminEmail }) : null;
   if (!user || !user.userId) {
     return { error: createErrorResponse('先に先生のアカウントで管理パネルを 1 度開いてください (登録がまだです)', null, { error: 'OWNER_NOT_REGISTERED' }) };
@@ -35,7 +35,7 @@ function __migrationOwner_() {
  * @param {Object} lesson - { lessonId, name, state, createdAt, startedAt, endedAt, lessonJson (snapshots の rows 入り) }
  * @returns {Object} { success, data: { lessonId, skipped?, sheets, archiveRows } }
  */
-function migrateImportLesson(lesson) {
+function migrateImportLesson_(lesson) {
   const copied = [];   // この回に写したシート (失敗したら消す)
   try {
     const owner = __migrationOwner_();
@@ -50,7 +50,7 @@ function migrateImportLesson(lesson) {
     }
 
     const lessonJson = JSON.parse(JSON.stringify(lesson.lessonJson));
-    const ss = SpreadsheetApp.openById(getCachedProperty('DATABASE_SPREADSHEET_ID'));
+    const ss = SpreadsheetApp.openById(getCachedProperty_('DATABASE_SPREADSHEET_ID'));
     const moved = { sheets: 0, archiveRows: 0 };
 
     // 1. 授業モードの回答シートを先生のスプレッドシートへ写す
@@ -139,7 +139,7 @@ function migrateImportLesson(lesson) {
  * @param {number} [params.shiftMinutes] - 時刻のずらし (分)
  * @param {boolean} [params.dryRun] - true なら数えるだけで書かない
  */
-function migrateImportLessonAnswers(params) {
+function migrateImportLessonAnswers_(params) {
   try {
     const owner = __migrationOwner_();
     if (owner.error) return owner.error;
@@ -226,7 +226,7 @@ function migrateImportLessonAnswers(params) {
  * (ボードにつながっている授業を、新しいシートを指すようにかけ直すため)。
  * @param {Object} config
  */
-function migrateImportConfig(config) {
+function migrateImportConfig_(config) {
   try {
     const owner = __migrationOwner_();
     if (owner.error) return owner.error;

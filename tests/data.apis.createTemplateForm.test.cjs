@@ -151,6 +151,8 @@ function loadCtx(overrides = {}) {
     getConfigOrDefault: () => ({}),
     saveUserConfig: () => ({ success: true }),
     openSpreadsheet: () => null,
+    // 管理パネルの処理は先生だけ (helpers.js)。既定は先生として呼ぶ。
+    teacherOnlyError_: overrides.teacherOnlyError_ || (() => null),
     SpreadsheetApp: {
       create: (title) => {
         const ss = makeFakeSpreadsheet(title);
@@ -225,7 +227,7 @@ function loadCtx(overrides = {}) {
     SYSTEM_LIMITS: {},
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: myEmail, isAdmin: false }),
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     saveToCacheWithSizeCheck: () => true,
     emailToShortHash: () => 'h_xxxx',
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
@@ -951,4 +953,11 @@ test('readTemplateColumnMapping_: 見出しが作ったときの並びなら割�
   assert.equal(ctx.readTemplateColumnMapping_(ss, shifted), null);
   // 書き添えの無いシート (先生が自分で作ったフォーム)
   assert.equal(ctx.readTemplateColumnMapping_(makeFakeSpreadsheet('x'), TEMPLATE_HEADERS.matrix), null);
+});
+
+test('createTemplateForm: 先生以外 (児童の画面から直接呼ばれた) は断り、フォームを作らない', () => {
+  const ctx = loadCtx({ teacherOnlyError_: () => ({ success: false, message: '管理者権限が必要です' }) });
+  const res = ctx.createTemplateForm('matrix');
+  assert.equal(res.success, false);
+  assert.equal(ctx.__lastForm, undefined, 'FormApp.create を呼ばない');
 });

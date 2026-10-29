@@ -80,7 +80,7 @@ function loadDataServiceContext(overrides = {}) {
     extractHighlight: () => false,
     getQuestionText: () => '',
     formatTimestamp: (v) => String(v || ''),
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     ...overrides
   };
 
@@ -525,7 +525,7 @@ test('processBatchData: batch read error is handled gracefully (regression: erro
 });
 
 // =====================================================================
-// deleteLinkedFormResponseByTimestamp
+// deleteLinkedFormResponseByTimestamp_
 // =====================================================================
 
 test('deleteLinkedFormResponseByTimestamp: deletes response matching timestamp', () => {
@@ -546,7 +546,7 @@ test('deleteLinkedFormResponseByTimestamp: deletes response matching timestamp',
   };
 
   // 1 秒以内の誤差は許容
-  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date('2026-04-21T12:00:00.000Z'));
+  const result = ctx.deleteLinkedFormResponseByTimestamp_(sheet, new Date('2026-04-21T12:00:00.000Z'));
 
   assert.equal(result.success, true);
   assert.deepEqual(deletedIds, ['resp-1']);
@@ -558,7 +558,7 @@ test('deleteLinkedFormResponseByTimestamp: returns note when sheet has no linked
   });
   const sheet = { getFormUrl: () => null };
 
-  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date());
+  const result = ctx.deleteLinkedFormResponseByTimestamp_(sheet, new Date());
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'no linked form');
@@ -577,7 +577,7 @@ test('deleteLinkedFormResponseByTimestamp: returns note when no response matches
   });
   const sheet = { getFormUrl: () => 'https://docs.google.com/forms/d/1X/edit' };
 
-  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date('2026-04-21T12:00:00Z'));
+  const result = ctx.deleteLinkedFormResponseByTimestamp_(sheet, new Date('2026-04-21T12:00:00Z'));
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'no matching form response');
@@ -589,7 +589,7 @@ test('deleteLinkedFormResponseByTimestamp: swallows FormApp errors and reports n
   });
   const sheet = { getFormUrl: () => 'https://docs.google.com/forms/d/1X/edit' };
 
-  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date());
+  const result = ctx.deleteLinkedFormResponseByTimestamp_(sheet, new Date());
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'permission denied');
@@ -696,7 +696,7 @@ function loadDeleteContext(rows) {
       }
     }),
     deleteRows: (start, count) => { deleted.push({ start, count }); data.splice(start - 1, count); }
-    // getFormUrl 無し → deleteLinkedFormResponseByTimestamp は graceful に no-op
+    // getFormUrl 無し → deleteLinkedFormResponseByTimestamp_ は graceful に no-op
   };
   const ctx = loadDataServiceContext({
     getCurrentEmail: () => 'owner@example.com',
@@ -704,7 +704,7 @@ function loadDeleteContext(rows) {
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1', sheetName: 'Sheet1' } }),
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
-    getCachedProperty: () => null
+    getCachedProperty_: () => null
   });
   return { ctx, deleted, data };
 }

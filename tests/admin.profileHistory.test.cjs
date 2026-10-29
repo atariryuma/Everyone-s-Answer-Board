@@ -29,7 +29,7 @@ function loadAdminContext(overrides = {}) {
     PropertiesService: {
       getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {}, getProperties: () => ({}) })
     },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     ...overrides
   };
   vm.createContext(context);
@@ -47,7 +47,7 @@ function loadConfigContext(overrides = {}) {
     VALIDATOR_BOARD_MODES: ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'],
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {}, removeAll: () => {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     getWebAppUrl: () => 'https://example.com/exec',
     ...overrides
   };

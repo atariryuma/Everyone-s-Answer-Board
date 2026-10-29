@@ -3,7 +3,7 @@
  *   管理など）。クロスファイル依存は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess, logError_ */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser_, updateUser_, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty_, setCachedProperty_, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess, logError_ */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -80,6 +80,12 @@ function processLoginAction() {
         message: '管理者と同一ドメインのアカウントでログインしてください。'
       };
     }
+    // 登録できるのはこの配置の先生だけ。先生として実行するので、児童が画面から直接これを呼んで
+    //   自分を登録すると、自分のボードの設定に先生の任意のスプレッドシートを入れて公開し、
+    //   その中身を読めてしまう (2026-10-29 のレビュー)。
+    if (!isAdministrator(email)) {
+      return createErrorResponse('この配置の先生だけが使えます', null, { error: 'TEACHER_ONLY' });
+    }
 
     const tokenInfo = getGoogleIdFromToken();
     const googleId = tokenInfo?.googleId || '';
@@ -91,7 +97,7 @@ function processLoginAction() {
       user = findUserByGoogleId(googleId, { requestingUser: email, skipAccessCheck: true });
       if (user) {
         const oldEmail = user.userEmail;
-        const result = updateUser(user.userId, { userEmail: email }, { skipAccessCheck: true });
+        const result = updateUser_(user.userId, { userEmail: email }, { skipAccessCheck: true });
         if (result?.success) {
           user.userEmail = email;
           try {
@@ -100,11 +106,11 @@ function processLoginAction() {
             console.warn('processLoginAction: Failed to clear old email cache:', e.message);
           }
           // 管理者メールも自動更新
-          const adminEmail = getCachedProperty('ADMIN_EMAIL');
+          const adminEmail = getCachedProperty_('ADMIN_EMAIL');
           if (adminEmail && adminEmail.toLowerCase() === oldEmail.toLowerCase()) {
             // Store normalized: isAdministrator compares case-insensitively but
             // other write sites (ensureDeploymentBootstrap_) persist the lowercased form.
-            setCachedProperty('ADMIN_EMAIL', email.toLowerCase());
+            setCachedProperty_('ADMIN_EMAIL', email.toLowerCase());
             console.log('processLoginAction: ADMIN_EMAIL updated', { oldEmail, newEmail: email });
           }
         }
@@ -118,14 +124,14 @@ function processLoginAction() {
     }
 
     if (user && googleId && !user.googleId) {
-      const result = updateUser(user.userId, { googleId });
+      const result = updateUser_(user.userId, { googleId });
       if (result?.success) {
         user.googleId = googleId;
       }
     }
 
     if (!user) {
-      user = createUser(email, {}, { googleId });
+      user = createUser_(email, {}, { googleId });
       if (!user) {
         logError_('processLoginAction.createUser', new Error('createUser returned null'), { email });
         return {

@@ -106,7 +106,7 @@ main.js (doGet/doPost routing, auth)
 - **Service files** contain pure business logic (ConfigService, DataService, UserService, ReactionService)
 - **DatabaseCore.js**: users シートの CRUD と、スプレッドシートを開くときのアクセス判定 (`checkSpreadsheetAccess_` → `SpreadsheetApp.openById`)
 - **SystemController.js**: System diagnostics, performance monitoring, deployment management (`publishApp` with etag conflict detection)
-- **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty` (30s TTL cache for PropertiesService)
+- **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty_` (30s TTL cache for PropertiesService)
 - **validators.js**: All input validation functions
 
 ### アクセス (誰が何を開けるか)
@@ -115,10 +115,13 @@ main.js (doGet/doPost routing, auth)
 サービスアカウント・Sheets API の直叩き・共有設定は使わない。「誰に見せてよいか」だけを `checkSpreadsheetAccess_`
 (DatabaseCore.js) が決める:
 
-| 呼び出し元 | DB | 公開中のボードのシート | 非公開のボードのシート | どのボードにも無いシート |
-| ---------- | -- | ---------------------- | ---------------------- | ------------------------ |
-| **先生 (管理者)** | 可 | 可 | 可 | 可 (作ったばかりのフォームの回答先など) |
-| **児童・ほかの先生** | 可 | 可 | 不可 | 不可 |
+| 呼び出し元 | 公開中のボードが指すシート | 非公開のボードのシート | どのボードにも無いシート |
+| ---------- | -------------------------- | ---------------------- | ------------------------ |
+| **先生 (管理者)** | 可 | 可 | 可 (作ったばかりのフォームの回答先など) |
+| **児童・ほかの先生** | 可 | 不可 | 不可 |
+
+- DB (先生のスプレッドシート) も同じ扱い。授業モードの回答シートが全部入るので、児童が開けるのは
+  授業モードの授業がボードにつながって公開されている間だけ。users / lessons は `openDatabase` で直接読む
 
 - 判定は 60 秒 cache (不許可は 5 秒)。公開状態が変わったら `invalidateAccessDecisionCache_` で版を上げて古くする
 - ほかの先生 (共同編集者) はボード SS の編集者。`isBoardCollaborator` が DriveApp で編集者を読む (AccessControl.js)
@@ -154,15 +157,15 @@ main.js (doGet/doPost routing, auth)
 
 | 層 | TTL | 用途 | 注意 |
 | -- | --- | ---- | ---- |
-| `getCachedProperty(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | write は必ず `setCachedProperty` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
+| `getCachedProperty_(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | write は必ず `setCachedProperty_` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
 | `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, アクセス判定, rate-limit counter) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck()` 経由 |
-| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
+| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty_` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
 
 **判断フロー (新規 cache を書く時):**
 
-1. 永続 secret / 設定 → `PropertiesService.setProperty` (direct write) + 読みは `getCachedProperty`
+1. 永続 secret / 設定 → `PropertiesService.setProperty` (direct write) + 読みは `getCachedProperty_`
 2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck`
-3. すでに `getCachedProperty` で 30s memoize される config への参照 → 何もしない (透過的)
+3. すでに `getCachedProperty_` で 30s memoize される config への参照 → 何もしない (透過的)
 
 ### Frontend
 
@@ -255,7 +258,7 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 ### Performance
 
 - **Batch operations always** - `getDataRange().getValues()` not `getRange(i,j).getValue()` in loops (70x difference)
-- **Cache PropertiesService** - use `getCachedProperty()` with 30s TTL (see helpers.js)
+- **Cache PropertiesService** - use `getCachedProperty_()` with 30s TTL (see helpers.js)
 - **Minimize external service calls** - in-script JS operations are faster
 
 ### レスポンスの形 (サーバ → クライアント)
@@ -284,6 +287,10 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 
 ### Security
 
+- **名前が `_` で終わらない関数は、どれも児童の画面から `google.script.run` で呼べる。しかも先生の権限で動く**
+  (先生として実行するため)。画面から呼ばせない処理は名前を `_` で終える。画面から呼ぶ管理パネルの処理は
+  入口で `teacherOnlyError_()` を確かめる。呼び出し元を確かめない公開関数を足さない
+  (2026-10-29: `getCachedProperty` / `setCachedProperty` / 引っ越し / フォーム操作 / 利用者の登録が、児童から呼べた)
 - **`Session.getActiveUser()` only** - never `getEffectiveUser()` (privilege escalation risk)
 - **Validate all inputs** - use validators.js functions before processing
 - **Sanitize HTML** - `textContent` not `innerHTML` for user content; use `escapeHtml()` if innerHTML required

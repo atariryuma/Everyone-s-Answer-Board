@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson, migrateImportConfig, migrateImportLessonAnswers */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers_, updateUser_, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -39,7 +39,7 @@ function isProtectedPropertyKey(key) {
  */
 function assertManagedSpreadsheet_(spreadsheetId) {
   try {
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
     if (dbId && spreadsheetId === dbId) return null;
     if (__boardSpreadsheetIds_().indexOf(spreadsheetId) !== -1) return null;
     return createErrorResponse('指定された spreadsheetId は app 管理下のボードではありません (操作を拒否)');
@@ -53,7 +53,7 @@ function assertManagedSpreadsheet_(spreadsheetId) {
 // ボードの設定 (いまのボードと保存したプロファイル) が指しているスプレッドシート。
 function __boardSpreadsheetIds_() {
   const ids = new Set();
-  (getAllUsers({ activeOnly: false }, { systemLookup: true }) || []).forEach((u) => {
+  (getAllUsers_({ activeOnly: false }, { systemLookup: true }) || []).forEach((u) => {
     const cfg = u && u.configJson ? safeJsonParse_(u.configJson, null) : null;
     if (!cfg) return;
     if (typeof cfg.spreadsheetId === 'string' && cfg.spreadsheetId) ids.add(cfg.spreadsheetId);
@@ -81,7 +81,7 @@ function getAdminUsers() {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
 
-    const users = getAllUsers({ activeOnly: false }, { systemLookup: true });
+    const users = getAllUsers_({ activeOnly: false }, { systemLookup: true });
     return {
       success: true,
       users: users || []
@@ -582,7 +582,7 @@ function dispatchAdminOperation(operation, params) {
       return testSystemDiagnosis();
 
     case 'autoRepair':
-      return performAutoRepair();
+      return performAutoRepair_();
 
     case 'cacheReset':
       return forceUrlSystemReset();
@@ -601,7 +601,7 @@ function dispatchAdminOperation(operation, params) {
       if (isProtectedPropertyKey(params.key)) {
         return createErrorResponse(`Property "${params.key}" is protected and cannot be read via admin API`, null, { error: 'PROTECTED_PROPERTY' });
       }
-      // Why direct read (lint suppressed): admin "view raw property" 用途。getCachedProperty
+      // Why direct read (lint suppressed): admin "view raw property" 用途。getCachedProperty_
       //   は 30s cache が挟まるため、admin が値を更新した直後に古い値が見える事故になる。
       // lint-disable-next-line no-direct-property-fetch
       const value = PropertiesService.getScriptProperties().getProperty(params.key);
@@ -797,6 +797,12 @@ function dispatchAdminOperation(operation, params) {
         spreadsheetId: procResult.spreadsheetId || '',
         sheetName: procResult.sheetName || 'フォームの回答 1'
       };
+      // 列の割り当ても新しいシートのものに差し替える (前のボードの列を新しいシートに当てない)。
+      //   決められなければ割り当てに触れない (空の組で上書きすると保存の検証で落ちる)。
+      const analysis = getColumnAnalysis(patch.spreadsheetId, patch.sheetName);
+      if (analysis && analysis.success && analysis.mapping && Object.keys(analysis.mapping).length) {
+        patch.columnMapping = analysis.mapping;
+      }
       const saveResult = applyConfigPatch_(user.userId, patch, { publish: false, replaceKeys: ['columnMapping'] });
       // config 保存が失敗したら全体を失敗として返す。 旧実装は top-level success:true で
       //   失敗を nested configSave に埋もれさせており、 .success を見る CLI が「接続済」と
@@ -824,7 +830,7 @@ function dispatchAdminOperation(operation, params) {
         return createErrorResponse('formId or formUrl is required');
       }
       { const e = reqObj('schema'); if (e) return e; }
-      return customizeForm(params.formId || params.formUrl, params.schema);
+      return customizeForm_(params.formId || params.formUrl, params.schema);
     }
 
     case 'setFormAllowResubmit': {
@@ -969,7 +975,7 @@ function dispatchAdminOperation(operation, params) {
 
     case 'renameDriveFile': {
       // Drive 上のファイル名を変更する（Form / Spreadsheet どちらも file.setName で OK）。
-      // 主用途: customizeForm でタイトルを差し替えた既存 Form / SS の名前同期、
+      // 主用途: customizeForm_ でタイトルを差し替えた既存 Form / SS の名前同期、
       //        または手動命名済の SS を後から命名し直す等。
       //
       //   注意: form.setTitle() は Forms 内部タイトル、SpreadsheetApp.create(name) や
@@ -1226,11 +1232,11 @@ function dispatchAdminOperation(operation, params) {
     // 共有の本体から先生専用の配置への引っ越し (Migration.js / scripts/migrate-to-single.js)
     case 'migrate.importLesson': {
       { const e = reqObj('lesson'); if (e) return e; }
-      return migrateImportLesson(params.lesson);
+      return migrateImportLesson_(params.lesson);
     }
     case 'migrate.importConfig': {
       { const e = reqObj('config'); if (e) return e; }
-      return migrateImportConfig(params.config);
+      return migrateImportConfig_(params.config);
     }
     case 'migrate.importLessonAnswers': {
       { const e = reqStr('lessonId'); if (e) return e; }
@@ -1239,7 +1245,7 @@ function dispatchAdminOperation(operation, params) {
         return createErrorResponse('sheets ([{ sourceSheet, phaseIndex }]) が必要です');
       }
       if (params.classMap !== undefined && !isPlainObject(params.classMap)) return createErrorResponse('classMap (object) が不正です');
-      return migrateImportLessonAnswers(params);
+      return migrateImportLessonAnswers_(params);
     }
     default:
       // 検証用の配置にだけ入る入口 (scripts/verify/DevInvoke.js を scripts/deploy-single.js の

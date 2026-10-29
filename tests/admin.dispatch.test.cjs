@@ -13,8 +13,8 @@ function loadAdminContext(overrides = {}) {
     isAdministrator: () => true,
     findUserByEmail: () => ({ userId: 'u1', userEmail: 'admin@example.com' }),
     findUserById: () => ({ userId: 'u1', userEmail: 'admin@example.com', isActive: true }),
-    getAllUsers: () => [{ userId: 'u1', userEmail: 'admin@example.com', isActive: true }],
-    updateUser: () => ({ success: true }),
+    getAllUsers_: () => [{ userId: 'u1', userEmail: 'admin@example.com', isActive: true }],
+    updateUser_: () => ({ success: true }),
     getUserConfig: () => ({ success: true, config: {} }),
     saveUserConfig: () => ({ success: true }),
     requireAdmin: () => ({ email: 'admin@example.com', isAdmin: true }),
@@ -22,7 +22,7 @@ function loadAdminContext(overrides = {}) {
     getBatchedAdminAuth: () => ({ success: true, email: 'admin@example.com', isAdmin: true }),
     // SystemController functions (called by dispatch)
     testSystemDiagnosis: () => ({ success: true, message: 'diagnosis ok' }),
-    performAutoRepair: () => ({ success: true, message: 'repair ok' }),
+    performAutoRepair_: () => ({ success: true, message: 'repair ok' }),
     forceUrlSystemReset: () => ({ success: true, message: 'reset ok' }),
     getPerformanceMetrics: (cat) => ({ success: true, category: cat }),
     diagnosePerformance: () => ({ success: true, message: 'perf ok' }),
@@ -34,7 +34,7 @@ function loadAdminContext(overrides = {}) {
         getProperties: () => ({ 'APP_NAME': 'test', 'ADMIN_API_KEY': 'secret123' })
       })
     },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     ...overrides
   };
   vm.createContext(context);

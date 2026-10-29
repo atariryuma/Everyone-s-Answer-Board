@@ -6,7 +6,7 @@
  *   誰が何を見てよいかだけを checkSpreadsheetAccess_ が決める。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty_, clearPropertyCache_, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
 
 // users シート書き込みの key 単位 lock (acquireCacheLock_ / helpers.js)。
 const USERS_LOCK_KEYS_ = Object.freeze({
@@ -39,13 +39,14 @@ function invalidateAccessDecisionCache_(spreadsheetId) {
 /**
  * このスプレッドシートを、いまの呼び出し元に開かせてよいか。
  *
- *   | 呼び出し元           | DB | 先生のシート (公開中) | 先生のシート (非公開) | ボードに無いシート |
- *   |----------------------|----|------------------------|------------------------|--------------------|
- *   | 先生 (管理者)        | 可 | 可                     | 可                     | 可 (作ったばかりのフォームの回答先など) |
- *   | 児童・ほかの先生      | 可 | 可                     | 不可                   | 不可               |
+ *   | 呼び出し元           | 公開中のボードが指すシート | 非公開のボードのシート | ボードに無いシート |
+ *   |----------------------|----------------------------|------------------------|--------------------|
+ *   | 先生 (管理者)        | 可                         | 可                     | 可 (作ったばかりのフォームの回答先など) |
+ *   | 児童・ほかの先生      | 可                         | 不可                   | 不可               |
  *
- *   DB は画面から直接は読まれず、サーバの処理が users / lessons を読むためだけに開く。
- *   児童の読める範囲は「公開中のボードの設定に入っているシート」だけ (findUserBySpreadsheetId)。
+ *   DB (先生のスプレッドシート) も同じ扱い。DB には授業モードの回答シートが全部入るので、
+ *   児童が開けるのは授業モードの授業がボードにつながって公開されている間だけ。users / lessons を
+ *   読むサーバの処理は openDatabase で直接開く (ここを通らない)。
  *
  * @param {string} spreadsheetId
  * @param {string} [context] - ログ識別用
@@ -53,9 +54,6 @@ function invalidateAccessDecisionCache_(spreadsheetId) {
  */
 function checkSpreadsheetAccess_(spreadsheetId, context = 'unknown') {
   try {
-    if (spreadsheetId === getCachedProperty('DATABASE_SPREADSHEET_ID')) {
-      return { allowed: true, reason: 'database' };
-    }
     const currentEmail = getCurrentEmail();
     if (currentEmail && isAdministrator(currentEmail)) {
       return { allowed: true, reason: 'teacher' };
@@ -108,7 +106,7 @@ function checkSpreadsheetAccess_(spreadsheetId, context = 'unknown') {
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null}
  */
 function openDatabase() {
-  const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+  const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
   if (!dbId) {
     console.warn('openDatabase: DATABASE_SPREADSHEET_ID not configured');
     return null;
@@ -373,7 +371,7 @@ function findUserByGoogleId(googleId, context = {}) {
 
 /**
  * findUserBy*系の共通実装。
- * 探索は (1) individual cache → (2) getAllUsers キャッシュ → (3) 直接DB の順。
+ * 探索は (1) individual cache → (2) getAllUsers_ キャッシュ → (3) 直接DB の順。
  * @param {string} fieldName - 検索するユーザーフィールド ('userEmail' | 'userId' | 'googleId')
  * @param {*} fieldValue - 一致させる値
  * @param {Object} context - requestingUser / preloadedAuth / systemLookup 等に加え、
@@ -386,7 +384,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
   try {
     let individualCacheKey = null;
     if (cacheKeyPrefix) {
-      const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
+      const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
       individualCacheKey = `${cacheKeyPrefix}_v${cacheVersion}_${fieldValue}`;
       try {
         const cached = CacheService.getScriptCache().get(individualCacheKey);
@@ -400,7 +398,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
     }
 
     try {
-      const allUsers = getAllUsers(
+      const allUsers = getAllUsers_(
         { activeOnly: false },
         { ...context, systemLookup: true, skipCache: false }
       );
@@ -527,7 +525,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
  * @param {string} [context.googleId] - Googleアカウント不変ID
  * @returns {Object|null} Created user object
  */
-function createUser(email, initialConfig = {}, context = {}) {
+function createUser_(email, initialConfig = {}, context = {}) {
   // email 単位の lock。別の児童の初回ログインは互いに待たない (30 人の初回ログインが
   //   1 本ずつ直列になり、10 秒で諦めた児童が「ユーザー登録に失敗」になっていた)。
   //   同じ email の二重作成 (二重タブ) だけを 1 本に絞る。構造変更 (行の削除) の lock が立っていれば待つ。
@@ -552,7 +550,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     // 直前に別インスタンスが同じ email を作っていても、この V8 インスタンスの 30 秒 memo には
     //   古い USER_CACHE_VERSION が残っている。memo を捨てて最新 version の一覧で存在確認する
     //   (捨てないと二重タブで同じ児童の行が 2 つできる)。
-    clearPropertyCache('USER_CACHE_VERSION');
+    clearPropertyCache_('USER_CACHE_VERSION');
     const existingUser = findUserByEmail(email, {
       requestingUser: currentEmail
     });
@@ -644,7 +642,7 @@ function createUser(email, initialConfig = {}, context = {}) {
  * @param {Object} context - アクセスコンテキスト
  * @returns {Array} User list
  */
-function getAllUsers(options = {}, context = {}) {
+function getAllUsers_(options = {}, context = {}) {
   try {
     let currentEmail, isAdmin;
     if (context.preloadedAuth) {
@@ -661,7 +659,7 @@ function getAllUsers(options = {}, context = {}) {
       return [];
     }
 
-    const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
+    const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
     const cacheSuffix = `${simpleHash(options)}_${context.systemLookup ? 'sys' : 'norm'}`;
     const cacheKey = `all_users_v${cacheVersion}_${cacheSuffix}`;
     const skipCache = context.skipCache || false;
@@ -759,7 +757,7 @@ function clearDatabaseUserCache() {
 
     props.setProperty('USER_CACHE_VERSION', newVersion.toString());
 
-    clearPropertyCache('USER_CACHE_VERSION');
+    clearPropertyCache_('USER_CACHE_VERSION');
   } catch (error) {
     logError_('clearDatabaseUserCache', error);
   }
@@ -804,7 +802,7 @@ function createUserObjectFromRow(row, headers) {
  * @param {Object} context - アクセスコンテキスト
  * @returns {Object} {success: boolean, message?: string} Operation result
  */
-function updateUser(userId, updates, context = {}) {
+function updateUser_(userId, updates, context = {}) {
   // userId 単位の lock (ScriptLock 全体ではなく)。
   //   Why: 以前は ScriptLock を users シートの read → write の間 (1〜3 秒、429 なら 15 秒超) 握って
   //   いた。ScriptLock はスクリプトで 1 本なので、教師が設定を保存するたびに児童のリアクション
@@ -952,7 +950,7 @@ function updateUser(userId, updates, context = {}) {
   }
 }
 
-// updates が、いま読んだ行と内容的に同じか (updateUser の no-op 判定)。
+// updates が、いま読んだ行と内容的に同じか (updateUser_ の no-op 判定)。
 //   configJson は lastAccessedAt / etag を除いて比較する (保存のたびに必ず変わる 2 項目)。
 //   それ以外の列は文字列として比較。書く列が 1 つも無ければ false (従来どおり lastModified を書く)。
 function __userRowUnchanged_(headers, row, updates) {
@@ -1008,7 +1006,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
-    const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
+    const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
     const cacheKey = `user_by_sheet_v${cacheVersion}_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
@@ -1026,10 +1024,10 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
     // skipCache は「SS → user の対応 (user_by_sheet, 10 分)」だけを飛ばす。users 一覧そのものは
     //   USER_CACHE_VERSION 付き cache (config 保存で bump) を使う。
-    //   Why: 以前は skipCache が getAllUsers にも伝わり、checkSpreadsheetAccess_ の
+    //   Why: 以前は skipCache が getAllUsers_ にも伝わり、checkSpreadsheetAccess_ の
     //   cache miss (児童 × SS ごとに 60 秒) のたびに users シートを読んでいた。30 人の授業で
     //   毎分 30 read、しかもフェーズ切替で同時に切れるので burst になっていた (2026-09-08)。
-    const allUsers = getAllUsers({ activeOnly: false }, {
+    const allUsers = getAllUsers_({ activeOnly: false }, {
       ...context, skipCache: false, systemLookup: true, preloadedAuth: context.preloadedAuth
     });
     if (!Array.isArray(allUsers)) {
@@ -1068,7 +1066,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
     }
 
     // Why (negative cache 5s): 旧版は 60s null cache で「Target user not found」 が
-    //   1 分間ハマる事故を起こしていた (profile 切替 transient + getAllUsers stale fetch)。
+    //   1 分間ハマる事故を起こしていた (profile 切替 transient + getAllUsers_ stale fetch)。
     //   stale SS URL の防御目的なら 5s で十分 (polling ~ 8s なので次回ヒット時に再判定)。
     //   USER_CACHE_VERSION bump で proactive invalidation も働くが、 fallback として TTL も短縮。
     if (!skipCache) {

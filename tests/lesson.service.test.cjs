@@ -113,7 +113,7 @@ function loadLessonContext(overrides = {}) {
     LESSON_RESPONSES_SHEET_HEADERS: RESPONSES_HEADERS,
     // helpers.js の deepClone を test 環境にも提供 (LessonService が依存)。
     deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
-    getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
+    getCachedProperty_: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
     getCurrentEmail: () => 'teacher@example.com',
     isAdministrator: (email) => email === 'admin@example.com',
     findUserByEmail: (email) => email === 'teacher@example.com' ? { userId: 'u1', userEmail: email } : null,
@@ -142,7 +142,7 @@ function loadLessonContext(overrides = {}) {
       success: true,
       data: []
     })),
-    getAllUsers: overrides.getAllUsers || (() => []),
+    getAllUsers_: overrides.getAllUsers_ || (() => []),
     getConfigOrDefault: overrides.getConfigOrDefault || (() => ({})),
     ScriptApp: overrides.ScriptApp || {
       getProjectTriggers: () => [],

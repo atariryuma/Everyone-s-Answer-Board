@@ -65,7 +65,7 @@ const OPERATIONS = [
   'setFormAllowResubmit', 'uploadLessonImage',
   // Data ops (v5) — テストデータ投入専用
   'appendRows', 'clearDataRows', 'setSheetHeader',
-  // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
+  // Drive file rename (v5.1) — customizeForm_ 後の Drive file name 同期 etc.
   'renameDriveFile',
   // Lesson workspace — wizard / runner / replay / archive
   // (唯一の定義は src/AdminApis.js の dispatchAdminOperation。ここはその --help ミラー)
@@ -83,6 +83,8 @@ const OPERATIONS = [
 function resolveTenant(args) {
   const i = args.indexOf('--tenant');
   const name = i >= 0 ? args[i + 1] : null;
+  // 値の付け忘れで既定 (本番の先生) に送らない。
+  if (i >= 0 && (!name || name.startsWith('--'))) throw new Error('--tenant の値 (配置の名前) がありません');
   const rest = i >= 0 ? args.slice(0, i).concat(args.slice(i + 2)) : args;
   const file = path.join(__dirname, 'single-tenants.json');
   if (!fs.existsSync(file)) throw new Error('scripts/single-tenants.json がありません (deploy-single.js create で作る)');

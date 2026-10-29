@@ -33,19 +33,19 @@ function loadHelpersContext(overrides = {}) {
   return { context, propsCalls, propsStore };
 }
 
-// --- getCachedProperty ---
+// --- getCachedProperty_ ---
 
 test('getCachedProperty: fetches from PropertiesService on first call', () => {
   const { context, propsCalls } = loadHelpersContext();
-  const value = context.getCachedProperty('ADMIN_EMAIL');
+  const value = context.getCachedProperty_('ADMIN_EMAIL');
   assert.equal(value, 'admin@test.com');
   assert.deepEqual(propsCalls, [['get', 'ADMIN_EMAIL']]);
 });
 
 test('getCachedProperty: returns cached value on second call within TTL', () => {
   const { context, propsCalls } = loadHelpersContext();
-  context.getCachedProperty('ADMIN_EMAIL');
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   // PropertiesService should be called only once
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 1);
 });
@@ -56,68 +56,68 @@ test('getCachedProperty: refetches after TTL expires', () => {
     _mockTime: mockTime,
     Date: { now: () => mockTime }
   });
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 1);
 
   // Advance past 30s TTL
   mockTime += 31000;
   context.Date = { now: () => mockTime };
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 2);
 });
 
-// --- setCachedProperty ---
+// --- setCachedProperty_ ---
 
 test('setCachedProperty: writes to PropertiesService', () => {
   const { context, propsCalls } = loadHelpersContext();
-  context.setCachedProperty('NEW_KEY', 'new_value');
+  context.setCachedProperty_('NEW_KEY', 'new_value');
   assert.deepEqual(propsCalls[0], ['set', 'NEW_KEY', 'new_value']);
 });
 
 test('setCachedProperty: invalidates memory cache', () => {
   const { context, propsCalls } = loadHelpersContext();
   // Cache the value
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 1);
 
   // Write new value — should invalidate cache
-  context.setCachedProperty('ADMIN_EMAIL', 'new@test.com');
+  context.setCachedProperty_('ADMIN_EMAIL', 'new@test.com');
 
   // Next read should fetch from PropertiesService again
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 2);
 });
 
-// --- clearPropertyCache ---
+// --- clearPropertyCache_ ---
 
 test('clearPropertyCache: clears specific key', () => {
   const { context, propsCalls } = loadHelpersContext();
-  context.getCachedProperty('ADMIN_EMAIL');
-  context.clearPropertyCache('ADMIN_EMAIL');
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
+  context.clearPropertyCache_('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   // Should have fetched twice (cache was cleared)
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 2);
 });
 
 test('clearPropertyCache: clears all when no key', () => {
   const { context, propsCalls } = loadHelpersContext();
-  context.getCachedProperty('ADMIN_EMAIL');
-  context.getCachedProperty('DB_ID');
-  context.clearPropertyCache();
-  context.getCachedProperty('ADMIN_EMAIL');
-  context.getCachedProperty('DB_ID');
+  context.getCachedProperty_('ADMIN_EMAIL');
+  context.getCachedProperty_('DB_ID');
+  context.clearPropertyCache_();
+  context.getCachedProperty_('ADMIN_EMAIL');
+  context.getCachedProperty_('DB_ID');
   // Each key fetched twice
   assert.equal(propsCalls.filter(c => c[0] === 'get').length, 4);
 });
 
-// --- setCachedProperty ---
+// --- setCachedProperty_ ---
 
 test('setCachedProperty: writes through and clears memory cache for that key', () => {
   const { context, propsCalls } = loadHelpersContext();
-  context.getCachedProperty('ADMIN_EMAIL');
-  context.setCachedProperty('ADMIN_EMAIL', 'new@example.com');
+  context.getCachedProperty_('ADMIN_EMAIL');
+  context.setCachedProperty_('ADMIN_EMAIL', 'new@example.com');
   // After set, the cached entry is invalidated — next read hits PropertiesService
-  context.getCachedProperty('ADMIN_EMAIL');
+  context.getCachedProperty_('ADMIN_EMAIL');
   const gets = propsCalls.filter((c) => c[0] === 'get').length;
   const sets = propsCalls.filter((c) => c[0] === 'set').length;
   assert.equal(sets, 1);

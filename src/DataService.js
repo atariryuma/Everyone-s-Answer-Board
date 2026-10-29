@@ -765,7 +765,7 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     // Why: sheet.deleteRows だけでは Google Forms のレスポンスストアには残り、
     //      フォームの集計・再送信防止・回答編集 URL が実在する回答として扱われる。
     //      未リンク・権限不足は致命的ではないので best-effort でシート削除は成功扱い。
-    deleteLinkedFormResponseByTimestamp(sheet, rowData[0]);
+    deleteLinkedFormResponseByTimestamp_(sheet, rowData[0]);
 
     return {
       success: true,
@@ -788,7 +788,7 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
  * @param {Date} rowTimestamp - sheet.getRange(...).getValues() 由来なので常に Date
  * @returns {{success:boolean, message?:string}}
  */
-function deleteLinkedFormResponseByTimestamp(sheet, rowTimestamp) {
+function deleteLinkedFormResponseByTimestamp_(sheet, rowTimestamp) {
   const TOLERANCE_MS = 1000;
   try {
     const formUrl = sheet.getFormUrl();

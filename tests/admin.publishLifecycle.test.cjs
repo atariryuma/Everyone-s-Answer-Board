@@ -48,7 +48,7 @@ function loadAdminContext(overrides = {}) {
       savedConfigs[userId] = { ...config, etag: 'etag_' + Date.now() + '_' + Math.random() };
       return { success: true, etag: savedConfigs[userId].etag, config: savedConfigs[userId] };
     },
-    updateUser: () => ({ success: true }),
+    updateUser_: () => ({ success: true }),
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: () => null,
@@ -56,7 +56,7 @@ function loadAdminContext(overrides = {}) {
         deleteProperty: () => {}
       })
     },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     __savedConfigs: savedConfigs,
     ...overrides
   };

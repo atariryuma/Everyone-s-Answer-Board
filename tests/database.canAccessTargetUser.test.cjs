@@ -28,7 +28,7 @@ function loadCtx(overrides = {}) {
     Session: { getActiveUser: () => ({ getEmail: () => 'viewer@example.com' }) },
     getCurrentEmail: () => 'viewer@example.com',
     isAdministrator: (e) => e === 'admin@example.com',
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
     validateEmail: (e) => ({ isValid: true, sanitized: e, errors: [] }),

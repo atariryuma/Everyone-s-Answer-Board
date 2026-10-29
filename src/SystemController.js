@@ -1,17 +1,17 @@
 /**
  * @fileoverview SystemController - システム管理・診断・公開ライフサイクル。
  *   - URL システム: forceUrlSystemReset, getWebAppUrl (6h cache + saved fallback)
- *   - 診断・監視: testSystemDiagnosis, performAutoRepair
+ *   - 診断・監視: testSystemDiagnosis, performAutoRepair_
  *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
  *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
- *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection, searchFormsByDrive
+ *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection_, searchFormsByDrive_
  *   - DB: testDatabaseConnection, __ensureSheetWithHeaders_ (配置の初回にシートをそろえる)
  *
  * 公開状態の書き換えはここの publishApp と AdminApis.js の 2 関数 (republishMyBoard /
  * unpublishBoard) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty_, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache_, teacherOnlyError_ */
 
 /**
  * キャッシュ期間 (秒)
@@ -98,7 +98,7 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  *
  * 本実装は version-bump 方式で「全体を一括無効化できる」cache 層を実際に invalidate する:
  *   - clearDatabaseUserCache(): USER_CACHE_VERSION を bump → 全 user cache エントリを一括失効
- *   - clearPropertyCache(): in-memory PropertiesService LRU を全消去
+ *   - clearPropertyCache_(): in-memory PropertiesService LRU を全消去
  *   - _webAppUrlCache: in-memory web app URL cache をリセット
  *
  * 注: board data cache (per-user, 10s TTL) / SA token (50min) / SA validation cache
@@ -118,8 +118,8 @@ function invalidateGlobalCaches_() {
     results.push(`ユーザーキャッシュ無効化失敗: ${e && e.message ? e.message : 'Unknown error'}`);
   }
   try {
-    if (typeof clearPropertyCache === 'function') {
-      clearPropertyCache();
+    if (typeof clearPropertyCache_ === 'function') {
+      clearPropertyCache_();
       results.push('プロパティメモリキャッシュ全消去');
     }
   } catch (e) {
@@ -348,7 +348,7 @@ function testSystemDiagnosis() {
  *
  * @returns {Object} 修復結果
  */
-function performAutoRepair() {
+function performAutoRepair_() {
   try {
 
     const adminAuth = getBatchedAdminAuth();
@@ -663,7 +663,7 @@ function publishApp(publishConfig) {
  * @param {boolean} isOwner - オーナー権限フラグ
  * @returns {Object} {formUrl, confidence, detectionMethod}
  */
-function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
+function detectFormConnection_(spreadsheet, sheet, sheetName, isOwner) {
   const results = {
     formUrl: null,
     formTitle: null,
@@ -722,7 +722,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   if (isOwner) {
     try {
       const spreadsheetId = spreadsheet.getId();
-      const driveFormResult = searchFormsByDrive(spreadsheetId, sheetName);
+      const driveFormResult = searchFormsByDrive_(spreadsheetId, sheetName);
       if (driveFormResult.formUrl) {
         results.formUrl = driveFormResult.formUrl;
         results.formTitle = driveFormResult.formTitle;
@@ -892,7 +892,7 @@ function generateFormTitle(sheetName, spreadsheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} {formUrl, formTitle}
  */
-function searchFormsByDrive(spreadsheetId, sheetName) {
+function searchFormsByDrive_(spreadsheetId, sheetName) {
   try {
 
     const forms = DriveApp.getFilesByType('application/vnd.google-apps.form');
@@ -996,6 +996,7 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
 function getFormInfo(spreadsheetId, sheetName) {
   const startTime = new Date().toISOString();
   try {
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
     if (!spreadsheetId || !sheetName) {
       return __formInfoFailure_('INVALID_ARGUMENTS', 'スプレッドシートIDとシート名を指定してください。', { sheetName });
     }
@@ -1092,7 +1093,7 @@ function __extractFormScaleItems_(formUrl) {
 function __buildFormInfoResult_(access, spreadsheetId, sheetName) {
   const { spreadsheet, sheet, spreadsheetName } = access;
   const accessMethod = 'normal_permissions';
-  const detection = detectFormConnection(spreadsheet, sheet, sheetName, true);
+  const detection = detectFormConnection_(spreadsheet, sheet, sheetName, true);
   const scaleItems = detection.formUrl ? __extractFormScaleItems_(detection.formUrl) : null;
   const formData = {
     formUrl: detection.formUrl || null,
@@ -1517,7 +1518,7 @@ function testDatabaseConnection() {
       };
     }
 
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
     const usersSheet = spreadsheet.getSheetByName('users');
 
     if (!usersSheet) {

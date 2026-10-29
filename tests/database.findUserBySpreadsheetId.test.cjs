@@ -51,8 +51,8 @@ function loadCtx(overrides = {}) {
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
-    getCachedProperty: (k) => (k in propsStore ? propsStore[k] : null),
-    clearPropertyCache: () => {},
+    getCachedProperty_: (k) => (k in propsStore ? propsStore[k] : null),
+    clearPropertyCache_: () => {},
     simpleHash: (s) => String(s).length,
     saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
     safeJsonParse_: (text, fallback) => {
@@ -68,11 +68,11 @@ function loadCtx(overrides = {}) {
   Object.assign(context, overrides);
   vm.createContext(context);
   DB_SCRIPT.runInContext(context);
-  // Why post-load override: DatabaseCore.js は function getAllUsers() を内部で宣言しており、
+  // Why post-load override: DatabaseCore.js は function getAllUsers_() を内部で宣言しており、
   //   vm.runInContext 後にグローバルとして context に bind される。pre-load override は
   //   その宣言で上書きされてしまうため、post-load で書き換える必要がある。
-  //   getAllUsers の参照は呼び出し時に scope chain を辿るので、後で代入したスタブも反映される。
-  context.getAllUsers = overrides.getAllUsers || (() => users);
+  //   getAllUsers_ の参照は呼び出し時に scope chain を辿るので、後で代入したスタブも反映される。
+  context.getAllUsers_ = overrides.getAllUsers_ || (() => users);
   return context;
 }
 
@@ -136,16 +136,16 @@ test('findUserBySpreadsheetId: 見つからない場合 null + negative-cache', 
 });
 
 // =====================================================================
-// cache hit: getAllUsers を呼ばずに cached value を返す
+// cache hit: getAllUsers_ を呼ばずに cached value を返す
 // =====================================================================
 
-test('findUserBySpreadsheetId: cache hit ならば getAllUsers を呼ばない', () => {
+test('findUserBySpreadsheetId: cache hit ならば getAllUsers_ を呼ばない', () => {
   const cachedUser = { userId: 'u-cached', userEmail: 'cached@x.com' };
   const cache = makeCache({ 'user_by_sheet_v0_sheet-X': JSON.stringify(cachedUser) });
   let getAllCalled = 0;
   const ctx = loadCtx({
     cache,
-    getAllUsers: () => { getAllCalled++; return []; }
+    getAllUsers_: () => { getAllCalled++; return []; }
   });
 
   const result = ctx.findUserBySpreadsheetId('sheet-X');
@@ -183,7 +183,7 @@ test('findUserBySpreadsheetId: 同じ version (同じ key 名前空間) なら�
   const ctx = loadCtx({
     cache,
     propsStore: { USER_CACHE_VERSION: '3' },
-    getAllUsers: () => { getAllCalled++; return []; }
+    getAllUsers_: () => { getAllCalled++; return []; }
   });
 
   const result = ctx.findUserBySpreadsheetId('sheet-Y');
@@ -203,7 +203,7 @@ test('findUserBySpreadsheetId: { skipCache: true } で cache 読み書きをバ�
   const ctx = loadCtx({
     cache,
     users: [user('FRESH', 'sheet-Z')],
-    getAllUsers: () => { getAllCalled++; return [user('FRESH', 'sheet-Z')]; }
+    getAllUsers_: () => { getAllCalled++; return [user('FRESH', 'sheet-Z')]; }
   });
 
   const result = ctx.findUserBySpreadsheetId('sheet-Z', { skipCache: true });
@@ -243,19 +243,19 @@ test('findUserBySpreadsheetId: configJson が undefined の user は default {} 
 });
 
 // =====================================================================
-// getAllUsers が失敗 / null を返した場合
+// getAllUsers_ が失敗 / null を返した場合
 // =====================================================================
 
-test('findUserBySpreadsheetId: getAllUsers が非配列を返したら null', () => {
+test('findUserBySpreadsheetId: getAllUsers_ が非配列を返したら null', () => {
   const ctx = loadCtx({
-    getAllUsers: () => null
+    getAllUsers_: () => null
   });
   assert.equal(ctx.findUserBySpreadsheetId('sheet-X'), null);
 });
 
-test('findUserBySpreadsheetId: getAllUsers が throw したら null を返す (全体 try/catch)', () => {
+test('findUserBySpreadsheetId: getAllUsers_ が throw したら null を返す (全体 try/catch)', () => {
   const ctx = loadCtx({
-    getAllUsers: () => { throw new Error('DB error'); }
+    getAllUsers_: () => { throw new Error('DB error'); }
   });
   assert.equal(ctx.findUserBySpreadsheetId('sheet-X'), null);
 });

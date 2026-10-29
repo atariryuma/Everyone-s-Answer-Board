@@ -25,7 +25,7 @@ function loadMainContext(overrides = {}) {
     addReaction: (userId, rowId, reactionType) => ({ success: true, userId, rowId, reactionType }),
     toggleHighlight: (userId, rowId) => ({ success: true, userId, rowId }),
     publishApp: (config) => ({ success: true, config }),
-    getCachedProperty: (key) => key === 'ADMIN_API_KEY' ? 'test-secret-key' : key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    getCachedProperty_: (key) => key === 'ADMIN_API_KEY' ? 'test-secret-key' : key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     dispatchAdminOperation: (operation, params) => {
       if (operation === 'getUsers') return { success: true, users: [] };
       if (operation === 'getAppStatus') return { success: true, status: 'enabled' };
@@ -36,9 +36,9 @@ function loadMainContext(overrides = {}) {
 
   Object.assign(context, overrides);
 
-  // Stub setCachedProperty AFTER overrides so it reads the final PropertiesService.
-  if (!context.setCachedProperty) {
-    context.setCachedProperty = (key, value) => {
+  // Stub setCachedProperty_ AFTER overrides so it reads the final PropertiesService.
+  if (!context.setCachedProperty_) {
+    context.setCachedProperty_ = (key, value) => {
       try {
         context.PropertiesService.getScriptProperties().setProperty(key, value);
       } catch (_) { /* stub best-effort */ }
@@ -214,7 +214,7 @@ test('doPost: adminApi rejects missing API key', () => {
 
 test('doPost: adminApi returns error when ADMIN_API_KEY not configured', () => {
   const context = loadMainContext({
-    getCachedProperty: () => null
+    getCachedProperty_: () => null
   });
   const event = createPostEvent({ action: 'adminApi', apiKey: 'any-key', operation: 'getUsers' });
   const response = parseResponse(context.doPost(event));
@@ -309,7 +309,7 @@ test('toggleHighlight action: rejects NaN rowId', () => {
 
 test('setupApiKey: rejects 16-space whitespace key (silent bypass fix)', () => {
   const context = loadMainContext({
-    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     PropertiesService: {
       getScriptProperties: () => ({
@@ -330,8 +330,8 @@ test('setupApiKey: rejects 16-space whitespace key (silent bypass fix)', () => {
 test('setupApiKey: accepts valid 16-char key', () => {
   let savedKey = null;
   const context = loadMainContext({
-    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
-    setCachedProperty: (k, v) => { if (k === 'ADMIN_API_KEY') savedKey = v; },
+    getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    setCachedProperty_: (k, v) => { if (k === 'ADMIN_API_KEY') savedKey = v; },
     Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     PropertiesService: {
       getScriptProperties: () => ({

@@ -1,5 +1,5 @@
 /**
- * updateUser: 内容が同じ書き込みは DB に書かず USER_CACHE_VERSION も上げない (2026-10 監査)。
+ * updateUser_: 内容が同じ書き込みは DB に書かず USER_CACHE_VERSION も上げない (2026-10 監査)。
  *
  * Why: 書き込みのたびに clearDatabaseUserCache が version を上げ、児童 30 人分の user cache が
  *   一斉に落ちて次の poll が users シートを読み直していた。lastAccessedAt / etag しか違わない
@@ -54,8 +54,8 @@ function loadCtx(sheet) {
     Utilities: { sleep: () => {} },
     getCurrentEmail: () => 'owner@example.com',
     isAdministrator: () => false,
-    getCachedProperty: (k) => (k === 'USER_CACHE_VERSION' ? (props.USER_CACHE_VERSION || '0') : null),
-    clearPropertyCache: () => {},
+    getCachedProperty_: (k) => (k === 'USER_CACHE_VERSION' ? (props.USER_CACHE_VERSION || '0') : null),
+    clearPropertyCache_: () => {},
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
     validateEmail: (e) => ({ isValid: /.+@.+/.test(String(e || '')), sanitized: e, errors: [] }),
@@ -82,7 +82,7 @@ test('updateUser: lastAccessedAt / etag だけが違う configJson は書かず�
   // key 順も変えて渡す (順序の違いは差分ではない)
   const same = { etag: 'new_etag', lastAccessedAt: '2026-10-16T00:00:00.000Z', profiles: [{ spreadsheetId: 'ss1', id: 'p1' }],
     displaySettings: { boardMode: 'board', showNames: false }, isPublished: true, spreadsheetId: 'ss1' };
-  const res = ctx.updateUser('u1', { configJson: JSON.stringify(same) }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { configJson: JSON.stringify(same) }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true);
   assert.equal(res.unchanged, true);
   assert.equal(res.currentEtag, 'old_etag', '永続済の etag を返す (client が次の保存で使う)');
@@ -95,7 +95,7 @@ test('updateUser: 内容が違えば従来どおり書いて version を上げ�
   const sheet = makeUsersSheet([row()]);
   const { ctx, props } = loadCtx(sheet);
   const changed = { ...PERSISTED, displaySettings: { showNames: true, boardMode: 'board' }, etag: 'new_etag' };
-  const res = ctx.updateUser('u1', { configJson: JSON.stringify(changed) }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { configJson: JSON.stringify(changed) }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true);
   assert.ok(!res.unchanged);
   assert.equal(sheet.calls.setValues.length, 1);
@@ -106,7 +106,7 @@ test('updateUser: 配列の中身の違い (profile 追加) は差分として�
   const sheet = makeUsersSheet([row()]);
   const { ctx } = loadCtx(sheet);
   const changed = { ...PERSISTED, profiles: [{ id: 'p1', spreadsheetId: 'ss1' }, { id: 'p2', spreadsheetId: 'ss2' }] };
-  const res = ctx.updateUser('u1', { configJson: JSON.stringify(changed) }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { configJson: JSON.stringify(changed) }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true);
   assert.equal(sheet.calls.setValues.length, 1);
 });
@@ -114,9 +114,9 @@ test('updateUser: 配列の中身の違い (profile 追加) は差分として�
 test('updateUser: configJson 以外の列 (isActive) も同じ値なら書かない / 違えば書く', () => {
   const sheet = makeUsersSheet([row()]);
   const { ctx } = loadCtx(sheet);
-  assert.equal(ctx.updateUser('u1', { isActive: true }, { requestingUser: 'owner@example.com' }).unchanged, true);
+  assert.equal(ctx.updateUser_('u1', { isActive: true }, { requestingUser: 'owner@example.com' }).unchanged, true);
   assert.equal(sheet.calls.setValues.length, 0);
-  const res = ctx.updateUser('u1', { isActive: false }, { requestingUser: 'owner@example.com' });
+  const res = ctx.updateUser_('u1', { isActive: false }, { requestingUser: 'owner@example.com' });
   assert.equal(res.success, true);
   assert.ok(!res.unchanged);
   assert.equal(sheet.calls.setValues.length, 1);
@@ -125,7 +125,7 @@ test('updateUser: configJson 以外の列 (isActive) も同じ値なら書かな
 test('updateUser: etag の CAS (expectedEtag) は no-op 判定より先に効く', () => {
   const sheet = makeUsersSheet([row()]);
   const { ctx } = loadCtx(sheet);
-  const res = ctx.updateUser('u1', { configJson: JSON.stringify(PERSISTED) },
+  const res = ctx.updateUser_('u1', { configJson: JSON.stringify(PERSISTED) },
     { requestingUser: 'owner@example.com', expectedEtag: 'stale_etag' });
   assert.equal(res.success, false);
   assert.equal(res.error, 'etag_mismatch');

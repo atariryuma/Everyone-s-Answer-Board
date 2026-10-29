@@ -49,8 +49,8 @@ function loadDatabaseContext(overrides = {}) {
     isAdministrator: overrides.isAdministrator || (() => false),
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
-    getCachedProperty: (k) => (k in propsStore ? propsStore[k] : null),
-    clearPropertyCache: () => {},
+    getCachedProperty_: (k) => (k in propsStore ? propsStore[k] : null),
+    clearPropertyCache_: () => {},
     simpleHash: (s) => String(s).length,
     saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
     safeJsonParse_: (text, fallback) => {
@@ -95,9 +95,13 @@ test('openSpreadsheet: 不正な id は null', () => {
   assert.equal(ctx.openSpreadsheet(null), null);
 });
 
-test('openSpreadsheet: DB は誰の呼び出しでも直接開く', () => {
+test('openSpreadsheet: DB (授業の回答シートが入る) も、児童は公開中のボードが指しているときだけ開ける', () => {
   const { opened, SpreadsheetApp } = openByIdRecorder();
-  const ctx = loadDatabaseContext({ SpreadsheetApp, propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' } });
+  const boards = {};
+  const ctx = withBoards(loadDatabaseContext({ SpreadsheetApp, currentEmail: 'child@example.com', propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' } }), boards);
+  assert.equal(ctx.openSpreadsheet('db-id'), null, 'ボードが別のシートを指している (授業がつながっていない)');
+  boards['db-id'] = { userId: 'u1', published: true };   // 授業モードの授業がボードにつながった
+  ctx.invalidateAccessDecisionCache_('db-id');
   const access = ctx.openSpreadsheet('db-id');
   assert.ok(access);
   assert.equal(access.spreadsheet.getId(), 'db-id');
@@ -126,15 +130,15 @@ test('openSpreadsheet: 児童は公開中のボードのシートだけ開ける
 test('openSpreadsheet: openById が失敗したら null', () => {
   const ctx = loadDatabaseContext({
     SpreadsheetApp: { openById: () => { throw new Error('not found'); } },
-    propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' }
+    isAdministrator: () => true
   });
-  assert.equal(ctx.openSpreadsheet('db-id'), null);
+  assert.equal(ctx.openSpreadsheet('ss-1'), null);
 });
 
 test('openSpreadsheet: getSheet はシート名で引き、名前が無い・失敗したときは null', () => {
   const ss = { getSheetByName: (n) => { if (n === 'boom') throw new Error('x'); return { name: n }; } };
-  const ctx = loadDatabaseContext({ SpreadsheetApp: { openById: () => ss }, propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' } });
-  const access = ctx.openSpreadsheet('db-id');
+  const ctx = loadDatabaseContext({ SpreadsheetApp: { openById: () => ss }, isAdministrator: () => true });
+  const access = ctx.openSpreadsheet('ss-1');
   assert.equal(access.getSheet('users').name, 'users');
   assert.equal(access.getSheet(''), null);
   assert.equal(access.getSheet('boom'), null);

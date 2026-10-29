@@ -1,6 +1,6 @@
 /**
  * 行番号のずれ防御 (ReactionService.resolveRowIdentity_ / executeBoardRowOperation の expect) と
- * users 一覧 cache の圧縮 (DatabaseCore.getAllUsers の pack / unpack) を固定する。
+ * users 一覧 cache の圧縮 (DatabaseCore.getAllUsers_ の pack / unpack) を固定する。
  *
  * Why: 教師が回答を削除すると行番号が繰り上がり、次の poll までの数秒間、児童の画面の行番号は
  *   隣の回答を指す。児童の画面が持つ emailHash (塩入り) で同じ回答か確かめ、違えば書かない。
@@ -134,7 +134,7 @@ test('executeBoardRowOperation: 行がずれていたら書かずに ROW_CHANGED
 });
 
 // =====================================================================
-// getAllUsers: 一覧 cache を gzip で書く
+// getAllUsers_: 一覧 cache を gzip で書く
 // =====================================================================
 
 test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (100KB 超でも入る)', () => {
@@ -171,7 +171,7 @@ test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (1
   vm.runInContext(SRC('DatabaseCore.js'), helpersCtx, { filename: 'DatabaseCore.js' });
   helpersCtx.openDatabase = () => ({ getSheetByName: () => sheet });
 
-  const first = helpersCtx.getAllUsers({ activeOnly: false }, { systemLookup: true });
+  const first = helpersCtx.getAllUsers_({ activeOnly: false }, { systemLookup: true });
   assert.equal(first.length, 50);
   assert.equal(reads, 1);
   const stored = [...cache._store.entries()].find(([k]) => k.startsWith('all_users_v'));
@@ -179,7 +179,7 @@ test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (1
   assert.ok(stored[1].length < 100000, `cache 値は 100KB 未満 (${stored[1].length} 文字)`);
   assert.ok(JSON.parse(stored[1]).__gz, '圧縮表現で書かれている');
 
-  const second = helpersCtx.getAllUsers({ activeOnly: false }, { systemLookup: true });
+  const second = helpersCtx.getAllUsers_({ activeOnly: false }, { systemLookup: true });
   assert.equal(reads, 1, '2 回目は cache から (シートを読まない)');
   assert.equal(JSON.stringify(second), JSON.stringify(first), '読み返した形は同じ');
 });

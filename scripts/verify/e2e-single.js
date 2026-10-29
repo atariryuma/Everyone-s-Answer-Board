@@ -162,6 +162,19 @@ check('先生(掲示板)', '再び公開する → 児童が読める (republish
   return { pass: ok(r) && ok(s), note: ok(r) ? '' : text(r) };
 });
 
+// ---------------- 児童が管理の処理を直接呼んでも断られる (先生として実行なので大事) ----------------
+for (const [fn, fnArgs] of [
+  ['getForms', []], ['createTemplateForm', ['board', {}]], ['processFormUrlInput', [form.editUrl]],
+  ['setFormAllowResubmit', [form.formId, false]], ['connectDataSource', [sheet.id, sheet.name]],
+  ['getColumnAnalysis', [sheet.id, sheet.name]], ['getFormInfo', [sheet.id, sheet.name]],
+  ['uploadLessonImage', ['data:image/png;base64,iVBORw0KGgo=', 'x.png']], ['processLoginAction', []]
+]) {
+  check('児童(権限)', `${fn} を児童が呼ぶと断られる`, () => {
+    const r = inv(fn, fnArgs, STUDENT[0]);
+    return { pass: Boolean(r) && r.success === false, note: text(r) };
+  });
+}
+
 // ---------------- 授業モード (native) ----------------
 let lessonId = null;
 const nativeIds = [];

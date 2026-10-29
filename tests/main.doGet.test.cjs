@@ -44,7 +44,7 @@ function loadDoGetContext(overrides = {}) {
     checkAppAccessRestriction: () => false,
     hasCoreSystemProps: () => true,
     getWebAppUrl: () => 'https://example.com/exec',
-    getCachedProperty: (k) => k === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    getCachedProperty_: (k) => k === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     shouldEnforceDomainRestrictions: () => true,
     validateDomainAccess: () => ({ allowed: true }),
     getBatchedAdminData: () => ({ success: false, error: 'test error' }),

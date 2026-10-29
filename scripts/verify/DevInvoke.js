@@ -20,7 +20,7 @@ const DEV_INVOKE_ALLOWED_ = [
   'getFormInfo', 'getForms', 'getMyLessonTrajectory', 'getNotificationUpdate', 'getPublishedSheetData',
   'getWebAppUrl', 'isAdmin', 'processFormUrlInput', 'publishApp', 'republishMyBoard', 'saveConfig',
   'setFormAllowResubmit', 'submitLessonAnswer', 'toggleHighlight', 'unpublishBoard', 'validateHeaderIntegrity',
-  'uploadLessonImage',
+  'uploadLessonImage', 'processLoginAction',
   // 失敗の中身を見るための内側の処理 (応答に理由が載らないものを、検証用でだけ直接呼ぶ)
   'validateConfig', '__buildPhaseConfigPatch_', 'getUserConfig'
 ];

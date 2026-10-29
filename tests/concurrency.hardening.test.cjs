@@ -4,7 +4,7 @@
  *  - SA proxy の読み失敗 ([] が返る) を「空のボード」と混同して成功 cache しない (DataService)
  *  - 共有 cache の reacted を閲覧者ごとに付け直す (ReactionService.applyViewerReactions_)
  *  - key 単位の cache lock (helpers.acquireCacheLock_)
- *  - createUser は失敗で error envelope を返さず null、存在確認の前に version memo を捨てる
+ *  - createUser_ は失敗で error envelope を返さず null、存在確認の前に version memo を捨てる
  *  - escapeHtml は " と ' もエスケープする (SharedUtilities)
  *  - polling の世代番号 (page.js): stop → start の間に終わった poll がチェーンを増やさない
  */
@@ -182,7 +182,7 @@ test('processReactionDirect: 隣り合う 2 セルが変わる切替 (LIKE → C
       setValues: (vs) => { writes.push({ row, col, vs }); vs[0].forEach((v, i) => { data[row - 1][col - 1 + i] = v; }); }
     })
   };
-  const r = ctx.processReactionDirect(sheet, 2, 'CURIOUS', 'a@example.com', data[0]);
+  const r = ctx.processReactionDirect_(sheet, 2, 'CURIOUS', 'a@example.com', data[0]);
   assert.equal(r.action, 'added');
   assert.equal(writes.length, 1, 'LIKE (3 列目) と CURIOUS (4 列目) は隣なので 1 回で書く');
   assert.equal(data[1][2], '');
@@ -257,7 +257,7 @@ test('withStampedeGuard_: key を書いてから flight を外す (待ってい�
 });
 
 // =====================================================================
-// DatabaseCore.createUser: null 契約 + version memo の破棄
+// DatabaseCore.createUser_: null 契約 + version memo の破棄
 // =====================================================================
 
 test('createUser: users シートが読めない (429 で []) ときは error envelope ではなく null', () => {
@@ -277,8 +277,8 @@ test('createUser: users シートが読めない (429 で []) ときは error en
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),
     executeWithRetry: (fn) => fn(),
-    getCachedProperty: () => null,
-    clearPropertyCache: (k) => cleared.push(k),
+    getCachedProperty_: () => null,
+    clearPropertyCache_: (k) => cleared.push(k),
     simpleHash: () => 'h',
     saveToCacheWithSizeCheck: () => true,
     DEFAULT_DISPLAY_SETTINGS: {},
@@ -291,7 +291,7 @@ test('createUser: users シートが読めない (429 で []) ときは error en
   // users シートは読めない ([] が返る)
   const sheet = { getName: () => 'users', getDataRange: () => ({ getValues: () => [] }), getLastRow: () => 1000, getLastColumn: () => 7, getRange: () => ({ getValues: () => [] }) };
   context.openDatabase = () => ({ getSheetByName: () => sheet });
-  const user = context.createUser('new@example.com', {}, {});
+  const user = context.createUser_('new@example.com', {}, {});
   assert.equal(user, null, '呼び出し側の `if (!user)` で拾える');
   assert.ok(cleared.includes('USER_CACHE_VERSION'), '存在確認の前に version memo を捨てる (別インスタンスの作成を見逃さない)');
 });

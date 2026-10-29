@@ -120,7 +120,7 @@ function loadContext(overrides = {}) {
     LESSON_RESPONSES_SHEET_HEADERS: RESPONSES_HEADERS,
     deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
     // 先生のスプレッドシート (DB) に授業の回答シートも入る。テストでは回答シートの入れ物と同じものにする。
-    getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'native_ss_1' : null,
+    getCachedProperty_: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'native_ss_1' : null,
     getCurrentEmail: () => currentEmail,
     isAdministrator: (email) => email === 'admin@example.com',
     findUserByEmail: (email) => (email === 'teacher@example.com')
@@ -131,7 +131,7 @@ function loadContext(overrides = {}) {
     applyConfigPatch_: (uid, patch) => { Object.assign(boardConfig, patch); return { success: true }; },
     getUserConfig: () => ({ success: true, config: boardConfig }),
     getPublishedSheetData: () => ({ success: true, data: [] }),
-    getAllUsers: () => [],
+    getAllUsers_: () => [],
     getConfigOrDefault: overrides.getConfigOrDefault || (() => ({})),
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => {} }) }) }) }) },
     Date: Date,
@@ -1451,8 +1451,8 @@ function withRealCache(h) {
   };
   h.context.PropertiesService = { getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {} }) };
   h.context.Utilities.sleep = () => {};
-  // helpers.js は getConfigOrDefault / getCachedProperty も本物で定義し直すので、テストの stub を戻す。
-  const keep = { getConfigOrDefault: h.context.getConfigOrDefault, getCachedProperty: h.context.getCachedProperty };
+  // helpers.js は getConfigOrDefault / getCachedProperty_ も本物で定義し直すので、テストの stub を戻す。
+  const keep = { getConfigOrDefault: h.context.getConfigOrDefault, getCachedProperty_: h.context.getCachedProperty_ };
   vm.runInContext(HELPERS_SOURCE, h.context, { filename: 'helpers.js' });
   Object.assign(h.context, keep);
   const reads = { lessons: 0 };
@@ -1737,13 +1737,15 @@ test('dailyLessonArchiveSweep: 授業モードの授業は回答シートを読�
   seedThinkPhase(h, lessonId);
   let boardReads = 0;
   h.context.getPublishedSheetData = () => { boardReads++; return { success: true, data: [] }; };
-  h.context.getAllUsers = () => [{ userId: 'u1', userEmail: 'teacher@example.com' }];
+  h.context.getAllUsers_ = () => [{ userId: 'u1', userEmail: 'teacher@example.com' }];
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, currentLessonStartedAt: dayAgo, isPublished: true });
+  h.setEmail('');   // 時刻のトリガーから (呼び出し元のメールは無い)
   const summary = h.context.dailyLessonArchiveSweep();
   assert.equal(summary.archived, 0);
   assert.equal(summary.skipped, 1);
   assert.equal(boardReads, 0, '回答シートを読まない');
+  h.setEmail('teacher@example.com');
   assert.equal(h.context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId).state, 'active');
 });
 
@@ -1948,7 +1950,7 @@ function loadMigration() {
     };
     oldSheets.set(name, s);
   };
-  h.context.getCachedProperty = (k) => ({ DATABASE_SPREADSHEET_ID: 'db-id', ADMIN_EMAIL: 'teacher@example.com' })[k] || null;
+  h.context.getCachedProperty_ = (k) => ({ DATABASE_SPREADSHEET_ID: 'db-id', ADMIN_EMAIL: 'teacher@example.com' })[k] || null;
   h.context.__nativeSheetName_ = h.context.__realNativeSheetName_;
   h.context.SpreadsheetApp.openById = (id) => (id === 'db-id' ? dbSs : id === 'old-native' ? oldSs : null);
   const responses = () => h.context.openDatabase().getSheetByName('lesson_responses')._data;
@@ -1984,7 +1986,7 @@ test('引っ越し: 授業モードの授業を、先生のスプレッドシー
   addOldSheet('phase1', [['t', 'a@x', '6年1組', '', 2, 4, 'r1', '']]);
   addOldSheet('phase2', []);
   const before = responses().length;
-  const res = h.context.migrateImportLesson(exportedNativeLesson());
+  const res = h.context.migrateImportLesson_(exportedNativeLesson());
   assert.equal(res.success, true, res.message);
   assert.equal(res.data.sheets, 2);
   assert.equal(res.data.archiveRows, 2);
@@ -2011,10 +2013,10 @@ test('引っ越し: 同じ授業をもう一度流しても二重にならない
   const { h, dbSheets, addOldSheet, responses } = loadMigration();
   addOldSheet('phase1', []);
   addOldSheet('phase2', []);
-  h.context.migrateImportLesson(exportedNativeLesson());
+  h.context.migrateImportLesson_(exportedNativeLesson());
   const rowsBefore = h.lessonsSheet._data.length;
   const respBefore = responses().length;
-  const res = h.context.migrateImportLesson(exportedNativeLesson());
+  const res = h.context.migrateImportLesson_(exportedNativeLesson());
   assert.equal(res.success, true);
   assert.equal(res.data.skipped, true);
   assert.equal(h.lessonsSheet._data.length, rowsBefore);
@@ -2029,7 +2031,7 @@ test('引っ越し: 読み戻せていないアーカイブがあれば止め、
   const lesson = exportedNativeLesson();
   lesson.lessonJson.snapshots[0].rows = [];   // 元で読み戻せなかった (rowCount は 2 のまま)
   const rowsBefore = h.lessonsSheet._data.length;
-  const res = h.context.migrateImportLesson(lesson);
+  const res = h.context.migrateImportLesson_(lesson);
   assert.equal(res.success, false);
   assert.equal(res.error, 'MIGRATION_FAILED');
   assert.equal(dbSheets.size, 0, '写したシートが残っている');
@@ -2041,7 +2043,7 @@ function loadAnswerImport() {
   const m = loadMigration();
   m.addOldSheet('phase1', [['2026-10-28T01:00:00.000Z', 'one@x', '6年1組', '', 2, 4, '1組の分', '']]);
   m.addOldSheet('phase2', []);
-  m.h.context.migrateImportLesson(exportedNativeLesson());
+  m.h.context.migrateImportLesson_(exportedNativeLesson());
   // 試作の列: 授業モードと同じ 8 列 + HIGHLIGHT。学級は切り替え忘れで「6年1組」、時刻は 7 時間早い。
   const bound = createSheet(['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと', 'HIGHLIGHT'], 'phase1');
   bound._data.push(['2026-10-28T19:38:00.000Z', 'a@x', '6年1組', '', 1, 2, '最初', '', '']);
@@ -2061,7 +2063,7 @@ function loadAnswerImport() {
 
 test('回答の合流: 学級と時刻を直して足し、同じ児童の送り直しは最後の 1 行だけ', () => {
   const { h, dest, params } = loadAnswerImport();
-  const res = h.context.migrateImportLessonAnswers(params());
+  const res = h.context.migrateImportLessonAnswers_(params());
   assert.equal(res.success, true, res.message);
   const s = res.data.sheets[0];
   assert.equal(s.sourceRows, 4);
@@ -2084,12 +2086,12 @@ test('回答の合流: 学級と時刻を直して足し、同じ児童の送り
 test('回答の合流: 試しに数えるだけなら書かず、もう一度流しても二重にならない', () => {
   const { h, dest, params } = loadAnswerImport();
   const before = dest().length;
-  const dry = h.context.migrateImportLessonAnswers(params({ dryRun: true }));
+  const dry = h.context.migrateImportLessonAnswers_(params({ dryRun: true }));
   assert.equal(dry.success, true, dry.message);
   assert.equal(dry.data.sheets[0].imported, 2);
   assert.equal(dest().length, before, 'dryRun で書いてはいけない');
-  h.context.migrateImportLessonAnswers(params());
-  const again = h.context.migrateImportLessonAnswers(params());
+  h.context.migrateImportLessonAnswers_(params());
+  const again = h.context.migrateImportLessonAnswers_(params());
   assert.equal(again.data.sheets[0].imported, 0);
   assert.equal(again.data.sheets[0].alreadyThere, 2);
   assert.equal(dest().length, before + 2);
@@ -2105,4 +2107,43 @@ test('フォームの授業のフェーズ: 作ったフォームの割り当て
   assert.equal(h.context.__buildPhaseConfigPatch_(withMapping, lessonJson, 'l1').columnMapping.numericX, 4);
   assert.equal('columnMapping' in h.context.__buildPhaseConfigPatch_(legacy, lessonJson, 'l1'), false,
     '空の組を渡すと保存の検証で落ちる (授業を始められない)');
+});
+
+test('dailyLessonArchiveSweep: 先生以外が画面から直接呼んでも何もしない', () => {
+  const h = loadContext({ currentEmail: 'child@example.com' });
+  let scanned = 0;
+  h.context.getAllUsers_ = () => { scanned++; return []; };
+  h.context.dailyLessonArchiveSweep();
+  assert.equal(scanned, 0);
+});
+
+test('__boardPatchForPhase_: フォームのフェーズは列の割り当てをそのときの回答シートから決め直す', () => {
+  const h = loadContext();
+  const analyzed = [];
+  h.context.getColumnAnalysis = (ssId, sheetName) => {
+    analyzed.push(ssId);
+    // 先生が customizeForm で質問を足した後の並び (理由が 1 列ずれた)
+    return { success: true, mapping: { email: 1, class: 2, name: 3, answer: 4, numericX: 4, reason: 6 } };
+  };
+  const lessonJson = { inputMode: 'form', phases: [] };
+  const phase = { name: '議論のあと', formTemplate: 'numberline', spreadsheetId: 'f2', sheetName: 'フォームの回答 1',
+    columnMapping: { email: 1, class: 2, name: 3, answer: 4, numericX: 4, reason: 5 } };
+  lessonJson.phases = [phase];
+  const patch = h.context.__boardPatchForPhase_(phase, lessonJson, 'l1');
+  assert.deepEqual(analyzed, ['f2']);
+  assert.equal(patch.columnMapping.reason, 6, '覚えた割り当てではなく、いまのシートの割り当て');
+  // 決め直せない (answer が決まらない) ときは覚えた割り当てを使う
+  h.context.getColumnAnalysis = () => ({ success: true, mapping: { reason: 5 } });
+  assert.equal(h.context.__boardPatchForPhase_(phase, lessonJson, 'l1').columnMapping.reason, 6);
+});
+
+test('__boardPatchForPhase_: 授業モードのフェーズはシートを読まない (列は決まっている)', () => {
+  const h = loadContext();
+  let analyzed = 0;
+  h.context.getColumnAnalysis = () => { analyzed++; return { success: false }; };
+  const draft = h.context.createLessonDraft('u1', 'ロレンゾ', 'dialogue-reconsider-5phase');
+  const lessonJson = draft.data.lesson.lessonJson;
+  lessonJson.phases.forEach((p, i) => { p.spreadsheetId = 'native_ss_1'; p.sheetName = 'phase' + (i + 1); });
+  h.context.__boardPatchForPhase_(lessonJson.phases[0], lessonJson, 'l1');
+  assert.equal(analyzed, 0);
 });

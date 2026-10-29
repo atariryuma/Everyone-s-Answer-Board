@@ -18,7 +18,7 @@ function loadUserServiceContext(overrides = {}) {
     findUserById: () => null,
     findUserByGoogleId: () => null,
     openSpreadsheet: () => null,
-    updateUser: () => ({ success: true }),
+    updateUser_: () => ({ success: true }),
     getUserConfig: () => ({ success: true, config: {} }),
     isAdministrator: () => false,
     CACHE_DURATION: { LONG: 600, USER_INDIVIDUAL: 300 },
@@ -88,18 +88,19 @@ function loadUserApisContext(overrides = {}) {
     getCurrentEmail: () => 'newmail@example.com',
     findUserByEmail: () => null,
     findUserByGoogleId: () => null,
-    isAdministrator: () => false,
+    // ログインして登録できるのはこの配置の先生だけ (processLoginAction)。既定は先生として呼ぶ。
+    isAdministrator: () => true,
     getUserConfig: () => ({ success: true, config: {} }),
-    createUser: (email, config, ctx) => ({
+    createUser_: (email, config, ctx) => ({
       userId: 'new-user-id',
       userEmail: email,
       googleId: ctx?.googleId || '',
       isActive: true
     }),
-    updateUser: () => ({ success: true }),
+    updateUser_: () => ({ success: true }),
     getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' }),
-    getCachedProperty: () => null,
-    setCachedProperty: () => {},
+    getCachedProperty_: () => null,
+    setCachedProperty_: () => {},
     getWebAppUrl: () => 'https://script.google.com/app',
     ScriptApp: { getIdentityToken: () => null },
     Utilities: {},
@@ -129,7 +130,7 @@ test('processLoginAction: detects email change via googleId and updates user', (
       assert.equal(ctx.skipAccessCheck, true, 'skipAccessCheck must be true for email migration');
       return gid === 'google-id-123' ? { ...oldUser } : null;
     },
-    updateUser: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
+    updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
     getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' })
   });
 
@@ -156,10 +157,10 @@ test('processLoginAction: updates ADMIN_EMAIL when admin email changes', () => {
     getCurrentEmail: () => 'new-admin@example.com',
     findUserByEmail: () => null,
     findUserByGoogleId: (gid, ctx) => gid === 'google-id-admin' ? { ...oldUser } : null,
-    updateUser: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
+    updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
     getGoogleIdFromToken: () => ({ googleId: 'google-id-admin', email: 'new-admin@example.com' }),
-    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'old-admin@example.com' : null,
-    setCachedProperty: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
+    getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'old-admin@example.com' : null,
+    setCachedProperty_: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
   });
 
   const result = ctx.processLoginAction();
@@ -180,10 +181,10 @@ test('processLoginAction: does not update ADMIN_EMAIL for non-admin email change
     getCurrentEmail: () => 'new-user@example.com',
     findUserByEmail: () => null,
     findUserByGoogleId: (gid, ctx) => gid === 'google-id-regular' ? { ...oldUser } : null,
-    updateUser: () => ({ success: true }),
+    updateUser_: () => ({ success: true }),
     getGoogleIdFromToken: () => ({ googleId: 'google-id-regular', email: 'new-user@example.com' }),
-    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
-    setCachedProperty: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
+    getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    setCachedProperty_: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
   });
 
   const result = ctx.processLoginAction();
@@ -204,7 +205,7 @@ test('processLoginAction: backfills googleId for existing user without it', () =
     getCurrentEmail: () => 'user@example.com',
     findUserByEmail: () => ({ ...existingUser }),
     getGoogleIdFromToken: () => ({ googleId: 'google-id-456', email: 'user@example.com' }),
-    updateUser: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; }
+    updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; }
   });
 
   const result = ctx.processLoginAction();
@@ -221,7 +222,7 @@ test('processLoginAction: creates new user with googleId when no match found', (
     findUserByEmail: () => null,
     findUserByGoogleId: () => null,
     getGoogleIdFromToken: () => ({ googleId: 'google-id-789', email: 'brand-new@example.com' }),
-    createUser: (email, config, context) => {
+    createUser_: (email, config, context) => {
       createdContext = context;
       return { userId: 'new-id', userEmail: email, googleId: context?.googleId || '' };
     }
@@ -355,7 +356,8 @@ test('checkUserAuthentication: returns domain-restricted when ensureDomainAccess
 
 test('checkUserAuthentication: reports authLevel=guest when user not in DB', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => null
+    findUserByEmail: () => null,
+    isAdministrator: () => false
   });
   const result = ctx.checkUserAuthentication();
   assert.equal(result.success, true);
@@ -365,7 +367,8 @@ test('checkUserAuthentication: reports authLevel=guest when user not in DB', () 
 
 test('checkUserAuthentication: reports authLevel=user when found in DB', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' })
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    isAdministrator: () => false
   });
   const result = ctx.checkUserAuthentication();
   assert.equal(result.authLevel, 'user');
@@ -408,3 +411,15 @@ test('checkUserAuthentication: swallows getUserConfig exceptions and reports has
   assert.equal(result.hasValidConfig, false);
 });
 
+
+test('processLoginAction: 先生以外 (児童の画面から直接呼ばれた) は登録しない', () => {
+  let created = 0;
+  const ctx = loadUserApisContext({
+    isAdministrator: () => false,
+    createUser_: () => { created++; return { userId: 'x', userEmail: 'child@example.com' }; }
+  });
+  const res = ctx.processLoginAction();
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'TEACHER_ONLY');
+  assert.equal(created, 0);
+});

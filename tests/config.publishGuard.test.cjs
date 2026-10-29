@@ -34,7 +34,7 @@ function loadConfigContext(persistedConfig) {
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     Utilities: { getUuid: () => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' },
     logError_: () => {},
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     getCurrentEmail: () => 'owner@example.com',
     isAdministrator: () => false,
     findUserById: () => user,
@@ -43,7 +43,7 @@ function loadConfigContext(persistedConfig) {
     validateConfigUserId: () => true,
     // permissive validator: pass every field through (mirrors validators.js isPublished passthrough)
     validateConfig: (cfg) => ({ isValid: true, errors: [], warnings: [], sanitized: { ...cfg } }),
-    updateUser: (_id, patch) => { saved = patch.configJson; return { success: true }; },
+    updateUser_: (_id, patch) => { saved = patch.configJson; return { success: true }; },
     URL,
     __getSaved: () => (saved ? JSON.parse(saved) : null)
   };
@@ -111,12 +111,12 @@ test('guard: non-publish fields still save normally on non-sentinel save', () =>
   assert.equal(saved.isPublished, true, 'but publish state is still protected');
 });
 
-test('saveUserConfig: updateUser が unchanged を返したら永続済の etag と config をそのまま返す', () => {
+test('saveUserConfig: updateUser_ が unchanged を返したら永続済の etag と config をそのまま返す', () => {
   // Why: 内容が同じ保存で新しい etag を返すと、client がそれを持ち、次の保存が etag_mismatch になる。
   const ctx = loadConfigContext({ isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' });
   let cleared = false;
   ctx.clearConfigCache = () => { cleared = true; };
-  ctx.updateUser = () => ({ success: true, unchanged: true, currentEtag: 'persisted_etag',
+  ctx.updateUser_ = () => ({ success: true, unchanged: true, currentEtag: 'persisted_etag',
     currentConfig: { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' } });
   const res = ctx.saveUserConfig('u1', { spreadsheetId: 'sheet1', etag: 'persisted_etag' });
   assert.equal(res.success, true);

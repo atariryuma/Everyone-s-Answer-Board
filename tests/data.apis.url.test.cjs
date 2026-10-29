@@ -35,7 +35,7 @@ function loadDataApisContext(overrides = {}) {
     SYSTEM_LIMITS: {},
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: 'viewer@example.com', isAdmin: false }),
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     saveToCacheWithSizeCheck: () => true,
     // emailHash は helpers.js 由来（M1/M2 可視化モードで揺らぎ追跡に使う仮名化ID）。
     emailToShortHash: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
@@ -49,6 +49,8 @@ function loadDataApisContext(overrides = {}) {
     getQuestionText: () => '',
     createDataServiceErrorResponse: (message) => ({ success: false, message }),
     isAdministrator: () => false,
+    // 管理パネルの処理は先生だけ (helpers.js)。既定は先生として呼ぶ。
+    teacherOnlyError_: () => null,
     ...overrides
   };
 
@@ -857,18 +859,17 @@ test('getColumnAnalysis: rejects unauthenticated user', () => {
   assert.match(result.error, /認証/);
 });
 
-test('getColumnAnalysis: 非所有者 (openById 失敗) かつ非adminは拒否', () => {
+test('getColumnAnalysis: 先生以外は拒否し、シートを開かない', () => {
   let openSpreadsheetCalled = false;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'stranger@example.com',
-    isAdministrator: () => false,
-    SpreadsheetApp: { openById: () => { throw new Error('PERMISSION_DENIED'); } },
+    teacherOnlyError_: () => ({ success: false, message: '管理者権限が必要です' }),
     openSpreadsheet: () => { openSpreadsheetCalled = true; return null; }
   });
   const result = ctx.getColumnAnalysis('someone-elses-ss', 'Sheet1');
   assert.equal(result.success, false);
   assert.match(result.message || result.error || '', /権限/);
-  assert.equal(openSpreadsheetCalled, false, '権限チェックで弾き SA pool 読み取りに到達しない');
+  assert.equal(openSpreadsheetCalled, false, '先生の確認で弾き、シートの読み取りに到達しない');
 });
 
 test('getColumnAnalysis: admin は openById 不可でも許可 (cross-user 分析)', () => {
@@ -885,7 +886,7 @@ test('getColumnAnalysis: admin は openById 不可でも許可 (cross-user 分�
     openSpreadsheet: () => ({ getSheet: () => sheet })
   });
   ctx.performIntegratedColumnDiagnostics = () => ({ recommendedMapping: { answer: 0 }, confidence: {} });
-  ctx.setupReactionAndHighlightColumns = () => ({ columnsAdded: [] });
+  ctx.setupReactionAndHighlightColumns_ = () => ({ columnsAdded: [] });
   const result = ctx.getColumnAnalysis('any-ss', 'Sheet1');
   assert.equal(result.success, true);
 });
@@ -941,7 +942,7 @@ test('getColumnAnalysis: returns headers and mapping on success', () => {
     confidence: { answer: 90 }
   });
   // Suppress column-setup side effect path by forcing no columns added
-  ctx.setupReactionAndHighlightColumns = () => ({ columnsAdded: [] });
+  ctx.setupReactionAndHighlightColumns_ = () => ({ columnsAdded: [] });
 
   const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
   assert.equal(result.success, true);
@@ -1042,7 +1043,7 @@ test('buildSafePublishedDataResult: converts Date timestamps to ISO strings', ()
 });
 
 // =====================================================================
-// setupReactionAndHighlightColumns — column detection is exact-match
+// setupReactionAndHighlightColumns_ — column detection is exact-match
 // =====================================================================
 
 test('setupReactionAndHighlightColumns: detects all four columns when present exactly', () => {
@@ -1053,7 +1054,7 @@ test('setupReactionAndHighlightColumns: detects all four columns when present ex
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     invalidateSheetHeadersCache: () => {}
   });
-  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
+  const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1',
     ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
   );
   assert.equal(result.success, true);
@@ -1064,7 +1065,7 @@ test('setupReactionAndHighlightColumns: detects all four columns when present ex
 test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT count as UNDERSTAND', () => {
   // Why regression: a previous substring check (header.includes("UNDERSTAND"))
   // treated a question header "UNDERSTANDING YOUR ANSWER" as if the UNDERSTAND
-  // column already existed, and skipped adding it. processReactionDirect then
+  // column already existed, and skipped adding it. processReactionDirect_ then
   // failed with "リアクション列が見つかりません" because it uses exact match.
   const addedValues = [];
   const sheetHeaders = ['Q1', 'UNDERSTANDING YOUR ANSWER'];
@@ -1084,7 +1085,7 @@ test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT cou
     invalidateSheetHeadersCache: () => {},
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }
   });
-  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1', sheetHeaders);
+  const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1', sheetHeaders);
   assert.equal(result.success, true, JSON.stringify(result));
   // All four reaction/highlight columns should be added because the header
   // "UNDERSTANDING YOUR ANSWER" is not a strict match for UNDERSTAND.
@@ -1102,7 +1103,7 @@ test('setupReactionAndHighlightColumns: detects lowercase/whitespace-padded head
     },
     invalidateSheetHeadersCache: () => {}
   });
-  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
+  const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1',
     ['Q1', '  understand ', 'Like', 'CURIOUS', ' highlight']
   );
   assert.equal(result.columnsAdded.length, 0);
@@ -1339,4 +1340,25 @@ test('getNotificationUpdate: 許可不足でない混雑は従来どおり「新
   assert.equal(res.success, true);
   assert.equal(res.boardBusy, true);
   assert.ok(res.retryAfterMs >= 8000, '混雑中は「何 ms 後に来てほしいか」を添える (失敗を覚えている 8 秒以上)');
+});
+
+test('先生以外が直接呼ぶと、フォーム・シート・Drive の管理の処理はどれも断る', () => {
+  const refuse = () => ({ success: false, message: '管理者権限が必要です' });
+  let touched = 0;
+  const ctx = loadDataApisContext({
+    teacherOnlyError_: refuse,
+    getCurrentEmail: () => 'child@example.com',
+    FormApp: { openByUrl: () => { touched++; }, openById: () => { touched++; } },
+    DriveApp: { getFilesByType: () => { touched++; return { hasNext: () => false }; } },
+    openSpreadsheet: () => { touched++; return null; }
+  });
+  for (const [fn, args] of [
+    ['getForms', []], ['processFormUrlInput', ['https://docs.google.com/forms/d/x/edit']],
+    ['setFormAllowResubmit', ['form-id', true]], ['connectDataSource', ['ss', 'Sheet1']],
+    ['getColumnAnalysis', ['ss', 'Sheet1']], ['uploadLessonImage', ['data:image/png;base64,AAAA', 'x.png']]
+  ]) {
+    const res = ctx[fn](...args);
+    assert.equal(res.success, false, fn);
+  }
+  assert.equal(touched, 0, '先生の Drive・フォーム・シートに触れない');
 });

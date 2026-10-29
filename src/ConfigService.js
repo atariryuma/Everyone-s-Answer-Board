@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
+/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById, updateUser_, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty_, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -557,15 +557,15 @@ function clearConfigCache(userId) {
  * 配置が使える状態か (管理者のメールと DB にするスプレッドシートがそろっているか)。
  *
  * Why cache: doGet のどのモードでも少なくとも 1 回呼ばれる hot path。
- *   getCachedProperty (30s メモリキャッシュ) に乗せる。setCachedProperty 経由の書き込みで
+ *   getCachedProperty_ (30s メモリキャッシュ) に乗せる。setCachedProperty_ 経由の書き込みで
  *   個別キーは即 invalidation されるので、配置直後の false → true 反映も問題ない。
  *
  * @returns {boolean}
  */
 function hasCoreSystemProps() {
   try {
-    const adminEmail = getCachedProperty('ADMIN_EMAIL');
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    const adminEmail = getCachedProperty_('ADMIN_EMAIL');
+    const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
     if (!adminEmail || !dbId) {
       console.warn('hasCoreSystemProps: 必須項目不足', { hasAdmin: !!adminEmail, hasDb: !!dbId });
       return false;
@@ -840,7 +840,7 @@ function saveUserConfig(userId, config, options = {}) {
     // etag 付きの保存は、書く直前 (行 lock の中) にも現物の etag と比べる (compare-and-set)。
     //   上の比較は cache 済の user を見ているので、同時に走った 2 つの保存 (教師の自動保存と
     //   フェーズ切替) が同じ etag を見て両方通り、後の書き込みが前の変更を飲み込んでいた。
-    const updateResult = updateUser(userId, {
+    const updateResult = updateUser_(userId, {
       configJson: JSON.stringify(cleanedConfig)
     }, config.etag ? { expectedEtag: config.etag } : {});
 

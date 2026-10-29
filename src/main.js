@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -705,16 +705,16 @@ function handleSetupApiKeyAction_(request) {
   if (!hasMeaningfulChars) {
     return createErrorResponse('apiKey must be a string of at least 16 non-whitespace characters', null, { error: 'INVALID_KEY_FORMAT' });
   }
-  // setCachedProperty also busts the 30s helpers.js memory cache so the very
+  // setCachedProperty_ also busts the 30s helpers.js memory cache so the very
   // next adminApi call in this process sees the new key.
-  setCachedProperty('ADMIN_API_KEY', rawKey);
+  setCachedProperty_('ADMIN_API_KEY', rawKey);
   return createSuccessResponse('ADMIN_API_KEY has been set', { configured: true });
 }
 
 // adminApi: APIキー認証 (Session 不要 → AI エージェントからアクセス可能)
 function handleAdminApiAction_(request) {
   const apiKey = typeof request.apiKey === 'string' ? request.apiKey : '';
-  const storedKey = getCachedProperty('ADMIN_API_KEY');
+  const storedKey = getCachedProperty_('ADMIN_API_KEY');
   if (!storedKey) {
     return createErrorResponse('ADMIN_API_KEY is not configured. Use setupApiKey action first.', null, { error: 'API_KEY_NOT_CONFIGURED' });
   }
@@ -725,7 +725,7 @@ function handleAdminApiAction_(request) {
   if (!isPlainObject(adminParams)) {
     return createErrorResponse('params must be a JSON object', null, { error: 'INVALID_PARAMS' });
   }
-  _apiKeyAdminEmail = getCachedProperty('ADMIN_EMAIL');
+  _apiKeyAdminEmail = getCachedProperty_('ADMIN_EMAIL');
   try {
     return dispatchAdminOperation(request.operation, adminParams);
   } finally {
@@ -881,7 +881,7 @@ function isAdministrator(email) {
   }
 
   try {
-    const adminEmail = getCachedProperty('ADMIN_EMAIL');
+    const adminEmail = getCachedProperty_('ADMIN_EMAIL');
     if (!adminEmail) {
       console.warn('isAdministrator: ADMIN_EMAIL設定が見つかりません');
       return false;

@@ -53,8 +53,8 @@ function loadAdminContext(overrides = {}) {
     isAdministrator: () => true,
     findUserByEmail: (email) => baseUsers.find(u => u.userEmail === email) || null,
     findUserById: (id) => baseUsers.find(u => u.userId === id) || null,
-    getAllUsers: () => baseUsers,
-    updateUser: () => ({ success: true }),
+    getAllUsers_: () => baseUsers,
+    updateUser_: () => ({ success: true }),
     // getUserConfig returns parsed config
     getUserConfig: (userId) => {
       const u = baseUsers.find(x => x.userId === userId);
@@ -76,7 +76,7 @@ function loadAdminContext(overrides = {}) {
     getConfigOrDefault: () => ({}),
     getBatchedAdminAuth: () => ({ success: true, email: 'admin@example.com', isAdmin: true }),
     testSystemDiagnosis: () => ({ success: true }),
-    performAutoRepair: () => ({ success: true }),
+    performAutoRepair_: () => ({ success: true }),
     forceUrlSystemReset: () => ({ success: true }),
     getPerformanceMetrics: (c) => ({ success: true, category: c }),
     diagnosePerformance: () => ({ success: true }),
@@ -85,7 +85,7 @@ function loadAdminContext(overrides = {}) {
         getProperty: () => null, setProperty: () => {}, getProperties: () => ({}), deleteProperty: () => {}
       })
     },
-    getCachedProperty: () => null,
+    getCachedProperty_: () => null,
     getColumnAnalysis: (spreadsheetId, sheetName) => ({
       success: true,
       headers: ['ts', 'name', 'ans', 'reason', 'rate'],
@@ -110,7 +110,7 @@ function loadAdminContext(overrides = {}) {
       sheetName: 'フォームの回答 1',
       wasCreated: true
     }),
-    customizeForm: (id, schema) => {
+    customizeForm_: (id, schema) => {
       if (!id) return { success: false, error: 'formId required' };
       if (!schema || !Array.isArray(schema.questions)) return { success: false, error: 'schema.questions required' };
       return {
@@ -214,7 +214,7 @@ test('exportConfigs: returns all users with parsed config', () => {
   const ctx = loadAdminContext();
   ctx.getAdminUsers = () => ({
     success: true,
-    users: ctx.getAllUsers()
+    users: ctx.getAllUsers_()
   });
 
   const res = ctx.dispatchAdminOperation('exportConfigs', {});
@@ -514,7 +514,7 @@ test('createForm / connectForm: rejects unknown userId', () => {
 
 
 // =====================================================================
-// customizeForm
+// customizeForm_
 // =====================================================================
 
 test('customizeForm: rejects missing formId/formUrl', () => {
