@@ -1903,3 +1903,48 @@ test('getLessonLiveAnswers: ボードにつながっていれば従来どおり�
   const unknown = h.context.getLessonLiveAnswers('u1', lessonId);
   assert.notEqual(unknown.data.onBoard, false, '分からないときは止めない');
 });
+
+// =====================================================================
+// 先生専用の配置 (isSingleTenant_): 授業ごとにスプレッドシートを作らず、
+//   先生のスプレッドシート (DATABASE_SPREADSHEET_ID) に「授業名｜番号 フェーズ名」のシートを足す
+// =====================================================================
+
+function useSingleTenant(h) {
+  const orig = h.context.SpreadsheetApp.openById;
+  h.context.isSingleTenant_ = () => true;
+  // 先生のスプレッドシート (db-id) を、テスト用の回答シート群と同じ入れ物として見せる。
+  h.context.SpreadsheetApp.openById = (id) => (id === 'db-id' ? orig('native_ss_1') : orig(id));
+  h.context.SpreadsheetApp.create = () => { throw new Error('先生専用では SpreadsheetApp.create を呼ばない'); };
+}
+
+test('先生専用: native の回答シートは先生のスプレッドシートに授業名つきで作られる', () => {
+  const h = loadContext();
+  useSingleTenant(h);
+  startNativeLesson(h);
+  assert.deepEqual(Array.from(h.nativeSheets.keys()), [
+    'ロレンゾの友達｜1 考える', 'ロレンゾの友達｜2 出会う', 'ロレンゾの友達｜3 議論する',
+    'ロレンゾの友達｜4 もう一度考える', 'ロレンゾの友達｜5 ふりかえる'
+  ]);
+  const lessonJson = JSON.parse(h.lessonsSheet._data[1][10]);
+  assert.equal(lessonJson.nativeSpreadsheetId, 'db-id');
+  assert.equal(Array.from(lessonJson.phases).every(p => p.spreadsheetId === 'db-id'), true);
+  // 列は本体の native シートと同じ (ボード・見取りが無分岐で読める)。
+  assert.deepEqual(Array.from(h.nativeSheets.get('ロレンゾの友達｜1 考える')._data[0]),
+    ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと']);
+  // 実行者 = 先生 = 持ち主なので、共有設定も addEditor も要らない。
+  assert.deepEqual(h.sharingCalls, []);
+  assert.deepEqual(Array.from(h.editorsAdded), []);
+});
+
+test('先生専用: 同じ名前の授業 (複製など) はシートが混ざらないよう「（2）」を付ける', () => {
+  const h = loadContext();
+  useSingleTenant(h);
+  startNativeLesson(h);
+  // 1 つ目を終えてから、同じ名前の授業をもう 1 つ始める。
+  const first = JSON.parse(h.lessonsSheet._data[1][10]);
+  h.context.endLesson('u1', h.lessonsSheet._data[1][0]);
+  startNativeLesson(h);
+  const names = Array.from(h.nativeSheets.keys());
+  assert.ok(names.includes('ロレンゾの友達（2）｜1 考える'), names.join(' / '));
+  assert.equal(first.nativeSheetPrefix, 'ロレンゾの友達');
+});

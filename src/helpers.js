@@ -3,7 +3,7 @@
  *   認証ショートカット、emailToShortHash（仮名化）。
  */
 
-/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
+/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_TENANCY, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
@@ -32,6 +32,51 @@ function getCachedProperty(key) {
 
   RUNTIME_PROPERTIES_CACHE[key] = { value, timestamp: now, lastAccess: now };
   return value;
+}
+
+/**
+ * 先生 1 人専用の配置か (Script Property `TENANCY` = 'single')。
+ *
+ * Why: 2026-10-29 10:20 ごろから、児童アカウントは「開いた人として実行」の Apps Script を
+ *   中身に関係なく開けなくなった (管理側の設定)。先生ごとに 1 つ「先生として実行」で配置すれば、
+ *   児童は自分の権限を何も使わない。そのとき SA pool は要らない: 実行者 = 先生 = すべての
+ *   スプレッドシートの持ち主なので、openById で直接開ける。
+ *   「誰が何を見てよいか」の判定 (validateServiceAccountUsage) は変えず、開く経路だけを切り替える。
+ * @returns {boolean}
+ */
+function isSingleTenant_() {
+  if (typeof DEPLOY_TENANCY !== 'undefined' && DEPLOY_TENANCY === 'single') return true;
+  return String(getCachedProperty('TENANCY') || '').trim().toLowerCase() === 'single';
+}
+
+/**
+ * 先生専用の配置で、初回に必要なプロパティと DB のシートをそろえる (2 回目以降は何もしない)。
+ * doGet / doPost の入口で呼ぶ。本体 (DEPLOY_TENANCY が空) では即 return。
+ *
+ * 管理者と DB は Tenancy.js に焼き込まれた値だけを使う (開いた人からは決めない)。
+ * プロパティが既にあれば上書きしない (先生が後から変えた値を守る)。
+ */
+function ensureSingleTenantBootstrap_() {
+  if (typeof DEPLOY_TENANCY === 'undefined' || DEPLOY_TENANCY !== 'single') return;
+  if (getCachedProperty('ADMIN_EMAIL') && getCachedProperty('DATABASE_SPREADSHEET_ID')) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;   // 同時に開いた別の人がそろえている。次の呼び出しで済んでいる
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (!props.getProperty('ADMIN_EMAIL') && DEPLOY_ADMIN_EMAIL) {
+      setCachedProperty('ADMIN_EMAIL', String(DEPLOY_ADMIN_EMAIL).trim().toLowerCase());
+    }
+    if (!props.getProperty('DATABASE_SPREADSHEET_ID') && DEPLOY_DATABASE_SPREADSHEET_ID) {
+      const ss = SpreadsheetApp.openById(DEPLOY_DATABASE_SPREADSHEET_ID);
+      __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
+      __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
+      __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
+      setCachedProperty('DATABASE_SPREADSHEET_ID', DEPLOY_DATABASE_SPREADSHEET_ID);
+    }
+    if (!props.getProperty('TENANCY')) setCachedProperty('TENANCY', 'single');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**

@@ -480,3 +480,20 @@ test('sanitizeDisplaySettings: reactionMode を保持し showReactions を導出
   assert.equal(bogus.showReactions, true);
   assert.equal('reactionMode' in context.sanitizeDisplaySettings({}), false);
 });
+
+// 先生専用の配置 (isSingleTenant_) は SA pool を使わないので、SA の鍵が無くても設定済み。
+test('hasCoreSystemProps: 先生専用なら SERVICE_ACCOUNT_CREDS が無くても true', () => {
+  const { context } = loadConfigContext({
+    props: { ADMIN_EMAIL: 'teacher@example.com', DATABASE_SPREADSHEET_ID: 'db-id' }
+  });
+  context.isSingleTenant_ = () => true;
+  assert.equal(context.hasCoreSystemProps(), true);
+  context.isSingleTenant_ = () => false;
+  assert.equal(context.hasCoreSystemProps(), false, '本体 (みんなで 1 つ) では今までどおり鍵が要る');
+});
+
+test('hasCoreSystemProps: 先生専用でも ADMIN_EMAIL と DB が無ければ false', () => {
+  const { context } = loadConfigContext({ props: { ADMIN_EMAIL: 'teacher@example.com' } });
+  context.isSingleTenant_ = () => true;
+  assert.equal(context.hasCoreSystemProps(), false);
+});

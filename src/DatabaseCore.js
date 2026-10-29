@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_, sheetsApiBackoffMs_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_, sheetsApiBackoffMs_, isSingleTenant_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -1111,7 +1111,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     }
 
     // accessMode: 'own' → openById (owner's OAuth), 'sa' → SA pool
-    const useSaPath = validation.accessMode === 'sa';
+    // 先生専用の配置 (isSingleTenant_) では実行者 = 先生 = 持ち主なので、許可された読み書きは
+    //   すべて openById で直接開く。誰が何を見てよいかは上の validation がそのまま決める。
+    const useSaPath = validation.accessMode === 'sa' && !(typeof isSingleTenant_ === 'function' && isSingleTenant_());
     let spreadsheet = null;
     let auth = null;
 

@@ -50,7 +50,8 @@
     "theme:verify": "node scripts/theme-verify.js",
     "theme:matrix": "node scripts/theme-matrix.js",
     "theme:uncovered": "node scripts/theme-matrix.js --uncovered",
-    "theme:perfect": "node scripts/theme-perfect.js"
+    "theme:perfect": "node scripts/theme-perfect.js",
+    "deploy:single": "node scripts/deploy-single.js"
   },
   "repository": {
     "type": "git",

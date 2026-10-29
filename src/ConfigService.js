@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global invalidateSaValidationCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
+/* global invalidateSaValidationCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES, isSingleTenant_ */
 
 /**
  * デフォルト設定取得
@@ -569,6 +569,8 @@ function hasCoreSystemProps() {
   try {
     const adminEmail = getCachedProperty('ADMIN_EMAIL');
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    // 先生専用の配置は SA pool を使わない (すべて先生の権限で直接開く) ので鍵は要らない。
+    if (typeof isSingleTenant_ === 'function' && isSingleTenant_()) return Boolean(adminEmail && dbId);
     const creds = getCachedProperty('SERVICE_ACCOUNT_CREDS');
 
     if (!adminEmail || !dbId || !creds) {

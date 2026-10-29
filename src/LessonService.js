@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
+/* global isSingleTenant_, acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -1261,6 +1261,7 @@ function __templateToBoardMode_(formTemplate) {
  * @returns {{spreadsheetId:string, sheetName:string}|null}
  */
 function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName, ownerEmail) {
+  if (typeof isSingleTenant_ === 'function' && isSingleTenant_()) return __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName);
   // スプレッドシートは授業に 1 つ。既に作ってあれば使い回す (resume 時の二重作成防止)。
   let ssId = lessonJson.nativeSpreadsheetId || '';
   let ss = null;
@@ -1309,6 +1310,46 @@ function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName, ownerEmail
       sheet = ss.insertSheet(sheetName);
     }
     sheet.appendRow(LESSON_NATIVE_SHEET_HEADERS);
+  }
+  return { spreadsheetId: ssId, sheetName };
+}
+
+/**
+ * 先生専用の配置 (isSingleTenant_) では、授業ごとにスプレッドシートを作らず、
+ * 先生のスプレッドシート (DATABASE_SPREADSHEET_ID) に「授業名｜フェーズ名」のシートを足す。
+ *
+ * Why: 先生が自分の授業の記録を 1 つのファイルで見渡せるようにする (ユーザー要望 2026-10-29)。
+ *   実行者 = 先生 = 持ち主なので共有設定も addEditor も要らない。
+ *   シート名の頭 (nativeSheetPrefix) は授業に 1 回だけ決めて lessonJson に残す。同じ名前の授業
+ *   (複製など) とシートが混ざらないよう、既に使われていれば「（2）」を付ける。
+ *
+ * @returns {{spreadsheetId:string, sheetName:string}|null}
+ */
+function __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName) {
+  const ssId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+  if (!ssId) return null;
+  const ss = SpreadsheetApp.openById(ssId);
+  // シート名に使えない文字 ([ ] * ? / \ :) を外し、長さも抑える (シート名の上限は 100 文字)。
+  const clean = (s) => String(s || '').replace(/[[\]*?/\\:]/g, ' ').replace(/\s+/g, ' ').trim();
+  let prefix = lessonJson.nativeSheetPrefix || '';
+  if (!prefix) {
+    const base = clean(lessonName || '授業').slice(0, 40) || '授業';
+    const used = ss.getSheets().map((s) => s.getName());
+    prefix = base;
+    for (let n = 2; used.some((name) => name.indexOf(prefix + '｜') === 0); n++) {
+      prefix = base + '（' + n + '）';
+    }
+    lessonJson.nativeSheetPrefix = prefix;
+  }
+  lessonJson.nativeSpreadsheetId = ssId;
+  const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+  const phaseName = clean((phases[phaseIdx] && phases[phaseIdx].name) || ('フェーズ' + (phaseIdx + 1)));
+  const sheetName = (prefix + '｜' + (phaseIdx + 1) + ' ' + phaseName).slice(0, 100);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    // appendRow は表の範囲を推定して列がずれることがあるので、1 行目に直接書く。
+    sheet.getRange(1, 1, 1, LESSON_NATIVE_SHEET_HEADERS.length).setValues([LESSON_NATIVE_SHEET_HEADERS]);
   }
   return { spreadsheetId: ssId, sheetName };
 }
@@ -3137,7 +3178,8 @@ function __readAllLessonRows_(phaseDef, opts) {
  */
 function __openEndedLessonSheet_(spreadsheetId) {
   try {
-    if (isAdministrator(getCurrentEmail())) {
+    // 先生専用の配置では実行者 = 先生 = 持ち主なので、管理者でも直接開ける (SA pool は無い)。
+    if (isAdministrator(getCurrentEmail()) && !(typeof isSingleTenant_ === 'function' && isSingleTenant_())) {
       // 管理者は他人の Drive に直接権限を持たないので SA pool 経由 (回答シートは開始時に共有済み)。
       const proxy = (typeof openSpreadsheetViaServiceAccount === 'function')
         ? openSpreadsheetViaServiceAccount(spreadsheetId) : null;

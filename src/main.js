@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_ */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureSingleTenantBootstrap_, isSingleTenant_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -120,6 +120,8 @@ function createAccessRestrictedTemplate(email, isAppDisabled = false, message = 
  */
 function doGet(e) {
   try {
+    // 先生専用の配置なら初回だけプロパティと DB のシートをそろえる (本体では何もしない)。
+    if (typeof ensureSingleTenantBootstrap_ === 'function') ensureSingleTenantBootstrap_();
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
@@ -398,6 +400,16 @@ function handleReviewMode_(params, currentEmail) {
 }
 
 function handleMainMode_(params, currentEmail) {
+  // 先生専用の配置 (isSingleTenant_) では使う先生は 1 人なので、「ログイン」「アプリ設定」の
+  //   入口を見せずに、先生が開いたら登録 (processLoginAction) を済ませて管理パネルを直接開く。
+  //   児童など先生以外は、本体と同じ案内 (ボタンなし) のまま。
+  if (typeof isSingleTenant_ === 'function' && isSingleTenant_() && currentEmail && isAdministrator(currentEmail)) {
+    const login = processLoginAction();
+    const userId = login && login.success && login.data && login.data.userId;
+    if (userId) return handleAdminMode_({ userId }, currentEmail);
+    // 登録に失敗したら本体と同じ画面 (ログインボタンあり) に戻す。痕跡は残す。
+    console.warn('handleMainMode_: single-tenant auto login failed:', login && login.message);
+  }
   return createAccessRestrictedTemplate(currentEmail);
 }
 

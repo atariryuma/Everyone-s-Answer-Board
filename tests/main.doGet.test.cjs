@@ -216,3 +216,56 @@ test('doGet view: 無効化されたユーザーのボードは所有者以外�
   context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
   assert.ok(templates.includes('Unpublished.html'));
 });
+
+// --- 先生専用の配置 (isSingleTenant_): トップを先生が開いたら管理パネルを直接開く ---
+
+function loadSingleTenantMain({ singleTenant, email, loginOk = true }) {
+  const loginCalls = [];
+  const { context, templates } = loadDoGetContext({
+    // getCurrentEmail は main.js 内で定義し直されるので、元の Session を差し替える。
+    Session: { getActiveUser: () => ({ getEmail: () => email }) },
+    isSingleTenant_: () => singleTenant,
+    processLoginAction: () => {
+      loginCalls.push(email);
+      return loginOk
+        ? { success: true, data: { userId: 'teacher-uid', email } }
+        : { success: false, message: 'ユーザー登録に失敗しました' };
+    },
+    // getBatchedAdminData は main.js の実物が動くので、その下の data 層だけ用意する。
+    findUserById: (uid) => ({ userId: uid, userEmail: email, isActive: true }),
+    getConfigOrDefault: () => ({}),
+    getQuestionText: () => '',
+    VALIDATOR_BOARD_MODES: ['auto', 'matrix'],
+    findUserByEmail: () => null
+  });
+  return { context, templates, loginCalls };
+}
+
+test('doGet 先生専用: 先生がトップを開くと、登録を済ませて管理パネルを返す (ログイン・アプリ設定の入口を出さない)', () => {
+  const h = loadSingleTenantMain({ singleTenant: true, email: 'admin@example.com' });
+  h.context.doGet(createGetEvent({}));
+  assert.deepEqual(h.loginCalls, ['admin@example.com']);
+  assert.ok(h.templates.includes('AdminPanel.html'), h.templates.join(','));
+  assert.ok(!h.templates.includes('AccessRestricted.html'));
+});
+
+test('doGet 先生専用: 児童がトップを開いても登録はせず、本体と同じ案内のまま', () => {
+  const h = loadSingleTenantMain({ singleTenant: true, email: 'child@example.com' });
+  h.context.doGet(createGetEvent({}));
+  assert.deepEqual(h.loginCalls, []);
+  assert.ok(h.templates.includes('AccessRestricted.html'));
+});
+
+test('doGet 本体 (みんなで 1 つ): 管理者がトップを開いても今までどおりの画面', () => {
+  const h = loadSingleTenantMain({ singleTenant: false, email: 'admin@example.com' });
+  h.context.doGet(createGetEvent({}));
+  assert.deepEqual(h.loginCalls, []);
+  assert.ok(h.templates.includes('AccessRestricted.html'));
+});
+
+test('doGet 先生専用: 登録に失敗したら本体と同じ画面 (ログインボタンあり) に戻す', () => {
+  const h = loadSingleTenantMain({ singleTenant: true, email: 'admin@example.com', loginOk: false });
+  h.context.doGet(createGetEvent({}));
+  assert.ok(h.templates.includes('AccessRestricted.html'));
+  assert.ok(!h.templates.includes('AdminPanel.html'));
+});

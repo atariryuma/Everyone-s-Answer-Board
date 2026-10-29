@@ -49,3 +49,7 @@ scripts/config.*.json
 # Optional: Keep .clasp.json.template for reference
 !.clasp.json.template
 .claude/launch.json
+
+# 先生専用の配置 (scripts/deploy-single.js)
+scripts/single-tenants.json
+.single-stage/
