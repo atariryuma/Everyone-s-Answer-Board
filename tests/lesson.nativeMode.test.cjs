@@ -2080,3 +2080,62 @@ test('引っ越し: 読み戻せていないアーカイブがあれば止め、
   assert.equal(dbSheets.size, 0, '写したシートが残っている');
   assert.equal(h.lessonsSheet._data.length, rowsBefore, '授業の行を書いてはいけない');
 });
+
+// 別のスプレッドシート (授業 1 つ専用の試作) の回答を、引っ越した授業のフェーズへ足す。
+function loadAnswerImport() {
+  const m = loadMigration();
+  m.addOldSheet('phase1', [['2026-10-28T01:00:00.000Z', 'one@x', '6年1組', '', 2, 4, '1組の分', '']]);
+  m.addOldSheet('phase2', []);
+  m.h.context.migrateImportLesson(exportedNativeLesson());
+  // 試作の列: 授業モードと同じ 8 列 + HIGHLIGHT。学級は切り替え忘れで「6年1組」、時刻は 7 時間早い。
+  const bound = createSheet(['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと', 'HIGHLIGHT'], 'phase1');
+  bound._data.push(['2026-10-28T19:38:00.000Z', 'a@x', '6年1組', '', 1, 2, '最初', '', '']);
+  bound._data.push(['2026-10-28T19:39:00.000Z', 'b@x', '6年1組', '', 3, 3, 'b', '', '']);
+  bound._data.push(['2026-10-28T19:40:00.000Z', 'A@x', '6年1組', '', 5, 5, '送り直し', '', '']);
+  bound._data.push(['2026-10-28T19:41:00.000Z', '', '6年1組', '', 4, 4, 'メール無し', '', '']);
+  const boundSs = { getId: () => 'bound', getSheetByName: (n) => (n === 'phase1' ? bound : null) };
+  const openById = m.h.context.SpreadsheetApp.openById;
+  m.h.context.SpreadsheetApp.openById = (id) => (id === 'bound' ? boundSs : openById(id));
+  const params = (extra) => Object.assign({
+    lessonId: 'lesson_old_1', sourceSpreadsheetId: 'bound',
+    sheets: [{ sourceSheet: 'phase1', phaseIndex: 0 }],
+    classMap: { '6年1組': '6年2組' }, shiftMinutes: 420
+  }, extra || {});
+  return Object.assign(m, { dest: () => m.dbSheets.get('てこのはたらき｜1 考える')._data, params });
+}
+
+test('回答の合流: 学級と時刻を直して足し、同じ児童の送り直しは最後の 1 行だけ', () => {
+  const { h, dest, params } = loadAnswerImport();
+  const res = h.context.migrateImportLessonAnswers(params());
+  assert.equal(res.success, true, res.message);
+  const s = res.data.sheets[0];
+  assert.equal(s.sourceRows, 4);
+  assert.equal(s.imported, 2);
+  assert.equal(s.noEmail, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.classes)), { '6年2組': 2 });
+  const added = dest().slice(2);
+  assert.equal(added.length, 2);
+  assert.equal(added[0].length, 8, '授業モードの 8 列だけ書く (HIGHLIGHT は持ち込まない)');
+  assert.deepEqual(JSON.parse(JSON.stringify(added.map(r => [r[0], r[2], r[6]]))), [
+    ['2026-10-29T02:40:00.000Z', '6年2組', '送り直し'],
+    ['2026-10-29T02:39:00.000Z', '6年2組', 'b']
+  ]);
+  assert.equal(dest()[1][6], '1組の分', '元からある行には触らない');
+  assert.deepEqual(Array.from(h.cacheBumps.slice(-1)), ['u1'], 'ボードの cache を新しくする');
+  // 応答に児童のメール・本文を載せない
+  assert.ok(!/a@x|b@x|送り直し/.test(JSON.stringify(res)));
+});
+
+test('回答の合流: 試しに数えるだけなら書かず、もう一度流しても二重にならない', () => {
+  const { h, dest, params } = loadAnswerImport();
+  const before = dest().length;
+  const dry = h.context.migrateImportLessonAnswers(params({ dryRun: true }));
+  assert.equal(dry.success, true, dry.message);
+  assert.equal(dry.data.sheets[0].imported, 2);
+  assert.equal(dest().length, before, 'dryRun で書いてはいけない');
+  h.context.migrateImportLessonAnswers(params());
+  const again = h.context.migrateImportLessonAnswers(params());
+  assert.equal(again.data.sheets[0].imported, 0);
+  assert.equal(again.data.sheets[0].alreadyThere, 2);
+  assert.equal(dest().length, before + 2);
+});

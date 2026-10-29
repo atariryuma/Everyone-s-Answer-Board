@@ -18,7 +18,7 @@
  *   - 元の本体のデータは消さない (写すだけ)
  */
 
-/* global isSingleTenant_, getCachedProperty, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __singleNativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, createErrorResponse, createSuccessResponse, logError_ */
+/* global isSingleTenant_, getCachedProperty, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __singleNativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
 
 // 引っ越し先の持ち主 (この配置の先生)。登録がまだなら先に管理パネルを開いてもらう。
 function __migrationOwner_() {
@@ -120,6 +120,107 @@ function migrateImportLesson(lesson) {
     });
     logError_('migrateImportLesson', error, { lessonId: lesson && lesson.lessonId });
     return createErrorResponse('引っ越しに失敗しました: ' + (error && error.message ? error.message : 'unknown'), null, { error: 'MIGRATION_FAILED' });
+  }
+}
+
+/**
+ * 別のスプレッドシートにある授業モードの回答を、この配置の授業のフェーズのシートへ足す。
+ *
+ * Why: 2026-10-29 の 6年2組は、先生専用の配置の前に作った試作 (授業 1 つ専用の紐づけアプリ) で
+ *   「考える」「もう一度考える」を送った。その回答をいまの授業に合流させる。試作は学級を
+ *   切り替えないまま使ったので学級が「6年1組」、時刻は 7 時間早く記録されていた
+ *   (classMap / shiftMinutes で直す)。
+ *
+ * 回答は Google の中で写すだけで、応答には件数しか載せない (児童の名前・本文を返さない)。
+ * 同じ児童・同じ学級の行がもうあれば足さない (何度流しても二重にならない)。
+ *
+ * @param {Object} params
+ * @param {string} params.lessonId - 足し先の授業 (授業モード)
+ * @param {string} params.sourceSpreadsheetId - 元の回答が入ったスプレッドシート
+ * @param {Array<{sourceSheet: string, phaseIndex: number}>} params.sheets - 元のシート → 足し先のフェーズ
+ * @param {Object} [params.classMap] - 学級の付け替え ({ '6年1組': '6年2組' })。無い学級はそのまま
+ * @param {number} [params.shiftMinutes] - 時刻のずらし (分)
+ * @param {boolean} [params.dryRun] - true なら数えるだけで書かない
+ */
+function migrateImportLessonAnswers(params) {
+  try {
+    const owner = __migrationOwner_();
+    if (owner.error) return owner.error;
+    const p = params || {};
+    if (!p.lessonId || typeof p.lessonId !== 'string') return createErrorResponse('lessonId が必要です', null, { error: 'INVALID_PARAMS' });
+    if (!p.sourceSpreadsheetId || typeof p.sourceSpreadsheetId !== 'string') return createErrorResponse('sourceSpreadsheetId が必要です', null, { error: 'INVALID_PARAMS' });
+    if (!Array.isArray(p.sheets) || !p.sheets.length) return createErrorResponse('sheets が必要です', null, { error: 'INVALID_PARAMS' });
+    const classMap = (p.classMap && typeof p.classMap === 'object') ? p.classMap : {};
+    const shiftMs = Number(p.shiftMinutes || 0) * 60 * 1000;
+    if (!isFinite(shiftMs)) return createErrorResponse('shiftMinutes が不正です', null, { error: 'INVALID_PARAMS' });
+
+    const found = __findLessonById_(p.lessonId);
+    const lesson = found && found.lesson;
+    if (!lesson) return createErrorResponse('授業が見つかりません', null, { error: 'LESSON_NOT_FOUND' });
+    const lessonJson = lesson.lessonJson || {};
+    if (lessonJson.inputMode !== 'native') return createErrorResponse('授業モードの授業ではありません', null, { error: 'NOT_NATIVE' });
+
+    const headers = LESSON_NATIVE_SHEET_HEADERS;
+    const COL = { ts: 0, email: 1, cls: 2 };
+    const src = SpreadsheetApp.openById(p.sourceSpreadsheetId);
+    const result = [];
+    let imported = 0;
+
+    p.sheets.forEach((m) => {
+      const phase = (lessonJson.phases || [])[m && m.phaseIndex];
+      if (!phase || !phase.spreadsheetId || !phase.sheetName) throw new Error('足し先のフェーズにシートがありません (phase ' + (m && m.phaseIndex) + ')');
+      const srcSheet = src.getSheetByName(String(m.sourceSheet || ''));
+      if (!srcSheet) throw new Error('元のシートが見つかりません: ' + m.sourceSheet);
+      const dest = SpreadsheetApp.openById(phase.spreadsheetId).getSheetByName(phase.sheetName);
+      if (!dest) throw new Error('足し先のシートが見つかりません: ' + phase.sheetName);
+
+      // 列は見出しの名前で合わせる (元は HIGHLIGHT の位置などが違う)。足し先は授業モードの列の並びであること。
+      const destData = dest.getDataRange().getValues();
+      const destHead = (destData[0] || []).slice(0, headers.length).map(String);
+      if (destHead.join('|') !== headers.join('|')) throw new Error('足し先の列の並びが授業モードと違います: ' + phase.sheetName);
+      const srcData = srcSheet.getDataRange().getValues();
+      const srcHead = (srcData[0] || []).map(String);
+      const idx = headers.map(h => srcHead.indexOf(h));
+      if (idx[COL.email] < 0 || idx[COL.cls] < 0) throw new Error('元のシートにメールアドレス / クラスの列がありません: ' + m.sourceSheet);
+
+      const keyOf = (email, cls) => String(email || '').trim().toLowerCase() + '|' + String(cls || '').trim();
+      const have = new Set(destData.slice(1).map(r => keyOf(r[COL.email], r[COL.cls])));
+      const latest = new Map();   // 元に同じ児童の行が複数あれば最後の行 (最新の送信) を採る = __findOwnLessonRow_ と同じ
+      const counts = { phaseIndex: m.phaseIndex, sourceRows: srcData.length - 1, imported: 0, alreadyThere: 0, noEmail: 0, classes: {} };
+      srcData.slice(1).forEach((r) => {
+        const row = idx.map(i => (i >= 0 ? r[i] : ''));
+        if (!String(row[COL.email] || '').trim()) { counts.noEmail++; return; }
+        const cls = String(row[COL.cls] || '').trim();
+        row[COL.cls] = Object.prototype.hasOwnProperty.call(classMap, cls) ? String(classMap[cls]) : cls;
+        const t = row[COL.ts] instanceof Date ? row[COL.ts] : new Date(String(row[COL.ts] || ''));
+        if (!isNaN(t.getTime())) row[COL.ts] = new Date(t.getTime() + shiftMs).toISOString();
+        latest.set(keyOf(row[COL.email], row[COL.cls]), row);
+      });
+      const rows = [];
+      latest.forEach((row, key) => {
+        if (have.has(key)) { counts.alreadyThere++; return; }
+        rows.push(row);
+        counts.classes[row[COL.cls]] = (counts.classes[row[COL.cls]] || 0) + 1;
+      });
+      counts.imported = rows.length;
+      if (rows.length && !p.dryRun) {
+        __withLessonLock_(() => {
+          dest.getRange(dest.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+        });
+        imported += rows.length;
+      }
+      result.push(counts);
+    });
+
+    if (imported > 0) {
+      try { bumpBoardDataVersion_(owner.user.userId); } catch (e) {
+        console.warn('migrateImportLessonAnswers: bumpBoardDataVersion_ failed (board may be stale up to 12s):', e && e.message);
+      }
+    }
+    return createSuccessResponse(p.dryRun ? '数えました (書いていません)' : '回答を足しました', { dryRun: Boolean(p.dryRun), sheets: result });
+  } catch (error) {
+    logError_('migrateImportLessonAnswers', error, { lessonId: params && params.lessonId });
+    return createErrorResponse('回答を足せませんでした: ' + (error && error.message ? error.message : 'unknown'), null, { error: 'MIGRATION_FAILED' });
   }
 }
 
