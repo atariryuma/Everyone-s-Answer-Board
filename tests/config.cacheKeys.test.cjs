@@ -62,28 +62,6 @@ function loadConfigContext(overrides = {}) {
   return { context, removedKeys };
 }
 
-// --- getUserCacheKeys_ ---
-
-test('getUserCacheKeys_: returns 5 keys for userId', () => {
-  const { context } = loadConfigContext();
-  const keys = context.getUserCacheKeys_('user-123');
-  assert.equal(keys.length, 5);
-  assert.ok(keys.includes('config_user-123'));
-  assert.ok(keys.includes('user_user-123'));
-  assert.ok(keys.includes('board_data_user-123'));
-  assert.ok(keys.includes('admin_panel_user-123'));
-  assert.ok(keys.includes('question_text_user-123'));
-});
-
-// --- clearConfigCache_ ---
-
-test('clearConfigCache: removes 5 keys for user', () => {
-  const { context, removedKeys } = loadConfigContext();
-  context.clearConfigCache_('user-1');
-  assert.equal(removedKeys.length, 5);
-  assert.ok(removedKeys.includes('config_user-1'));
-});
-
 // --- sanitizeDisplaySettings ---
 
 test('sanitizeDisplaySettings: coerces booleans (strict) and enforces page size bounds', () => {
@@ -329,7 +307,6 @@ function loadSaveContext(overrides = {}) {
       || (() => ({ isValid: true, errors: [], sanitized: {} })),
     validatePublishConfig: overrides.validatePublishConfig
       || (() => ({ success: true, data: {}, errors: [] })),
-    clearConfigCache_: overrides.clearConfigCache_ || (() => {}),
     ...overrides
   });
 }
@@ -426,15 +403,6 @@ test('saveUserConfig: updateUser_ failure propagates', () => {
   const result = context.saveUserConfig_('u1', { spreadsheetId: 'ss' });
   assert.equal(result.success, false);
   assert.match(result.message, /database write failed/);
-});
-
-test('saveUserConfig: clearConfigCache_ called on success', () => {
-  let cacheClearedFor = null;
-  const { context } = loadSaveContext();
-  // clearConfigCache_ lives in ConfigService.js; patch after load.
-  context.clearConfigCache_ = (id) => { cacheClearedFor = id; };
-  context.saveUserConfig_('u1', { spreadsheetId: 'ss' });
-  assert.equal(cacheClearedFor, 'u1');
 });
 
 test('saveUserConfig: uses validatePublishConfig when options.isPublish', () => {

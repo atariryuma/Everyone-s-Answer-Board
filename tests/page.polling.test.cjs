@@ -214,6 +214,25 @@ test('schedulePollingCheck: 3 回連続で失敗しても polling を止めな�
   assert.ok(next.delay >= 16000 && next.delay <= 24000, `授業中の backoff (20s ±20%): ${next.delay}`);
 });
 
+test('schedulePollingCheck: 読み込みと同じ学級・並び順を送る (サーバの cache を同じ key で使う)', async () => {
+  // Why: サーバの cache は学級と並び順を key に含む。確かめる側が送らないと読む側と key が分かれ、
+  //   版が上がるたびに同じシートを 2 回読んでいた。
+  const { instance, timers } = makeInstance({ lastActivityTime: Date.now() });
+  instance.state.lastSeenTimestamp = 0;
+  instance.getCurrentFilterState = () => ({ classFilter: '6-1', sortOrder: 'oldest', rawClassFilter: '6-1' });
+  const calls = [];
+  instance.runGas = async (fn, ...args) => { calls.push({ fn, args }); return { success: true, hasNewContent: false }; };
+  instance.polling.isActive = true;
+
+  instance.schedulePollingCheck();
+  await Array.from(timers.values()).pop().fn();
+
+  const poll = calls.find((c) => c.fn === 'getNotificationUpdate');
+  assert.ok(poll, 'getNotificationUpdate を呼ぶ');
+  assert.equal(poll.args[1].classFilter, '6-1');
+  assert.equal(poll.args[1].sortOrder, 'oldest');
+});
+
 // stopSimplePolling — both regular and cooldown timers cleared
 // =====================================================================
 
@@ -1328,13 +1347,15 @@ test('クラス既定: 授業が終わったら (対象クラスが消えたら)
 // 自動再送は冪等な呼び出しだけ (反転・削除は再送しない)
 // =====================================================================
 
-test('__retryBudgetFor: ハイライト / リアクション / 削除は 0、送信は 1、読み取りは 2', () => {
+test('__retryBudgetFor: ハイライト / リアクション / 削除 / 更新の確かめは 0、送信は 1、読み取りは 2', () => {
   const { instance } = makeInstance();
   assert.equal(instance.__retryBudgetFor('toggleHighlight'), 0);
   assert.equal(instance.__retryBudgetFor('addReaction'), 0);
   assert.equal(instance.__retryBudgetFor('deleteAnswerRow'), 0);
   assert.equal(instance.__retryBudgetFor('submitLessonAnswer'), 1);
-  assert.equal(instance.__retryBudgetFor('getNotificationUpdate'), 2);
+  // 更新の確かめは数秒後にまた呼ぶので、混んでいるときの失敗をすぐ呼び直さない (1 人 3 実行にしない)
+  assert.equal(instance.__retryBudgetFor('getNotificationUpdate'), 0);
+  assert.equal(instance.__retryBudgetFor('getPublishedSheetData'), 2);
 });
 
 test('getPollingInterval: サーバの retryAfterMs (混雑中) に 1 回だけ従い、指定より早く来ない', () => {

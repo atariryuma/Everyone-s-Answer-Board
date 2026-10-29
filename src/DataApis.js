@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, validateAccess_, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -157,11 +157,10 @@ function getForms() {
   }
 }
 
-// Why: 線形尺度の範囲は detectNumericScaleColumns の判定（0-10 の整数, レンジ 1-9）と
+// Why: 線形尺度の範囲は列の推定 (inferColumnRoles) の判定（0-10 の整数, レンジ 1-9）と
 //      整合する必要がある。テンプレートと検出ロジックが乖離すると、テンプレートで作った
 //      M1/M2 フォームの数値列が auto モードで検出されない事故になる。
 const TEMPLATE_SCALE_MIN = 1;
-const TEMPLATE_SCALE_MAX = 5;
 // 児童の学年に合わせて選べる粒度 (Forms LinearScale の max は 1〜10、min は 0〜1)。
 //   3 = 低学年向け (賛成 / どちらでもない / 反対)
 //   5 = 既定 (中学年〜)
@@ -195,7 +194,7 @@ function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel, scalePoin
  *   - 'numberline' (M1)  : クラス / 名前 / 立場(線形尺度1-5) / 理由       — 数直線可視化
  *   - 'matrix'     (M2)  : クラス / 名前 / X軸(線形尺度) / Y軸(線形尺度) / 理由 — 散布図
  *
- * Why M1/M2 テンプレートを用意するか: detectNumericScaleColumns は実データから
+ * Why M1/M2 テンプレートを用意するか: 列の推定は実データから
  *   線形尺度列を検出するが、空のフォームでは検出できないので教師に手動で
  *   ScaleItem を追加させる手間が残る。テンプレート時点で M1/M2 用の構造を作れば
  *   そのまま「✨ 自動判定」で boardMode=numberline/matrix に乗る。
@@ -988,7 +987,7 @@ function __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isAdmin, p
   }
 }
 
-function buildSafePublishedDataResult(result, config, viewerContext = {}) {
+function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
     viewerContext.isAdmin || viewerContext.isOwnBoard || displaySettings.showNames
@@ -1121,7 +1120,7 @@ const BOARD_CACHE_KEYS_ = {
 //   timestamp から作れる formattedTimestamp が載っていて、150〜250 行で JSON が 100KB を超え
 //   「cache に入らない → 毎 poll が Sheets を読む」になっていた (2026-10 監査)。cache に書くときは
 //   派生 3 項目を落として gzip+base64 にし、読むときに元の形へ戻す。受け手
-//   (buildSafePublishedDataResult / page.js) は何も変わらない。
+//   (buildSafePublishedDataResult_ / page.js) は何も変わらない。
 //   gzip が使えない環境 (test sandbox) では派生項目を落とすだけの形で書く。
 function packBoardDataForCache_(res) {
   if (!res || typeof res !== 'object' || !Array.isArray(res.data)) return res;
@@ -1432,7 +1431,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
-      return buildSafePublishedDataResult(
+      return buildSafePublishedDataResult_(
         __applyLessonHeader_(
           __maskOthersDuringInputPhase_(
             __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isSystemAdmin, lessonPhase),
@@ -1478,7 +1477,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
     if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
-    return buildSafePublishedDataResult(result, userConfig, {
+    return buildSafePublishedDataResult_(result, userConfig, {
       isAdmin: isSystemAdmin,
       isOwnBoard: true
     });
@@ -1513,9 +1512,9 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
  * @param {string} profileName
  * @param {string} [classFilter]
  * @param {string} [sortOrder]
- * @returns {Object} buildSafePublishedDataResult 形式 + viewingPastProfile
+ * @returns {Object} buildSafePublishedDataResult_ 形式 + viewingPastProfile
  */
-function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter, sortOrder) {
+function getPublishedSheetDataForProfile_(targetUserId, profileName, classFilter, sortOrder) {
   try {
     if (!targetUserId || typeof targetUserId !== 'string') {
       return createErrorResponse('targetUserId is required', []);
@@ -1543,7 +1542,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
 
     // history gate: students (非 owner / 非 admin) は profileHistory にある名前のみ閲覧可。
     //   owner/admin は profiles[] にあれば全部読めるようにする（preview 用途）。
-    // v2774: buildSafePublishedDataResult と同じく sanitizeProfileHistory 経由で参照する。
+    // v2774: buildSafePublishedDataResult_ と同じく sanitizeProfileHistory 経由で参照する。
     //   storage に古い orphan が残っていても、ここで cross-ref 通過後の history のみ gate に使う。
     const profiles = Array.isArray(targetConfig.profiles) ? targetConfig.profiles : [];
     const history = (typeof sanitizeProfileHistory === 'function')
@@ -1596,13 +1595,13 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     const result = getUserSheetData_(targetUserId, options, targetUser, synthesized);
     if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
-    return buildSafePublishedDataResult(result, synthesized, {
+    return buildSafePublishedDataResult_(result, synthesized, {
       isAdmin: isSystemAdmin,
       isOwnBoard,
       viewingPastProfile: profileName
     });
   } catch (error) {
-    logError_('getPublishedSheetDataForProfile', error);
+    logError_('getPublishedSheetDataForProfile_', error);
     return {
       success: false,
       error: (error && error.message) || 'データ取得エラー',

@@ -252,103 +252,6 @@ function validateSheetNameRaw_(value, maxLength) {
   return result;
 }
 
-function validateText(text, options = {}) {
-    const {
-      maxLength = 8192,
-      minLength = 0,
-      allowHtml = false,
-      allowNewlines = true
-    } = options;
-
-    const result = {
-      isValid: false,
-      sanitized: '',
-      errors: [],
-      warnings: [],
-      metadata: {}
-    };
-
-    if (text === null || text === undefined || typeof text !== 'string') {
-      result.errors.push('有効なテキスト文字列が必要です');
-      const inputType = text === null ? 'null' : text === undefined ? 'undefined' : typeof text;
-      result.metadata.inputType = inputType;
-      result.metadata.inputValue = text == null ? inputType : String(text);
-      return result;
-    }
-
-    let sanitized = text;
-    const originalLength = text.length;
-
-    if (sanitized.length < minLength) {
-      result.errors.push(`${minLength  }文字以上である必要があります`);
-      return result;
-    }
-
-    if (sanitized.length > maxLength) {
-      result.errors.push(`${maxLength  }文字以下である必要があります`);
-      return result;
-    }
-
-    const dangerousPatterns = [
-      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-      /javascript:/gi,
-      /on\w+\s*=/gi,
-      /<iframe\b[^>]*>/gi,
-      /<object\b[^>]*>/gi,
-      /<embed\b[^>]*>/gi,
-      /<link\b[^>]*>/gi,
-      /<meta\b[^>]*>/gi
-    ];
-
-    let hasSecurityRisk = false;
-    dangerousPatterns.forEach(pattern => {
-      if (pattern.test(sanitized)) {
-        hasSecurityRisk = true;
-        sanitized = sanitized.replace(pattern, '[REMOVED_FOR_SECURITY]');
-        result.warnings.push('セキュリティリスクのあるコンテンツを除去しました');
-      }
-    });
-
-    if (!allowHtml) {
-      sanitized = sanitized
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;');
-    }
-
-    if (!allowNewlines) {
-      sanitized = sanitized.replace(/[\r\n]/g, ' ');
-      // 改行なしモードは全空白を 1 つに圧縮。
-      sanitized = sanitized.replace(/\s+/g, ' ').trim();
-    } else {
-      // 改行を保持するモード。 旧実装は直後の \s+→space で保持したはずの \n を潰しており
-      //   allowNewlines が事実上 no-op だった。 行内の連続空白のみ圧縮し、 改行は維持する
-      //   (過剰な空行は 2 連までに抑制)。
-      sanitized = sanitized
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/[ \t]*\n[ \t]*/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-    }
-
-    result.isValid = true;
-    result.sanitized = sanitized;
-    result.metadata = {
-      originalLength,
-      sanitizedLength: sanitized.length,
-      hadSecurityRisk: hasSecurityRisk,
-      wasModified: originalLength !== sanitized.length || text !== sanitized
-    };
-
-    return result;
-}
-
-
-
 
 /**
  * スプレッドシートID検証
@@ -475,7 +378,7 @@ function validateConfig(config) {
     const fields = {
       spreadsheetId: { validator: validateSpreadsheetId, required: false },
       formUrl: { validator: validateUrl, required: false },
-      // シート名は HTML ではなく Sheets 上の識別子。validateText の entity 変換 (& → &amp; 等) を通すと
+      // シート名は HTML ではなく Sheets 上の識別子。HTML 向けの entity 変換 (& → &amp; 等) を通すと
       //   「Q&A」「3'組」のような名前が別名で保存され、getSheetByName が null になってボードが
       //   「シートが見つかりません」で止まる。長さと制御文字だけを見て原文のまま返す。
       sheetName: { validator: (v) => validateSheetNameRaw_(v, 100), required: false }
@@ -555,7 +458,5 @@ function validateConfig(config) {
     result.isValid = result.errors.length === 0;
     return result;
 }
-
-
 
 

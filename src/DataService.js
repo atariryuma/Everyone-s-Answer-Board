@@ -289,7 +289,7 @@ function processBatchData_(ctx) {
   // Headers don't change mid-batch, so resolve column indices once here
   // rather than per-row (resolveColumnIndex runs a full header scan on misses).
   const columnMapping = config.columnMapping || {};
-  // Why: numericX/Y はパターン検出がない（教師が手動 or detectNumericScaleColumns で選ぶ）。
+  // Why: numericX/Y はパターン検出がない（教師が手動 or 列の推定 inferColumnRoles で選ぶ）。
   //      columnMapping に明示インデックスがあるときだけ取り込む。-1 のとき item は null を入れる。
   const fieldIndices = {
     answer: resolveColumnIndex(headers, 'answer', columnMapping).index,
@@ -515,7 +515,7 @@ function processRawDataBatch(ctx) {
           isEmpty: isEmptyRow(row),
 
           // reacted は読んだ人 (viewerEmail) 基準。この結果は viewer 間で共有 cache されるので、
-          //   API 層 (buildSafePublishedDataResult) が voters から閲覧者ごとに reacted を付け直し、
+          //   API 層 (buildSafePublishedDataResult_) が voters から閲覧者ごとに reacted を付け直し、
           //   voters は wire に載せる前に落とす。付け直さないと最初に読んだ児童の 👍 が全員に出る。
           reactions: extractReactions(row, headers, viewerEmail, reactionIndices, { includeVoters: true }),
           highlight: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIGHLIGHT : null)

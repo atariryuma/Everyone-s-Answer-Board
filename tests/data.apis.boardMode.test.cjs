@@ -67,14 +67,14 @@ function loadDataApisContext(overrides = {}) {
 }
 
 // =====================================================================
-// buildSafePublishedDataResult: boardMode auto-detection
+// buildSafePublishedDataResult_: boardMode auto-detection
 // Why: フロントが boardMode を一意に受け取れる契約を保証。
 //      auto → numericX 有無で numberline/board、numericY もあれば matrix。
 // =====================================================================
 
 test('boardMode auto: returns "board" when no numeric columns mapped', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', answer: 'はい' }], header: 'q', sheetName: 's' },
     { displaySettings: { boardMode: 'auto' }, columnMapping: { answer: 1 } },
     { isAdmin: false, isOwnBoard: false }
@@ -84,7 +84,7 @@ test('boardMode auto: returns "board" when no numeric columns mapped', () => {
 
 test('boardMode auto: returns "numberline" when numericX only mapped', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', numericX: 3 }], header: 'q', sheetName: 's' },
     { displaySettings: { boardMode: 'auto' }, columnMapping: { numericX: 4 } },
     { isAdmin: false, isOwnBoard: false }
@@ -94,7 +94,7 @@ test('boardMode auto: returns "numberline" when numericX only mapped', () => {
 
 test('boardMode auto: returns "matrix" when both numericX and numericY mapped', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', numericX: 3, numericY: 4 }], header: 'q', sheetName: 's' },
     { displaySettings: { boardMode: 'auto' }, columnMapping: { numericX: 4, numericY: 5 } },
     { isAdmin: false, isOwnBoard: false }
@@ -104,7 +104,7 @@ test('boardMode auto: returns "matrix" when both numericX and numericY mapped', 
 
 test('boardMode auto: missing boardMode is treated as auto', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: 'q', sheetName: 's' },
     { displaySettings: {}, columnMapping: { numericX: 4 } },
     { isAdmin: false, isOwnBoard: false }
@@ -114,7 +114,7 @@ test('boardMode auto: missing boardMode is treated as auto', () => {
 
 test('boardMode: explicit non-auto value is preserved', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: 'q', sheetName: 's' },
     { displaySettings: { boardMode: 'board' }, columnMapping: { numericX: 4, numericY: 5 } },
     { isAdmin: false, isOwnBoard: false }
@@ -129,7 +129,7 @@ test('boardMode: explicit non-auto value is preserved', () => {
 
 test('emailHash: included for student viewer even when name/email stripped', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', email: 'student@x.com', name: '田中', answer: 'はい' }], header: '', sheetName: '' },
     { displaySettings: { showNames: false, boardMode: 'numberline' }, columnMapping: { numericX: 4 } },
     { isAdmin: false, isOwnBoard: false }
@@ -142,7 +142,7 @@ test('emailHash: included for student viewer even when name/email stripped', () 
 
 test('emailHash: also included for owner viewer (does not duplicate, just adds)', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', email: 'me@x.com', name: '本人', answer: 'はい' }], header: '', sheetName: '' },
     { displaySettings: { showNames: false, boardMode: 'board' }, columnMapping: {} },
     { isAdmin: false, isOwnBoard: true }
@@ -155,7 +155,7 @@ test('emailHash: also included for owner viewer (does not duplicate, just adds)'
 
 test('emailHash: null when email missing', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [{ id: 'row_2', answer: 'はい' }], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     {}
@@ -170,7 +170,7 @@ test('emailHash: null when email missing', () => {
 
 test('axisConfig: passed through from config', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     {
       displaySettings: { boardMode: 'numberline' },
@@ -190,7 +190,7 @@ test('axisConfig: passed through from config', () => {
 
 test('axisConfig: missing optional fields yield null safely', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     {}
@@ -208,7 +208,7 @@ test('axisConfig: missing optional fields yield null safely', () => {
 
 test('formMeta: returns formUrl + formTitle from active config', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     {
       displaySettings: {},
@@ -225,7 +225,7 @@ test('formMeta: returns formUrl + formTitle from active config', () => {
 
 test('formMeta: returns empty strings when config has no formUrl', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     {}
@@ -237,7 +237,7 @@ test('formMeta: returns empty strings when config has no formUrl', () => {
 
 test('formMeta: rejects non-string formUrl (defensive)', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {}, formUrl: { malicious: 'object' } },
     {}
@@ -253,7 +253,7 @@ test('formMeta: rejects non-string formUrl (defensive)', () => {
 
 test('viewerIsTeacher: true when isOwnBoard', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     { isOwnBoard: true }
@@ -263,7 +263,7 @@ test('viewerIsTeacher: true when isOwnBoard', () => {
 
 test('viewerIsTeacher: true when isAdmin', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     { isAdmin: true }
@@ -273,7 +273,7 @@ test('viewerIsTeacher: true when isAdmin', () => {
 
 test('viewerIsTeacher: false for regular viewer (student)', () => {
   const ctx = loadDataApisContext();
-  const result = ctx.buildSafePublishedDataResult(
+  const result = ctx.buildSafePublishedDataResult_(
     { data: [], header: '', sheetName: '' },
     { displaySettings: {}, columnMapping: {} },
     {}

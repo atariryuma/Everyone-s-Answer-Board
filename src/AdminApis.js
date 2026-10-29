@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getAllUsers_, updateUser_, getUserConfig, saveUserConfig_, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator_, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getAllUsers_, updateUser_, getUserConfig, saveUserConfig_, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile_, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator_, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -18,11 +18,8 @@ const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSW
 const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID', 'DEPLOYED_WEB_APP_URL'];
 
 // Magic-number elimination (Clean Code: replace literal numbers with named constants).
-const PROFILE_NAME_MAX_LEN = 50;              // saveProfile: profile name 最大長
 const SHEET_NAME_MAX_LEN = 200;               // Forms / Sheets で実用的に許容される sheet 名長
-const DRIVE_ERROR_BODY_PREVIEW_LEN = 300;     // Drive API エラーレスポンスのログ表示文字数
 const MAX_BULK_INSERT_ROWS = 500;             // bulkInsertRows API 1 回あたりの最大行数
-const PROTECTED_PROPERTY_MIN_LENGTH = 4;      // Property name の最低長 (短すぎる input を reject)
 
 function isProtectedPropertyKey(key) {
   if (typeof key !== 'string' || !key) return false;
@@ -1104,14 +1101,14 @@ function dispatchAdminOperation(operation, params) {
 
     case 'exportBoardData': {
       // 実践報告書 / 授業記録の作成用に、ボード公開済みの全件データを CLI から取得する。
-      //   - profileName を渡せば「過去 phase」も読める（getPublishedSheetDataForProfile 経由）
+      //   - profileName を渡せば「過去 phase」も読める（getPublishedSheetDataForProfile_ 経由）
       //   - 個人情報保護のため、デフォルトで `name` フィールドを除外する（stripName=false で残す）
       //   - reactions / emailHash / highlight / id / rowIndex は report 用には不要なので削ぎ落とす
       { const e = reqStr('userId'); if (e) return e; }
       const profileName = typeof params.profileName === 'string' && params.profileName ? params.profileName : null;
       const stripName = params.stripName !== false; // default true
       const result = profileName
-        ? getPublishedSheetDataForProfile(params.userId, profileName, params.classFilter || null, params.sortOrder || 'newest')
+        ? getPublishedSheetDataForProfile_(params.userId, profileName, params.classFilter || null, params.sortOrder || 'newest')
         : getPublishedSheetData(params.classFilter || null, params.sortOrder || 'newest', false, params.userId);
       const rows = Array.isArray(result.data) ? result.data : [];
       const slim = rows.map(r => __projectBoardRowForExport_(r, { includeName: !stripName }));
@@ -1365,64 +1362,4 @@ function deepMerge_(target, source) {
   return out;
 }
 
-
-/**
- * SS の DOMAIN_WITH_LINK / DOMAIN 共有を revoke する。
- *   - 既に PRIVATE なら no-op (changed=false)
- *   - 通常 setSharing で PRIVATE に戻す。 失敗時は Drive REST API で domain permission を削除
- *
- * @returns {{success:boolean, changed:boolean, error?:string}}
- */
-function revokeDomainSharing_(spreadsheetId) {
-  try {
-    const file = DriveApp.getFileById(spreadsheetId);
-    const access = file.getSharingAccess();
-
-    if (access === DriveApp.Access.PRIVATE) {
-      return { success: true, changed: false };
-    }
-
-    try {
-      file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-      return { success: true, changed: true };
-    } catch (_setSharingError) {
-      // Workspace ポリシーで setSharing が落ちる場合は Drive REST API で domain permission を
-      // 直接削除する fallback。
-      const token = ScriptApp.getOAuthToken();
-      const listUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(spreadsheetId) +
-        '/permissions?fields=permissions(id,type,role,domain)&supportsAllDrives=true';
-      const listResp = UrlFetchApp.fetch(listUrl, {
-        method: 'get',
-        headers: { Authorization: 'Bearer ' + token },
-        muteHttpExceptions: true
-      });
-      if (listResp.getResponseCode() !== 200) {
-        return createErrorResponse(`Drive list permissions ${listResp.getResponseCode()}: ${listResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}`, null, { changed: false });
-      }
-      const data = JSON.parse(listResp.getContentText());
-      const perms = Array.isArray(data.permissions) ? data.permissions : [];
-      const domainPerms = perms.filter((p) => p.type === 'domain');
-      let changed = false;
-      for (const p of domainPerms) {
-        const delUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(spreadsheetId) +
-          '/permissions/' + encodeURIComponent(p.id) + '?supportsAllDrives=true';
-        const delResp = UrlFetchApp.fetch(delUrl, {
-          method: 'delete',
-          headers: { Authorization: 'Bearer ' + token },
-          muteHttpExceptions: true
-        });
-        const code = delResp.getResponseCode();
-        if (code >= 200 && code < 300) { changed = true; }
-        else if (code !== 404) {
-          return createErrorResponse(
-            `Drive delete permission ${code}: ${delResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}`,
-            null, { changed });
-        }
-      }
-      return { success: true, changed };
-    }
-  } catch (err) {
-    return createErrorResponse(err.message || String(err), null, { changed: false });
-  }
-}
 

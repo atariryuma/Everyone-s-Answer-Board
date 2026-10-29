@@ -114,8 +114,8 @@ test('guard: non-publish fields still save normally on non-sentinel save', () =>
 test('saveUserConfig: updateUser_ が unchanged を返したら永続済の etag と config をそのまま返す', () => {
   // Why: 内容が同じ保存で新しい etag を返すと、client がそれを持ち、次の保存が etag_mismatch になる。
   const ctx = loadConfigContext({ isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' });
-  let cleared = false;
-  ctx.clearConfigCache_ = () => { cleared = true; };
+  let bumped = false;
+  ctx.bumpBoardDataVersion_ = () => { bumped = true; };
   ctx.updateUser_ = () => ({ success: true, unchanged: true, currentEtag: 'persisted_etag',
     currentConfig: { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' } });
   const res = ctx.saveUserConfig_('u1', { spreadsheetId: 'sheet1', etag: 'persisted_etag' });
@@ -123,5 +123,5 @@ test('saveUserConfig: updateUser_ が unchanged を返したら永続済の etag
   assert.equal(res.unchanged, true);
   assert.equal(res.etag, 'persisted_etag');
   assert.equal(res.config.etag, 'persisted_etag');
-  assert.equal(cleared, false, '何も変わっていないので cache も触らない');
+  assert.equal(bumped, false, '何も変わっていないのでボードの版も上げない');
 });

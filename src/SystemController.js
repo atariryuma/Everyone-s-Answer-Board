@@ -4,7 +4,7 @@
  *   - 診断・監視: testSystemDiagnosis, performAutoRepair_
  *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
  *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
- *   - フォーム連携: validateAccess_, getFormInfo, detectFormConnection_, searchFormsByDrive_
+ *   - フォーム連携: getFormInfo, detectFormConnection_, searchFormsByDrive_
  *   - DB: testDatabaseConnection_, __ensureSheetWithHeaders_ (配置の初回にシートをそろえる)
  *
  * 公開状態の書き換えはここの publishApp と AdminApis.js の 2 関数 (republishMyBoard /
@@ -932,56 +932,6 @@ function searchFormsByDrive_(spreadsheetId, sheetName) {
   } catch (error) {
     logError_('searchFormsByDrive', error);
     throw error;
-  }
-}
-
-/**
- * スプレッドシートへのアクセス権限を検証（同一ドメイン共有設定で通常権限アクセス）。
- * @param {string} spreadsheetId
- * @param {boolean} [autoAddEditor=true] - true 時、必要なら共有デフォルトを自動付与する
- */
-function validateAccess_(spreadsheetId, autoAddEditor = true) {
-  try {
-    const dataAccess = openSpreadsheet(spreadsheetId, { context: 'systemController' });
-    if (!dataAccess || !dataAccess.spreadsheet) {
-      // null を分割代入すると "Cannot destructure property" がそのまま利用者に見える。
-      return createErrorResponse('スプレッドシートにアクセスできません。共有設定と ID を確認してください', null, { error: 'SPREADSHEET_ACCESS_DENIED' });
-    }
-    const { spreadsheet } = dataAccess;
-
-    const sheets = spreadsheet.getSheets();
-
-    let spreadsheetName;
-    try {
-      spreadsheetName = spreadsheet.getName();
-    } catch (error) {
-      spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
-    }
-
-    const result = {
-      success: true,
-      message: 'アクセス権限が確認されました',
-      spreadsheetName,
-      sheets: sheets.map(sheet => {
-        const { lastRow, lastCol } = getSheetInfo(sheet);
-        return {
-          name: sheet.getName(),
-          rowCount: lastRow,
-          columnCount: lastCol
-        };
-      }),
-      owner: 'Domain Shared Access',
-      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
-    };
-
-    return result;
-  } catch (error) {
-    logError_('AdminController.validateAccess', error);
-    return {
-      success: false,
-      message: error.message,
-      sheets: []
-    };
   }
 }
 

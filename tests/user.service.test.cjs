@@ -45,10 +45,8 @@ function loadUserServiceContext(overrides = {}) {
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: overrides.getConfigOrDefault || (() => ({})),
     isAdministrator: overrides.isAdministrator || (() => false),
-    clearConfigCache_: overrides.clearConfigCache_ || (() => {}),
     createExceptionResponse: (error) => ({ success: false, message: error.message }),
     getWebAppUrl: overrides.getWebAppUrl || (() => 'https://script.google.com/macros/s/abc/exec'),
-    getUserCacheKeys_: overrides.getUserCacheKeys_ || ((userId) => [`user_kv_${userId}`]),
     ...overrides
   };
 

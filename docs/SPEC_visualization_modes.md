@@ -65,7 +65,7 @@
 
 - `config.displaySettings.boardMode` を新規追加。値は `'auto' | 'board' | 'numberline' | 'matrix'`。
 - 既定値: `'auto'`（`columnMapping.numericX/Y` の有無から自動判定。numericX/Y どちらも無ければ `'board'` に倒れるので既存挙動と完全互換）。
-- `'auto'` の解決ロジック (`src/DataApis.js` `buildSafePublishedDataResult`): numericX + numericY → `matrix` / numericX のみ → `numberline` / どちらも無し → `board`。
+- `'auto'` の解決ロジック (`src/DataApis.js` `buildSafePublishedDataResult_`): numericX + numericY → `matrix` / numericX のみ → `numberline` / どちらも無し → `board`。
 - 管理画面で教師が選択。プレビューは保存後の View ページで確認。
 
 ### F-2 数値列の選択（M1: 1 列、M2: 2 列）
@@ -319,7 +319,7 @@ item.numericY = Number.isFinite(numericY) ? numericY : null;
 
 ### 8.2 `src/DataApis.js`
 
-#### 変更箇所 1: `buildSafePublishedDataResult()` (src/DataApis.js)
+#### 変更箇所 1: `buildSafePublishedDataResult_()` (src/DataApis.js)
 
 **変更**: numericX/Y はそのまま wire に乗せる（個人情報ではない）。
 匿名性確保のため、`showNames=false` のときも emailHash を送る（個人を識別不能だが同一児童の追跡は可能）。
@@ -549,7 +549,7 @@ CSS で：
 
 1. config スキーマ拡張（`ConfigService.js` sanitize 追加）— 2h
 2. `processRawDataBatch()` に numericX 取込 — 2h
-3. `buildSafePublishedDataResult()` で emailHash + axisConfig 返却 — 3h
+3. `buildSafePublishedDataResult_()` で emailHash + axisConfig 返却 — 3h
 4. `renderBoard` dispatcher 化 — 2h
 5. `page.viz.js.html` で d3 ビーズワーム描画 — 6h
 6. ホバーツールチップ + 匿名コメント表示 — 3h
@@ -601,7 +601,7 @@ CSS で：
 - `tests/column.numericScale.test.cjs` — `detectNumericScaleColumns()` の検出精度
 - `tests/data.service.numeric.test.cjs` — `processRawDataBatch` が numericX/Y を含めるか
 - `tests/config.boardMode.test.cjs` — sanitize の allowlist
-- `tests/data.apis.axisConfig.test.cjs` — `buildSafePublishedDataResult` が emailHash を返すか
+- `tests/data.apis.axisConfig.test.cjs` — `buildSafePublishedDataResult_` が emailHash を返すか
 
 ### 13.2 統合確認（手動）
 

@@ -1267,7 +1267,7 @@ test('toggleLessonHighlight: 一覧が見ていたシート・行をボードと
 
   const res = h.context.toggleLessonHighlight('u1', lessonId, 3, 'phase1', 'b@example.com');
   assert.equal(res.success, true);
-  // 照合 (ボードの config / その行の児童) は executeBoardRowOperation が行ロックの中で行う
+  // 照合 (ボードの config / その行の児童) は executeBoardRowOperation_ が行ロックの中で行う
   assert.equal(calls.length, 1);
   assert.equal(calls[0][1], 3);
   assert.equal(calls[0][2].expectedSpreadsheetId, 'native_ss_1');
@@ -1731,24 +1731,6 @@ test('__maybeAutoArchiveLesson_: 授業モードは条件を満たしても arch
   assert.equal(h.context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId).state, 'active');
 });
 
-test('dailyLessonArchiveSweep: 授業モードの授業は回答シートを読まずに skip する', () => {
-  const h = loadContext();
-  const lessonId = startNativeLesson(h);
-  seedThinkPhase(h, lessonId);
-  let boardReads = 0;
-  h.context.getPublishedSheetData = () => { boardReads++; return { success: true, data: [] }; };
-  h.context.getAllUsers_ = () => [{ userId: 'u1', userEmail: 'teacher@example.com' }];
-  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId, currentLessonStartedAt: dayAgo, isPublished: true });
-  h.setEmail('');   // 時刻のトリガーから (呼び出し元のメールは無い)
-  const summary = h.context.dailyLessonArchiveSweep();
-  assert.equal(summary.archived, 0);
-  assert.equal(summary.skipped, 1);
-  assert.equal(boardReads, 0, '回答シートを読まない');
-  h.setEmail('teacher@example.com');
-  assert.equal(h.context.listLessons('u1').data.lessons.find(l => l.lessonId === lessonId).state, 'active');
-});
-
 test('__isManualEndLesson_: lesson 行が読めないときは終了させない側に倒す', () => {
   const h = loadContext();
   assert.equal(h.context.__isManualEndLesson_('missing'), true);
@@ -2107,14 +2089,6 @@ test('フォームの授業のフェーズ: 作ったフォームの割り当て
   assert.equal(h.context.__buildPhaseConfigPatch_(withMapping, lessonJson, 'l1').columnMapping.numericX, 4);
   assert.equal('columnMapping' in h.context.__buildPhaseConfigPatch_(legacy, lessonJson, 'l1'), false,
     '空の組を渡すと保存の検証で落ちる (授業を始められない)');
-});
-
-test('dailyLessonArchiveSweep: 先生以外が画面から直接呼んでも何もしない', () => {
-  const h = loadContext({ currentEmail: 'child@example.com' });
-  let scanned = 0;
-  h.context.getAllUsers_ = () => { scanned++; return []; };
-  h.context.dailyLessonArchiveSweep();
-  assert.equal(scanned, 0);
 });
 
 test('__boardPatchForPhase_: フォームのフェーズは列の割り当てをそのときの回答シートから決め直す', () => {

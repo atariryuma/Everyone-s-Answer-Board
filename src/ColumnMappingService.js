@@ -15,7 +15,6 @@
  * Entry points:
  *   inferColumnRoles(headers, sampleData, options)        ← 統合分析 (内部 + 直接呼び)
  *   performIntegratedColumnDiagnostics(headers, options)  ← getColumnAnalysis 用
- *   detectNumericScaleColumns(headers, sampleData)        ← 線形尺度のみ (互換)
  *   resolveColumnIndex(headers, fieldType, mapping)       ← 行処理 hot path (DataService)
  *   filterSystemColumns(headers)                          ← resolveColumnIndex 内部 + テスト
  */
@@ -423,7 +422,7 @@ function inferColumnRoles(headers, sampleData = [], options = {}) {
 }
 
 // =====================================================================
-// 線形尺度検出 (公開 + 内部共用)
+// 線形尺度検出 (inferColumnRoles の内部)
 // =====================================================================
 
 function __collectNumericScaleCandidates(columns) {
@@ -451,21 +450,6 @@ function __collectNumericScaleCandidates(columns) {
   }
   candidates.sort((a, b) => b.confidence - a.confidence);
   return candidates;
-}
-
-function detectNumericScaleColumns(headers, sampleData) {
-  if (!Array.isArray(headers) || !Array.isArray(sampleData)) return [];
-  const columns = headers.map((header, index) => {
-    const isSystem = __isSystemHeader(header);
-    const values = [];
-    if (!isSystem) {
-      for (const row of sampleData) {
-        if (Array.isArray(row)) values.push(row[index]);
-      }
-    }
-    return { index, header, isSystem, stats: __analyzeColumnData(values) };
-  });
-  return __collectNumericScaleCandidates(columns);
 }
 
 // =====================================================================

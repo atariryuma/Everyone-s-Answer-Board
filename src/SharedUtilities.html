@@ -325,11 +325,6 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     }
-
-    isValidEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email);
-    }
   }
 
 

@@ -4762,9 +4762,14 @@
       const errBox = document.getElementById('lesson-start-error');
       if (btn) { if (!btn.dataset.label) btn.dataset.label = btn.textContent; btn.disabled = true; btn.textContent = '⏳ 作成中...'; }
       if (errBox) { errBox.hidden = true; errBox.innerHTML = ''; }
-      gasRun('lesson.start', { userId, lessonId: currentLessonId }).then((res) => {
+      const lessonId = currentLessonId;
+      // 書きかけの編集 (自動保存は少し待ってから送る) を送り終えてから始める。
+      //   Why: 開始は授業を読み直して丸ごと書き戻すので、送り終える前に押すと直前の編集
+      //   (問い・クラス・軸) が古い値に戻り、フォームも古い値で作られていた。
+      flushLessonSaves();
+      saveQueue.then(() => gasRun('lesson.start', { userId, lessonId })).then((res) => {
         if (res && res.success) {
-          openLessonRunner(currentLessonId, res.data.lesson);
+          openLessonRunner(lessonId, res.data.lesson);
           // 一覧を読み直してボード設定タブをロックする (boardTabLockedBy は一覧からしか更新されない)。
           //   Why: 開始直後にブラウザの「戻る」で管理パネルへ戻ると、ロックが無いまま自動保存や公開が
           //   走り、授業が書いた設定 (データソース / 列 / 公開状態) を上書きしていた。

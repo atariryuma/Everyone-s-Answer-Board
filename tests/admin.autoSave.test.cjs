@@ -265,9 +265,16 @@ test('AdminPanel: publishApp は進行中の saveDraft (__saveDraftDone) を待�
 
 test('AdminPanel: lesson.start 成功後と popstate で loadLessonList を呼び、ボード設定タブのロックを合わせる', () => {
   const startBody = ADMIN_JS.slice(ADMIN_JS.indexOf("gasRun('lesson.start'"), ADMIN_JS.indexOf('// 失敗: backend は resumable'));
-  assert.match(startBody, /openLessonRunner\(currentLessonId, res\.data\.lesson\);\s*[\s\S]*?loadLessonList\(\);/, 'start 成功で一覧を読み直す');
+  assert.match(startBody, /openLessonRunner\(lessonId, res\.data\.lesson\);\s*[\s\S]*?loadLessonList\(\);/, 'start 成功で一覧を読み直す');
   const popBody = ADMIN_JS.slice(ADMIN_JS.indexOf("window.addEventListener('popstate'"), ADMIN_JS.indexOf('// ---------- Initial bootstrap'));
   assert.match(popBody, /loadLessonList\(\);/, 'popstate で一覧を読み直す');
+});
+
+test('AdminPanel: 開始は書きかけの編集を送り終えてから lesson.start を呼ぶ', () => {
+  // Why: 開始は授業を読み直して丸ごと書き戻す。自動保存 (少し待ってから送る) より先に走ると、
+  //   直前の編集 (問い・クラス・軸) が古い値に戻り、フォームも古い値で作られていた。
+  const fnBody = ADMIN_JS.slice(ADMIN_JS.indexOf('function lessonStartNow()'), ADMIN_JS.indexOf('window.lessonStartNow = lessonStartNow;'));
+  assert.match(fnBody, /flushLessonSaves\(\);\s*saveQueue\.then\(\(\) => gasRun\('lesson\.start'/, '送り終えるのを待ってから開始する');
 });
 
 test('AdminPanel: 「再投稿を許可」の Form 同期は UNIFIED_CONFIG.formId (存在しない) を見ない', () => {

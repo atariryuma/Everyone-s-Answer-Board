@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -52,10 +52,7 @@ function __nativeColumnMapping_(formTemplate) {
   return m;
 }
 
-const LESSON_NATIVE_COL_TIMESTAMP = 1;   // 1-based (getRange 用)
-const LESSON_NATIVE_COL_EMAIL = 2;
-const LESSON_NATIVE_COL_X = 5;
-const LESSON_NATIVE_COL_INSIGHT = 8;
+const LESSON_NATIVE_COL_EMAIL = 2;   // 1-based (getRange 用)
 
 // 画面の権能。教師のフェーズ送りが、全児童の画面で「何ができるか」を決める。
 //   Why 権能を phase に持たせるか: 「アプリが議論を代替しない」「先入観より先に自分の考えを持つ」
@@ -70,11 +67,9 @@ const LESSON_SCREEN_ROLES = Object.freeze({
 const LESSON_INPUT_ROLES = [LESSON_SCREEN_ROLES.INPUT, LESSON_SCREEN_ROLES.REINPUT];
 // 理由 / 加わったこと の文字数上限 (Sheets セル上限ではなく、児童が書く現実的な長さ)。
 const LESSON_ANSWER_TEXT_MAX = 500;
-// Auto-archive thresholds (unpublishBoard hook + daily sweep)。
+// Auto-archive thresholds (unpublishBoard hook)。
 const LESSON_AUTO_ARCHIVE_MIN_MS = 5 * 60 * 1000;        // < 5 分 = テスト操作とみなして skip
 const LESSON_AUTO_ARCHIVE_MIN_RESPONSES = 1;             // 0 回答 = 授業として成立してない
-const LESSON_DAILY_STALE_HOURS = 4;                      // 最終回答から 4h 経過 = もう授業終了とみなす
-const LESSON_DAILY_TRIGGER_HOUR = 23;                    // 23:00 JST に sweep
 
 // ----- 内部 CRUD: lessons シートに対する row-level 操作 -----
 
@@ -1150,18 +1145,12 @@ function __notOnBoardResponse_(boardLessonId) {
 }
 
 // ボードを、この授業のいまのフェーズにつなぐ (= そのフェーズの config を再適用する)。
-//   切り替えたときは掲示板データの cache も捨てる。cache の key はボード単位でシートを含まないので、
-//   残すと最大 10 秒、前の授業の回答が返る (直後に記録を取ると、それが記録に入る)。
-function __attachBoardToLessonPhase_(userId, lessonId, lessonJson, phaseIdx, switched) {
+//   掲示板データの cache は、読む先 (シート / 列) が変わった保存で saveUserConfig_ が版を上げて捨てる。
+function __attachBoardToLessonPhase_(userId, lessonId, lessonJson, phaseIdx) {
   const phase = (lessonJson.phases || [])[phaseIdx];
   __setFormAcceptingResponses_(phase, true);
   const result = applyConfigPatch_(userId, __boardPatchForPhase_(phase, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
   if (!result.success) return result;
-  if (switched && typeof bumpBoardDataVersion_ === 'function') {
-    try { bumpBoardDataVersion_(userId); } catch (e) {
-      console.warn('[lesson/board] 切替後の cache 破棄に失敗 (最大 10 秒、前の授業の回答が見える):', e && e.message);
-    }
-  }
   __invalidateViewerLessonPhase_(userId);
   return result;
 }
@@ -1420,7 +1409,7 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     //   教師が別の目的で名前表示を ON にしたときに、この授業の匿名性が
     //   静かに失われる。授業モードの側で既定を持つ。
     //   教師は isOwnBoard なのでこの設定に関わらず名前を見られる
-    //   (buildSafePublishedDataResult の includeIdentity)。
+    //   (buildSafePublishedDataResult_ の includeIdentity)。
     //   phase 側で明示的に true を指定した場合だけ従う。
     if (baseDisplay.showNames !== true) {
       displaySettings.showNames = false;
@@ -1797,7 +1786,7 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
     // つながっていなければ、記録 (snapshot) を取る前にボードをこの授業へつなぎ直す。
     //   記録はボードが映しているデータを写すので、先に取ると別の授業の回答が入る。
     if (isReapply || !onBoard) {
-      const reapply = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, fromIdx, !onBoard);
+      const reapply = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, fromIdx);
       if (!reapply.success) {
         return createErrorResponse(`フェーズ設定の再適用に失敗しました: ${reapply.message || 'unknown'}`);
       }
@@ -1963,7 +1952,7 @@ function endLesson(userId, lessonId, options) {
     const boardLessonId = __boardLessonId_(userId);
     if (boardLessonId !== lessonId) {
       if (!(options && options.switchBoard)) return __notOnBoardResponse_(boardLessonId);
-      const attached = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, currentIdx, true);
+      const attached = __attachBoardToLessonPhase_(userId, lessonId, lessonJson, currentIdx);
       if (!attached.success) {
         return createErrorResponse(`ボードの切替に失敗しました: ${attached.message || 'unknown'}`);
       }
@@ -2112,11 +2101,9 @@ function __maybeAutoArchiveLesson_(targetUser, currentConfig) {
  * 自動アーカイブの対象外か (= 教師が「授業終了」を押すまで終わらない授業か)。
  *
  * Why 授業モードを対象外にするか: 実態は 1 つの授業を複数クラス × 複数日で使う
- *   (2026-09 は 4 クラス 3 週間)。「最終回答から 4 時間で終了」「ボードを非公開にしたら終了」の
- *   safety net は Form 経由の 1 コマ授業を想定したもので、授業モードに当たると翌朝には授業が
- *   勝手に終わっていて、児童の ● → ★ の続きが取れなくなる。
- *   本番ではこれまで trigger が未設置だったため踏んでいないが、trigger を設置した瞬間に
- *   設置されるので、判定として明示する。
+ *   (2026-09 は 4 クラス 3 週間)。「ボードを非公開にしたら終了」の safety net は Form 経由の
+ *   1 コマ授業を想定したもので、授業モードに当たると授業が勝手に終わっていて、児童の ● → ★ の
+ *   続きが取れなくなる。
  *   lesson 行が読めない (429 等) ときも対象外に倒す: 読めないときに終了させる理由はない。
  */
 function __isManualEndLesson_(lessonId) {
@@ -2127,110 +2114,6 @@ function __isManualEndLesson_(lessonId) {
   } catch (error) {
     logError_('__isManualEndLesson_', error);
     return true;
-  }
-}
-
-/**
- * 1 日 1 回の cron entry。公開し忘れ lesson を回収する。
- *
- * Why: unpublish し忘れて翌日になったケースの safety net。
- *   currentLessonStartedAt が立っているユーザーを enumerate し、
- *   最終回答から LESSON_DAILY_STALE_HOURS 以上経過していれば auto-archive。
- *   isPublished は touch しない (公開ライフサイクル 3 関数のみが扱う規約)。
- *   marker のクリアは applyConfigPatch_ 経由で行う。
- */
-function dailyLessonArchiveSweep() {
-  // 時刻のトリガー (先生が作ったもの) からだけ走らせる。名前が _ で終わらないので画面からも呼べるが、
-  //   先生以外が呼ぶと授業中にアーカイブの取り込みと印の消去を何度でも起こせてしまう。
-  const caller = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
-  if (caller && !isAdministrator(caller)) {
-    console.warn('dailyLessonArchiveSweep: 先生以外からの呼び出しを断りました');
-    return;
-  }
-  const summary = { scanned: 0, archived: 0, skipped: 0, errors: 0 };
-  try {
-    if (typeof getAllUsers_ !== 'function') return summary;
-    const users = getAllUsers_({ activeOnly: false }, { systemLookup: true });
-    const staleThresholdMs = LESSON_DAILY_STALE_HOURS * 60 * 60 * 1000;
-    const now = Date.now();
-
-    for (const user of (users || [])) {
-      summary.scanned++;
-      let cfg;
-      try {
-        cfg = (typeof getConfigOrDefault === 'function') ? getConfigOrDefault(user.userId, user) : null;
-      } catch (cfgErr) {
-        summary.errors++;
-        logError_('dailyLessonArchiveSweep:getConfig', cfgErr);
-        continue;
-      }
-      if (!cfg || !cfg.currentLessonStartedAt || !cfg.activeLessonId) {
-        summary.skipped++;
-        continue;
-      }
-      // 授業モードは教師が「授業終了」を押すまで終わらない (回答シートを読む前に判定する)。
-      if (__isManualEndLesson_(cfg.activeLessonId)) {
-        summary.skipped++;
-        continue;
-      }
-
-      let mostRecent = new Date(cfg.currentLessonStartedAt).getTime();
-      try {
-        const data = getPublishedSheetData(null, 'newest', true, user.userId);
-        const rows = (data && Array.isArray(data.data)) ? data.data : [];
-        for (const r of rows) {
-          const ts = r && r.timestamp ? new Date(r.timestamp).getTime() : 0;
-          if (ts > mostRecent) mostRecent = ts;
-        }
-      } catch (fetchErr) {
-        logError_('dailyLessonArchiveSweep:fetchRows', fetchErr);
-      }
-
-      if (now - mostRecent < staleThresholdMs) {
-        summary.skipped++;
-        continue;
-      }
-
-      const archiveResult = __maybeAutoArchiveLesson_(user, cfg);
-      if (archiveResult.archived) {
-        summary.archived++;
-        try {
-          applyConfigPatch_(user.userId, {
-            activeLessonId: null,
-            currentLessonStartedAt: null
-          }, { publish: false });
-        } catch (patchErr) {
-          summary.errors++;
-          logError_('dailyLessonArchiveSweep:clearMarker', patchErr);
-        }
-      } else {
-        summary.skipped++;
-      }
-    }
-  } catch (error) {
-    logError_('dailyLessonArchiveSweep', error);
-    summary.errors++;
-  }
-  return summary;
-}
-
-/**
- * lesson 関連の time-based trigger を冪等にインストール。
- *   今は呼び出し元が無い (呼んでいた setupApp は初期設定画面ごと廃止した)。既に同名トリガーが居れば何もしない。
- */
-function installLessonTriggers_() {
-  try {
-    if (typeof ScriptApp === 'undefined' || !ScriptApp.getProjectTriggers) return;
-    const existing = ScriptApp.getProjectTriggers();
-    const already = existing.some(t => t.getHandlerFunction && t.getHandlerFunction() === 'dailyLessonArchiveSweep');
-    if (already) return;
-    ScriptApp.newTrigger('dailyLessonArchiveSweep')
-      .timeBased()
-      .everyDays(1)
-      .atHour(LESSON_DAILY_TRIGGER_HOUR)
-      .create();
-  } catch (error) {
-    logError_('installLessonTriggers', error);
   }
 }
 
@@ -3018,7 +2901,7 @@ function __liveAnswersSig_(text) {
  *
  * 書き込みはボードと同じ toggleHighlight (同じ HIGHLIGHT 列・同じ行ロック・同じ board
  * cache の無効化) に委ねる。ここで決めるのは「一覧が見ていたのはどのシートのどの行か」だけで、
- * 照合そのものは executeBoardRowOperation が自分の config 読みと行ロックの中で行う。
+ * 照合そのものは executeBoardRowOperation_ が自分の config 読みと行ロックの中で行う。
  * Why: toggleHighlight はボードの config が指すシートの行番号に書く。フェーズ切替の直後・
  *   config の再適用失敗・行の削除で番号がずれた状態で押すと、別の児童の行に付く。
  *

@@ -346,7 +346,7 @@ test('getPublishedSheetData: classFilter="すべて" is converted to undefined',
 });
 
 // =====================================================================
-// Option B: getPublishedSheetDataForProfile (past-phase read-only endpoint)
+// Option B: getPublishedSheetDataForProfile_ (past-phase read-only endpoint)
 // =====================================================================
 
 function ctxWithProfileHistory(profileHistory, profiles, overrides = {}) {
@@ -951,7 +951,7 @@ test('getColumnAnalysis: returns headers and mapping on success', () => {
 });
 
 // =====================================================================
-// buildSafePublishedDataResult — privacy: identity fields must not leak
+// buildSafePublishedDataResult_ — privacy: identity fields must not leak
 // =====================================================================
 
 function buildRow(overrides = {}) {
@@ -970,9 +970,9 @@ function buildRow(overrides = {}) {
   };
 }
 
-test('buildSafePublishedDataResult: strips email/name for student viewer when showNames=false', () => {
+test('buildSafePublishedDataResult_: strips email/name for student viewer when showNames=false', () => {
   const ctx = loadDataApisContext();
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow()], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: false } },
     { isAdmin: false, isOwnBoard: false }
@@ -985,9 +985,9 @@ test('buildSafePublishedDataResult: strips email/name for student viewer when sh
   assert.equal(out.data[0].reason, 'because');
 });
 
-test('buildSafePublishedDataResult: keeps email/name for admin viewer', () => {
+test('buildSafePublishedDataResult_: keeps email/name for admin viewer', () => {
   const ctx = loadDataApisContext();
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow()], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: false } },
     { isAdmin: true, isOwnBoard: false }
@@ -996,9 +996,9 @@ test('buildSafePublishedDataResult: keeps email/name for admin viewer', () => {
   assert.equal(out.data[0].name, 'Student A');
 });
 
-test('buildSafePublishedDataResult: keeps email/name for board owner', () => {
+test('buildSafePublishedDataResult_: keeps email/name for board owner', () => {
   const ctx = loadDataApisContext();
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow()], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: false } },
     { isAdmin: false, isOwnBoard: true }
@@ -1007,9 +1007,9 @@ test('buildSafePublishedDataResult: keeps email/name for board owner', () => {
   assert.equal(out.data[0].name, 'Student A');
 });
 
-test('buildSafePublishedDataResult: keeps email/name when showNames=true (named mode)', () => {
+test('buildSafePublishedDataResult_: keeps email/name when showNames=true (named mode)', () => {
   const ctx = loadDataApisContext();
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow()], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: true } },
     { isAdmin: false, isOwnBoard: false }
@@ -1018,9 +1018,9 @@ test('buildSafePublishedDataResult: keeps email/name when showNames=true (named 
   assert.equal(out.data[0].email, 'student@example.com');
 });
 
-test('buildSafePublishedDataResult: default viewerContext (omitted) treated as non-privileged', () => {
+test('buildSafePublishedDataResult_: default viewerContext (omitted) treated as non-privileged', () => {
   const ctx = loadDataApisContext();
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow()], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: false } }
   );
@@ -1028,13 +1028,13 @@ test('buildSafePublishedDataResult: default viewerContext (omitted) treated as n
   assert.equal(out.data[0].name, undefined);
 });
 
-test('buildSafePublishedDataResult: converts Date timestamps to ISO strings', () => {
+test('buildSafePublishedDataResult_: converts Date timestamps to ISO strings', () => {
   const ctx = loadDataApisContext();
   // Why vm.runInContext: Date constructors differ across vm contexts, so
   //   `v instanceof Date` inside the source (which uses the context's Date)
   //   is false for a Date built out here. Build the Date inside the context.
   const ts = vm.runInContext("new Date('2026-04-22T10:00:00Z')", ctx);
-  const out = ctx.buildSafePublishedDataResult(
+  const out = ctx.buildSafePublishedDataResult_(
     { data: [buildRow({ timestamp: ts })], header: 'H', sheetName: 'S' },
     { displaySettings: { showNames: true } },
     { isAdmin: true }

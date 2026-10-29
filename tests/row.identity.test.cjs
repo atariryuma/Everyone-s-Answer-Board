@@ -1,5 +1,5 @@
 /**
- * 行番号のずれ防御 (ReactionService.resolveRowIdentity_ / executeBoardRowOperation の expect) と
+ * 行番号のずれ防御 (ReactionService.resolveRowIdentity_ / executeBoardRowOperation_ の expect) と
  * users 一覧 cache の圧縮 (DatabaseCore.getAllUsers_ の pack / unpack) を固定する。
  *
  * Why: 教師が回答を削除すると行番号が繰り上がり、次の poll までの数秒間、児童の画面の行番号は
@@ -105,7 +105,7 @@ test('resolveRowIdentity_: 旧形式 { column, value } はそのまま文字列�
   assert.equal(id.matches(' a@x.com '), true);
 });
 
-test('executeBoardRowOperation: 行がずれていたら書かずに ROW_CHANGED を返す', () => {
+test('executeBoardRowOperation_: 行がずれていたら書かずに ROW_CHANGED を返す', () => {
   const writes = [];
   const data = [['timestamp', 'email', 'answer', 'UNDERSTAND', 'LIKE', 'CURIOUS'], ['t1', 'a@example.com', 'A', '', '', ''], ['t2', 'b@example.com', 'B', '', '', '']];
   const sheet = {
@@ -131,6 +131,30 @@ test('executeBoardRowOperation: 行がずれていたら書かずに ROW_CHANGED
   assert.equal(res2.success, false);
   assert.equal(res2.error, 'ROW_CHANGED');
   assert.equal(writes.length, 1, 'ずれていた 2 回目は何も書かない');
+});
+
+test('addReaction: 画面から来た { column, value } は照合に使わない (隠れた列の中身を当てさせない)', () => {
+  const data = [['timestamp', 'email', 'answer', 'UNDERSTAND', 'LIKE', 'CURIOUS'], ['t1', 'a@example.com', 'A', '', '', '']];
+  const sheet = {
+    getName: () => 'S', getParent: () => ({ getId: () => 'ss' }),
+    getLastColumn: () => 6,
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      getValues: () => [data[row - 1].slice(col - 1, col - 1 + numCols)],
+      setValue: () => {}, setValues: () => {}
+    })
+  };
+  const ctx = loadReaction({
+    findPublishedBoardOwner_: () => ({ userId: 'owner', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'S', isPublished: true, displaySettings: { reactionMode: 'count' } }),
+    openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
+    getSheetHeaders: () => ({ headers: data[0] })
+  });
+  // メール列 (2 列目) に別の値を当てても ROW_CHANGED にならない = 当たり外れが分からない
+  const guess = ctx.addReaction('owner', 2, 'LIKE', { rowIdentity: { column: 2, value: 'b@example.com' } });
+  assert.notEqual(guess.error, 'ROW_CHANGED', JSON.stringify(guess));
+  assert.equal(ctx.__clientRowExpect_({ rowIdentity: { column: 2, value: 'x' } }).rowIdentity.column, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.__clientRowExpect_({ rowIdentity: { field: 'email', hash: 'h' } }))),
+    { rowIdentity: { field: 'email', hash: 'h' } }, '画面が送る形はそのまま');
 });
 
 // =====================================================================

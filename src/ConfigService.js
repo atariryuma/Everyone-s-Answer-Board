@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById_, updateUser_, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty_, logError_, VALID_REACTION_MODES */
+/* global invalidateAccessDecisionCache_, bumpBoardDataVersion_, getCurrentEmail, findUserById_, updateUser_, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty_, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -531,28 +531,6 @@ function calculateCompletionScore(config) {
   return score;
 }
 
-function getUserCacheKeys_(userId) {
-  return [
-    `config_${userId}`,
-    `user_${userId}`,
-    `board_data_${userId}`,
-    `admin_panel_${userId}`,
-    `question_text_${userId}`
-  ];
-}
-
-/**
- * 設定キャッシュクリア
- * @param {string} userId - ユーザーID
- */
-function clearConfigCache_(userId) {
-  try {
-    CacheService.getScriptCache().removeAll(getUserCacheKeys_(userId));
-  } catch (error) {
-    console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
-  }
-}
-
 /**
  * 配置が使える状態か (管理者のメールと DB にするスプレッドシートがそろっているか)。
  *
@@ -875,7 +853,7 @@ function saveUserConfig_(userId, config, options = {}) {
       };
     }
 
-    clearConfigCache_(userId);
+    // users の cache は updateUser_ が版 (user_cache_ver) を新しくするので、ここで消すものは無い。
 
     // アクセス判定 (checkSpreadsheetAccess_) の 60 秒 cache は版を key に含むので、版を上げて古くする。
     //   公開状態以外の変更でも SS が差し替わることがある (profile 切替) ので、新旧両方の SS について上げる。
@@ -887,6 +865,15 @@ function saveUserConfig_(userId, config, options = {}) {
         try { invalidateAccessDecisionCache_(id); }
         catch (cacheRemoveError) { console.warn('saveUserConfig: Failed to clear access decision cache:', cacheRemoveError.message); }
       });
+    }
+
+    // ボードの読み取り cache (key はボードの版。シートを含まない) は、読む先 (シート / 列の割り当て)
+    //   が変わったら版を上げて古くする。Why: フェーズ切替やフォームの切替で別のシートを指しても、
+    //   最大 12 秒は前のシートの行が返り、それを読み込んだ児童の画面は次の投稿まで前の回答のままだった。
+    const sourceOf = (c) => JSON.stringify([c && c.spreadsheetId, c && c.sheetName, (c && c.columnMapping) || null]);
+    if (typeof bumpBoardDataVersion_ === 'function' && (!persistedConfig || sourceOf(persistedConfig) !== sourceOf(cleanedConfig))) {
+      try { bumpBoardDataVersion_(userId); }
+      catch (bumpError) { console.warn('saveUserConfig: ボードの版を上げられませんでした (最大 12 秒、前のシートの行が見える):', bumpError.message); }
     }
 
     return {

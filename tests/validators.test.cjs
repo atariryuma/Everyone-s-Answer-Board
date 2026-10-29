@@ -151,69 +151,6 @@ test('validateSpreadsheetId: rejects empty or non-string', () => {
 });
 
 // =====================================================================
-// validateText
-// =====================================================================
-
-test('validateText: escapes HTML by default', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('<script>alert(1)</script>');
-  assert.equal(r.isValid, true);
-  assert.ok(!r.sanitized.includes('<script>'));
-  // Since the dangerous-pattern scrub replaces first, then escape runs,
-  // final output should not contain executable markup
-  assert.ok(!r.sanitized.toLowerCase().includes('<script'));
-});
-
-test('validateText: detects javascript: and flags security risk', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('Click me: javascript:alert(1)');
-  assert.equal(r.metadata.hadSecurityRisk, true);
-  assert.ok(!r.sanitized.includes('javascript:'));
-});
-
-test('validateText: enforces maxLength', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('x'.repeat(9000));
-  assert.equal(r.isValid, false);
-  assert.ok(r.errors.some((e) => e.includes('以下')));
-});
-
-test('validateText: enforces minLength', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('ab', { minLength: 5 });
-  assert.equal(r.isValid, false);
-  assert.ok(r.errors.some((e) => e.includes('以上')));
-});
-
-test('validateText: rejects non-string input with type metadata', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText(null);
-  assert.equal(r.isValid, false);
-  assert.equal(r.metadata.inputType, 'null');
-});
-
-test('validateText: collapses multiple whitespace', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('hello   world   ');
-  assert.equal(r.sanitized, 'hello world');
-});
-
-test('validateText: strips newlines when allowNewlines=false', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateText('line1\nline2\r\nline3', { allowNewlines: false });
-  assert.ok(!r.sanitized.includes('\n'));
-  assert.ok(!r.sanitized.includes('\r'));
-});
-
-test('validateText: normalizes CRLF to LF when allowNewlines=true', () => {
-  const ctx = loadValidatorsContext();
-  // Run with allowHtml:true so newlines survive (default would replace whitespace)
-  const r = ctx.validateText('a\r\nb\rc', { allowNewlines: true, allowHtml: true });
-  // \s+ collapse still runs, but that's OK — we just check no CR remains
-  assert.ok(!r.sanitized.includes('\r'));
-});
-
-// =====================================================================
 // validateMapping
 // =====================================================================
 

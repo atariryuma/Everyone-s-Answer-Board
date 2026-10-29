@@ -22,7 +22,6 @@ function loadUserServiceContext(overrides = {}) {
     getUserConfig: () => ({ success: true, config: {} }),
     isAdministrator: () => false,
     CACHE_DURATION: { LONG: 600, USER_INDIVIDUAL: 300 },
-    clearConfigCache_: () => {},
     SYSTEM_LIMITS: { MAX_USERS: 100 },
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     ScriptApp: { getIdentityToken: () => null },

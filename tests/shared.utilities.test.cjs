@@ -185,27 +185,6 @@ test('Cache: setting existing key does not trigger eviction', () => {
 });
 
 // =====================================================================
-// SecurityUtilities.isValidEmail
-// =====================================================================
-
-test('SecurityUtilities.isValidEmail: accepts standard addresses', () => {
-  const { SecurityUtilities } = loadSharedUtilities();
-  const s = new SecurityUtilities();
-  assert.equal(s.isValidEmail('user@example.com'), true);
-  assert.equal(s.isValidEmail('first.last+tag@sub.example.co.jp'), true);
-});
-
-test('SecurityUtilities.isValidEmail: rejects malformed addresses', () => {
-  const { SecurityUtilities } = loadSharedUtilities();
-  const s = new SecurityUtilities();
-  assert.equal(s.isValidEmail('no-at-sign'), false);
-  assert.equal(s.isValidEmail('@example.com'), false);
-  assert.equal(s.isValidEmail('user@'), false);
-  assert.equal(s.isValidEmail('user @example.com'), false);
-  assert.equal(s.isValidEmail(''), false);
-});
-
-// =====================================================================
 // ButtonBusyManager — 全ページのボタン共通の処理中 UX
 // =====================================================================
 

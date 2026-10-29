@@ -471,12 +471,12 @@ test('extractHighlight: returns false when column missing', () => {
 });
 
 // =====================================================================
-// canActOnTargetBoard
+// canActOnTargetBoard_
 // =====================================================================
 
-test('canActOnTargetBoard: admin always has permission', () => {
+test('canActOnTargetBoard_: admin always has permission', () => {
   const ctx = loadReactionContext({ isAdministrator: (email) => email === 'admin@example.com' });
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'admin@example.com',
     { userEmail: 'other@example.com' },
     { isPublished: false }
@@ -484,9 +484,9 @@ test('canActOnTargetBoard: admin always has permission', () => {
   assert.equal(ok, true);
 });
 
-test('canActOnTargetBoard: board owner has permission on unpublished', () => {
+test('canActOnTargetBoard_: board owner has permission on unpublished', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'owner@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: false }
@@ -494,9 +494,9 @@ test('canActOnTargetBoard: board owner has permission on unpublished', () => {
   assert.equal(ok, true);
 });
 
-test('canActOnTargetBoard: any user has permission on published (viewer op)', () => {
+test('canActOnTargetBoard_: any user has permission on published (viewer op)', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true }
@@ -504,9 +504,9 @@ test('canActOnTargetBoard: any user has permission on published (viewer op)', ()
   assert.equal(ok, true);
 });
 
-test('canActOnTargetBoard: non-owner blocked on unpublished', () => {
+test('canActOnTargetBoard_: non-owner blocked on unpublished', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: false }
@@ -514,9 +514,9 @@ test('canActOnTargetBoard: non-owner blocked on unpublished', () => {
   assert.equal(ok, false);
 });
 
-test('canActOnTargetBoard: requireEditor blocks viewer on published (editor op)', () => {
+test('canActOnTargetBoard_: requireEditor blocks viewer on published (editor op)', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true },
@@ -525,9 +525,9 @@ test('canActOnTargetBoard: requireEditor blocks viewer on published (editor op)'
   assert.equal(ok, false, 'Highlight/editor操作は公開ボードの閲覧者でも拒否されるべき');
 });
 
-test('canActOnTargetBoard: requireEditor allows owner', () => {
+test('canActOnTargetBoard_: requireEditor allows owner', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'owner@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true },
@@ -536,12 +536,12 @@ test('canActOnTargetBoard: requireEditor allows owner', () => {
   assert.equal(ok, true);
 });
 
-test('canActOnTargetBoard: collaborator (SS editor) allowed on requireEditor (v2855)', () => {
+test('canActOnTargetBoard_: collaborator (SS editor) allowed on requireEditor (v2855)', () => {
   // ボード SS の editor として共有された共同教師は highlight/unpublish 等の editor 操作を実行可能。
   const ctx = loadReactionContext({
     isBoardCollaborator_: (targetUser, email) => email === 'collab@example.com'
   });
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'collab@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true },
@@ -550,12 +550,12 @@ test('canActOnTargetBoard: collaborator (SS editor) allowed on requireEditor (v2
   assert.equal(ok, true);
 });
 
-test('canActOnTargetBoard: non-collaborator viewer still blocked on requireEditor', () => {
+test('canActOnTargetBoard_: non-collaborator viewer still blocked on requireEditor', () => {
   // SS editor として登録されていない viewer は requireEditor を pass しない。
   const ctx = loadReactionContext({
     isBoardCollaborator_: () => false
   });
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true },
@@ -564,13 +564,13 @@ test('canActOnTargetBoard: non-collaborator viewer still blocked on requireEdito
   assert.equal(ok, false);
 });
 
-test('canActOnTargetBoard: requireEditor allows admin via preloaded isAdmin (perf path)', () => {
+test('canActOnTargetBoard_: requireEditor allows admin via preloaded isAdmin (perf path)', () => {
   // isAdministrator を呼ばせない（preloaded を信用する）ことを検証
   let calls = 0;
   const ctx = loadReactionContext({
     isAdministrator: () => { calls += 1; return false; }
   });
-  const ok = ctx.canActOnTargetBoard(
+  const ok = ctx.canActOnTargetBoard_(
     'someone@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: false },
@@ -580,18 +580,18 @@ test('canActOnTargetBoard: requireEditor allows admin via preloaded isAdmin (per
   assert.equal(calls, 0, 'options.isAdmin=true の時に isAdministrator を再計算しないこと');
 });
 
-test('canActOnTargetBoard: null actor → false', () => {
+test('canActOnTargetBoard_: null actor → false', () => {
   const ctx = loadReactionContext();
   assert.equal(
-    ctx.canActOnTargetBoard(null, { userEmail: 'x' }, { isPublished: true }),
+    ctx.canActOnTargetBoard_(null, { userEmail: 'x' }, { isPublished: true }),
     false
   );
 });
 
-test('canActOnTargetBoard: null targetUser → false', () => {
+test('canActOnTargetBoard_: null targetUser → false', () => {
   const ctx = loadReactionContext();
   assert.equal(
-    ctx.canActOnTargetBoard('a@x.com', null, { isPublished: true }),
+    ctx.canActOnTargetBoard_('a@x.com', null, { isPublished: true }),
     false
   );
 });
@@ -954,7 +954,7 @@ test('toggleHighlight: short-circuits when cache lock already held', () => {
 });
 
 // =====================================================================
-// executeBoardRowOperation の expect (押した側が見ていた行の照合)
+// executeBoardRowOperation_ の expect (押した側が見ていた行の照合)
 //   Why: 授業中の回答一覧は「どのシートのどの行 (どの児童) か」を覚えて ☆ を押す。フェーズ切替・
 //   config 再適用失敗・削除による行の繰り上がりで番号がずれたら、書かずに ROW_CHANGED を返す。
 // =====================================================================
@@ -1002,7 +1002,7 @@ test('toggleHighlight: 同じ児童の置き直し (timestamp が変わっただ
   assert.equal(res.success, true, res.message);
 });
 
-test('executeBoardRowOperation: 回答の無い行 (A 列が空) には書かない (孤立セルを作らない)', () => {
+test('executeBoardRowOperation_: 回答の無い行 (A 列が空) には書かない (孤立セルを作らない)', () => {
   const { ctx, sheet } = buildHighlightContext();   // データは 2〜3 行目だけ
   const res = ctx.toggleHighlight('owner-1', 60);
   assert.equal(res.success, false);
@@ -1019,7 +1019,7 @@ test('addReaction: 回答の無い行には書かない', () => {
   assert.equal(sheet._writes.length, 0);
 });
 
-test('executeBoardRowOperation: A 列が読めなかった (429 で空配列) ときは空行と混同せず BUSY で断る', () => {
+test('executeBoardRowOperation_: A 列が読めなかった (429 で空配列) ときは空行と混同せず BUSY で断る', () => {
   const { ctx, sheet } = buildHighlightContext();
   const origGetRange = sheet.getRange;
   sheet.getRange = (row, col, numRows, numCols) => {

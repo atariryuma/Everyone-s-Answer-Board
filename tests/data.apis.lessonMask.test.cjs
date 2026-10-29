@@ -128,24 +128,24 @@ test('応答に lessonPhase を同梱する (授業中はフェーズ、授業�
   assert.equal(out.lessonPhase.phaseIndex, 0);
   const none = loadContext(null);
   assert.equal(none.__applyLessonHeader_({ success: true, header: 'h' }, 'u1').lessonPhase, null);
-  // buildSafePublishedDataResult は lessonPhase を落とさない
-  const built = ctx.buildSafePublishedDataResult(out, { displaySettings: { showNames: false } }, { isAdmin: false, isOwnBoard: false });
+  // buildSafePublishedDataResult_ は lessonPhase を落とさない
+  const built = ctx.buildSafePublishedDataResult_(out, { displaySettings: { showNames: false } }, { isAdmin: false, isOwnBoard: false });
   assert.equal(built.lessonPhase.phaseIndex, 0);
 });
 
-test('buildSafePublishedDataResult: 閲覧者自身の仮名 (viewerEmailHash) を載せ、他者の生メアドは載せない', () => {
+test('buildSafePublishedDataResult_: 閲覧者自身の仮名 (viewerEmailHash) を載せ、他者の生メアドは載せない', () => {
   const ctx = loadContext(null);
   ctx.emailToShortHash_ = (e) => 'h_' + String(e).toLowerCase();
   const result = { success: true, data: [
     { rowIndex: 2, email: 'me@example.com', answer: 'a' },
     { rowIndex: 3, email: 'other@example.com', answer: 'b' }
   ] };
-  const out = ctx.buildSafePublishedDataResult(result, { displaySettings: { showNames: false } }, { email: 'ME@example.com' });
+  const out = ctx.buildSafePublishedDataResult_(result, { displaySettings: { showNames: false } }, { email: 'ME@example.com' });
   assert.equal(out.viewerEmailHash, 'h_me@example.com');
   assert.equal(out.data[0].emailHash, 'h_me@example.com');
   assert.equal(out.data[0].email, undefined);
   assert.equal(out.data[1].email, undefined);
-  const noEmail = ctx.buildSafePublishedDataResult(result, { displaySettings: {} }, {});
+  const noEmail = ctx.buildSafePublishedDataResult_(result, { displaySettings: {} }, {});
   assert.equal(noEmail.viewerEmailHash, null);
 });
 

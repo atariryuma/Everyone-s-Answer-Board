@@ -74,6 +74,9 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
 
 - viewer の `getPublishedSheetData` 結果を 12s ScriptCache
 - reaction/highlight write 時に `bumpBoardDataVersion_` で即時 stale
+- key はボードの版でシートを含まないので、読む先 (シート / 列の割り当て) が変わる config 保存でも
+  `saveUserConfig_` が版を上げる (フェーズ切替の直後に前のシートの行を返さない)
+- 児童の更新の確かめ (`getNotificationUpdate`) は読み込みと同じ学級・並び順を送り、同じ key を使う
 - 同時に cache が切れても `withStampedeGuard_` で 1 人だけが読む (他は直前の値か BUSY)
 - **cache に書く形は圧縮表現** (`packBoardDataForCache_` / `unpackBoardDataFromCache_`): 行から
   派生 3 項目 (`opinion` = answer / `isEmpty` = false / `formattedTimestamp` = timestamp から復元) を

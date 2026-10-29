@@ -1018,6 +1018,9 @@
     // 自動再送の回数。冪等でない (反転・削除) 呼び出しは 0。
     __retryBudgetFor(funcName) {
       if (['toggleHighlight', 'addReaction', 'deleteAnswerRow'].includes(funcName)) return 0;
+      // 更新の確かめは数秒後にまた呼ぶ (失敗が続けば間隔も伸びる)。Why: 混んでいるときの失敗
+      //   (service invoked too many times 等) をすぐ 2 回呼び直すと、1 人 3 実行に増えて混雑を深めていた。
+      if (funcName === 'getNotificationUpdate') return 0;
       if (funcName === 'submitLessonAnswer') return 1;
       return 2;
     }
@@ -1202,8 +1205,14 @@
         }
 
         try {
+          // 読み込み (getPublishedSheetData) と同じ学級・並び順を送る。Why: サーバの cache は
+          //   この 2 つを key に含むので、送らないと確かめる側と読む側が別の key になり、
+          //   版が上がるたびに同じシートを 2 回読んでいた。
+          const filter = this.getCurrentFilterState();
           const response = await this.runGas('getNotificationUpdate', this.state.userId, {
-            lastUpdateTime: this.state.lastSeenTimestamp
+            lastUpdateTime: this.state.lastSeenTimestamp,
+            classFilter: filter.classFilter,
+            sortOrder: filter.sortOrder
           });
 
           // Why: 以前は response.success が false でも errorCount=0 にリセットしていたため、
@@ -5146,11 +5155,9 @@
      *      新しいタブで開いたときに前回の選択を自動復元する。
      *      localStorage 採用でも良いが、授業中の一時的な絞り込みを次回も引きずると
      *      混乱するので、タブ閉鎖で消える session スコープを選ぶ。
+     *
+     * このタブで利用者が自分で選んだ値。無ければ null (既定に任せる)。
      */
-    loadPersistedClassFilter() {
-      return this.__explicitClassFilter() || 'すべて';
-    }
-    // このタブで利用者が自分で選んだ値。無ければ null (既定に任せる)。
     __explicitClassFilter() {
       try {
         return sessionStorage.getItem(this.getScopedKey('classFilter')) || null;

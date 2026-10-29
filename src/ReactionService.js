@@ -1,6 +1,6 @@
 /**
  * @fileoverview ReactionService - リアクション (UNDERSTAND/LIKE/CURIOUS) と
- *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
+ *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard_）。
  */
 
 /* global resolveColumnIndex, emailToShortHash_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
@@ -103,6 +103,14 @@ function resolveRowIdentity_(rowIdentity, headers, config) {
   return null;
 }
 
+// 児童の画面から来た expect は、列番号と値で比べる形 ({ column, value }) を受け付けない。
+//   Why: 任意の列 (メール・名前) に値を当て、ROW_CHANGED かどうかで隠れた中身を確かめられる。
+//   その形はサーバ内の呼び出し (授業モードのハイライト) だけが使う。
+function __clientRowExpect_(expect) {
+  if (!expect || typeof expect !== 'object' || !expect.rowIdentity || typeof expect.rowIdentity !== 'object') return expect;
+  return Object.assign({}, expect, { rowIdentity: Object.assign({}, expect.rowIdentity, { column: undefined }) });
+}
+
 // 見出し行 (1 行目) だけを読む。getDataRange().getValues()[0] はシート全体を読むので、quota が
 //   尽きているときほど重い読みを増やしていた。読めなければ [] (呼び出し側が「一時利用不可」にする)。
 function readHeaderRowOnly_(sheet) {
@@ -140,7 +148,7 @@ function readHeaderRowOnly_(sheet) {
  * @param {boolean} [options.requireEditor=false] editor 権限を要求するか
  * @param {boolean} [options.isAdmin] 呼び出し側が計算済みの isAdmin（省略時は再計算）
  */
-function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
+function canActOnTargetBoard_(actorEmail, targetUser, config, options = {}) {
   if (!actorEmail || !targetUser) return false;
 
   const isAdmin = typeof options.isAdmin === 'boolean'
@@ -226,7 +234,7 @@ function processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, prel
   const missingForProvision = missingTypes.slice();
 
   if (missingForProvision.length > 0) {
-    // Why fresh header re-read: 呼び出し側 (executeBoardRowOperation) は preloadedHeaders
+    // Why fresh header re-read: 呼び出し側 (executeBoardRowOperation_) は preloadedHeaders
     // を 10 分 cache から取得していて、別スレッドが直前に provisioning 済みでも
     // cache が stale だと「missing」と誤判定し、重複列を append してしまう。
     // LockService 取得後にここを通るが、cache 上の headers は別途古いままなので
@@ -615,10 +623,10 @@ function addReaction(targetUserId, rowIndex, reactionType, expect) {
   if (__isLessonReactionsOff_(targetUserId)) {
     return createErrorResponse('授業中はリアクションを使えません', null, { error: 'LESSON_ACTIVE' });
   }
-  return executeBoardRowOperation({
+  return executeBoardRowOperation_({
     targetUserId,
     rowIndex,
-    expect,
+    expect: __clientRowExpect_(expect),
     lockKeyPrefix: 'reaction',
     label: 'addReaction',
     openContext: 'reaction_processing',
@@ -644,10 +652,10 @@ function addReaction(targetUserId, rowIndex, reactionType, expect) {
  * ハイライト切り替え（マルチテナント対応）。
  * @param {string} targetUserId - ボード所有者の userId
  * @param {number|string} rowIndex - 行番号または 'row_#'
- * @param {Object} [expect] - 押した側が見ていた行の照合 (executeBoardRowOperation の expect)
+ * @param {Object} [expect] - 押した側が見ていた行の照合 (executeBoardRowOperation_ の expect)
  */
 function toggleHighlight(targetUserId, rowIndex, expect) {
-  return executeBoardRowOperation({
+  return executeBoardRowOperation_({
     targetUserId,
     rowIndex,
     expect,
@@ -700,7 +708,7 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
  *   不一致は ROW_CHANGED で返し、書かない (別の回答に付けない)。
  * @returns {Object} API レスポンス
  */
-function executeBoardRowOperation(options) {
+function executeBoardRowOperation_(options) {
   const {
     targetUserId, rowIndex, lockKeyPrefix, label, openContext,
     concurrentMessage, process, formatSuccess, requireEditor
@@ -724,7 +732,7 @@ function executeBoardRowOperation(options) {
       return createErrorResponse('ROW_CHANGED: ボードの表示が切り替わりました。画面を読み込み直してください');
     }
 
-    if (!canActOnTargetBoard(actorEmail, targetUser, config, {
+    if (!canActOnTargetBoard_(actorEmail, targetUser, config, {
       isAdmin,
       requireEditor: requireEditor === true
     })) {
@@ -783,7 +791,7 @@ function executeBoardRowOperation(options) {
     try {
       // Race protection: lock acquire 中に教師が unpublish した可能性がある。 lock 取得後
       // に publish 状態を再確認し、 viewer (= non-admin non-owner) からの write を再度 gate。
-      // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard と同じ判定基準)。
+      // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard_ と同じ判定基準)。
       if (!isAdmin && !sameEmail_(targetUser.userEmail, actorEmail)) {
         const refreshedUser = findPublishedBoardOwner_(targetUserId, actorEmail, { preloadedAuth });
         if (!refreshedUser) {

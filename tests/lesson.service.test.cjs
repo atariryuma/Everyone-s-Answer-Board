@@ -831,44 +831,6 @@ test('__maybeAutoArchiveLesson_: 0 回答なら archive しない', () => {
   assert.equal(res.reason, 'no_responses');
 });
 
-test('installLessonTriggers: 既存トリガーがあれば skip (idempotent)', () => {
-  let createCount = 0;
-  const { context } = loadLessonContext({
-    ScriptApp: {
-      getProjectTriggers: () => [{ getHandlerFunction: () => 'dailyLessonArchiveSweep' }],
-      newTrigger: () => {
-        createCount++;
-        return { timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => {} }) }) }) };
-      }
-    }
-  });
-  context.installLessonTriggers_();
-  assert.equal(createCount, 0, '既存トリガーがあるのに新規作成された');
-});
-
-test('installLessonTriggers: トリガーが無ければ 1 つ作成', () => {
-  let createCount = 0;
-  let scheduledHour = null;
-  const { context } = loadLessonContext({
-    ScriptApp: {
-      getProjectTriggers: () => [],
-      newTrigger: (fn) => ({
-        timeBased: () => ({
-          everyDays: () => ({
-            atHour: (h) => {
-              scheduledHour = h;
-              return { create: () => { createCount++; } };
-            }
-          })
-        })
-      })
-    }
-  });
-  context.installLessonTriggers_();
-  assert.equal(createCount, 1);
-  assert.equal(scheduledHour, 23);
-});
-
 // ── targetIndex による直接ジャンプ (回答ボード上の phase pill 用) ──
 // Why: pill は全 phase を並べるので隣以外も押せる。±1 しか無いと死んだ UI になる。
 
@@ -1233,15 +1195,14 @@ test('advanceLessonPhase: ボードにつながっていない授業は送らな
 
 test('advanceLessonPhase: 同じフェーズ + switchBoard が「この授業にボードを切り替える」', () => {
   const { h, moral, science } = startTwoLessons();
-  let bumps = 0;
-  h.context.bumpBoardDataVersion_ = () => { bumps++; };
+  // 前の授業の回答を cache から返さないための版上げは、読む先が変わった保存で saveUserConfig_ が行う
+  //   (tests/config.boardVersionOnSourceChange.test.cjs)。
 
   const res = h.context.advanceLessonPhase('u1', moral, null, 0, { switchBoard: true });
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.data.reapplied, true);
   assert.equal(res.data.switchedBoard, true);
   assert.equal(h.boardConfig.activeLessonId, moral);
-  assert.equal(bumps, 1, '前の授業の回答が cache から返らないよう捨てる');
   assert.equal(
     h.context.getLessonForReview('u1', moral).data.lesson.lessonJson.profileTransitions.length, 1,
     '切り替えはフェーズの遷移ではない');
