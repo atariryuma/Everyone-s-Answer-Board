@@ -15,7 +15,7 @@
  *   npm run api -- perfMetrics --category api
  *   npm run api -- listProperties
  *
- *   npm run api -- findUser --email t260781p@naha-okinawa.ed.jp
+ *   npm run api -- findUser --email teacher@example.ed.jp
  *   npm run api -- getUserConfig --userId adb24b94-...
  *   npm run api -- exportConfigs --file backup.json    # ファイルへ保存
  *   npm run api -- setUserConfig --userId <uuid> --patch '{"displaySettings":{"boardMode":"numberline"}}'

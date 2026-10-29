@@ -95,8 +95,8 @@ Everyone-s-Answer-Board/
 
 ```bash
 npm test                                   # テスト実行（node:test）
-npm run deploy:single -- deploy --name t260781p-verify   # 検証用の配置へ
-npm run verify:e2e -- t260781p-verify      # 画面の機能を端から端まで（54 項目）
+npm run deploy:single -- deploy --name <検証用の名前>   # 検証用の配置へ
+npm run verify:e2e -- <検証用の名前>      # 画面の機能を端から端まで（54 項目）
 npm run deploy                             # 全員の配置を更新
 
 npm run api -- systemDiagnosis             # システム診断

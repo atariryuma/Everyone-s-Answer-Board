@@ -8,7 +8,7 @@
  * 先生の操作は API キー経路 (= 先生)、児童の操作は dev.invoke の as で児童のふりをして呼ぶ。
  * 出すのは成否と件数だけ。作ったフォーム・授業は名前に【検証】を付ける。
  *
- *   node scripts/verify/e2e-single.js --name t260781p-verify
+ *   node scripts/verify/e2e-single.js --name <検証用の名前>
  */
 const path = require('path');
 const fs = require('fs');

@@ -17,7 +17,7 @@
 | `npm run api -- perfDiagnosis` | overallStatus: **healthy**、detectedIssues: **0** |
 | Cloud Logging 直近 72h ERROR (Naha) | **0 件** |
 | hot path (getData) の Sheets API 呼び出し | 3-5 回/リクエスト (batch 読み済み)。SA token cache 50min / verify cache 10min が効いている |
-| N+1 / batch 違反 | **検出ゼロ** (processBatchData / resolveReactionColumns_ とも適切) |
+| N+1 / batch 違反 | **検出ゼロ** (processBatchData_ / resolveReactionColumns_ とも適切) |
 | PropertiesService 直読み | hot path になし (main.js の初回ゲート直読みは意図的・コメント済み) |
 
 → **性能リファクタは行わない**。監査で見つかった軽微候補 (board data cache の size 実測、getSheetInfo の headers 再利用) は「様子見」であり、この指示書の作業対象ではない。

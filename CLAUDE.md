@@ -27,7 +27,7 @@ node --test tests/main.doPost.test.cjs   # Run a single test file
 npm run deploy                           # 全員の配置を更新 (URL はそのまま。deploy-single.js deploy --all)
 npm run deploy:single -- deploy --name <名前>   # 1 人分だけ更新
 npm run deploy:single -- create --name <名前> --adminEmail <先生のメール>   # 先生を足す
-npm run verify:e2e -- t260781p-verify    # 検証用の配置で画面の機能を端から端まで動かす (54 項目)
+npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の機能を端から端まで動かす (54 項目)
 ```
 
 **配置の形**: 先生ごとに 1 つ、先生の Drive のスプレッドシートに紐づいたアプリを「先生として実行」で配置する
@@ -36,10 +36,10 @@ npm run verify:e2e -- t260781p-verify    # 検証用の配置で画面の機能�
 `scripts/deploy-single.js` が焼き込む。先生ごとの値は `scripts/single-tenants.json` (git に入れない)。
 Why: 2026-10-29 から児童アカウントは「開いた人として実行」の Apps Script を一切開けない (管理側の設定)。
 
-**Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name t260781p-verify` →
-`npm run verify:e2e -- t260781p-verify` → `npm run deploy` → Git commit → `git push`
+**Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name <検証用の名前>` →
+`npm run verify:e2e -- <検証用の名前>` → `npm run deploy` → Git commit → `git push`
 
-**検証用の配置** (`t260781p-verify`): `extraFiles: ["scripts/verify/DevInvoke.js"]` 付き。admin API の `dev.invoke` で
+**検証用の配置** (名前の例 `<先生>-verify`): `extraFiles: ["scripts/verify/DevInvoke.js"]` 付き。admin API の `dev.invoke` で
 画面が `google.script.run` で呼ぶ処理を名前で呼べる (児童のふりは `as`)。本番の先生には付けない。
 
 **CI** (.github/workflows/ci.yml): Syntax check + `npm run lint:errors` + `npm test`（品質ゲートのみ。配置はローカルで行う）

@@ -276,7 +276,7 @@ function getAdaptiveBatchSize(consecutiveErrors, totalDataRows) {
 /**
  * @param {Object} ctx - {sheet, headers, lastRow, lastCol, config, options, startTime}
  */
-function processBatchData(ctx) {
+function processBatchData_(ctx) {
   const { sheet, headers, lastRow, lastCol, config, options, startTime } = ctx;
   const MAX_EXECUTION_TIME = 20000;
   const MAX_CONSECUTIVE_ERRORS = 3;
@@ -342,7 +342,7 @@ function processBatchData(ctx) {
         || errorMessage.includes('quota') || errorMessage.includes('too many times');
       if (isQuota) {
         // quota は一時的な混雑で原因は明らか。ERROR で積まない (WARN に落として痕跡は残す)。
-        console.warn('DataService.processBatchData: read throttled', { startRow, endRow, consecutiveErrors, errorMessage });
+        console.warn('DataService.processBatchData_: read throttled', { startRow, endRow, consecutiveErrors, errorMessage });
       } else {
         logError_('DataService.processBatchData', batchError, {
           startRow,
@@ -385,7 +385,7 @@ function processBatchData(ctx) {
     //      旧版は 42/42 完了時にも WARN を吐いて false-positive アラート扱いされていた。
     if (Date.now() - startTime > MAX_EXECUTION_TIME) {
       if (processedCount < totalDataRows) {
-        console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
+        console.warn('DataService.processBatchData_: 実行時間制限のため処理を中断', {
           processedRows: processedCount,
           totalRows: totalDataRows
         });
@@ -426,7 +426,7 @@ function fetchSpreadsheetData_(config, options = {}) {
     return busySheetDataResult_(config.sheetName);
   }
   const ctx = { sheet, headers, lastRow, lastCol, config, options, startTime };
-  const processedData = processBatchData(ctx);
+  const processedData = processBatchData_(ctx);
 
   // 読めずに飛ばした範囲がある結果は「このボードの中身」ではない。成功として返すと cache に
   //   乗って全員に配られる。混雑として返し、次の poll で読み直させる。

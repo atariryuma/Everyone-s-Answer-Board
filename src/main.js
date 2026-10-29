@@ -834,7 +834,7 @@ function handleClientErrorReport_(email, payload) {
     const tag = `[client/${level}]`;
     const summary = `${tag} ${context ? '(' + context + ') ' : ''}${message}`;
     // Why (domain leak fix): 旧実装は `user@***` でドメイン部のみマスクしていたが、
-    //   local part をそのまま残すと naha-okinawa の児童 ID (例: t260781p) が
+    //   local part をそのまま残すと 学校のアカウント ID (例: t123456a) が
     //   ログから個人特定可能だった。local part も短縮 SHA1 で完全仮名化する。
     const anonReporter = (() => {
       if (!email || typeof email !== 'string' || email.indexOf('@') < 0) return 'unknown';

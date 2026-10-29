@@ -446,7 +446,7 @@ test('getUserSheetData: uses preloadedUser and preloadedConfig without DB hits',
 });
 
 // =====================================================================
-// processBatchData: regression — at least one batch attempted
+// processBatchData_: regression — at least one batch attempted
 // Ensures the 20s time-check does not short-circuit before any batch when
 // setup (connectToSpreadsheetSheet_ + getSheetInfo) consumed the budget.
 // =====================================================================
@@ -471,7 +471,7 @@ test('processBatchData: processes first batch even when startTime is already pas
   // 修正後: 少なくとも 1 バッチは試行されて全 3 行が処理される。
   const staleStartTime = Date.now() - 30000;
 
-  const result = ctx.processBatchData({
+  const result = ctx.processBatchData_({
     sheet,
     headers: ['Timestamp', 'Answer'],
     lastRow: 4,
@@ -508,7 +508,7 @@ test('processBatchData: batch read error is handled gracefully (regression: erro
 
   let result;
   assert.doesNotThrow(() => {
-    result = ctx.processBatchData({
+    result = ctx.processBatchData_({
       sheet: throwingSheet,
       headers: ['Timestamp', 'Answer'],
       lastRow: 4,
@@ -766,7 +766,7 @@ test('processBatchData: 正常時は 1000 行グリッドでも getRange 1 回�
       return { getValues: () => [[new Date().toISOString(), 'a@x', '1', 'A', 3, 4, '理由', '']] };
     }
   };
-  const result = ctx.processBatchData({
+  const result = ctx.processBatchData_({
     sheet, headers, lastRow: 1000, lastCol: headers.length,
     config: { columnMapping: { answer: 4, reason: 6, class: 2, name: 3, email: 1, numericX: 4, numericY: 5 } },
     options: {}, startTime: Date.now()

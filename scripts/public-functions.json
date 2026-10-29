@@ -114,7 +114,6 @@
     "openSpreadsheet",
     "parseAndRepairConfig",
     "performIntegratedColumnDiagnostics",
-    "processBatchData",
     "processDataSourceOperations",
     "processLoginAction",
     "processRawDataBatch",
