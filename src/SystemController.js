@@ -11,7 +11,7 @@
  * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache, isSingleTenant_ */
 
 /**
  * キャッシュ期間 (秒)
@@ -262,9 +262,12 @@ function testSystemDiagnosis() {
       const props = PropertiesService.getScriptProperties();
       const coreProps = {
         adminEmail: !!props.getProperty('ADMIN_EMAIL'),
-        databaseId: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
-        serviceAccount: !!props.getProperty('SERVICE_ACCOUNT_CREDS')
+        databaseId: !!props.getProperty('DATABASE_SPREADSHEET_ID')
       };
+      // 先生専用の配置は SA pool を使わない (hasCoreSystemProps と同じ判定)。
+      if (!(typeof isSingleTenant_ === 'function' && isSingleTenant_())) {
+        coreProps.serviceAccount = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
+      }
 
       const allCorePresent = Object.values(coreProps).every(Boolean);
       diagnostics.push({
