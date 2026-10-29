@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Common'); ?>
+  <style>
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 8px; margin-top: 8px; }
+    .step { text-align: left; }
+    .step.current { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+    .step small { display: block; color: var(--muted); font-weight: 400; }
+    .big-count { font-size: 2.5rem; font-weight: 800; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { border-bottom: 1px solid var(--border); padding: 6px; text-align: left; vertical-align: top; }
+    select { font: inherit; padding: 8px; border-radius: 10px; border: 1px solid var(--border); min-height: 44px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1><?= lessonTitle ?>（先生の画面）</h1>
+    <div class="card">
+      <div class="controls">
+        <label>学級 <select id="cls"></select></label>
+        <span class="muted">学級を切り替えると「考える」から始まります（前の学級の回答はシートに残ります）。</span>
+      </div>
+      <div class="steps" id="steps"></div>
+    </div>
+    <!-- ここから下は電子黒板に映してよい範囲 -->
+    <div class="card">
+      <div class="phase-name" id="phase-name"></div>
+      <p class="question" id="question"></p>
+      <div id="projection"></div>
+    </div>
+    <!-- 児童ごとの回答 (名前あり) は投影しない。手元で開くときだけ。 -->
+    <details class="card">
+      <summary>児童ごとの回答（名前あり・投影しない）</summary>
+      <div id="table"></div>
+    </details>
+    <div id="banner" class="banner" hidden></div>
+  </main>
+<script>
+  const POLL_MS = 4000;
+  let tv = null;
+  let busy = false;
+  let lastKey = '';
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function render(v) {
+    // 変わっていないのに作り直すと、押そうとした瞬間にボタンが入れ替わって押せないことがある。
+    const key = JSON.stringify(v) + busy;
+    if (key === lastKey) return;
+    lastKey = key;
+    tv = v;
+    const sel = document.getElementById('cls');
+    if (!sel.options.length) {
+      v.classes.forEach(c => sel.appendChild(new Option(c, c)));
+      sel.addEventListener('change', () => act('setClass', sel.value, '学級を「' + sel.value + '」に切り替えます。フェーズは「考える」に戻ります。'));
+    }
+    sel.value = v.cls;
+
+    const steps = document.getElementById('steps');
+    steps.textContent = '';
+    v.phases.forEach((p, i) => {
+      const b = el('button', 'btn step' + (i === v.phaseIndex ? ' current' : ''));
+      b.type = 'button';
+      b.append(document.createTextNode((i === v.phaseIndex ? '▶ ' : '') + p.name));
+      const writes = p.role === 'input' || p.role === 'reinput';
+      b.appendChild(el('small', null, writes ? v.counts[i] + ' 人が送信' : ' '));
+      b.disabled = i === v.phaseIndex || busy;
+      b.addEventListener('click', () => act('setPhase', i));
+      steps.appendChild(b);
+    });
+
+    const phase = v.phases[v.phaseIndex];
+    document.getElementById('phase-name').textContent = phase.name;
+    document.getElementById('question').textContent = phase.question;
+    const proj = document.getElementById('projection');
+    proj.textContent = '';
+    if (phase.role === 'input' || phase.role === 'reinput') {
+      // 書いている間は分布を映さない (先に出た答えに引っぱられないように)。人数だけ。
+      const c = el('p', null);
+      c.append(el('span', 'big-count', String(v.counts[v.phaseIndex])), document.createTextNode(' 人が送りました'));
+      proj.appendChild(c);
+    } else {
+      const src = v.sourcePhaseIndex;
+      const dots = v.answers.filter(a => a.phase === src).map(a => ({ x: a.x, y: a.y }));
+      proj.appendChild(el('p', 'muted', '「' + v.phases[src].name + '」の分布（数字は人数）'));
+      const box = el('div');
+      renderMatrix(box, { grid: v.grid, axis: v.axis, dots });
+      proj.appendChild(box);
+    }
+    renderTable(v);
+  }
+
+  function renderTable(v) {
+    const inputs = v.phases.map((p, i) => i).filter(i => v.phases[i].role === 'input' || v.phases[i].role === 'reinput');
+    const people = {};
+    v.answers.forEach(a => { (people[a.who] = people[a.who] || {})[a.phase] = a; });
+    const t = el('table');
+    const head = el('tr');
+    head.appendChild(el('th', null, '児童'));
+    inputs.forEach(i => head.appendChild(el('th', null, v.phases[i].name)));
+    t.appendChild(head);
+    Object.keys(people).sort().forEach(who => {
+      const tr = el('tr');
+      tr.appendChild(el('td', null, who));
+      inputs.forEach(i => {
+        const a = people[who][i];
+        tr.appendChild(el('td', null, a ? placeLabel(v.axis, a.x, a.y) + '\n' + a.reason : '—'));
+      });
+      t.appendChild(tr);
+    });
+    const box = document.getElementById('table');
+    box.textContent = '';
+    box.appendChild(t);
+  }
+
+  async function act(fn, arg, confirmText) {
+    if (confirmText && !confirm(confirmText)) { if (tv) document.getElementById('cls').value = tv.cls; return; }
+    busy = true;
+    try { render(await call(fn, arg)); }
+    catch (e) { showError(e); }
+    finally { busy = false; if (tv) render(tv); }
+  }
+
+  function showError(e) {
+    const b = document.getElementById('banner');
+    b.textContent = (e && e.message) || '読み込めませんでした';
+    b.hidden = false;
+  }
+
+  async function poll() {
+    if (busy) return;
+    try { render(await call('getTeacherView')); document.getElementById('banner').hidden = true; }
+    catch (e) { showError(e); }
+  }
+
+  function init() {
+    poll();
+    const tick = () => setTimeout(async () => { await poll(); tick(); }, POLL_MS);
+    tick();
+  }
+  init();
+</script>
+</body>
+</html>
