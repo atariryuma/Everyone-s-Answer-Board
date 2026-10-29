@@ -623,6 +623,10 @@ html, body {
 .opinion-text {
   padding-right: var(--space-2);
 }
+/* 意見は h2 (.opinion-text) なので p だけに当てると clamp が効かない。
+   以前は p だけで、長い意見が 5 行以上に伸びて理由がカード下端の操作列
+   (★・リアクション) の下に潜っていた。 */
+.answer-preview .opinion-text,
 .answer-preview p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -833,18 +837,28 @@ body.highlight-busy .highlight-btn:not(.loading) {
  *   長い utility 連結は「どんな見た目か」を読むのに向かないので、
  *   意味のある名前を付けて CSS 側に置く。値は元の Tailwind と同一。
  * ============================================================================= */
-/* 回答カードのグリッド。列数は sizeSlider が --answers-cols を書き換える。 */
+/* 回答カードのグリッド。列数は sizeSlider が --answers-cols を書き換える。
+   Why: 以前は画面幅のブレークポイントで列数を固定しており、1024px を超えると
+        スライダーの列数 (既定 4) で必ず割っていた。iPad mini 横 (1158px) では
+        カードが 228px まで縮み 1 行 10 文字ほどになっていた。
+        いまは「カードの最小幅 --answers-card-min を守って入るだけ並べ、
+        --answers-cols は上限」にする (auto-fill + minmax の標準形)。
+        端末ごとのブレークポイントを足さなくても、どの幅でも読める幅が残る。
+        min(100%, ...) は最小幅より狭い画面で横にはみ出さないための保険。 */
 .answers-grid {
   display: grid;
   /* --answers-cols は sizeSlider が JS から書き換える (既定 4)。
      クラス名を組み立てないので、どの値でも確実に効く。 */
   --answers-cols: 4;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: var(--space-4);
+  --answers-card-min: 15rem;
+  --answers-gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(
+    var(--answers-card-min),
+    (100% - (var(--answers-cols) - 1) * var(--answers-gap)) / var(--answers-cols)
+  )), 1fr));
+  gap: var(--answers-gap);
   transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-@media (min-width: 640px)  { .answers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .answers-grid { grid-template-columns: repeat(var(--answers-cols), minmax(0, 1fr)); } }
 
 /* 回答モーダル / 説明モーダルの箱としてのレイアウト。
    Why: .modal-card 系 primitive は「表面 (bg/border/radius/max-width)」だけを担い、

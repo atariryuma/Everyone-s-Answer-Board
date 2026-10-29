@@ -2182,6 +2182,17 @@
     color: inherit;
     cursor: pointer;
   }
+  /* Runner のフェーズ列。
+     Why: 以前は flex nowrap + overflow-x:auto で、カード最小 180px × 5 枚 = 948px が
+          要った。iPad 縦 (744〜834px) では「ふりかえる」が画面外に出て、iPad Safari は
+          スクロールバーを出さないので存在に気づけなかった。
+          グリッドの auto-fit にして、入らなければ折り返す (全フェーズが常に見える)。 */
+  .lesson-runner-phases {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+    gap: var(--space-3);
+  }
+  .lesson-runner-phases .lesson-phase-card { min-width: 0; }
   button.lesson-phase-card:hover:not(:disabled) {
     border-color: var(--theme-border-normal);
   }
