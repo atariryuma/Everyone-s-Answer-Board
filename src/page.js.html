@@ -3324,13 +3324,20 @@
         return { success: false, error: 'この授業には記録が残っていません', data: [], header: '振り返り' };
       }
 
+      // リアクションは数だけ (lesson.backfillReactions で足した授業の記録だけが持つ)。押した人は
+      //   記録に無いので reacted は常に false。
+      const toReactions = (c) => (c ? {
+        UNDERSTAND: { count: c.UNDERSTAND || 0, reacted: false },
+        LIKE: { count: c.LIKE || 0, reacted: false },
+        CURIOUS: { count: c.CURIOUS || 0, reacted: false }
+      } : {});
       let rows = ph.rows.map((r) => ({
         id: 'review_' + ph.index + '_' + r.rowIndex,
         rowIndex: r.rowIndex,
         timestamp: r.timestamp || '',
         formattedTimestamp: r.timestamp || '',
         // snapshot は個人特定フィールドを落としてある (__projectBoardRowForExport_)。
-        //   名前 / リアクションは「無い」のが正で、空で補って read-only を構造的に保証する。
+        //   名前は「無い」のが正で、空で補う。
         name: '',
         email: '',
         class: r.class || '',
@@ -3339,9 +3346,11 @@
         reason: r.reason,
         numericX: (typeof r.numericX === 'number') ? r.numericX : null,
         numericY: (typeof r.numericY === 'number') ? r.numericY : null,
-        reactions: {},
-        highlight: false
+        reactions: toReactions(r.reactions),
+        highlight: Boolean(r.highlight)
       }));
+      const showsReactions = ph.rows.some((r) => r.reactions);
+      this.state.reviewShowsReactions = showsReactions;
 
       if (fetchParams && fetchParams.classFilter) {
         rows = rows.filter(r => r.class === fetchParams.classFilter);
@@ -3353,10 +3362,11 @@
       const t = ph.templateOptions || {};
       const displaySettings = {
         boardMode: this.__resolveReviewBoardMode(ph),
-        // 振り返りは read-only。名前もリアクションも snapshot に無いので表示しない。
+        // 振り返りは read-only。名前は snapshot に無いので表示しない。リアクションは記録に数が
+        //   あるときだけ数で見せる (押せない: addReaction は振り返り中に止めている)。
         showNames: false,
-        showReactions: false,
-        showCounts: false
+        showReactions: showsReactions,
+        showCounts: showsReactions
       };
       this.updateDisplaySettingsFromAPI(displaySettings);
 
@@ -4421,6 +4431,8 @@
      *   これは見せ方の制御であって権限ではない。
      */
     __reactionMode() {
+      // 振り返りはボードの設定に依らず、記録に数があるときだけ数で見せる。
+      if (this.state && this.state.isReviewMode) return this.state.reviewShowsReactions ? 'count' : 'off';
       if (this.__inLesson()) return 'off';
       const ds = (window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.displaySettings) || {};
       if (['off', 'private', 'color', 'count'].indexOf(ds.reactionMode) >= 0) return ds.reactionMode;

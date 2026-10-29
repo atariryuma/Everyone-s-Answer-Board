@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getAllUsers_, updateUser_, getUserConfig, saveUserConfig_, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile_, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator_, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getAllUsers_, updateUser_, getUserConfig, saveUserConfig_, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile_, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __backfillArchiveReactions_, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator_, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -1225,6 +1225,12 @@ function dispatchAdminOperation(operation, params) {
       { const e = reqStr('lessonId'); if (e) return e; }
       if (!Number.isInteger(params.phaseIndex)) return createErrorResponse('phaseIndex (整数) が必要です');
       return recaptureLessonArchive(params.userId, params.lessonId, params.phaseIndex);
+    }
+    // 終わった授業の記録に、元の回答シートのリアクションの数とハイライトを足す (--dryRun で数えるだけ)
+    case 'lesson.backfillReactions': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return __backfillArchiveReactions_(params.userId, params.lessonId, { dryRun: params.dryRun === true || params.dryRun === 'true' });
     }
     // 共有の本体から先生専用の配置への引っ越し (Migration.js / scripts/migrate-to-single.js)
     case 'migrate.importLesson': {

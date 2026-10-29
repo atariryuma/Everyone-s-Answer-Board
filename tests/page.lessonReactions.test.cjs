@@ -208,3 +208,35 @@ test('掲示板で reactionMode=off でも、自分の点 (授業だけの見せ
   const boardOff = { state: { viewerEmailHash: 'abc' }, __inLesson: () => false, __reactionsOff: () => true };
   assert.equal(isMe({ data: { emailHash: 'abc' } }, boardOff), false);
 });
+
+// ---- 振り返り: 記録に足したリアクションの数とハイライト (lesson.backfillReactions) ----
+function reviewApp(rows) {
+  const { app, ctx } = loadApp();
+  ctx.window.UNIFIED_CONFIG.displaySettings = { reactionMode: 'off' }; // いまのボードは「使わない」でも
+  app.state.isReviewMode = true;
+  app.state.reviewPhases = [{ index: 0, name: '本時の議論', rows }];
+  app.state.reviewPhaseIndex = 0;
+  app.updateDisplaySettingsFromAPI = () => {};
+  return { app, ctx };
+}
+
+test('振り返り: 記録に数があれば数で見せ、ハイライトも出す (押した人は無いので reacted は false)', () => {
+  const { app } = reviewApp([
+    { rowIndex: 2, answer: 'a', reason: 'r', reactions: { UNDERSTAND: 1, LIKE: 3, CURIOUS: 0 }, highlight: true },
+    { rowIndex: 3, answer: 'b', reason: 'r' }
+  ]);
+  const res = app.__buildReviewPhaseResult({});
+  assert.equal(res.data[0].reactions.LIKE.count, 3);
+  assert.equal(res.data[0].reactions.LIKE.reacted, false);
+  assert.equal(res.data[0].highlight, true);
+  assert.equal(JSON.stringify(res.data[1].reactions), '{}', '数の無い行は空のまま');
+  assert.equal(res.displaySettings.showReactions, true);
+  assert.equal(app.__reactionMode(), 'count', 'ボードの設定が off でも振り返りは数で見せる');
+});
+
+test('振り返り: 記録に数が無ければリアクションは出さない (これまでどおり)', () => {
+  const { app } = reviewApp([{ rowIndex: 2, answer: 'a', reason: 'r' }]);
+  const res = app.__buildReviewPhaseResult({});
+  assert.equal(res.displaySettings.showReactions, false);
+  assert.equal(app.__reactionMode(), 'off');
+});

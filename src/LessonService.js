@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_ */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_, formatTimestamp */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -969,24 +969,16 @@ function __hydrateLessonSnapshots_(lesson) {
 
   const spreadsheet = openDatabase();
   if (!spreadsheet) return;
-  const width = LESSON_RESPONSES_SHEET_HEADERS.length;
 
   for (const sn of targets) {
     try {
       const sheet = spreadsheet.getSheetByName(sn.sheet);
       if (!sheet) { sn.reason = 'ARCHIVE_SHEET_MISSING:' + sn.sheet; continue; }
-      const values = sheet.getRange(sn.startRow, 1, sn.rowCount, width).getValues() || [];
+      const values = sheet.getRange(sn.startRow, 1, sn.rowCount, __archiveReadWidth_(sheet)).getValues() || [];
+      __useShownArchiveTimestamps_(sheet, sn.startRow, values);
       sn.rows = values
         .filter(v => String(v[0]) === String(lesson.lessonId) && Number(v[1]) === Number(sn.phaseIndex))
-        .map(v => ({
-          rowIndex: __cellToNumOrNull_(v[2]),
-          timestamp: String(v[3] || ''),
-          class: String(v[4] || ''),
-          answer: v[5],
-          reason: v[6],
-          numericX: __cellToNumOrNull_(v[7]),
-          numericY: __cellToNumOrNull_(v[8])
-        }));
+        .map(__archiveValuesToRow_);
       if (sn.rows.length !== sn.rowCount) {
         sn.reason = 'ARCHIVE_POINTER_DRIFT:' + sn.rows.length + '/' + sn.rowCount;
       }
@@ -2224,6 +2216,130 @@ function recaptureLessonArchive(userId, lessonId, phaseIndex) {
     });
   } catch (error) {
     logError_('recaptureLessonArchive', error);
+    return createExceptionResponse(error);
+  }
+}
+
+// アーカイブの 1 行を振り返りの行に戻す。10〜13 列 (リアクションの数・ハイライト) は、
+//   lesson.backfillReactions で足した授業だけが持つ。無ければ項目ごと付けない。
+function __archiveValuesToRow_(v) {
+  const row = {
+    rowIndex: __cellToNumOrNull_(v[2]),
+    timestamp: String(v[3] || ''),
+    class: String(v[4] || ''),
+    answer: v[5],
+    reason: v[6],
+    numericX: __cellToNumOrNull_(v[7]),
+    numericY: __cellToNumOrNull_(v[8])
+  };
+  const counts = { UNDERSTAND: __cellToNumOrNull_(v[9]) || 0, LIKE: __cellToNumOrNull_(v[10]) || 0, CURIOUS: __cellToNumOrNull_(v[11]) || 0 };
+  if (counts.UNDERSTAND || counts.LIKE || counts.CURIOUS) row.reactions = counts;
+  if (v[12] === true || /^true$/i.test(String(v[12] || '').trim())) row.highlight = true;
+  return row;
+}
+
+// 時刻の列 (4 列目) はセルの見えている文字で読む (values を書き換える)。
+//   Why: 記録は時刻を「yyyy/MM/dd HH:mm」の文字で書くが、シートがそれを日付に読み替える。DB の
+//   タイムゾーン (配置の DB は America/Los_Angeles だった) とスクリプトのタイムゾーンが違うと、
+//   値で読み戻した時刻がずれた (2026-05 の授業が 9 時間後の英語表記で振り返りに出ていた)。
+//   見えている文字は書いたときのまま。
+function __useShownArchiveTimestamps_(sheet, startRow, values) {
+  if (!values.length) return;
+  const range = sheet.getRange(startRow, 4, values.length, 1);
+  if (typeof range.getDisplayValues !== 'function') return;
+  const shown = range.getDisplayValues() || [];
+  values.forEach((v, i) => { if (shown[i]) v[3] = shown[i][0]; });
+}
+
+// 読む列数。9 列だった頃のシートを列数が足りないまま読んで落ちないよう、シートの列数で頭打ちにする。
+function __archiveReadWidth_(sheet) {
+  const width = LESSON_RESPONSES_SHEET_HEADERS.length;
+  return (sheet && typeof sheet.getMaxColumns === 'function') ? Math.min(width, sheet.getMaxColumns()) : width;
+}
+
+/**
+ * 終わった授業の記録に、元の回答シートのリアクションの数とハイライトの有無を足す (保守オペレーション)。
+ *
+ * Why: 記録は答え・理由・位置・クラス・時刻だけを残してきた (v2738〜)。リアクションのセルは
+ *   押した人のメールなので残さないが、数とハイライトの有無は個人を特定しない。元の回答シートが
+ *   残っていれば、記録の行番号の行から読める。
+ * 照合: 記録の行番号の行と時刻 (分まで) が一致する行にだけ足す。行を消して行がずれていたら、
+ *   別の回答に付けないよう足さない (unmatched の数だけ返す)。
+ * 授業中の授業は対象外 (フェーズの記録を取り直すと、この 4 列は無い行になる)。
+ *
+ * @param {Object} [opts] - { dryRun } 数えるだけで書かない
+ * @returns フェーズごとの件数だけ (行の中身は返さない)
+ */
+function __backfillArchiveReactions_(userId, lessonId, opts) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const lesson = auth.found.lesson;
+    if (lesson.state === 'active') {
+      return createErrorResponse('授業中の授業には足せません。終えてから実行してください');
+    }
+    const lessonJson = lesson.lessonJson || {};
+    const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
+    const snaps = (Array.isArray(lessonJson.snapshots) ? lessonJson.snapshots : [])
+      .filter(sn => sn && sn.sheet && sn.startRow > 0 && sn.rowCount > 0);
+    const dryRun = Boolean(opts && opts.dryRun);
+    const db = openDatabase();
+    if (!db) return createErrorResponse('DB を開けませんでした');
+    const extraHeaders = LESSON_RESPONSES_SHEET_HEADERS.slice(9);
+    const minuteKey = (value) => {
+      const k = (value === '' || value === null || value === undefined) ? '-' : formatTimestamp(value);
+      return k === '-' ? null : k;
+    };
+    const phaseResults = [];
+
+    for (const sn of snaps) {
+      const phase = phases[sn.phaseIndex] || {};
+      const out = { phaseIndex: sn.phaseIndex, name: phase.name || '', rows: 0, matched: 0, unmatched: 0,
+        withReactions: 0, highlighted: 0, totals: { UNDERSTAND: 0, LIKE: 0, CURIOUS: 0 } };
+      phaseResults.push(out);
+      if (!phase.spreadsheetId || !phase.sheetName) { out.skipped = 'NO_SOURCE_SHEET'; continue; }
+      const src = openSpreadsheet(phase.spreadsheetId, { context: 'lesson_backfill' });
+      const srcSheet = src && src.getSheet(phase.sheetName);
+      if (!srcSheet) { out.skipped = 'SOURCE_SHEET_MISSING'; continue; }
+      const archive = db.getSheetByName(sn.sheet);
+      if (!archive) { out.skipped = 'ARCHIVE_SHEET_MISSING'; continue; }
+      if (archive.getMaxColumns() < LESSON_RESPONSES_SHEET_HEADERS.length) {
+        archive.insertColumnsAfter(archive.getMaxColumns(), LESSON_RESPONSES_SHEET_HEADERS.length - archive.getMaxColumns());
+      }
+
+      const srcValues = srcSheet.getDataRange().getValues();
+      const head = (srcValues[0] || []).map(h => String(h || '').trim());
+      const tsCol = head.findIndex(h => /^(timestamp|タイムスタンプ)$/i.test(h));
+      const col = { UNDERSTAND: head.indexOf('UNDERSTAND'), LIKE: head.indexOf('LIKE'), CURIOUS: head.indexOf('CURIOUS'), HIGHLIGHT: head.indexOf('HIGHLIGHT') };
+      const count = (srcRow, key) => (col[key] < 0 ? 0 : String(srcRow[col[key]] || '').split('|').filter(e => e.trim()).length);
+
+      const values = archive.getRange(sn.startRow, 1, sn.rowCount, LESSON_RESPONSES_SHEET_HEADERS.length).getValues();
+      __useShownArchiveTimestamps_(archive, sn.startRow, values);
+      const extra = values.map((v) => {
+        const keep = [v[9], v[10], v[11], v[12]];
+        // 他の授業の行 (ポインタのずれ) は触らない
+        if (String(v[0]) !== String(lessonId) || Number(v[1]) !== Number(sn.phaseIndex)) return keep;
+        out.rows++;
+        const srcRow = srcValues[Number(v[2]) - 1];
+        const key = minuteKey(v[3]);
+        if (!srcRow || tsCol < 0 || !key || minuteKey(srcRow[tsCol]) !== key) { out.unmatched++; return keep; }
+        out.matched++;
+        const u = count(srcRow, 'UNDERSTAND'), l = count(srcRow, 'LIKE'), c = count(srcRow, 'CURIOUS');
+        const h = col.HIGHLIGHT >= 0 && (srcRow[col.HIGHLIGHT] === true || /^true$/i.test(String(srcRow[col.HIGHLIGHT] || '').trim()));
+        if (u || l || c) out.withReactions++;
+        if (h) out.highlighted++;
+        out.totals.UNDERSTAND += u; out.totals.LIKE += l; out.totals.CURIOUS += c;
+        return [u || '', l || '', c || '', h ? true : ''];
+      });
+      if (!dryRun && out.matched > 0) {
+        archive.getRange(1, 10, 1, extraHeaders.length).setValues([extraHeaders]);
+        archive.getRange(sn.startRow, 10, extra.length, extraHeaders.length).setValues(extra);
+      }
+    }
+    return createSuccessResponse(dryRun ? '数えました (書いていません)' : 'リアクションの数とハイライトを足しました',
+      { lessonId, dryRun, phases: phaseResults });
+  } catch (error) {
+    logError_('__backfillArchiveReactions_', error);
     return createExceptionResponse(error);
   }
 }

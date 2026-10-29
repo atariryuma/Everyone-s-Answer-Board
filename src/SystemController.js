@@ -39,7 +39,10 @@ const LESSONS_SHEET_HEADERS = ['lessonId', 'userId', 'name', 'state', 'createdAt
  *   破裂し、本文が段階的に切り詰められていた。回答は「無界・追記一回きり」のデータなので
  *   1 件 1 行で持ち、lessonJson 側は範囲ポインタ {sheet, startRow, rowCount} だけを持つ。
  */
-const LESSON_RESPONSES_SHEET_HEADERS = ['lessonId', 'phaseIndex', 'rowIndex', 'timestamp', 'class', 'answer', 'reason', 'numericX', 'numericY'];
+// 回答アーカイブ (1 回答 1 行)。後ろの 4 列はリアクションの数とハイライトの有無 (押した人のメールは残さない)。
+//   フェーズの記録はこの 4 列を書かない。終わった授業に lesson.backfillReactions が元の回答シートから足す。
+const LESSON_RESPONSES_SHEET_HEADERS = ['lessonId', 'phaseIndex', 'rowIndex', 'timestamp', 'class', 'answer', 'reason', 'numericX', 'numericY',
+  'understand', 'like', 'curious', 'highlight'];
 
 /**
  * プロパティキャッシュTTL (ミリ秒)

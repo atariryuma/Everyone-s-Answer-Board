@@ -51,6 +51,8 @@ npm run api -- createForm --userId <uuid> --templateType board|numberline|matrix
 npm run api -- lesson.list --userId <uuid>
 npm run api -- lesson.liveAnswers --userId <uuid> --lessonId <id>
 npm run api -- lesson.advance --userId <uuid> --lessonId <id> --direction next
+npm run api -- lesson.backfillReactions --userId <uuid> --lessonId <id> --dryRun  # 終わった授業の振り返りに
+                                                            # 元の回答シートのリアクションの数・ハイライトを足す (--dryRun で数えるだけ)
 ```
 
 JSON 引数: `--patch` / `--filter` / `--json` は自動パース、`--file path.json` で params を読み込み、
