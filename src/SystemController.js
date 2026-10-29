@@ -97,7 +97,7 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  * (`user_cache_<id>` 等) が動的なため **1 件も消えていなかった** (no-op なのに success を返す)。
  *
  * 本実装は version-bump 方式で「全体を一括無効化できる」cache 層を実際に invalidate する:
- *   - clearDatabaseUserCache_(): USER_CACHE_VERSION を bump → 全 user cache エントリを一括失効
+ *   - clearDatabaseUserCache_(): users の cache の版 (user_cache_ver) を新しくする → 全 user cache エントリを一括失効
  *   - clearPropertyCache_(): in-memory PropertiesService LRU を全消去
  *   - _webAppUrlCache: in-memory web app URL cache をリセット
  *
@@ -112,7 +112,7 @@ function invalidateGlobalCaches_() {
   try {
     if (typeof clearDatabaseUserCache_ === 'function') {
       clearDatabaseUserCache_();
-      results.push('ユーザーキャッシュ無効化 (USER_CACHE_VERSION bump)');
+      results.push('ユーザーキャッシュ無効化 (user_cache_ver を更新)');
     }
   } catch (e) {
     results.push(`ユーザーキャッシュ無効化失敗: ${e && e.message ? e.message : 'Unknown error'}`);

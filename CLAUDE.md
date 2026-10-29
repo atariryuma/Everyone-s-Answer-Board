@@ -89,7 +89,7 @@ pre-commit hook は `npm install` 時に自動有効化される（`postinstall`
 
 ### Request Flow
 
-- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Handler table `DO_GET_HANDLERS` (main.js) is the single source of truth: `admin` / `view` / `review` / `main` (既定・未知の mode も `main` にフォールバック)。ログイン・初期設定・アプリ設定の画面は無い: 先生専用の配置では先生がトップを開くと `processLoginAction` で登録して管理パネルを直接返し、初回のプロパティと DB シートは `ensureSingleTenantBootstrap_` がそろえる。停止/再開などの運用操作は Admin API で行う
+- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Handler table `DO_GET_HANDLERS` (main.js) is the single source of truth: `admin` / `view` / `review` / `main` (既定・未知の mode も `main` にフォールバック)。ログイン・初期設定・アプリ設定の画面は無い: 先生専用の配置では先生がトップを開くと `processLoginAction` で登録して管理パネルを直接返し、初回のプロパティと DB シートは `ensureDeploymentBootstrap_` がそろえる。停止/再開などの運用操作は Admin API で行う
 - **`doPost(e)`** (main.js): Routes JSON `action` field to handler functions. Actions are allowlist-managed; each must have input validation.
 - Both entry points authenticate via `Session.getActiveUser().getEmail()`
 
@@ -99,14 +99,14 @@ pre-commit hook は `npm install` 時に自動有効化される（`postinstall`
 main.js (doGet/doPost routing, auth)
   → *Apis.js (API endpoints, parameter extraction, response formatting)
     → *Service.js (business logic, data transformation)
-      → DatabaseCore.js (spreadsheet I/O, circuit breaker, retries)
+      → DatabaseCore.js (users の読み書き, シートを開くときのアクセス判定)
 ```
 
 - **Apis files** group endpoints by domain (AdminApis, UserApis, DataApis)
 - **Service files** contain pure business logic (ConfigService, DataService, UserService, ReactionService)
 - **DatabaseCore.js**: users シートの CRUD と、スプレッドシートを開くときのアクセス判定 (`checkSpreadsheetAccess_` → `SpreadsheetApp.openById`)
 - **SystemController.js**: System diagnostics, performance monitoring, deployment management (`publishApp` with etag conflict detection)
-- **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty_` (30s TTL cache for PropertiesService)
+- **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty_` (PropertiesService の値を 1 回の実行の中だけ覚える)
 - **validators.js**: All input validation functions
 
 ### アクセス (誰が何を開けるか)
@@ -159,7 +159,7 @@ main.js (doGet/doPost routing, auth)
 | -- | --- | ---- | ---- |
 | `getCachedProperty_(key)` | **1 回の実行の中だけ** (メモリ、 50 件) | **config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | ADMIN_EMAIL / DATABASE_SPREADSHEET_ID は `Deployment.js` の焼き込みを返し、プロパティを読まない。 ほかの鍵は実行ごとに 1 回プロパティを読む (google.script.run の 1 呼び出し = 1 実行で、メモリは持ち越さない)。 write は `setCachedProperty_` 経由 |
 | `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, アクセス判定, rate-limit counter) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck_()` 経由 |
-| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty_` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
+| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty_` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは古い値で二重設定しないよう直読み (`main.js` 参照) |
 
 **先生として実行なので、児童 30 人の処理がすべて先生 1 人の 1 日の上限に数えられる** (プロパティの読み書き
 50 万回 / 日、同時実行 30)。5 秒おきに呼ばれる処理 (`getNotificationUpdate` など) でプロパティを読まない。
@@ -170,7 +170,7 @@ main.js (doGet/doPost routing, auth)
 
 1. 永続 secret / 設定 → `PropertiesService.setProperty` (direct write) + 読みは `getCachedProperty_`
 2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck_`
-3. すでに `getCachedProperty_` で 30s memoize される config への参照 → 何もしない (透過的)
+3. すでに `getCachedProperty_` で読む config への参照 → 何もしない (透過的)
 
 ### Frontend
 
@@ -263,7 +263,7 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 ### Performance
 
 - **Batch operations always** - `getDataRange().getValues()` not `getRange(i,j).getValue()` in loops (70x difference)
-- **Cache PropertiesService** - use `getCachedProperty_()` with 30s TTL (see helpers.js)
+- **Cache PropertiesService** - `getCachedProperty_()` を通す (1 回の実行の中で覚える。ADMIN_EMAIL / DB は焼き込み。see helpers.js)
 - **Minimize external service calls** - in-script JS operations are faster
 
 ### レスポンスの形 (サーバ → クライアント)

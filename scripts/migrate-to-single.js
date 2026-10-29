@@ -9,6 +9,10 @@
  *
  * 児童の回答はこのスクリプトの中を通るだけで、画面には授業名と件数しか出さない。
  *
+ * 注意: 元の本体の SA の鍵は 2026-10-29 に削除した。流す前に answer-board-db-manager の鍵を 1 本だけ
+ *   作り直して元の本体の SERVICE_ACCOUNT_CREDS に入れ、元の本体を一時的に配置し直す。終わったら
+ *   配置を外して鍵を消す (元の DB は SA にだけ共有されているため)。
+ *
  * 使い方:
  *   node scripts/migrate-to-single.js --name <先生専用の名前> --userId <元の本体の userId> [--dry-run]
  *

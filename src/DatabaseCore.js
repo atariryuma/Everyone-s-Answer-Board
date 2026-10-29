@@ -418,7 +418,7 @@ function findUserByField_(fieldName, fieldValue, context = {}) {
         //   Why: 以前はここから users シートを直接読み直していた (寸法 + ヘッダ + TextFinder +
         //   該当行 = 数 read)。users に居ない児童の findUserByEmail_ (checkUserAuthentication /
         //   getActiveFormInfo / validateHeaderIntegrity) が毎回それを払い、授業中の 30 人分が
-        //   users シートの 429 の一因だった (2026-09-08)。一覧は USER_CACHE_VERSION 付きの
+        //   users シートの 429 の一因だった (2026-09-08)。一覧は users の cache の版 (user_cache_ver) 付きの
         //   cache なので、作成直後のユーザーも clearDatabaseUserCache_ の bump で次の読みから見える。
         return null;
       }
@@ -704,7 +704,7 @@ function getAllUsers_(options = {}, context = {}) {
     //      saveToCacheWithSizeCheck_でサイズ超過を検出しログに残す。
     const isCacheable = (users) => Array.isArray(users) && users.length > 0;
 
-    // stampede 防止: config 保存 (USER_CACHE_VERSION bump) の直後は全 viewer の個別 cache も
+    // stampede 防止: config 保存 (user_cache_ver の更新) の直後は全 viewer の個別 cache も
     //   同時に miss し、30 人分の polling が一斉に users シートを読んでいた。1 件だけが読み、
     //   残りは最大 1.2 秒待って埋まった cache を読む。stale (直前の一覧) は返さない:
     //   findUserByField_ が古い configJson を個別 cache (15 分) に固定してしまうため。
@@ -895,7 +895,7 @@ function updateUser_(userId, updates, context = {}) {
         }
 
         // 内容が同じ書き込みは省く (2026-10 監査)。
-        //   Why: 書き込みのたびに clearDatabaseUserCache_ が USER_CACHE_VERSION を上げ、児童 30 人分の
+        //   Why: 書き込みのたびに clearDatabaseUserCache_ が users の cache の版 (user_cache_ver) を新しくし、児童 30 人分の
         //   user cache が一斉に落ちて次の poll が users シートを読み直す (stampede guard で 1 read に
         //   抑えてはいる)。lastAccessedAt / etag しか違わない保存 (同じ内容の再保存、同じ patch の
         //   再適用) で version を上げる理由は無い。cache 済の user ではなく、いま読んだ行と比べる
@@ -1037,7 +1037,7 @@ function findUserBySpreadsheetId_(spreadsheetId, context = {}) {
     }
 
     // skipCache は「SS → user の対応 (user_by_sheet, 10 分)」だけを飛ばす。users 一覧そのものは
-    //   USER_CACHE_VERSION 付き cache (config 保存で bump) を使う。
+    //   users の cache の版 (user_cache_ver) 付き cache (config 保存で新しくなる) を使う。
     //   Why: 以前は skipCache が getAllUsers_ にも伝わり、checkSpreadsheetAccess_ の
     //   cache miss (児童 × SS ごとに 60 秒) のたびに users シートを読んでいた。30 人の授業で
     //   毎分 30 read、しかもフェーズ切替で同時に切れるので burst になっていた (2026-09-08)。
@@ -1082,7 +1082,7 @@ function findUserBySpreadsheetId_(spreadsheetId, context = {}) {
     // Why (negative cache 5s): 旧版は 60s null cache で「Target user not found」 が
     //   1 分間ハマる事故を起こしていた (profile 切替 transient + getAllUsers_ stale fetch)。
     //   stale SS URL の防御目的なら 5s で十分 (polling ~ 8s なので次回ヒット時に再判定)。
-    //   USER_CACHE_VERSION bump で proactive invalidation も働くが、 fallback として TTL も短縮。
+    //   user_cache_ver の更新で proactive invalidation も働くが、 fallback として TTL も短縮。
     if (!skipCache) {
       try {
         CacheService.getScriptCache().put(cacheKey, JSON.stringify(null), 5);

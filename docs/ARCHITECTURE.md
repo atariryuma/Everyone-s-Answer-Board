@@ -87,7 +87,7 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
 
 ## users シートの書き込み省略 ([DatabaseCore.js](../src/DatabaseCore.js) `updateUser_`)
 
-- 書き込みのたびに `USER_CACHE_VERSION` が上がり、全 viewer の user cache が一斉に落ちる
+- 書き込みのたびに users の cache の版 (CacheService の `user_cache_ver`) が新しくなり、全 viewer の user cache が一斉に落ちる
   (stampede guard で 1 read には抑えてある)
 - いま読んだ行と内容が同じ (configJson は `lastAccessedAt` / `etag` を除いて比較) なら書かず、
   `{ success, unchanged: true, currentEtag }` を返す。`saveUserConfig_` は永続済の etag を client に返す
