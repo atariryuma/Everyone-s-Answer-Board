@@ -103,7 +103,7 @@ function processLoginAction() {
           const adminEmail = getCachedProperty('ADMIN_EMAIL');
           if (adminEmail && adminEmail.toLowerCase() === oldEmail.toLowerCase()) {
             // Store normalized: isAdministrator compares case-insensitively but
-            // other write sites (setupApp) persist the lowercased form.
+            // other write sites (ensureSingleTenantBootstrap_) persist the lowercased form.
             setCachedProperty('ADMIN_EMAIL', email.toLowerCase());
             console.log('processLoginAction: ADMIN_EMAIL updated', { oldEmail, newEmail: email });
           }

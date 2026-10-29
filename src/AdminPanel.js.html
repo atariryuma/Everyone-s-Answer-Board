@@ -228,12 +228,6 @@
         }
       } catch (e) { /* タブ初期選択は best-effort */ }
 
-      // Why ここで prefetch: CLAUDE.md「top-level に google.script.run を置かない」ルールに
-      //   従い、以前 EOF の独立 IIFE で動かしていた prefetchAppSetupUrl() を init() 内へ移す。
-      //   初期化バッチが終わってからの非同期 prefetch なので、ユーザー操作の前に
-      //   appSetup URL が温まる挙動は維持される (await しない fire-and-forget)。
-      try { prefetchAppSetupUrl(); } catch (e) { console.warn('prefetchAppSetupUrl skipped:', e.message); }
-
       try { initSaveConfigWrapper(); } catch (e) { console.warn('initSaveConfigWrapper skipped:', e.message); }
       try { initPublishToggleWrapper(); } catch (e) { console.warn('initPublishToggleWrapper skipped:', e.message); }
       try { initThemeSelect(); } catch (e) { console.warn('initThemeSelect skipped:', e.message); }
@@ -257,7 +251,6 @@
    *  CLAUDE.md準拠: Batched AdminPanel initialization for 70x performance improvement
    * Combines multiple sequential operations into efficient batch processing:
    * - Panel initialization
-   * - Administrator access check
    * - Footer initialization with board info
    */
   async function initializeBatchedAdminPanel() {
@@ -265,7 +258,6 @@
       window.setLoading(true, '処理中...');
 
       await initializePanelCore();
-      await checkAdministratorAccess();
 
       try {
         const adminData = await loadBatchedAdminData();
@@ -945,7 +937,7 @@
    *   各 callsite で個別に `window.location` 系を呼ぶと罠を踏み続けるので、必ずこの helper
    *   経由でビルドする。`_cachedWebAppUrl` を優先、未取得時は同期 fetch + callback。
    *
-   * @param {string} mode - `?mode=` の値 (review / manual / appSetup / view 等)
+   * @param {string} mode - `?mode=` の値 (review / view 等)
    * @param {Object} [params] - 追加クエリパラメータ {key: value}
    * @param {Function} onReady - URL 取得後に呼ぶコールバック (url が引数)
    * @param {Function} [onError] - 取得失敗時のコールバック
@@ -1356,17 +1348,6 @@
     });
   }
 
-  function checkAdministratorAccess() {
-    runServer('isAdmin').then((isAdmin) => {
-      const appSetupBtn = document.getElementById('app-setup-btn');
-      if (appSetupBtn) appSetupBtn.style.display = isAdmin ? 'block': 'none';
-    }, (error) => {
-      console.warn('システム管理者確認エラー:', error);
-      const appSetupBtn = document.getElementById('app-setup-btn');
-      if (appSetupBtn) appSetupBtn.style.display = 'none';
-    });
-  }
-
   /**
    * フォームURL自動解析（リアルタイム）+ 自動検証＆接続
    * @param {string} fullUrl - 入力されたフォームURL
@@ -1433,13 +1414,15 @@
     const messageEl = document.getElementById('url-validation-message');
     if (messageEl) {
       messageEl.textContent = message;
+      // 色は status token (light/dark 両対応)。生の text-green-400 等は、それを class 属性に
+      //   書いていた別ページが無くなると UtilityStyles に生成されず、無言で色が消える。
       messageEl.className = 'text-xs mt-1 ';
       if (type === 'success') {
-        messageEl.className += 'text-green-400';
+        messageEl.className += 'text-theme-status-success';
       } else if (type === 'warning') {
-        messageEl.className += 'text-yellow-400';
+        messageEl.className += 'text-theme-status-warning';
       } else if (type === 'error') {
-        messageEl.className += 'text-red-400';
+        messageEl.className += 'text-theme-status-error';
       } else {
         messageEl.className += 'text-theme-muted';
       }
@@ -2552,7 +2535,7 @@
     if (!el) return;
     const next = msg || '';
     const cls = 'text-xs ' + (
-      level === 'success'? 'text-green-400'      : level === 'warning'? 'text-yellow-400'      : level === 'error'? 'text-red-400'      : 'text-theme-muted'
+      level === 'success'? 'text-theme-status-success'      : level === 'warning'? 'text-theme-status-warning'      : level === 'error'? 'text-theme-status-error'      : 'text-theme-muted'
     );
     if (el.textContent === next && el.className === cls) return;
     el.textContent = next;
@@ -3214,23 +3197,6 @@
     }
     document.body.removeChild(textarea);
   }
-
-  /**
-   * アプリ設定 URL をプリフェッチして a[href] にセット。
-   * v2772: buildWebAppUrl helper 経由に統一 (個別 `getWebAppUrl` 呼び出しを廃止)。
-   */
-  function prefetchAppSetupUrl() {
-    const appSetupBtn = document.getElementById('app-setup-btn');
-    if (!appSetupBtn) return;
-    const targetUserId = window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.targetUserId;
-    buildWebAppUrl('appSetup', targetUserId ? { userId: targetUserId } : null,
-      (url) => { appSetupBtn.href = safeHttpsHref_(url); },
-      (err) => { console.warn('アプリ設定URL取得エラー:', err && err.message); }
-    );
-  }
-
-  // prefetchAppSetupUrl は init() 内で呼ばれる (上記参照)。EOF の top-level kickoff は
-  // CLAUDE.md「top-level google.script.run 禁止」ルールに違反するため削除。
 
   // =====================================================================
   // Lesson Workspace: 作成 wizard + Runner + 過去一覧。

@@ -133,9 +133,8 @@ const RULES = [
     ],
     filter: (filepath) => /\.html$/.test(filepath)
       && !filepath.includes('/tests/')
-      // UnifiedStyles / login 背景は意匠として意図的に残す領域があるため対象外。
+      // UnifiedStyles は意匠として意図的に残す領域があるため対象外。
       && !filepath.endsWith('/UnifiedStyles.css.html')
-      && !filepath.endsWith('/LoginPage.html')
       // SharedPageHead は UnifiedStyles を展開した生成物 (v2909)。元ファイルで
       // 検査済みの内容を二重に報告してしまうため対象外にする。
       && !filepath.endsWith('/SharedPageHead.html'),

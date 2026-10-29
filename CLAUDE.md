@@ -97,7 +97,7 @@ pre-commit hook は `npm install` 時に自動有効化される（`postinstall`
 
 ### Request Flow
 
-- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Handler table `DO_GET_HANDLERS` (main.js) is the single source of truth: `login` / `admin` / `setup` / `appSetup` / `view` / `review` / `main` (既定・未知の mode も `main` にフォールバック)
+- **`doGet(e)`** (main.js): Routes `?mode=` parameter to HTML templates via `HtmlService`. Handler table `DO_GET_HANDLERS` (main.js) is the single source of truth: `admin` / `view` / `review` / `main` (既定・未知の mode も `main` にフォールバック)。ログイン・初期設定・アプリ設定の画面は無い: 先生専用の配置では先生がトップを開くと `processLoginAction` で登録して管理パネルを直接返し、初回のプロパティと DB シートは `ensureSingleTenantBootstrap_` がそろえる。停止/再開などの運用操作は Admin API で行う
 - **`doPost(e)`** (main.js): Routes JSON `action` field to handler functions. Actions are allowlist-managed; each must have input validation.
 - Both entry points authenticate via `Session.getActiveUser().getEmail()`
 
@@ -345,7 +345,7 @@ Tests run in Node.js using `node:test` (no frameworks). GAS globals are stubbed 
 
 ### Required Script Properties
 
-Set via GAS editor or SetupPage:
+Set via GAS editor (先生専用の配置では `ADMIN_EMAIL` / `DATABASE_SPREADSHEET_ID` を `ensureSingleTenantBootstrap_` が `Tenancy.js` の値で初回に入れる):
 
 | Property | Description |
 | -------- | ----------- |

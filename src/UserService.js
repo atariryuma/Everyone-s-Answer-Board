@@ -1,9 +1,9 @@
 /**
- * @fileoverview UserService - 認証・現在ユーザー情報取得（getUser / isAdmin /
+ * @fileoverview UserService - 認証・現在ユーザー情報取得（isAdmin /
  *   IDトークン由来の Google 不変 ID 取得）。
  */
 
-/* global getCurrentEmail, findUserByEmail, isAdministrator */
+/* global getCurrentEmail, isAdministrator */
 
 /**
  * ユーザー情報キャッシュキーを生成（UserApis.js から参照される）
@@ -63,48 +63,3 @@ function isAdmin() {
     return false;
   }
 }
-
-/**
- * Get user information with specified type
- * @param {string} infoType - Type of info: 'email', 'full'
- * @returns {Object} User information
- */
-function getUser(infoType = 'email') {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'Not authenticated'
-      };
-    }
-
-    if (infoType === 'email') {
-      return {
-        success: true,
-        email
-      };
-    }
-
-    if (infoType === 'full') {
-      const user = findUserByEmail(email, { requestingUser: email });
-      return {
-        success: true,
-        email,
-        user: user || null
-      };
-    }
-
-    return {
-      success: false,
-      message: `Unsupported infoType: ${infoType}`
-    };
-  } catch (error) {
-    logError_('getUser', error);
-    return {
-      success: false,
-      message: error.message || 'User retrieval failed'
-    };
-  }
-}
-

@@ -26,48 +26,24 @@
 
         <? if (typeof isAppDisabled !== 'undefined' && isAppDisabled) { ?>
         <!-- ========== アプリ無効化中 ========== -->
-        <div class="box box-warning mb-6">
+        <div class="box box-warning">
           <p class="text-theme-status-warning font-semibold mb-1">現在メンテナンス中です</p>
           <p class="text-theme-muted text-sm">管理者がシステムの設定を行っています。しばらくお待ちください。</p>
         </div>
 
         <? } else if (typeof message !== 'undefined' && message) { ?>
-        <!-- ========== ドメイン不一致等のメッセージ ========== -->
-        <div class="box box-error mb-6">
+        <!-- ========== ドメイン不一致・準備未完了などのメッセージ ========== -->
+        <div class="box box-error">
           <p class="text-theme-status-error text-sm"><?= message ?></p>
         </div>
 
         <? } else { ?>
         <!-- ========== 通常のアクセス制限（トップページ直アクセス等） ========== -->
-        <div class="box mb-6">
+        <div class="box">
           <p class="text-theme-secondary text-sm">このページは管理者・登録ユーザー向けです。</p>
           <p class="text-theme-muted text-xs mt-2">回答ボードの閲覧は、先生から共有されたURLからアクセスしてください。</p>
         </div>
         <? } ?>
-
-        <!-- ========== アクション ========== -->
-
-        <? if (typeof isAdministrator !== 'undefined' && isAdministrator) { ?>
-        <!-- 管理者 -->
-        <div class="space-y-3">
-          <a id="admin-login-link" target="_top"
-            class="btn btn-secondary w-full is-disabled">
-            読み込み中...
-          </a>
-          <a id="app-setup-link" target="_top"
-            class="btn btn-secondary w-full is-disabled">
-            読み込み中...
-          </a>
-        </div>
-
-        <? } else if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
-        <!-- 登録済みユーザー -->
-        <a id="editor-login-link" target="_top"
-          class="btn btn-secondary w-full is-disabled">
-          読み込み中...
-        </a>
-        <? } ?>
-
       </div>
 
       <!-- フッター -->
@@ -78,37 +54,5 @@
 
     <?!= include('SharedUtilities'); ?>
     <?!= include('SharedErrorHandling'); ?>
-
-    <script>
-      function enableLink(el, href, text) {
-        if (!el) return;
-        el.href = href;
-        el.textContent = text;
-        el.classList.remove('pointer-events-none', 'bg-theme-card-3', 'text-theme-muted');
-        el.classList.add('btn', 'btn-primary');
-      }
-
-      document.addEventListener('DOMContentLoaded', async function() {
-        let webAppUrl;
-        try {
-          webAppUrl = await runServer('getWebAppUrl');
-        } catch (_) {
-          // URL取得失敗時はボタンをエラー表示のまま
-          return;
-        }
-        enableLink(document.getElementById('admin-login-link'), webAppUrl + '?mode=login', 'ログイン');
-        enableLink(document.getElementById('editor-login-link'), webAppUrl + '?mode=login', 'ログインしてはじめる');
-
-        const appSetupLink = document.getElementById('app-setup-link');
-        if (!appSetupLink) return;
-        try {
-          const userInfo = await runServer('getUser', 'full');
-          const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
-          enableLink(appSetupLink, webAppUrl + '?mode=appSetup' + (userId ? '&userId=' + userId : ''), 'アプリ設定');
-        } catch (_) {
-          enableLink(appSetupLink, webAppUrl + '?mode=appSetup', 'アプリ設定');
-        }
-      });
-    </script>
   </body>
 </html>

@@ -441,8 +441,7 @@
     <div class="app-header-inner">
       <h1>みんなの回答ボード</h1>
       <div class="flex items-center gap-2">
-        <!-- アカウント: 旧「ユーザー情報」カード + 「アプリ設定」を集約。
-             常時 4 カードを右カラムに置く必要が無くなる。 -->
+        <!-- アカウント: どのアカウントで開いているかだけを示す (旧「ユーザー情報」カード)。 -->
         <details class="account-menu">
           <summary title="アカウント">
             <svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg>
@@ -452,16 +451,6 @@
           <div class="account-panel">
             <div class="text-xs text-theme-muted">ログイン中</div>
             <div id="current-user-email" class="text-sm text-theme break-all">読み込み中...</div>
-            <!-- システム管理者のみ表示 (updateResourceButtons が display を制御) -->
-            <a id="app-setup-btn" target="_top" class="link-btn w-full text-center block" style="display: none;">
-              <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
-              アプリ設定
-            </a>
-            <button type="button" class="btn btn-secondary w-full"
-              onclick="window.sharedUtilities.auth.logout()">
-              <svg class="icon" aria-hidden="true"><use href="#i-log-out"></use></svg>
-              ログアウト
-            </button>
           </div>
         </details>
       </div>

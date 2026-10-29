@@ -76,13 +76,9 @@ const SCAN_FILES = [
   'AdminPanel.html',
   'AdminPanel.js.html',
   'AccessRestricted.html',
-  'LoginPage.html',
-  'login.js.html',
   'Unpublished.html',
-  'AppSetupPage.html',
   'ErrorBoundary.html',
   'LessonWorkspace.html',
-  'SetupPage.html',
   'SharedErrorHandling.html',
   'SharedUtilities.html',
 ];

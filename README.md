@@ -108,8 +108,6 @@ GASエディタで **プロジェクトの設定** > **スクリプトプロパ�
 | `SERVICE_ACCOUNT_CREDS` | Step 3でダウンロードしたJSONの内容（全文貼り付け） |
 | `ADMIN_API_KEY` | 任意の秘密文字列（16文字以上、CLIツール認証用） |
 
-または、SetupPage（`デプロイURL?mode=setup`）から設定可能です。
-
 ### Step 8: 初回デプロイ（GASエディタから）
 
 初回のみGASエディタでの操作が必要です（2回目以降は `npm run deploy:prod` で完結）。
@@ -124,9 +122,9 @@ GASエディタで **プロジェクトの設定** > **スクリプトプロパ�
 
 ### Step 9: 初期設定の確認
 
-1. デプロイURLに `?mode=setup` を追加してアクセス
-2. システム設定が正しく読み込まれていることを確認
-3. `?mode=login` でログインページにアクセスし、管理者としてログイン
+1. `npm run api -- systemDiagnosis` で、システム設定と DB 接続が正しく読み込まれていることを確認
+2. 先生専用の配置 (`scripts/deploy-single.js`) では、先生がデプロイURLを開くとそのまま管理パネルが開く
+   （ログイン画面・初期設定画面・アプリ設定画面はない。停止 / 再開は `npm run api -- disableApp` / `enableApp`）
 
 ---
 

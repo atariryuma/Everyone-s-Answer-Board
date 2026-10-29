@@ -101,9 +101,9 @@ function evaluateDomainRestriction(email) {
  * @returns {HtmlOutput} 制限ページ
  */
 function createAccessRestrictedTemplate(email, isAppDisabled = false, message = '') {
+  // 案内文だけの画面。ログイン・アプリ設定の入口は画面ごと廃止したので、
+  //   以前ここで引いていた管理者判定と users の検索 (ボタンの出し分け用) は要らない。
   const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
-  template.isAdministrator = email ? isAdministrator(email) : false;
-  template.isRegisteredUser = email ? !!findUserByEmail(email, { requestingUser: email }) : false;
   template.userEmail = email || '';
   template.timestamp = new Date().toISOString();
   template.isAppDisabled = Boolean(isAppDisabled);
@@ -137,21 +137,16 @@ function doGet(e) {
       );
     }
 
-    const isAppDisabled = checkAppAccessRestriction();
-    if (isAppDisabled) {
-      const isAdmin = currentEmail ? isAdministrator(currentEmail) : false;
-      const canOpenAppSetup = mode === 'appSetup' && isAdmin;
-      if (!canOpenAppSetup) {
-        return createAccessRestrictedTemplate(currentEmail, true);
-      }
+    // 停止中は管理者も含めて案内だけ。再開は Admin API (`npm run api -- enableApp`) で行う。
+    if (checkAppAccessRestriction()) {
+      return createAccessRestrictedTemplate(currentEmail, true);
     }
 
-    // セットアップ未完了なら自動でセットアップページへ
-    if (mode !== 'setup') {
-      const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
-      if (!setupDone) {
-        return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
-      }
+    // 必須プロパティがそろっていなければ案内だけ出す。先生専用の配置では
+    //   ensureSingleTenantBootstrap_ (上) がそろえるので、ここに来るのは配置の失敗時だけ。
+    const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
+    if (!setupDone) {
+      return createAccessRestrictedTemplate(currentEmail, false, 'このアプリはまだ準備できていません。管理者に連絡してください。');
     }
 
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
@@ -169,7 +164,6 @@ function doGet(e) {
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     errorTemplate.title = 'システムエラー';
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
-    errorTemplate.hideLoginButton = true;
 
     return errorTemplate.evaluate().setTitle('エラー');
   }
@@ -179,17 +173,13 @@ function doGet(e) {
 // Why: doGet を 1 ハンドラ = 1 mode の薄い dispatcher にする。
 //   元の switch (~200 行) を Clean Code "Replace Conditional with Polymorphism" で table-driven 化。
 
-function handleLoginMode_() {
-  return HtmlService.createTemplateFromFile('LoginPage.html').evaluate().setTitle('ログイン');
-}
-
 function handleAdminMode_(params, currentEmail) {
   if (!currentEmail) {
-    return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
+    return createRedirectTemplate('ErrorBoundary.html', 'Google アカウントにログインしてから、もう一度開いてください。');
   }
   const targetUserId = params.userId;
   if (!targetUserId) {
-    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
+    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。トップページから開き直してください。');
   }
   const adminData = getBatchedAdminData(targetUserId);
   if (!adminData.success) {
@@ -228,48 +218,13 @@ function handleAdminMode_(params, currentEmail) {
   return template.evaluate().setTitle('管理');
 }
 
-function handleSetupMode_(params, currentEmail) {
-  let showSetup = false;
-  try {
-    if (typeof hasCoreSystemProps === 'function') {
-      showSetup = !hasCoreSystemProps();
-    } else {
-      // hasCoreSystemProps が未ロードの fallback。getCachedProperty で 3 回の Property fetch をまとめる。
-      const hasAdmin = !!getCachedProperty('ADMIN_EMAIL');
-      const hasDb = !!getCachedProperty('DATABASE_SPREADSHEET_ID');
-      const hasCreds = !!getCachedProperty('SERVICE_ACCOUNT_CREDS');
-      showSetup = !(hasAdmin && hasDb && hasCreds);
-    }
-  } catch (_) {
-    showSetup = true;
-  }
-  if (showSetup) {
-    return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
-  }
-  return createAccessRestrictedTemplate(currentEmail);
-}
-
-function handleAppSetupMode_(params, currentEmail) {
-  if (!currentEmail || !isAdministrator(currentEmail)) {
-    return createRedirectTemplate('ErrorBoundary.html', 'このページへのアクセス権限がありません。');
-  }
-  let userIdParam = params.userId || '';
-  if (!userIdParam) {
-    const adminUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
-    if (adminUser) userIdParam = adminUser.userId;
-  }
-  const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
-  template.userIdParam = userIdParam;
-  return template.evaluate().setTitle('システム設定');
-}
-
 function handleViewMode_(params, currentEmail) {
   if (!currentEmail) {
-    return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
+    return createRedirectTemplate('ErrorBoundary.html', 'Google アカウントにログインしてから、もう一度開いてください。');
   }
   const targetUserId = params.userId;
   if (!targetUserId) {
-    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
+    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。先生から共有された URL を開き直してください。');
   }
   const viewerData = getBatchedViewerData(targetUserId, currentEmail);
   if (!viewerData.success) {
@@ -400,24 +355,22 @@ function handleReviewMode_(params, currentEmail) {
 }
 
 function handleMainMode_(params, currentEmail) {
-  // 先生専用の配置 (isSingleTenant_) では使う先生は 1 人なので、「ログイン」「アプリ設定」の
-  //   入口を見せずに、先生が開いたら登録 (processLoginAction) を済ませて管理パネルを直接開く。
-  //   児童など先生以外は、本体と同じ案内 (ボタンなし) のまま。
+  // 先生専用の配置 (isSingleTenant_) では使う先生は 1 人なので、先生が開いたら登録
+  //   (processLoginAction) を済ませて管理パネルを直接開く。ログイン画面・アプリ設定画面は
+  //   これに置き換えて廃止した (未知の mode=login / setup / appSetup もここに来る)。
+  //   児童など先生以外は案内だけ。
   if (typeof isSingleTenant_ === 'function' && isSingleTenant_() && currentEmail && isAdministrator(currentEmail)) {
     const login = processLoginAction();
     const userId = login && login.success && login.data && login.data.userId;
     if (userId) return handleAdminMode_({ userId }, currentEmail);
-    // 登録に失敗したら本体と同じ画面 (ログインボタンあり) に戻す。痕跡は残す。
+    // 登録に失敗したら案内の画面に戻す。開き直せば登録をやり直すので、痕跡だけ残す。
     console.warn('handleMainMode_: single-tenant auto login failed:', login && login.message);
   }
   return createAccessRestrictedTemplate(currentEmail);
 }
 
 const DO_GET_HANDLERS = {
-  login: handleLoginMode_,
   admin: handleAdminMode_,
-  setup: handleSetupMode_,
-  appSetup: handleAppSetupMode_,
   view: handleViewMode_,
   review: handleReviewMode_,
   main: handleMainMode_
@@ -435,18 +388,10 @@ function createRedirectTemplate(redirectPage, error) {
   try {
     const template = HtmlService.createTemplateFromFile(redirectPage);
 
-    if (redirectPage === 'AccessRestricted.html') {
-      const email = getCurrentEmail();
-      template.isAdministrator = email ? isAdministrator(email) : false;
-      template.userEmail = email || '';
-      template.timestamp = new Date().toISOString();
-      if (error) {
-        template.message = error;
-      }
-    } else if (error && redirectPage === 'ErrorBoundary.html') {
+    // AccessRestricted は createAccessRestrictedTemplate が唯一の入口 (ここでは組み立てない)。
+    if (error && redirectPage === 'ErrorBoundary.html') {
       template.title = 'アクセスエラー';
       template.message = error;
-      template.hideLoginButton = true;
       template.webAppUrl = getWebAppUrl() || '';
     }
 
@@ -457,7 +402,6 @@ function createRedirectTemplate(redirectPage, error) {
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
-    fallbackTemplate.hideLoginButton = true;
     fallbackTemplate.webAppUrl = getWebAppUrl() || '';
     return fallbackTemplate.evaluate().setTitle('エラー');
   }

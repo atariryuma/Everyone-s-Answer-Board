@@ -1,17 +1,17 @@
 /**
  * @fileoverview SystemController - システム管理・診断・公開ライフサイクル。
  *   - URL システム: forceUrlSystemReset, getWebAppUrl (6h cache + saved fallback)
- *   - 診断・監視: testSystemDiagnosis, monitorSystem, checkDataIntegrity, performAutoRepair
+ *   - 診断・監視: testSystemDiagnosis, performAutoRepair
  *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
  *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
  *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection, searchFormsByDrive
- *   - 初期セットアップ: setupApp, testDatabaseConnection
+ *   - DB: testDatabaseConnection, __ensureSheetWithHeaders_ (先生専用の配置の初回にシートをそろえる)
  *
  * 公開状態の書き換えはここの publishApp と AdminApis.js の 3 関数 (republishMyBoard /
  * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_, clearDatabaseUserCache, clearPropertyCache */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache */
 
 /**
  * キャッシュ期間 (秒)
@@ -90,12 +90,6 @@ __rootSys.TIMEOUT_MS = TIMEOUT_MS;
 __rootSys.SLEEP_MS = SLEEP_MS;
 
 /**
- * システム状態の強制リセット
- * AppSetupPage.html から呼び出される（緊急時用）
- *
- * @returns {Object} リセット結果
- */
-/**
  * 全体キャッシュ無効化（cacheReset / autoRepair 共通）。
  *
  * GAS の CacheService.remove(key) は完全一致キーのみ削除し、 prefix/wildcard 削除が無い。
@@ -141,11 +135,15 @@ function invalidateGlobalCaches_() {
   return results;
 }
 
+/**
+ * システム状態の強制リセット。Admin API の cacheReset から呼ばれる（緊急時用）。
+ *
+ * @returns {Object} リセット結果
+ */
 function forceUrlSystemReset() {
   try {
-    // Why (log level): login.js.html:283 が **毎回のログイン**で呼ぶため、WARN として記録すると
-    //   1日数十回の WARN ノイズが Cloud Logging を埋め、本物のアラートが埋もれる。
-    //   定常動作なので INFO に降格 (旧版は 24h で 5件の WARN を吐いていた)。
+    // Why (log level): 管理者が意図して呼ぶ保守操作 (Admin API の cacheReset) なので、
+    //   異常を示す WARN ではなく INFO で残す。
     console.log('システム強制リセットが実行されました');
 
     const cacheResults = invalidateGlobalCaches_();
@@ -246,8 +244,7 @@ function isValidWebAppUrl_(url) {
 }
 
 /**
- * システム全体の診断実行
- * AppSetupPage.html から呼び出される
+ * システム全体の診断実行。Admin API の systemDiagnosis から呼ばれる。
  *
  * @returns {Object} 診断結果
  */
@@ -343,192 +340,6 @@ function testSystemDiagnosis() {
   } catch (error) {
     logError_('testSystemDiagnosis', error);
     return createExceptionResponse(error, 'System diagnosis failed');
-  }
-}
-
-/**
- * Monitor system health and performance - CLAUDE.md準拠命名
- * @returns {Object} System monitoring result
- */
-function monitorSystem() {
-  try {
-
-    const adminAuth = getBatchedAdminAuth();
-    if (!adminAuth.success) {
-      return adminAuth.authError || adminAuth.adminError || createAuthError();
-    }
-
-    const metrics = {};
-
-    try {
-      // Why: 他の API は executionTime を "Nms" 文字列で返すため、ISO timestamp は別名で返す。
-      metrics.executedAt = new Date().toISOString();
-      metrics.quotaStatus = 'MONITORING';
-    } catch (error) {
-      metrics.quotaStatus = 'ERROR';
-      metrics.quotaError = error.message;
-    }
-
-    try {
-      const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
-      metrics.userCount = Array.isArray(users) ? users.length : 0;
-      metrics.databaseStatus = 'ACCESSIBLE';
-    } catch (error) {
-      metrics.userCount = 0;
-      metrics.databaseStatus = 'ERROR';
-      metrics.databaseError = error.message;
-    }
-
-    try {
-      const cache = CacheService.getScriptCache();
-      const testKey = 'monitoring_test';
-      const testValue = Date.now().toString();
-      cache.put(testKey, testValue, 60);
-      const retrieved = cache.get(testKey);
-
-      metrics.cacheStatus = retrieved === testValue ? 'OPERATIONAL' : 'DEGRADED';
-      cache.remove(testKey);
-    } catch (error) {
-      metrics.cacheStatus = 'ERROR';
-      metrics.cacheError = error.message;
-    }
-
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
-      metrics.serviceAccountStatus = creds ? 'CONFIGURED' : 'NOT_CONFIGURED';
-    } catch (error) {
-      metrics.serviceAccountStatus = 'ERROR';
-      metrics.serviceAccountError = error.message;
-    }
-
-    const healthScore = Object.keys(metrics).filter(key =>
-      metrics[key] === 'OPERATIONAL' ||
-      metrics[key] === 'ACCESSIBLE' ||
-      metrics[key] === 'CONFIGURED'
-    ).length;
-
-    return {
-      success: true,
-      message: 'System monitoring completed',
-      healthScore: `${healthScore}/4`,
-      status: healthScore >= 3 ? 'HEALTHY' : healthScore >= 2 ? 'DEGRADED' : 'CRITICAL',
-      metrics,
-      recommendations: healthScore < 3 ? ['Check failed components', 'Review system configuration'] : ['System operating normally'],
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (error) {
-    logError_('monitorSystem', error);
-    return createExceptionResponse(error, 'System monitoring failed');
-  }
-}
-
-/**
- * Check data integrity - CLAUDE.md準拠命名
- * @returns {Object} Data integrity check result
- */
-function checkDataIntegrity() {
-  try {
-
-    const adminAuth = getBatchedAdminAuth();
-    if (!adminAuth.success) {
-      return adminAuth.authError || adminAuth.adminError || createAuthError();
-    }
-
-    const integrityResults = [];
-
-    try {
-      const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
-      const userCount = Array.isArray(users) ? users.length : 0;
-      const validUsers = users.filter(user =>
-        user &&
-        user.userId &&
-        user.userEmail &&
-        user.userEmail.includes('@')
-      ).length;
-
-      integrityResults.push({
-        check: 'User Database',
-        status: validUsers === userCount ? 'PASS' : 'WARN',
-        details: `${validUsers}/${userCount} valid user records`,
-        validCount: validUsers,
-        totalCount: userCount
-      });
-
-      let configErrors = 0;
-      let validConfigs = 0;
-
-      if (Array.isArray(users)) {
-        for (const user of users) {
-          try {
-            // 一覧で読んだ行を渡す (preloadedUser)。渡さないと user ごとに findUserById →
-            //   個別 cache miss → 一覧 cache の線形検索が走り、ユーザー数の 2 乗で遅くなる。
-            const configResult = getUserConfig(user.userId, user);
-            if (configResult.success) {
-              validConfigs++;
-            } else {
-              configErrors++;
-            }
-          } catch (configError) {
-            configErrors++;
-          }
-        }
-      }
-
-      integrityResults.push({
-        check: 'Configuration Integrity',
-        status: configErrors === 0 ? 'PASS' : 'WARN',
-        details: `${validConfigs} valid configs, ${configErrors} errors`,
-        validCount: validConfigs,
-        errorCount: configErrors
-      });
-    } catch (error) {
-      // getAllUsers() failure — config loop errors are caught individually above
-      integrityResults.push({
-        check: 'User Database',
-        status: 'ERROR',
-        error: error.message
-      });
-    }
-
-    try {
-      const dbConfig = testDatabaseConnection();
-      integrityResults.push({
-        check: 'Database Schema',
-        status: dbConfig.success ? 'PASS' : 'FAIL',
-        details: dbConfig.success ? 'Schema accessible' : 'Schema validation failed'
-      });
-    } catch (error) {
-      integrityResults.push({
-        check: 'Database Schema',
-        status: 'ERROR',
-        error: error.message
-      });
-    }
-
-    const passedChecks = integrityResults.filter(r => r.status === 'PASS').length;
-    const totalChecks = integrityResults.length;
-    const hasErrors = integrityResults.some(r => r.status === 'ERROR');
-    const hasWarnings = integrityResults.some(r => r.status === 'WARN');
-
-    return {
-      success: !hasErrors,
-      message: hasErrors ? 'Data integrity check found errors' : hasWarnings ? 'Data integrity check found warnings' : 'Data integrity check passed',
-      summary: {
-        totalChecks,
-        passed: passedChecks,
-        warnings: integrityResults.filter(r => r.status === 'WARN').length,
-        errors: integrityResults.filter(r => r.status === 'ERROR').length
-      },
-      overallStatus: hasErrors ? 'CRITICAL' : hasWarnings ? 'WARNING' : 'HEALTHY',
-      checks: integrityResults,
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (error) {
-    logError_('checkDataIntegrity', error);
-    return createExceptionResponse(error, 'Data integrity check failed');
   }
 }
 
@@ -1741,178 +1552,17 @@ function testDatabaseConnection() {
   }
 }
 
-/**
- * Setup application with system properties
- * @param {string} serviceAccountJson - Service account credentials
- * @param {string} databaseId - Database spreadsheet ID
- * @param {string} adminEmail - Administrator email
- * @param {string} googleClientId - Google Client ID (optional)
- * @returns {Object} Setup result
- */
-function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-  try {
-    const validation = __validateSetupInputs_(serviceAccountJson, databaseId, adminEmail);
-    if (!validation.ok) return validation.error;
-    const { currentEmail, normalizedAdminEmail, parsedCredentials, trimmedDatabaseId } = validation;
-
-    const auth = __checkSetupAuth_(currentEmail, normalizedAdminEmail);
-    if (!auth.ok) return auth.error;
-
-    __persistSetupProperties_(trimmedDatabaseId, normalizedAdminEmail, serviceAccountJson, googleClientId);
-    __ensureDatabaseSheets_(trimmedDatabaseId, parsedCredentials);
-    __installLessonTriggersIfAvailable_();
-
-    return {
-      success: true,
-      message: 'Application setup completed successfully',
-      data: {
-        databaseId: trimmedDatabaseId,
-        adminEmail: normalizedAdminEmail,
-        googleClientId: googleClientId || null
-      }
-    };
-  } catch (error) {
-    logError_('setupApplication', error);
-    return createExceptionResponse(error);
-  }
-}
-
-// 入力チェック + パース (validateEmail + databaseId 形式 + JSON parse + 必須キー検査)。
-function __validateSetupInputs_(serviceAccountJson, databaseId, adminEmail) {
-  const fail = (message) => ({ ok: false, error: { success: false, message } });
-
-  if (!serviceAccountJson || !databaseId || !adminEmail) {
-    return fail('必須パラメータが不足しています');
-  }
-  const currentEmail = getCurrentEmail();
-  if (!currentEmail) return fail('セットアップ実行者の認証が必要です');
-
-  const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
-  if (!validateEmail(normalizedAdminEmail).isValid) {
-    return fail('管理者メールアドレスの形式が不正です');
-  }
-
-  const trimmedDatabaseId = String(databaseId).trim();
-  if (!/^[a-zA-Z0-9-_]{40,60}$/.test(trimmedDatabaseId)) {
-    return fail('データベーススプレッドシートIDの形式が不正です');
-  }
-
-  let parsedCredentials;
-  try { parsedCredentials = JSON.parse(serviceAccountJson); }
-  catch (jsonError) { return fail(`サービスアカウントJSONの解析に失敗しました: ${jsonError.message}`); }
-
-  const requiredCredFields = ['type', 'project_id', 'private_key', 'client_email'];
-  const missing = requiredCredFields.filter(field => !parsedCredentials[field]);
-  if (missing.length > 0) {
-    return fail(`サービスアカウントJSONに必須項目が不足しています: ${missing.join(', ')}`);
-  }
-
-  return { ok: true, currentEmail, normalizedAdminEmail, parsedCredentials, trimmedDatabaseId };
-}
-
-// 既設定なら admin + domain チェック、初回なら入力 admin 本人実行を検証。
-function __checkSetupAuth_(currentEmail, normalizedAdminEmail) {
-  const fail = (message) => ({ ok: false, error: { success: false, message } });
-  const alreadyConfigured = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : false;
-
-  if (alreadyConfigured) {
-    if (!isAdministrator(currentEmail)) return { ok: false, error: createAdminRequiredError() };
-    if (typeof validateDomainAccess === 'function') {
-      const domainCheck = validateDomainAccess(currentEmail, {
-        allowIfAdminUnconfigured: false,
-        allowIfEmailMissing: false
-      });
-      if (!domainCheck.allowed) {
-        return fail('管理者と同一ドメインのアカウントでセットアップを実行してください');
-      }
-    }
-  } else if (currentEmail.toLowerCase() !== normalizedAdminEmail) {
-    return fail('初回セットアップは入力した管理者メールアドレス本人で実行してください');
-  }
-  return { ok: true };
-}
-
-function __persistSetupProperties_(trimmedDatabaseId, normalizedAdminEmail, serviceAccountJson, googleClientId) {
-  setCachedProperty('DATABASE_SPREADSHEET_ID', trimmedDatabaseId);
-  setCachedProperty('ADMIN_EMAIL', normalizedAdminEmail);
-  setCachedProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
-  if (googleClientId) setCachedProperty('GOOGLE_CLIENT_ID', googleClientId);
-}
-
-// SA を editor として共有 + users / lessons シートを idempotent にセットアップ。
-function __ensureDatabaseSheets_(trimmedDatabaseId, parsedCredentials) {
-  try {
-    const ss = SpreadsheetApp.openById(trimmedDatabaseId);
-    const saEmail = parsedCredentials.client_email;
-    const editors = ss.getEditors().map(e => e.getEmail().toLowerCase());
-    if (!editors.includes(saEmail.toLowerCase())) {
-      ss.addEditor(saEmail);
-      console.log('setupApp: Added service account as editor:', saEmail);
-    }
-    __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
-    __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
-    __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
-  } catch (dbError) {
-    console.warn('setupApp: Database initialization failed:', dbError.message);
-  }
-}
-
+// DB のシートを idempotent にそろえる (無ければ作る / 空ならヘッダーを書く)。
+//   先生専用の配置の初回 (helpers.js の ensureSingleTenantBootstrap_) が使う。
 function __ensureSheetWithHeaders_(ss, sheetName, headers) {
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
     sheet.appendRow(headers);
-    console.log(`setupApp: Created ${sheetName} sheet with headers`);
+    console.log(`__ensureSheetWithHeaders_: Created ${sheetName} sheet with headers`);
   } else if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
-    console.log(`setupApp: Added headers to empty ${sheetName} sheet`);
-  }
-}
-
-function __installLessonTriggersIfAvailable_() {
-  try { installLessonTriggers(); }
-  catch (triggerErr) { console.warn('setupApp: installLessonTriggers failed:', triggerErr.message); }
-}
-
-/**
- * データベーススプレッドシートをGASプロジェクトと同じフォルダに自動作成
- * @returns {Object} { success, spreadsheetId, message }
- */
-function createDatabase() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
-
-    // GASプロジェクトの親フォルダを取得
-    const scriptId = ScriptApp.getScriptId();
-    const scriptFile = DriveApp.getFileById(scriptId);
-    const parents = scriptFile.getParents();
-    const folder = parents.hasNext() ? parents.next() : null;
-
-    // スプレッドシート作成
-    const ss = SpreadsheetApp.create('みんなの回答ボード DB');
-    const sheet = ss.getSheets()[0];
-    sheet.setName('users');
-    sheet.appendRow(USERS_SHEET_HEADERS);
-
-    // lessons シート (lesson archive 用) も同時に作成
-    const lessonsSheet = ss.insertSheet('lessons');
-    lessonsSheet.appendRow(LESSONS_SHEET_HEADERS);
-    const responsesSheet = ss.insertSheet('lesson_responses');
-    responsesSheet.appendRow(LESSON_RESPONSES_SHEET_HEADERS);
-
-    if (folder) {
-      DriveApp.getFileById(ss.getId()).moveTo(folder);
-    }
-
-    return {
-      success: true,
-      spreadsheetId: ss.getId(),
-      message: 'データベースを作成しました'
-    };
-  } catch (error) {
-    logError_('createDatabase', error);
-    return createErrorResponse(`作成に失敗しました: ${error.message}`);
+    console.log(`__ensureSheetWithHeaders_: Added headers to empty ${sheetName} sheet`);
   }
 }
 

@@ -2,13 +2,12 @@
  * @fileoverview SecurityService - ドメイン制限 (組織内ドメインのみアクセス可) の判定。
  *   - extractDomainSafely / isSystemSetupComplete / shouldEnforceDomainRestrictions
  *   - validateDomainAccess (admin ドメインと一致するかチェック)
- *   - getDeployUserDomainInfo (LoginPage の domain badge 用)
  *
  * 入力検証は validators.js、 認可は main.js requireAdmin / DatabaseCore.js access control、
  * SA pool 管理は DatabaseCore.js に分離されている (混同しないこと)。
  */
 
-/* global getCurrentEmail, getCachedProperty, hasCoreSystemProps, logError_ */
+/* global getCachedProperty, hasCoreSystemProps */
 
 /**
  * 安全にメールアドレスからドメインを抽出する
@@ -104,38 +103,4 @@ function validateDomainAccess(email, options = {}) {
     message: allowed ? 'Domain access allowed' : 'Domain mismatch',
     reason: allowed ? 'domain_match' : 'domain_mismatch'
   };
-}
-
-/**
- * Deploy user domain information retrieval
- * @returns {Object} Domain information and validation result
- */
-function getDeployUserDomainInfo() {
-  try {
-    const email = getCurrentEmail();
-    const accessResult = validateDomainAccess(email, {
-      allowIfAdminUnconfigured: true,
-      allowIfEmailMissing: false
-    });
-
-    return {
-      success: accessResult.allowed,
-      domain: accessResult.userDomain,
-      userEmail: email,
-      userDomain: accessResult.userDomain,
-      adminDomain: accessResult.adminDomain,
-      isValidDomain: accessResult.allowed,
-      reason: accessResult.reason,
-      message: accessResult.message,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    logError_('SecurityService.getDeployUserDomainInfo', error);
-    return {
-      success: false,
-      message: error.message,
-      domain: null,
-      isValidDomain: false
-    };
-  }
 }

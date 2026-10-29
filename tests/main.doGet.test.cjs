@@ -15,21 +15,24 @@ function createHtmlOutput(title) {
 
 function loadDoGetContext(overrides = {}) {
   const templates = [];
+  const templateObjects = [];
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     logError_: () => {},
     HtmlService: {
       createTemplateFromFile: (name) => {
         templates.push(name);
-        return {
+        const tpl = {
           evaluate: () => createHtmlOutput(name),
-          title: null, message: null, hideLoginButton: null,
+          title: null, message: null,
           userId: null, configJSON: null, mapping: null,
           spreadsheetId: null, sheetName: null, editorName: null,
           isEditor: null, boardOwnerName: null, isPublished: null,
-          userEmail: null, isAdministrator: null, timestamp: null,
+          userEmail: null, timestamp: null,
           questionText: null, formUrl: null
         };
+        templateObjects.push({ name, tpl });
+        return tpl;
       },
       XFrameOptionsMode: { ALLOWALL: 'ALLOWALL' }
     },
@@ -59,19 +62,62 @@ function loadDoGetContext(overrides = {}) {
   vm.createContext(context);
   const source = fs.readFileSync(path.resolve(__dirname, '../src/main.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'main.js' });
-  return { context, templates };
+  return { context, templates, templateObjects };
 }
 
 function createGetEvent(params = {}) {
   return { parameter: params };
 }
 
-// --- Public modes (no auth required) ---
+// --- 廃止した画面 (ログイン・初期設定・アプリ設定) ---
+//   ルートごと消したので、古いブックマークの ?mode=login / setup / appSetup は
+//   未知の mode と同じく main (トップ) と同じ振る舞いになる。
 
-test('doGet: login mode loads LoginPage template', () => {
-  const { context, templates } = loadDoGetContext();
-  context.doGet(createGetEvent({ mode: 'login' }));
-  assert.ok(templates.includes('LoginPage.html'));
+for (const mode of ['login', 'setup', 'appSetup']) {
+  test(`doGet: mode=${mode} は廃止。トップ (main) と同じ案内を返す`, () => {
+    const { context, templates } = loadDoGetContext();
+    context.doGet(createGetEvent({ mode }));
+    assert.deepEqual(templates, ['AccessRestricted.html']);
+  });
+
+  test(`doGet: mode=${mode} を管理者が開いても、廃止した画面は出ない`, () => {
+    const { context, templates } = loadDoGetContext({
+      Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) }
+    });
+    context.doGet(createGetEvent({ mode }));
+    assert.deepEqual(templates, ['AccessRestricted.html']);
+  });
+}
+
+test('doGet: 削除したルートは handler table にも残っていない', () => {
+  const { context } = loadDoGetContext();
+  const modes = vm.runInContext('Object.keys(DO_GET_HANDLERS)', context);
+  assert.deepEqual([...modes].sort(), ['admin', 'main', 'review', 'view']);
+});
+
+test('doGet: トップの案内は users を引かない (ボタンの出し分けが無くなったため)', () => {
+  let lookups = 0;
+  const { context, templates } = loadDoGetContext({
+    // getCurrentEmail は main.js 内で定義し直されるので、元の Session を差し替える。
+    Session: { getActiveUser: () => ({ getEmail: () => 'child@example.com' }) },
+    findUserByEmail: () => { lookups++; return null; }
+  });
+  context.doGet(createGetEvent({}));
+  assert.ok(templates.includes('AccessRestricted.html'));
+  assert.equal(lookups, 0);
+});
+
+// --- 必須プロパティ未設定 ---
+
+test('doGet: 必須プロパティがそろっていなければ、初期設定画面ではなく準備中の案内を返す', () => {
+  const { context, templates, templateObjects } = loadDoGetContext({ hasCoreSystemProps: () => false });
+  for (const mode of ['main', 'admin', 'view', 'setup']) {
+    templates.length = 0;
+    templateObjects.length = 0;
+    context.doGet(createGetEvent({ mode, userId: 'u1' }));
+    assert.deepEqual(templates, ['AccessRestricted.html'], `mode=${mode}`);
+    assert.equal(templateObjects[0].tpl.message, 'このアプリはまだ準備できていません。管理者に連絡してください。');
+  }
 });
 
 
@@ -115,20 +161,6 @@ test('doGet: view with failed data fetch returns error page', () => {
   assert.ok(templates.includes('ErrorBoundary.html'));
 });
 
-// --- mode=appSetup ---
-
-test('doGet: appSetup without auth returns error page', () => {
-  const { context, templates } = loadDoGetContext({ getCurrentEmail: () => null });
-  context.doGet(createGetEvent({ mode: 'appSetup' }));
-  assert.ok(templates.includes('ErrorBoundary.html'));
-});
-
-test('doGet: appSetup with non-admin returns error page', () => {
-  const { context, templates } = loadDoGetContext();
-  context.doGet(createGetEvent({ mode: 'appSetup' }));
-  assert.ok(templates.includes('ErrorBoundary.html'));
-});
-
 // --- default mode ---
 
 test('doGet: default mode returns AccessRestricted', () => {
@@ -144,18 +176,31 @@ test('doGet: domain restriction blocks all modes', () => {
     shouldEnforceDomainRestrictions: () => true,
     validateDomainAccess: () => ({ allowed: false, reason: 'domain_mismatch' })
   });
-  context.doGet(createGetEvent({ mode: 'login' }));
-  assert.ok(templates.includes('AccessRestricted.html'));
+  context.doGet(createGetEvent({ mode: 'admin', userId: 'u1' }));
+  assert.deepEqual(templates, ['AccessRestricted.html']);
 });
 
 // --- app disabled ---
 
 test('doGet: disabled app blocks non-admin access', () => {
-  const { context, templates } = loadDoGetContext({
+  const { context, templates, templateObjects } = loadDoGetContext({
     checkAppAccessRestriction: () => true
   });
-  context.doGet(createGetEvent({ mode: 'login' }));
-  assert.ok(templates.includes('AccessRestricted.html'));
+  context.doGet(createGetEvent({ mode: 'view', userId: 'u1' }));
+  assert.deepEqual(templates, ['AccessRestricted.html']);
+  assert.equal(templateObjects[0].tpl.isAppDisabled, true);
+});
+
+test('doGet: 停止中は管理者も案内だけ (アプリ設定画面の例外は廃止。再開は Admin API の enableApp)', () => {
+  const { context, templates } = loadDoGetContext({
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
+    checkAppAccessRestriction: () => true
+  });
+  for (const mode of ['appSetup', 'admin', 'main']) {
+    templates.length = 0;
+    context.doGet(createGetEvent({ mode, userId: 'u1' }));
+    assert.deepEqual(templates, ['AccessRestricted.html'], `mode=${mode}`);
+  }
 });
 
 // --- null event ---
@@ -263,7 +308,14 @@ test('doGet 本体 (みんなで 1 つ): 管理者がトップを開いても今
   assert.ok(h.templates.includes('AccessRestricted.html'));
 });
 
-test('doGet 先生専用: 登録に失敗したら本体と同じ画面 (ログインボタンあり) に戻す', () => {
+test('doGet 先生専用: 古いブックマークの ?mode=login を先生が開いても管理パネルを返す', () => {
+  const h = loadSingleTenantMain({ singleTenant: true, email: 'admin@example.com' });
+  h.context.doGet(createGetEvent({ mode: 'login' }));
+  assert.deepEqual(h.loginCalls, ['admin@example.com']);
+  assert.ok(h.templates.includes('AdminPanel.html'), h.templates.join(','));
+});
+
+test('doGet 先生専用: 登録に失敗したら案内の画面に戻す', () => {
   const h = loadSingleTenantMain({ singleTenant: true, email: 'admin@example.com', loginOk: false });
   h.context.doGet(createGetEvent({}));
   assert.ok(h.templates.includes('AccessRestricted.html'));

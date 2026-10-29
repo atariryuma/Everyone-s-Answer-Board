@@ -274,8 +274,7 @@ check('21. color-scheme CSS property (dark+light)', hasCsRoot && hasCsLight, `ro
 const bootExists = FILE_SET.has('SharedThemeBoot.html');
 const headBundlesBoot = FILE_SET.has('SharedPageHead.html')
   && /SharedThemeBoot/.test(readSrc('SharedPageHead.html'));
-const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'LoginPage', 'AppSetupPage', 'SetupPage',
-                            'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
+const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
 let bootMissing = 0;
 for (const p of PAGES_NEEDING_BOOT) {
   const name = `${p}.html`;
@@ -472,7 +471,7 @@ check(`26. border-radius Tailwind scale 準拠率 ≥ 80%`, r1.ratio >= 0.8, `${
 //   token 1 箇所変えれば全 alpha variant + 全 light/dark variant が自動追従。
 //   v2849 で cyan/blue 6 系列、 v2851 で status (success/warning/error/purple) +
 //   destructive/indigo を追加し計 22 系列 を network。
-//   exempt: token 定義行 / `theme:exempt` 注釈 / login.js.html (standalone popup) /
+//   exempt: token 定義行 / `theme:exempt` 注釈 /
 //           `var(--token, rgba(...))` fallback (defensive, allowed)。
 const PRIMARY_RGBA_TARGETS = [
   // cyan / blue 系 (v2849-v2850)
@@ -502,14 +501,9 @@ const PRIMARY_RGBA_TARGETS = [
   { re: /rgba\(234,\s*88,\s*12/,   alt: '--theme-accent-destructive' },  // orange-600
   { re: /rgba\(99,\s*102,\s*241/,  alt: '--theme-accent-indigo' },       // indigo-500
 ];
-// standalone popup window で書かれており theme system を持たない (window 外なので
-// CSS 変数が定義されていない)。 axis 31 のスキャン対象外。
-const RGBA_EXEMPT_FILES = new Set(['login.js.html']);
-
 function countPrimaryRgbaHardcoded() {
   const violations = [];
   for (const f of HTML_FILES) {
-    if (RGBA_EXEMPT_FILES.has(f)) continue;
     const lines = readSrc(f).split('\n');
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -534,8 +528,8 @@ check('31. Status + Accent rgba hardcoded = 0 (color-mix 統一)',
 // 32. mobile chrome bar 色が --theme-bg-base と一致しているか
 // Why: theme-color meta は mobile browser の上部バーの色。値は --theme-bg-base と揃っていないと
 //   ページ背景とバーだけ色が違う状態になる。SharedThemeBoot は CSS 読み込みより前に走るため
-//   computed style を読めず、literal を持つしかない (LoginPage の静的 meta も同じ理由)。
-//   両方とも theme:exempt 指定で他の hardcoded 検査を素通りするので、ここが唯一の砦になる。
+//   computed style を読めず、literal を持つしかない。
+//   theme:exempt 指定で他の hardcoded 検査を素通りするので、ここが唯一の砦になる。
 //   themeManager 側 (SharedUtilities) は CSS 読み込み後なので --theme-bg-base を直接読んでおり、
 //   ここでは検査対象外。
 function checkThemeBarSync() {
