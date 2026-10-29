@@ -70,7 +70,8 @@ let sheet = null;
 check('掲示板', '管理パネルを開く (getBatchedAdminData)', () => ({ pass: ok(inv('getBatchedAdminData', [userId])) }));
 check('掲示板', '自分のフォーム一覧 (getForms)', () => { const r = inv('getForms'); return { pass: ok(r), note: ok(r) ? `${(r.forms || r.data || []).length} 件` : text(r) }; });
 check('掲示板', 'テンプレートからフォームを作る (createTemplateForm: matrix)', () => {
-  form = inv('createTemplateForm', ['matrix', { title: '【検証】マトリクス（消してよい）' }]);
+  // 名前は lessonName で付ける (title は受け付けない)。【検証】で始めて dev.trashTestFiles で片付けられるように
+  form = inv('createTemplateForm', ['matrix', { lessonName: '【検証】マトリクス（消してよい）' }]);
   return { pass: ok(form) && Boolean(form.spreadsheetId), note: ok(form) ? '' : text(form) };
 });
 // 管理パネルと同じ順番: 作ったフォームの回答先を設定に下書き保存してから (自動保存)、URL の読み込み → 接続 → 列の推定。
@@ -259,8 +260,12 @@ check('授業(フォーム)', 'フォームを閉じる → 終える (lesson.cl
   return { pass: ok(a) && ok(b), note: ok(a) && ok(b) ? '' : text(ok(a) ? b : a) };
 });
 
-// ---------------- 後片付け (授業は消す。フォームとシートは Drive に残る) ----------------
+// ---------------- 後片付け (授業は消し、作ったフォーム・シート・画像はゴミ箱へ) ----------------
 nativeIds.forEach((id, i) => check('後片付け', `授業を消す ${i + 1} (lesson.delete)`, () => { const r = op('lesson.delete', { userId, lessonId: id }); return { pass: ok(r), note: ok(r) ? '' : text(r) }; }));
+check('後片付け', '作ったフォーム・シート・画像をゴミ箱へ (dev.trashTestFiles)', () => {
+  const r = op('dev.trashTestFiles', {});
+  return { pass: ok(r) && r.count > 0, note: ok(r) ? `${r.count} 件` : text(r) };
+});
 
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length} / ${results.length} 項目 OK`);

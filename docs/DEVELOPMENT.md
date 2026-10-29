@@ -113,7 +113,7 @@ npm run check                         # test + systemDiagnosis（配置への疎
 ### 2-5. 画面の機能を端から端まで (検証用の配置)
 
 ```bash
-npm run verify:e2e -- <検証用の名前>  # 掲示板モード・授業モード・児童の操作の 54 項目
+npm run verify:e2e -- <検証用の名前>  # 掲示板モード・授業モード・児童の操作・後片付けの 64 項目
 ```
 
 検証用の配置 (`single-tenants.json` に `extraFiles: ["scripts/verify/DevInvoke.js"]`) でだけ流せる。
@@ -172,7 +172,7 @@ npm run api -- getUserConfig --userId <uuid>   # 設定が壊れていないか�
 ```bash
 npm test
 npm run deploy:single -- deploy --name <検証用の名前>
-npm run verify:e2e -- <検証用の名前>          # 54 項目
+npm run verify:e2e -- <検証用の名前>          # 64 項目
 npm run deploy                                 # 全員の配置へ
 npm run api -- systemDiagnosis
 git commit -m "feat: ..." && git push

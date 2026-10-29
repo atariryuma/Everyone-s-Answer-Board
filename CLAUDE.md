@@ -27,7 +27,7 @@ node --test tests/main.doPost.test.cjs   # Run a single test file
 npm run deploy                           # 全員の配置を更新 (URL はそのまま。deploy-single.js deploy --all)
 npm run deploy:single -- deploy --name <名前>   # 1 人分だけ更新
 npm run deploy:single -- create --name <名前> --adminEmail <先生のメール>   # 先生を足す
-npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の機能を端から端まで動かす (54 項目)
+npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の機能を端から端まで動かす (64 項目)
 ```
 
 **配置の形**: 先生ごとに 1 つ、先生の Drive のスプレッドシートに紐づいたアプリを「先生として実行」で配置する
