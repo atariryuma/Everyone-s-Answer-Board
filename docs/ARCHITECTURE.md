@@ -31,7 +31,7 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
 | **児童・ほかの先生** | 可 | 不可 | 不可 |
 
 - 児童に開かせてよいのは「公開中のボードの設定 (いまのボード + 保存したプロファイル) に入っているシート」
-  だけ (`findUserBySpreadsheetId` → `isUserBoardPublished`)
+  だけ (`findUserBySpreadsheetId_` → `isUserBoardPublished`)
 - DB も同じ扱い (授業モードの回答シートが全部入るので、授業がボードにつながって公開されている間だけ)。
   users / lessons を読むサーバの処理は `openDatabase` で直接開く (判定を通らない)
 
@@ -44,7 +44,7 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
   入口で `teacherOnlyError_()` を確かめる。`processLoginAction` も先生だけを登録する
 - 判定は 60 秒 cache (不許可は 5 秒)。key に版を含め、公開状態が変わったら
   `invalidateAccessDecisionCache_` で版を上げて全 viewer 分を古くする (公開終了直後の 60 秒の漏れを防ぐ)
-- 共同編集者 (ほかの先生) = ボード SS の編集者。`isBoardCollaborator` が DriveApp で編集者・持ち主を読む
+- 共同編集者 (ほかの先生) = ボード SS の編集者。`isBoardCollaborator_` が DriveApp で編集者・持ち主を読む
   ([AccessControl.js](../src/AccessControl.js))。許可 2 分 / 不許可 10 分 cache
 
 ---
@@ -87,7 +87,7 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
 - 書き込みのたびに `USER_CACHE_VERSION` が上がり、全 viewer の user cache が一斉に落ちる
   (stampede guard で 1 read には抑えてある)
 - いま読んだ行と内容が同じ (configJson は `lastAccessedAt` / `etag` を除いて比較) なら書かず、
-  `{ success, unchanged: true, currentEtag }` を返す。`saveUserConfig` は永続済の etag を client に返す
+  `{ success, unchanged: true, currentEtag }` を返す。`saveUserConfig_` は永続済の etag を client に返す
 
 ---
 

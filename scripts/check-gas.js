@@ -22,6 +22,7 @@
  *  11. <use href="#i-X"> の X が SVG sprite に定義されているか
  *  12. アイコンを使うページが sprite を include しているか
  *  13. .modal-overlay が markup 上で閉じた状態から始まるか
+ *  15. 名前が _ で終わらない関数 (google.script.run から呼べる) が scripts/public-functions.json に載っているか
  *
  * 使い方:
  *   npm run check:gas          # 全項目
@@ -393,6 +394,29 @@ for (const s of jsSrc.values()) {
     }
   }
   check('13. overlay が既定で閉じている', bad.length === 0, bad.join(', '));
+}
+
+// ── 15. 公開関数は一覧に載っているものだけ ───────────────────────────
+//   Why: Apps Script は名前が _ で終わらない関数をすべて google.script.run に出す。先生として実行する
+//   配置ではどれも先生の権限で動くので、児童が開発ツールから呼ぶとプロパティの読み書きや
+//   シートの書き換えができた (2026-10-29)。新しい公開関数は一覧に載せる (= 確かめた) か _ で終える。
+{
+  const listPath = path.resolve(__dirname, 'public-functions.json');
+  const list = JSON.parse(fs.readFileSync(listPath, 'utf8'));
+  const allowed = new Set([...(list.entryPoints || []), ...(list.reviewedHarmless || [])]);
+  const declared = new Set();
+  for (const [, src] of jsSrc) {
+    for (const m of stripComments(src).matchAll(/^function ([A-Za-z0-9$]+)\(/gm)) {
+      if (!m[1].endsWith('_')) declared.add(m[1]);
+    }
+  }
+  const unlisted = [...declared].filter((n) => !allowed.has(n)).sort();
+  const stale = [...allowed].filter((n) => !declared.has(n)).sort();
+  const detail = [
+    ...unlisted.map((n) => `${n} (一覧に無い公開関数: _ で終えるか、確かめて scripts/public-functions.json に載せる)`),
+    ...stale.map((n) => `${n} (一覧にあるが定義が無い: 一覧から消す)`)
+  ].join(', ');
+  check('15. 公開関数 (google.script.run から呼べる) は一覧に載っているものだけ', detail === '', detail);
 }
 
 // ── 出力 ──────────────────────────────────────────────────────────

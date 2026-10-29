@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers_, updateUser_, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getAllUsers_, updateUser_, getUserConfig, saveUserConfig_, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm_, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator_, logError_, safeJsonParse_, sameEmail_, migrateImportLesson_, migrateImportConfig_, migrateImportLessonAnswers_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -70,10 +70,10 @@ function __boardSpreadsheetIds_() {
 function resolveTargetUser_(params) {
   const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
   if (targetUserId) {
-    return findUserById(targetUserId, { requestingUser: getCurrentEmail() });
+    return findUserById_(targetUserId, { requestingUser: getCurrentEmail() });
   }
   const email = getCurrentEmail();
-  return email ? findUserByEmail(email, { requestingUser: email }) : null;
+  return email ? findUserByEmail_(email, { requestingUser: email }) : null;
 }
 
 function getAdminUsers() {
@@ -93,7 +93,7 @@ function getAdminUsers() {
 }
 
 // =====================================================================
-// 公開ライフサイクル: __applyPublishStateChange を通じて isPublished を書く 3 操作
+// 公開ライフサイクル: __applyPublishStateChange_ を通じて isPublished を書く 3 操作
 // （publishApp は SystemController.js 側）。詳細仕様: CLAUDE.md の同見出し節。
 // =====================================================================
 
@@ -107,25 +107,25 @@ function getAdminUsers() {
  * @param {string} [options.sourceEtag] - 楽観ロック用 etag。指定時は不一致で reject
  * @returns {Object} { success, message, userId, isPublished, publishedAt, etag, redirectUrl }
  */
-function __applyPublishStateChange(targetUserId, newState, options = {}) {
+function __applyPublishStateChange_(targetUserId, newState, options = {}) {
   const email = getCurrentEmail();
   if (!email) return createAuthError();
 
   // 対象ユーザーの特定（指定があればそれ、なければ自分）
   //
-  // Why 見つからないときに自分へ差し替えないか: findUserById は admin/本人のみ通す strict ACL
+  // Why 見つからないときに自分へ差し替えないか: findUserById_ は admin/本人のみ通す strict ACL
   //   なので、collaborator が他人のボードを指定すると null になる。ここで自分の record に
   //   フォールバックすると「他人のボードを止めるつもりが自分のボードを止める」事故になる
   //   (collaborator の緊急停止は下の分岐で許可しているのに、対象がすり替わって無意味だった)。
-  //   公開中のボードは findPublishedBoardOwner で引けるので、そちらで解決する。
+  //   公開中のボードは findPublishedBoardOwner_ で引けるので、そちらで解決する。
   let targetUser;
   if (targetUserId) {
-    targetUser = findUserById(targetUserId, { requestingUser: email })
-      || (typeof findPublishedBoardOwner === 'function'
-        ? findPublishedBoardOwner(targetUserId, email)
+    targetUser = findUserById_(targetUserId, { requestingUser: email })
+      || (typeof findPublishedBoardOwner_ === 'function'
+        ? findPublishedBoardOwner_(targetUserId, email)
         : null);
   } else {
-    targetUser = findUserByEmail(email, { requestingUser: email });
+    targetUser = findUserByEmail_(email, { requestingUser: email });
   }
   if (!targetUser) return createUserNotFoundError();
 
@@ -136,16 +136,16 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   //   publish 再開は owner / admin のみ — 「閉じる方向」 だけ collaborator OK。
   if (!isAdmin && !isOwnBoard) {
     const isUnpublishingOnly = (newState === false)
-      && typeof isBoardCollaborator === 'function'
-      && isBoardCollaborator(targetUser, email);
+      && typeof isBoardCollaborator_ === 'function'
+      && isBoardCollaborator_(targetUser, email);
     if (!isUnpublishingOnly) {
       return createErrorResponse('ボードの公開状態を変更する権限がありません');
     }
   }
 
-  // Why getUserConfig (not getConfigOrDefault): saveUserConfig 前の read で「failure を empty
-  //   {} で隠す」は危険。findUserById が 429/cache miss を返すと {} になり、それを spread して
-  //   saveUserConfig するとユーザーの profile/columnMapping/displaySettings を空で全上書きする
+  // Why getUserConfig (not getConfigOrDefault): saveUserConfig_ 前の read で「failure を empty
+  //   {} で隠す」は危険。findUserById_ が 429/cache miss を返すと {} になり、それを spread して
+  //   saveUserConfig_ するとユーザーの profile/columnMapping/displaySettings を空で全上書きする
   //   (data-loss バグ)。getConfigOrDefault は read-only 用途のみで使う。
   const cfgResult = getUserConfig(targetUser.userId, targetUser);
   if (!cfgResult || !cfgResult.success) {
@@ -191,13 +191,13 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     }
   }
 
-  // saveUserConfig は updatedConfig が継承した currentConfig.etag で楽観ロックを行う
+  // saveUserConfig_ は updatedConfig が継承した currentConfig.etag で楽観ロックを行う
   //   (read=L158 と save の間に別 writer が config を変えていれば etag_mismatch)。
   //   この conflict を汎用エラーに埋もれさせず、 publishApp と同じく構造化して surface し、
   //   フロントが再読み込みを促せるようにする (caller に sourceEtag を強制せず非破壊で対称化)。
   // __allowPublishStateWrite: この関数は publish 状態を書き換える正規経路の 1 つ。
-  //   saveUserConfig の publish-state ガードを通過させる (CLAUDE.md の 3 関数不変条件)。
-  const saveResult = saveUserConfig(targetUser.userId, updatedConfig, { __allowPublishStateWrite: true });
+  //   saveUserConfig_ の publish-state ガードを通過させる (CLAUDE.md の 3 関数不変条件)。
+  const saveResult = saveUserConfig_(targetUser.userId, updatedConfig, { __allowPublishStateWrite: true });
   if (!saveResult.success) {
     if (saveResult.error === 'etag_mismatch') {
       return {
@@ -236,11 +236,11 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
 /**
  * 自分のボードを再公開（所有者用）。
  * @param {Object} [options] - { sourceEtag }
- * @returns {Object} __applyPublishStateChange の戻り値
+ * @returns {Object} __applyPublishStateChange_ の戻り値
  */
 function republishMyBoard(options = {}) {
   try {
-    return __applyPublishStateChange(null, true, { sourceEtag: options.sourceEtag });
+    return __applyPublishStateChange_(null, true, { sourceEtag: options.sourceEtag });
   } catch (error) {
     logError_('republishMyBoard', error);
     return createExceptionResponse(error);
@@ -251,11 +251,11 @@ function republishMyBoard(options = {}) {
  * ボードを非公開にする（所有者 or 管理者）。
  * @param {string} [targetUserId] - 対象ユーザーID（省略時は自分）
  * @param {Object} [options] - { sourceEtag }
- * @returns {Object} __applyPublishStateChange の戻り値
+ * @returns {Object} __applyPublishStateChange_ の戻り値
  */
 function unpublishBoard(targetUserId, options = {}) {
   try {
-    return __applyPublishStateChange(targetUserId || null, false, {
+    return __applyPublishStateChange_(targetUserId || null, false, {
       sourceEtag: options.sourceEtag,
       // unpublish 時 = 教師の「授業終了」意思表示。lesson auto-archive を同 save で実行する。
       triggerLessonAutoArchive: options.triggerLessonAutoArchive !== false
@@ -459,7 +459,7 @@ function markWelcomeSeen() {
       return createAuthError();
     }
 
-    const currentUser = findUserByEmail(email, { requestingUser: email });
+    const currentUser = findUserByEmail_(email, { requestingUser: email });
     if (!currentUser) {
       return createUserNotFoundError('ユーザーが見つかりません');
     }
@@ -473,7 +473,7 @@ function markWelcomeSeen() {
     const config = cfgResult.config;
     config.hasSeenWelcome = true;
 
-    const saveResult = saveUserConfig(currentUser.userId, config);
+    const saveResult = saveUserConfig_(currentUser.userId, config);
     if (!saveResult.success) {
       return createErrorResponse('設定の保存に失敗しました');
     }
@@ -585,7 +585,7 @@ function dispatchAdminOperation(operation, params) {
       return performAutoRepair_();
 
     case 'cacheReset':
-      return forceUrlSystemReset();
+      return forceUrlSystemReset_();
 
     case 'perfMetrics': {
       const category = typeof params.category === 'string' ? params.category : 'all';
@@ -638,7 +638,7 @@ function dispatchAdminOperation(operation, params) {
     //      parsed config を返す/受け取る API が必要。
     case 'findUser': {
       { const e = reqStr('email'); if (e) return e; }
-      const user = findUserByEmail(String(params.email).trim(), { requestingUser: getCurrentEmail() });
+      const user = findUserByEmail_(String(params.email).trim(), { requestingUser: getCurrentEmail() });
       if (!user) return createErrorResponse('User not found');
       return createSuccessResponse('User found', { user: redactUserForApi_(user) });
     }
@@ -917,11 +917,11 @@ function dispatchAdminOperation(operation, params) {
         const cleanHeader = String(params.newHeader).trim().substring(0, 200);
         cell.setValue(cleanHeader);
         // Why: SHEET_HEADERS は 10 分 TTL でキャッシュされる (SystemController.DATABASE_LONG)。
-        //   invalidate しないと getQuestionText が古い「回答」を返し続け、headingLabel が
+        //   invalidate しないと getQuestionText_ が古い「回答」を返し続け、headingLabel が
         //   更新されない (CLAUDE.md: setupColumns 時は明示的に invalidate せよ規約と同じ)。
         try {
-          if (typeof invalidateSheetHeadersCache === 'function') {
-            invalidateSheetHeadersCache(params.spreadsheetId, params.sheetName);
+          if (typeof invalidateSheetHeadersCache_ === 'function') {
+            invalidateSheetHeadersCache_(params.spreadsheetId, params.sheetName);
           }
         } catch (cacheErr) {
           console.warn('setSheetHeader: cache invalidate failed', cacheErr.message);
@@ -1293,7 +1293,7 @@ function redactUserForApi_(user) {
  * Why: CLI から `setUserConfig --patch '{"displaySettings":{"boardMode":"numberline"}}'`
  *      で部分更新できるようにするための内部実装。深いマージで他フィールドを保持。
  *
- *      sanitize は saveUserConfig が validateAndSanitizeConfig 経由で行うので、
+ *      sanitize は saveUserConfig_ が validateAndSanitizeConfig 経由で行うので、
  *      ここでは patch を merge するだけ。許可フィールドはバックエンドの sanitize
  *      関数の allowlist が最終ゲート。
  *
@@ -1305,7 +1305,7 @@ function applyConfigPatch_(userId, patch, options) {
   }
   // isPublished/publishedAt は publish lifecycle (3 関数) だけが書き換えてよいので patch から除外。
   //   deepMerge_ が cur.config 側の現値を保持するため data-loss なし。最終 backstop は
-  //   saveUserConfig の __allowPublishStateWrite ガード。
+  //   saveUserConfig_ の __allowPublishStateWrite ガード。
   const PROTECTED = ['userId', 'userEmail', 'googleId', 'createdAt', 'etag', 'isPublished', 'publishedAt'];
   // Clone & strip protected keys top-level
   const safePatch = {};
@@ -1335,7 +1335,7 @@ function applyConfigPatch_(userId, patch, options) {
 
   // Save through existing sanitizing pipeline (validateAndSanitizeConfig handles everything)
   const saveOptions = options && options.publish ? { isPublish: true } : { isMainConfig: true };
-  const result = saveUserConfig(userId, merged, saveOptions);
+  const result = saveUserConfig_(userId, merged, saveOptions);
   return result;
 }
 

@@ -1,6 +1,6 @@
 /**
  * Utility function regression tests for sanitizeMapping / sanitizeProfileHistory /
- * normalizeHeader / emailToShortHash.
+ * normalizeHeader / emailToShortHash_.
  *
  * Why: これらは hot path で多用される data integrity 関数。テストが薄かったため
  *   今後の edit で silent 回帰を検出できなかった (Dead CSS audit test-gap finding)。
@@ -125,34 +125,34 @@ test('normalizeHeader: handles null/undefined/non-string', () => {
 });
 
 // =====================================================================
-// emailToShortHash
+// emailToShortHash_
 // =====================================================================
 
 test('emailToShortHash: deterministic for same email', () => {
   const ctx = loadHelpersCtx();
-  const a = ctx.emailToShortHash('student@school.jp');
-  const b = ctx.emailToShortHash('student@school.jp');
+  const a = ctx.emailToShortHash_('student@school.jp');
+  const b = ctx.emailToShortHash_('student@school.jp');
   assert.equal(a, b);
 });
 
 test('emailToShortHash: different emails produce different hashes', () => {
   const ctx = loadHelpersCtx();
-  const a = ctx.emailToShortHash('student-a@school.jp');
-  const b = ctx.emailToShortHash('student-b@school.jp');
+  const a = ctx.emailToShortHash_('student-a@school.jp');
+  const b = ctx.emailToShortHash_('student-b@school.jp');
   assert.notEqual(a, b);
 });
 
 test('emailToShortHash: returns 8 hex chars (4 bytes)', () => {
   const ctx = loadHelpersCtx();
-  const h = ctx.emailToShortHash('test@example.com');
+  const h = ctx.emailToShortHash_('test@example.com');
   assert.match(h, /^[0-9a-f]{8}$/);
 });
 
 test('emailToShortHash: null/empty input returns null sentinel', () => {
   const ctx = loadHelpersCtx();
   // 仕様: invalid input → null (helpers.js:262 JSDoc 通り)
-  assert.equal(ctx.emailToShortHash(null), null);
-  assert.equal(ctx.emailToShortHash(''), null);
-  assert.equal(ctx.emailToShortHash(undefined), null);
-  assert.equal(ctx.emailToShortHash('   '), null);
+  assert.equal(ctx.emailToShortHash_(null), null);
+  assert.equal(ctx.emailToShortHash_(''), null);
+  assert.equal(ctx.emailToShortHash_(undefined), null);
+  assert.equal(ctx.emailToShortHash_('   '), null);
 });

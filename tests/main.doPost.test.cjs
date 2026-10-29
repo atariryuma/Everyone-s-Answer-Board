@@ -20,8 +20,8 @@ function loadMainContext(overrides = {}) {
       })
     },
     evaluateDomainRestriction: () => ({ allowed: true }),
-    findUserByEmail: () => ({ userId: 'user-1' }),
-    getUserSheetData: () => ({ rows: [{ id: 1 }] }),
+    findUserByEmail_: () => ({ userId: 'user-1' }),
+    getUserSheetData_: () => ({ rows: [{ id: 1 }] }),
     addReaction: (userId, rowId, reactionType) => ({ success: true, userId, rowId, reactionType }),
     toggleHighlight: (userId, rowId) => ({ success: true, userId, rowId }),
     publishApp: (config) => ({ success: true, config }),

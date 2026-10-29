@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -226,7 +226,7 @@ function handleViewMode_(params, currentEmail) {
   if (!targetUserId) {
     return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。先生から共有された URL を開き直してください。');
   }
-  const viewerData = getBatchedViewerData(targetUserId, currentEmail);
+  const viewerData = getBatchedViewerData_(targetUserId, currentEmail);
   if (!viewerData.success) {
     return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象のボードが見つかりません。URLを確認してください。');
   }
@@ -253,7 +253,7 @@ function handleViewMode_(params, currentEmail) {
   //   owner と同じ「進行操作」 (highlight / unpublish / リアクション削除) を実行可能。
   //   ボード設定変更や lesson 編集は引き続き owner / admin 専用 (AccessControl.js 参照)。
   const isCollaborator = !isAdminUser && !isOwnBoard
-    && (typeof isBoardCollaborator === 'function' && isBoardCollaborator(targetUser, currentEmail));
+    && (typeof isBoardCollaborator_ === 'function' && isBoardCollaborator_(targetUser, currentEmail));
   const isEditor = isAdminUser || isOwnBoard || isCollaborator;
 
   // 未公開ボードの扱い:
@@ -421,18 +421,18 @@ const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArr
  * @param {string} action - 'getData' | 'refreshData' (ログ識別用)
  * @returns {Object} response
  */
-function doPostHandleGetData(request, email, action) {
+function doPostHandleGetData_(request, email, action) {
   if (request.options !== undefined && !isPlainObject(request.options)) {
     return createErrorResponse('Invalid options payload');
   }
   try {
-    const user = findUserByEmail(email, { requestingUser: email });
+    const user = findUserByEmail_(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
     // 外側の success は内側の結果に揃える。以前は読みが失敗しても success:true で包んでいたので、
     //   受け手が data.success まで見ないと失敗に気付けなかった。shape (data に結果) は変えない。
-    const result = getUserSheetData(user.userId, request.options || {});
+    const result = getUserSheetData_(user.userId, request.options || {});
     const ok = Boolean(result && result.success !== false);
     // 行の reactions は共有 cache 用に投票者メール一覧 (voters) を持つ。wire に出す前に、
     //   呼び出し元 1 人分の reacted に変換して voters を落とす (getPublishedSheetData と同じ)。
@@ -453,7 +453,7 @@ function doPostHandleGetData(request, email, action) {
  * @param {Object} request
  * @returns {Object} response
  */
-function doPostHandleAddReaction(request) {
+function doPostHandleAddReaction_(request) {
   if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
     return createErrorResponse('Target user ID required for reaction');
   }
@@ -471,7 +471,7 @@ function doPostHandleAddReaction(request) {
  * @param {Object} request
  * @returns {Object} response
  */
-function doPostHandleToggleHighlight(request) {
+function doPostHandleToggleHighlight_(request) {
   if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
     return createErrorResponse('Target user ID required for highlight');
   }
@@ -492,7 +492,7 @@ function doPostHandleToggleHighlight(request) {
  * @param {Object} request
  * @returns {Object} response
  */
-function doPostHandleSubmitLessonAnswer(request) {
+function doPostHandleSubmitLessonAnswer_(request) {
   if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
     return createErrorResponse('Target user ID required for lesson answer');
   }
@@ -505,7 +505,7 @@ function doPostHandleSubmitLessonAnswer(request) {
 /**
  * publishApp ハンドラ — ボード公開（owner 認証は publishApp 内で行う）。
  */
-function doPostHandlePublishApp(request) {
+function doPostHandlePublishApp_(request) {
   try {
     if (!isPlainObject(request.config) || Object.keys(request.config).length === 0) {
       return createErrorResponse('Publish config is required');
@@ -734,13 +734,13 @@ function handleAdminApiAction_(request) {
 }
 
 const DO_POST_ACTION_HANDLERS = {
-  getData: (req, email, action) => doPostHandleGetData(req, email, action),
-  refreshData: (req, email, action) => doPostHandleGetData(req, email, action),
-  addReaction: (req) => doPostHandleAddReaction(req),
-  toggleHighlight: (req) => doPostHandleToggleHighlight(req),
-  publishApp: (req) => doPostHandlePublishApp(req),
-  submitLessonAnswer: (req) => doPostHandleSubmitLessonAnswer(req),
-  reportClientError: (req, email) => handleClientErrorReport(email, req.payload)
+  getData: (req, email, action) => doPostHandleGetData_(req, email, action),
+  refreshData: (req, email, action) => doPostHandleGetData_(req, email, action),
+  addReaction: (req) => doPostHandleAddReaction_(req),
+  toggleHighlight: (req) => doPostHandleToggleHighlight_(req),
+  publishApp: (req) => doPostHandlePublishApp_(req),
+  submitLessonAnswer: (req) => doPostHandleSubmitLessonAnswer_(req),
+  reportClientError: (req, email) => handleClientErrorReport_(email, req.payload)
 };
 
 /**
@@ -777,14 +777,14 @@ const DO_POST_ACTION_HANDLERS = {
 function reportClientError(payload) {
   try {
     const email = getCurrentEmail();
-    return handleClientErrorReport(email, payload);
+    return handleClientErrorReport_(email, payload);
   } catch (error) {
     // Silent: client error reporter 自体の失敗で client 体験を壊さない。
     return createErrorResponse('reportClientError internal error', null, { error: 'REPORT_FAILED' });
   }
 }
 
-function handleClientErrorReport(email, payload) {
+function handleClientErrorReport_(email, payload) {
   try {
     if (!isPlainObject(payload)) {
       return createErrorResponse('payload must be an object', null, { error: 'INVALID_PAYLOAD' });
@@ -899,12 +899,12 @@ function isAdministrator(email) {
  * @param {string} currentEmail - Current viewer email
  * @returns {Object} Batched result with all required data
  */
-function getBatchedViewerData(targetUserId, currentEmail) {
+function getBatchedViewerData_(targetUserId, currentEmail) {
   try {
     const isAdminUser = isAdministrator(currentEmail);
     const preloadedAuth = { email: currentEmail, isAdmin: isAdminUser };
 
-    const targetUser = findPublishedBoardOwner(targetUserId, currentEmail, { preloadedAuth });
+    const targetUser = findPublishedBoardOwner_(targetUserId, currentEmail, { preloadedAuth });
     if (!targetUser) {
       return createErrorResponse('対象ユーザーが見つかりません');
     }
@@ -941,7 +941,7 @@ function getBatchedAdminData(targetUserId) {
     const isAdmin = isAdministrator(currentEmail);
     const preloadedAuth = { email: currentEmail, isAdmin };
 
-    const targetUser = findUserById(targetUserId, {
+    const targetUser = findUserById_(targetUserId, {
       requestingUser: currentEmail,
       preloadedAuth
     });
@@ -964,7 +964,7 @@ function getBatchedAdminData(targetUserId) {
 
     const config = getConfigOrDefault(targetUserId, targetUser);
 
-    const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
+    const questionText = getQuestionText_(config, { targetUserEmail: targetUser.userEmail });
 
     const baseUrl = getWebAppUrl();
     const enhancedConfig = {
@@ -1049,7 +1049,7 @@ function getBatchedAdminAuth(options = {}) {
  * @param {Function} operation
  * @param {Object} [options]
  */
-function executeWithRetry(operation, options = {}) {
+function executeWithRetry_(operation, options = {}) {
   const maxRetries = options.maxRetries || 3;
   const initialDelay = options.initialDelay || 500;
   const maxDelay = options.maxDelay || 5000;

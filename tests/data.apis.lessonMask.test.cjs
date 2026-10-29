@@ -135,7 +135,7 @@ test('応答に lessonPhase を同梱する (授業中はフェーズ、授業�
 
 test('buildSafePublishedDataResult: 閲覧者自身の仮名 (viewerEmailHash) を載せ、他者の生メアドは載せない', () => {
   const ctx = loadContext(null);
-  ctx.emailToShortHash = (e) => 'h_' + String(e).toLowerCase();
+  ctx.emailToShortHash_ = (e) => 'h_' + String(e).toLowerCase();
   const result = { success: true, data: [
     { rowIndex: 2, email: 'me@example.com', answer: 'a' },
     { rowIndex: 3, email: 'other@example.com', answer: 'b' }

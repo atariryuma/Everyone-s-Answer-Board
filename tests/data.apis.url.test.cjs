@@ -10,16 +10,16 @@ function loadDataApisContext(overrides = {}) {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
-    findUserByEmail: () => null,
-    findUserById: () => null,
-    // DataApis.js は findPublishedBoardOwner 経由で公開ボード閲覧時の lookup を行うため、
-    // 上書きを尊重しつつ findUserById にデリゲートする。
-    findPublishedBoardOwner: (userId, viewerEmail, extra = {}) =>
-      (context.findUserById ? context.findUserById(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
-    findUserBySpreadsheetId: () => null,
+    findUserByEmail_: () => null,
+    findUserById_: () => null,
+    // DataApis.js は findPublishedBoardOwner_ 経由で公開ボード閲覧時の lookup を行うため、
+    // 上書きを尊重しつつ findUserById_ にデリゲートする。
+    findPublishedBoardOwner_: (userId, viewerEmail, extra = {}) =>
+      (context.findUserById_ ? context.findUserById_(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
+    findUserBySpreadsheetId_: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({}),
-    saveUserConfig: () => ({ success: true }),
+    saveUserConfig_: () => ({ success: true }),
     openSpreadsheet: () => null,
     // 既定では openById 成功 = 呼び出し元が当該 SS へアクセス権を持つ (owner 想定)。
     //   アクセス権なしを検証するテストは openById を throw する stub で上書きする。
@@ -36,9 +36,9 @@ function loadDataApisContext(overrides = {}) {
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: 'viewer@example.com', isAdmin: false }),
     getCachedProperty_: () => null,
-    saveToCacheWithSizeCheck: () => true,
+    saveToCacheWithSizeCheck_: () => true,
     // emailHash は helpers.js 由来（M1/M2 可視化モードで揺らぎ追跡に使う仮名化ID）。
-    emailToShortHash: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
+    emailToShortHash_: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
     validateUrl: () => ({ isValid: true }),
     validateSpreadsheetId: () => true,
@@ -46,7 +46,7 @@ function loadDataApisContext(overrides = {}) {
     extractReactions: () => ({}),
     extractHighlight: () => false,
     formatTimestamp: (v) => String(v || ''),
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     createDataServiceErrorResponse: (message) => ({ success: false, message }),
     isAdministrator: () => false,
     // 管理パネルの処理は先生だけ (helpers.js)。既定は先生として呼ぶ。
@@ -154,8 +154,8 @@ test('isValidFormUrl: rejects malformed URL strings', () => {
 test('validateHeaderIntegrity: returns user-not-found without session or target', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => null,
-    findUserById: () => null,
-    findUserByEmail: () => null
+    findUserById_: () => null,
+    findUserByEmail_: () => null
   });
   const result = ctx.validateHeaderIntegrity(null);
   assert.equal(result.success, false);
@@ -164,7 +164,7 @@ test('validateHeaderIntegrity: returns user-not-found without session or target'
 test('validateHeaderIntegrity: returns error when spreadsheet config incomplete', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: '', sheetName: '' })
   });
   const result = ctx.validateHeaderIntegrity('u1');
@@ -175,7 +175,7 @@ test('validateHeaderIntegrity: returns error when spreadsheet config incomplete'
 test('validateHeaderIntegrity: returns error when target sheet not found', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Missing' }),
     openSpreadsheet: () => ({ getSheet: () => null })
   });
@@ -187,7 +187,7 @@ test('validateHeaderIntegrity: returns error when target sheet not found', () =>
 test('validateHeaderIntegrity: returns valid=true for healthy headers', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
     openSpreadsheet: () => ({ getSheet: () => ({ name: 'Sheet1' }) }),
     getSheetInfo: () => ({ headers: ['Q1', '理由', '名前', 'LIKE'], lastRow: 10, lastCol: 4 })
@@ -202,7 +202,7 @@ test('validateHeaderIntegrity: returns valid=true for healthy headers', () => {
 test('validateHeaderIntegrity: reports empty-header count', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
     openSpreadsheet: () => ({ getSheet: () => ({}) }),
     getSheetInfo: () => ({ headers: ['Q1', '', '  ', 'LIKE'], lastRow: 2, lastCol: 4 })
@@ -215,7 +215,7 @@ test('validateHeaderIntegrity: reports empty-header count', () => {
 test('validateHeaderIntegrity: returns valid=false when all headers are empty', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
     openSpreadsheet: () => ({ getSheet: () => ({}) }),
     getSheetInfo: () => ({ headers: ['', '  ', null], lastRow: 0, lastCol: 3 })
@@ -237,7 +237,7 @@ function ctxWithAuth(overrides = {}) {
       email: 'viewer@example.com',
       isAdmin: false
     }),
-    getUserSheetData: () => ({
+    getUserSheetData_: () => ({
       success: true,
       data: [{ id: 1 }],
       headers: ['Q1'],
@@ -245,7 +245,7 @@ function ctxWithAuth(overrides = {}) {
       header: '',
       showDetails: true
     }),
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     ...overrides
   });
 }
@@ -261,7 +261,7 @@ test('getPublishedSheetData: rejects unauthenticated viewer', () => {
 
 test('getPublishedSheetData: rejects when target user not found', () => {
   const ctx = ctxWithAuth({
-    findUserById: () => null
+    findUserById_: () => null
   });
   const result = ctx.getPublishedSheetData(null, 'newest', false, 'ghost');
   assert.equal(result.success, false);
@@ -271,9 +271,9 @@ test('getPublishedSheetData: rejects when target user not found', () => {
 test('getPublishedSheetData: blocks non-admin non-owner viewer from unpublished board', () => {
   let getUserSheetDataCalled = false;
   const ctx = ctxWithAuth({
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false }),
-    getUserSheetData: () => { getUserSheetDataCalled = true; return { success: true }; }
+    getUserSheetData_: () => { getUserSheetDataCalled = true; return { success: true }; }
   });
   const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
   assert.equal(result.success, false);
@@ -283,7 +283,7 @@ test('getPublishedSheetData: blocks non-admin non-owner viewer from unpublished 
 
 test('getPublishedSheetData: allows non-admin on a published board', () => {
   const ctx = ctxWithAuth({
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true })
   });
   const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
@@ -296,7 +296,7 @@ test('getPublishedSheetData: allows owner to view their own unpublished board', 
       success: true, authenticated: true,
       email: 'owner@example.com', isAdmin: false
     }),
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false })
   });
   const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
@@ -309,7 +309,7 @@ test('getPublishedSheetData: allows system admin regardless of publish state', (
       success: true, authenticated: true,
       email: 'admin@example.com', isAdmin: true
     }),
-    findUserById: () => ({ userId: 'u1', userEmail: 'other@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'other@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false })
   });
   const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
@@ -319,9 +319,9 @@ test('getPublishedSheetData: allows system admin regardless of publish state', (
 test('getPublishedSheetData: forwards classFilter and sortOrder to getUserSheetData', () => {
   let capturedOptions = null;
   const ctx = ctxWithAuth({
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true }),
-    getUserSheetData: (_userId, options) => {
+    getUserSheetData_: (_userId, options) => {
       capturedOptions = options;
       return { success: true, data: [], headers: [], sheetName: '' };
     }
@@ -334,9 +334,9 @@ test('getPublishedSheetData: forwards classFilter and sortOrder to getUserSheetD
 test('getPublishedSheetData: classFilter="すべて" is converted to undefined', () => {
   let capturedOptions = null;
   const ctx = ctxWithAuth({
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true }),
-    getUserSheetData: (_userId, options) => {
+    getUserSheetData_: (_userId, options) => {
       capturedOptions = options;
       return { success: true, data: [], headers: [], sheetName: '' };
     }
@@ -351,7 +351,7 @@ test('getPublishedSheetData: classFilter="すべて" is converted to undefined',
 
 function ctxWithProfileHistory(profileHistory, profiles, overrides = {}) {
   return ctxWithAuth({
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({
       spreadsheetId: 'current-ss',
       sheetName: 'Current',
@@ -360,7 +360,7 @@ function ctxWithProfileHistory(profileHistory, profiles, overrides = {}) {
       profiles,
       profileHistory
     }),
-    getUserSheetData: () => ({
+    getUserSheetData_: () => ({
       success: true, data: [{ id: 1 }], headers: [], sheetName: 'Past', header: ''
     }),
     ...overrides
@@ -397,7 +397,7 @@ test('getNotificationUpdate: rejects invalid request (no email or targetUserId)'
 test('getNotificationUpdate: rejects unknown target user', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'a@x.com',
-    findUserById: () => null
+    findUserById_: () => null
   });
   const result = ctx.getNotificationUpdate('ghost', {});
   assert.equal(result.success, false);
@@ -406,7 +406,7 @@ test('getNotificationUpdate: rejects unknown target user', () => {
 test('getNotificationUpdate: blocks non-admin non-owner on unpublished board', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: false }),
     isAdministrator: () => false
   });
@@ -418,9 +418,9 @@ test('getNotificationUpdate: blocks non-admin non-owner on unpublished board', (
 test('getNotificationUpdate: reports hasNewContent=false when no items newer than lastUpdateTime', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({
+    getUserSheetData_: () => ({
       success: true,
       data: [
         { timestamp: '2026-04-18T10:00:00Z' },
@@ -439,9 +439,9 @@ test('getNotificationUpdate: reports hasNewContent=false when no items newer tha
 test('getNotificationUpdate: reports hasNewContent=true when items newer than lastUpdateTime', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({
+    getUserSheetData_: () => ({
       success: true,
       data: [
         { timestamp: '2026-04-18T10:00:00Z' }, // older
@@ -458,9 +458,9 @@ test('getNotificationUpdate: reports hasNewContent=true when items newer than la
   assert.equal(result.newItemsCount, 2);
 });
 
-test('getNotificationUpdate: viewer reuses board-data cache (no getUserSheetData on cache hit)', () => {
+test('getNotificationUpdate: viewer reuses board-data cache (no getUserSheetData_ on cache hit)', () => {
   // Why (v2865/H2): viewer は getPublishedSheetData と同一 cache entry を共有し、毎 poll の
-  //   無キャッシュ全読を避ける。cache hit 時は getUserSheetData (loader) を呼ばないこと。
+  //   無キャッシュ全読を避ける。cache hit 時は getUserSheetData_ (loader) を呼ばないこと。
   let loaderCalls = 0;
   const cachedPayload = JSON.stringify({
     success: true,
@@ -471,7 +471,7 @@ test('getNotificationUpdate: viewer reuses board-data cache (no getUserSheetData
   });
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
     isAdministrator: () => false,
     safeJsonParse_: (s, fb) => { try { return JSON.parse(s); } catch (_) { return fb; } },
@@ -483,11 +483,11 @@ test('getNotificationUpdate: viewer reuses board-data cache (no getUserSheetData
         remove: () => {}
       })
     },
-    getUserSheetData: () => { loaderCalls++; return { success: true, data: [] }; }
+    getUserSheetData_: () => { loaderCalls++; return { success: true, data: [] }; }
   });
   const result = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
   assert.equal(result.success, true);
-  assert.equal(loaderCalls, 0, 'cache hit must avoid getUserSheetData (no extra SA read)');
+  assert.equal(loaderCalls, 0, 'cache hit must avoid getUserSheetData_ (no extra SA read)');
   assert.equal(result.hasNewContent, true);
   assert.equal(result.newItemsCount, 1);
 });
@@ -496,7 +496,7 @@ test('getNotificationUpdate: owner is NOT cached (reads fresh for immediate edit
   let loaderCalls = 0;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
     isAdministrator: () => false,
     safeJsonParse_: (s, fb) => { try { return JSON.parse(s); } catch (_) { return fb; } },
@@ -508,7 +508,7 @@ test('getNotificationUpdate: owner is NOT cached (reads fresh for immediate edit
         put: () => {}, remove: () => {}
       })
     },
-    getUserSheetData: () => { loaderCalls++; return { success: true, data: [] }; }
+    getUserSheetData_: () => { loaderCalls++; return { success: true, data: [] }; }
   });
   ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
   assert.equal(loaderCalls, 1, 'owner must bypass cache and read fresh');
@@ -563,19 +563,19 @@ test('saveConfig: returns auth error without session', () => {
 test('saveConfig: returns user-not-found when email unknown', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'ghost@example.com',
-    findUserByEmail: () => null
+    findUserByEmail_: () => null
   });
   const result = ctx.saveConfig({}, {});
   assert.equal(result.success, false);
   assert.match(result.message, /ユーザー/);
 });
 
-test('saveConfig: delegates to saveUserConfig with isMainConfig by default', () => {
+test('saveConfig: delegates to saveUserConfig_ with isMainConfig by default', () => {
   let capturedOpts = null;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    saveUserConfig: (_userId, _config, opts) => {
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig_: (_userId, _config, opts) => {
       capturedOpts = opts;
       return { success: true };
     }
@@ -589,8 +589,8 @@ test('saveConfig: uses isDraft when options.isDraft is truthy', () => {
   let capturedOpts = null;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    saveUserConfig: (_userId, _config, opts) => {
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig_: (_userId, _config, opts) => {
       capturedOpts = opts;
       return { success: true };
     }
@@ -600,13 +600,13 @@ test('saveConfig: uses isDraft when options.isDraft is truthy', () => {
   assert.equal(capturedOpts.isMainConfig, undefined);
 });
 
-test('saveConfig: forwards userId and config to saveUserConfig unchanged', () => {
+test('saveConfig: forwards userId and config to saveUserConfig_ unchanged', () => {
   let capturedUserId = null;
   let capturedConfig = null;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    saveUserConfig: (userId, config) => {
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig_: (userId, config) => {
       capturedUserId = userId;
       capturedConfig = config;
       return { success: true };
@@ -619,22 +619,22 @@ test('saveConfig: forwards userId and config to saveUserConfig unchanged', () =>
   assert.equal(capturedConfig.columnMapping.answer, 2);
 });
 
-test('saveConfig: propagates saveUserConfig error', () => {
+test('saveConfig: propagates saveUserConfig_ error', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    saveUserConfig: () => ({ success: false, message: 'validation failed: invalid sheetName' })
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig_: () => ({ success: false, message: 'validation failed: invalid sheetName' })
   });
   const result = ctx.saveConfig({});
   assert.equal(result.success, false);
   assert.match(result.message, /validation failed/);
 });
 
-test('saveConfig: returns exception response when saveUserConfig throws', () => {
+test('saveConfig: returns exception response when saveUserConfig_ throws', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    saveUserConfig: () => { throw new Error('storage down'); }
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig_: () => { throw new Error('storage down'); }
   });
   const result = ctx.saveConfig({});
   assert.equal(result.success, false);
@@ -658,7 +658,7 @@ test('getActiveFormInfo: returns auth error without session', () => {
 test('getActiveFormInfo: resolves current user when no userId given', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({
       formUrl: 'https://docs.google.com/forms/d/abc/viewform',
       formTitle: 'クラスアンケート'
@@ -674,7 +674,7 @@ test('getActiveFormInfo: resolves current user when no userId given', () => {
 test('getActiveFormInfo: returns user-not-found when self-lookup fails', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'ghost@example.com',
-    findUserByEmail: () => null
+    findUserByEmail_: () => null
   });
   const result = ctx.getActiveFormInfo(null);
   assert.equal(result.success, false);
@@ -685,7 +685,7 @@ test('getActiveFormInfo: uses explicit userId over current user', () => {
   let findByEmailCalled = false;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserByEmail: () => { findByEmailCalled = true; return null; },
+    findUserByEmail_: () => { findByEmailCalled = true; return null; },
     getConfigOrDefault: (uid) => {
       assert.equal(uid, 'other-user-id');
       return { formUrl: 'https://forms.gle/xyz', formTitle: 'Other' };
@@ -699,7 +699,7 @@ test('getActiveFormInfo: uses explicit userId over current user', () => {
 test('getActiveFormInfo: reports shouldShow=false when formUrl absent', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({})
   });
   const result = ctx.getActiveFormInfo(null);
@@ -711,7 +711,7 @@ test('getActiveFormInfo: reports shouldShow=false when formUrl absent', () => {
 test('getActiveFormInfo: reports isValidUrl=false when formUrl is non-Google URL', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ formUrl: 'https://evil.example.com/fake-form' })
   });
   const result = ctx.getActiveFormInfo(null);
@@ -722,7 +722,7 @@ test('getActiveFormInfo: reports isValidUrl=false when formUrl is non-Google URL
 test('getActiveFormInfo: whitespace-only formUrl treated as absent', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ formUrl: '   ' })
   });
   const result = ctx.getActiveFormInfo(null);
@@ -732,7 +732,7 @@ test('getActiveFormInfo: whitespace-only formUrl treated as absent', () => {
 test('getActiveFormInfo: default formTitle when absent from config', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ formUrl: 'https://docs.google.com/forms/d/abc/viewform' })
   });
   const result = ctx.getActiveFormInfo(null);
@@ -1052,7 +1052,7 @@ test('setupReactionAndHighlightColumns: detects all four columns when present ex
   };
   const ctx = loadDataApisContext({
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
-    invalidateSheetHeadersCache: () => {}
+    invalidateSheetHeadersCache_: () => {}
   });
   const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1',
     ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
@@ -1082,7 +1082,7 @@ test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT cou
   const ctx = loadDataApisContext({
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     getSheetInfo: () => ({ lastCol: 2, lastRow: 1, headers: [] }),
-    invalidateSheetHeadersCache: () => {},
+    invalidateSheetHeadersCache_: () => {},
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }
   });
   const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1', sheetHeaders);
@@ -1101,7 +1101,7 @@ test('setupReactionAndHighlightColumns: detects lowercase/whitespace-padded head
     SpreadsheetApp: {
       openById: () => ({ getSheetByName: () => sheet })
     },
-    invalidateSheetHeadersCache: () => {}
+    invalidateSheetHeadersCache_: () => {}
   });
   const result = ctx.setupReactionAndHighlightColumns_('ss-1', 'Sheet1',
     ['Q1', '  understand ', 'Like', 'CURIOUS', ' highlight']
@@ -1118,15 +1118,15 @@ function makePollingCtx(overrides) {
   const loads = { n: 0 };
   const ctx = loadDataApisContext(Object.assign({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => { loads.n++; return { success: true, data: [] }; },
+    getUserSheetData_: () => { loads.n++; return { success: true, data: [] }; },
     CacheService: { getScriptCache: () => ({
       get: (k) => store.has(k) ? store.get(k) : null,
       put: (k, v) => { store.set(k, v); },
       remove: (k) => { store.delete(k); }
     }) },
-    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    saveToCacheWithSizeCheck_: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
     safeJsonParse_: (s, f) => { try { return JSON.parse(s); } catch (_) { return f; } }
   }, overrides || {}));
   return { ctx, loads };
@@ -1159,9 +1159,9 @@ function notificationContextWithPhase(phase, overrides = {}) {
   const calls = { sheetData: 0 };
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'child@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true, formUrl: 'https://forms.example/f' }),
-    getUserSheetData: () => { calls.sheetData++; return { success: true, data: [{ timestamp: '2026-09-08T05:00:00Z' }] }; },
+    getUserSheetData_: () => { calls.sheetData++; return { success: true, data: [{ timestamp: '2026-09-08T05:00:00Z' }] }; },
     __getViewerLessonPhase_: () => phase,
     ...overrides
   });
@@ -1214,9 +1214,9 @@ test('getNotificationUpdate: 授業中でなければ (lessonPhase=null) 従来�
 test('getNotificationUpdate: ボードの版番号 (boardVersion) を載せる (ハイライト等の行が増えない変化の検知用)', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({ success: true, data: [] }),
+    getUserSheetData_: () => ({ success: true, data: [] }),
     CacheService: { getScriptCache: () => ({ get: (k) => k === 'board_data_ver:u1' ? '7' : null, put: () => {}, remove: () => {} }) }
   });
   const result = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
@@ -1233,10 +1233,10 @@ test('prewarmBoardDataCache_: 全体 + クラスごとに 1 回ずつ読み、�
   const loads = [];
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: (uid, options) => { loads.push(options.classFilter || '_'); return { success: true, data: [] }; },
-    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    getUserSheetData_: (uid, options) => { loads.push(options.classFilter || '_'); return { success: true, data: [] }; },
+    saveToCacheWithSizeCheck_: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
     CacheService: { getScriptCache: () => ({
       get: (k) => (k === 'board_data_ver:u1' ? '7' : (store.has(k) ? store.get(k) : null)),
       put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
@@ -1254,9 +1254,9 @@ test('prewarmBoardDataCache_: 全体 + クラスごとに 1 回ずつ読み、�
 test('getNotificationUpdate: ボードが混んでいる (BUSY) ときは失敗にせず「新着なし」+ boardBusy で返す', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({ success: false, message: 'should not be called' }),
+    getUserSheetData_: () => ({ success: false, message: 'should not be called' }),
     withBoardDataCache_: undefined,
     withStampedeGuard_: () => ctx.boardDataBusyResult_()
   });
@@ -1284,7 +1284,7 @@ function contextWithProbe({ denied }) {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'child@example.com',
     logError_: (fn, err) => logs.push(fn + ': ' + (err && err.message)),
-    findPublishedBoardOwner: (_id, _email, extra = {}) => {
+    findPublishedBoardOwner_: (_id, _email, extra = {}) => {
       if (denied && extra.accessProbe) extra.accessProbe.denied = true;
       return null;
     }
@@ -1317,9 +1317,9 @@ test('getNotificationUpdate: 非公開ボードは Access denied (児童の画�
 test('getNotificationUpdate: 児童の「新着あり」は対象クラスの回答だけで数える', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'child@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({ success: true, data: [{ timestamp: '2026-10-20T05:00:00Z', class: '6年4組', email: 'x@example.com' }] }),
+    getUserSheetData_: () => ({ success: true, data: [{ timestamp: '2026-10-20T05:00:00Z', class: '6年4組', email: 'x@example.com' }] }),
     __getViewerLessonPhase_: () => ({ lessonId: 'l1', phaseIndex: 1, screenRole: 'browse', classes: ['6年1組'] })
   });
   const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
@@ -1330,9 +1330,9 @@ test('getNotificationUpdate: 児童の「新着あり」は対象クラスの回
 test('getNotificationUpdate: 許可不足でない混雑は従来どおり「新着なし」(boardBusy) で返す', () => {
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'child@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({ success: false, busy: true }),
+    getUserSheetData_: () => ({ success: false, busy: true }),
     authorizationScopeFailureSeen_: () => false,
     getBoardDataVersion_: () => '1'
   });

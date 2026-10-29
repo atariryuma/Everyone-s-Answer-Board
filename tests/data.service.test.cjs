@@ -69,16 +69,16 @@ function loadDataServiceContext(overrides = {}) {
     CACHE_DURATION: { DATABASE_LONG: 600, FORM_DATA: 30 },
     ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
-    findUserByEmail: () => null,
-    findUserById: () => null,
-    findUserBySpreadsheetId: () => null,
+    findUserByEmail_: () => null,
+    findUserById_: () => null,
+    findUserBySpreadsheetId_: () => null,
     openSpreadsheet: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({}),
     normalizeHeader: (h) => String(h || '').toLowerCase().trim(),
     extractReactions: () => ({}),
     extractHighlight: () => false,
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     formatTimestamp: (v) => String(v || ''),
     getCachedProperty_: () => null,
     ...overrides
@@ -189,7 +189,7 @@ test('getSheetHeaders: empty sheet yields zero cols and empty headers', () => {
 });
 
 // =====================================================================
-// invalidateSheetHeadersCache
+// invalidateSheetHeadersCache_
 // =====================================================================
 
 test('invalidateSheetHeadersCache: removes the exact cache key', () => {
@@ -200,7 +200,7 @@ test('invalidateSheetHeadersCache: removes the exact cache key', () => {
   });
   const ctx = loadDataServiceContext({ cache });
 
-  ctx.invalidateSheetHeadersCache('ss-1', 'Sheet1');
+  ctx.invalidateSheetHeadersCache_('ss-1', 'Sheet1');
 
   assert.equal(cache._store.has('sheet_headers_ss-1_Sheet1'), false);
   assert.equal(cache._store.has('sheet_headers_ss-1_Other'), true);
@@ -211,9 +211,9 @@ test('invalidateSheetHeadersCache: no-op when either arg is missing', () => {
   const cache = createMockCache({ 'sheet_headers_ss-1_Sheet1': 'cached' });
   const ctx = loadDataServiceContext({ cache });
 
-  ctx.invalidateSheetHeadersCache('', 'Sheet1');
-  ctx.invalidateSheetHeadersCache('ss-1', '');
-  ctx.invalidateSheetHeadersCache(null, null);
+  ctx.invalidateSheetHeadersCache_('', 'Sheet1');
+  ctx.invalidateSheetHeadersCache_('ss-1', '');
+  ctx.invalidateSheetHeadersCache_(null, null);
 
   assert.equal(cache._store.has('sheet_headers_ss-1_Sheet1'), true);
 });
@@ -227,7 +227,7 @@ test('invalidateSheetHeadersCache: swallows remove errors', () => {
   const ctx = loadDataServiceContext({ cache });
 
   // Should not throw
-  ctx.invalidateSheetHeadersCache('ss-1', 'Sheet1');
+  ctx.invalidateSheetHeadersCache_('ss-1', 'Sheet1');
 });
 
 // =====================================================================
@@ -358,7 +358,7 @@ test('getAdaptiveBatchSize: consecutive errors → 50', () => {
 });
 
 // =====================================================================
-// connectToSpreadsheetSheet
+// connectToSpreadsheetSheet_
 // =====================================================================
 
 test('connectToSpreadsheetSheet: returns { sheet, spreadsheet } on success', () => {
@@ -369,7 +369,7 @@ test('connectToSpreadsheetSheet: returns { sheet, spreadsheet } on success', () 
     })
   });
 
-  const result = ctx.connectToSpreadsheetSheet({ spreadsheetId: 'ss', sheetName: 'Sheet1' });
+  const result = ctx.connectToSpreadsheetSheet_({ spreadsheetId: 'ss', sheetName: 'Sheet1' });
 
   assert.equal(result.sheet, mockSheet);
 });
@@ -378,7 +378,7 @@ test('connectToSpreadsheetSheet: throws when openSpreadsheet returns null', () =
   const ctx = loadDataServiceContext({ openSpreadsheet: () => null });
 
   assert.throws(
-    () => ctx.connectToSpreadsheetSheet({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
+    () => ctx.connectToSpreadsheetSheet_({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
     /スプレッドシートアクセス/
   );
 });
@@ -387,7 +387,7 @@ test('connectToSpreadsheetSheet: throws when dataAccess has no spreadsheet', () 
   const ctx = loadDataServiceContext({ openSpreadsheet: () => ({}) });
 
   assert.throws(
-    () => ctx.connectToSpreadsheetSheet({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
+    () => ctx.connectToSpreadsheetSheet_({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
     /スプレッドシートアクセス/
   );
 });
@@ -400,27 +400,27 @@ test('connectToSpreadsheetSheet: throws when sheet not found', () => {
   });
 
   assert.throws(
-    () => ctx.connectToSpreadsheetSheet({ spreadsheetId: 'ss', sheetName: 'Missing' }),
+    () => ctx.connectToSpreadsheetSheet_({ spreadsheetId: 'ss', sheetName: 'Missing' }),
     /'Missing'/
   );
 });
 
 // =====================================================================
-// getUserSheetData: early returns (light-touch integration)
+// getUserSheetData_: early returns (light-touch integration)
 // =====================================================================
 
 test('getUserSheetData: returns error when user not found', () => {
-  const ctx = loadDataServiceContext({ findUserById: () => null });
-  const result = ctx.getUserSheetData('ghost', {});
+  const ctx = loadDataServiceContext({ findUserById_: () => null });
+  const result = ctx.getUserSheetData_('ghost', {});
   assert.equal(result.success, false);
   assert.match(result.message, /ユーザー/);
 });
 
 test('getUserSheetData: returns error when preloadedConfig missing spreadsheetId', () => {
   const ctx = loadDataServiceContext({
-    findUserById: () => ({ userId: 'u1', userEmail: 'a@x.com' })
+    findUserById_: () => ({ userId: 'u1', userEmail: 'a@x.com' })
   });
-  const result = ctx.getUserSheetData('u1', {}, null, { spreadsheetId: '' });
+  const result = ctx.getUserSheetData_('u1', {}, null, { spreadsheetId: '' });
   assert.equal(result.success, false);
   assert.match(result.message, /スプレッドシート/);
 });
@@ -429,12 +429,12 @@ test('getUserSheetData: uses preloadedUser and preloadedConfig without DB hits',
   let findCalls = 0;
   let configCalls = 0;
   const ctx = loadDataServiceContext({
-    findUserById: () => { findCalls += 1; return null; },
+    findUserById_: () => { findCalls += 1; return null; },
     getConfigOrDefault: () => { configCalls += 1; return {}; },
     openSpreadsheet: () => null // Will fail downstream, but that's after the preload check
   });
 
-  ctx.getUserSheetData(
+  ctx.getUserSheetData_(
     'u1',
     {},
     { userId: 'u1', userEmail: 'a@x.com' },
@@ -448,7 +448,7 @@ test('getUserSheetData: uses preloadedUser and preloadedConfig without DB hits',
 // =====================================================================
 // processBatchData: regression — at least one batch attempted
 // Ensures the 20s time-check does not short-circuit before any batch when
-// setup (connectToSpreadsheetSheet + getSheetInfo) consumed the budget.
+// setup (connectToSpreadsheetSheet_ + getSheetInfo) consumed the budget.
 // =====================================================================
 
 test('processBatchData: processes first batch even when startTime is already past budget', () => {
@@ -700,7 +700,7 @@ function loadDeleteContext(rows) {
   };
   const ctx = loadDataServiceContext({
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'Owner@Example.com' }), // 大小違い → sameEmail_ で owner 判定
+    findUserById_: () => ({ userId: 'u1', userEmail: 'Owner@Example.com' }), // 大小違い → sameEmail_ で owner 判定
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1', sheetName: 'Sheet1' } }),
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
@@ -799,7 +799,7 @@ test('deleteAnswerRow: 削除後にボード cache の version を上げ、行�
   const ctx = loadDataServiceContext({
     cache,
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1', sheetName: 'Sheet1' } }),
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),

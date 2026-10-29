@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const { gasResponseStubs, createContentServiceStub } = require('./_helpers.cjs');
 
 /**
- * Tests for the reportClientError doPost action and handleClientErrorReport handler.
+ * Tests for the reportClientError doPost action and handleClientErrorReport_ handler.
  *
  * Why: フロントエラーを Cloud Logging に流す唯一の入口なので、
  *      validation・rate-limit・truncation・xss-safe な logging を確実にする。
@@ -27,8 +27,8 @@ function loadMainContext(overrides = {}, errorSink) {
       getActiveUser: () => ({ getEmail: () => 'student@example.com' })
     },
     evaluateDomainRestriction: () => ({ allowed: true }),
-    findUserByEmail: () => ({ userId: 'user-1' }),
-    getUserSheetData: () => ({ rows: [] }),
+    findUserByEmail_: () => ({ userId: 'user-1' }),
+    getUserSheetData_: () => ({ rows: [] }),
     addReaction: () => ({ success: true }),
     toggleHighlight: () => ({ success: true }),
     publishApp: () => ({ success: true }),
@@ -113,12 +113,12 @@ test('reportClientError: rejects non-object payload', () => {
 });
 
 // =====================================================================
-// handleClientErrorReport: structured logging
+// handleClientErrorReport_: structured logging
 // =====================================================================
 
 test('handleClientErrorReport: logs error-level to console.error', () => {
   const { context, logs } = loadMainContext();
-  const res = context.handleClientErrorReport('user@example.com', {
+  const res = context.handleClientErrorReport_('user@example.com', {
     level: 'error',
     message: 'TypeError: x is null',
     context: 'renderBoard',
@@ -140,7 +140,7 @@ test('handleClientErrorReport: logs error-level to console.error', () => {
 
 test('handleClientErrorReport: warn level → console.warn', () => {
   const { context, logs } = loadMainContext();
-  const res = context.handleClientErrorReport('s@x.com', {
+  const res = context.handleClientErrorReport_('s@x.com', {
     level: 'warn', message: 'deprecated API'
   });
   assert.equal(res.success, true);
@@ -150,7 +150,7 @@ test('handleClientErrorReport: warn level → console.warn', () => {
 
 test('handleClientErrorReport: invalid level falls back to error', () => {
   const { context, logs } = loadMainContext();
-  context.handleClientErrorReport('s@x.com', { level: 'panic', message: 'bad level' });
+  context.handleClientErrorReport_('s@x.com', { level: 'panic', message: 'bad level' });
   // panic → falls back to error
   assert.equal(logs.error.length, 1);
 });
@@ -164,7 +164,7 @@ test('handleClientErrorReport: truncates oversized message/stack/context', () =>
   const longMsg = 'x'.repeat(2000);
   const longStack = 'y'.repeat(5000);
   const longCtx = 'z'.repeat(800);
-  context.handleClientErrorReport('s@x.com', {
+  context.handleClientErrorReport_('s@x.com', {
     level: 'error',
     message: longMsg,
     stack: longStack,
@@ -179,7 +179,7 @@ test('handleClientErrorReport: truncates oversized message/stack/context', () =>
 
 test('handleClientErrorReport: strips CR/LF/TAB from logged strings', () => {
   const { context, logs } = loadMainContext();
-  context.handleClientErrorReport('s@x.com', {
+  context.handleClientErrorReport_('s@x.com', {
     level: 'error',
     message: 'line1\nline2\rline3\t',
     context: 'a\nb'
@@ -197,10 +197,10 @@ test('handleClientErrorReport: strips CR/LF/TAB from logged strings', () => {
 test('handleClientErrorReport: rate-limits after 30 reports per email', () => {
   const { context, logs } = loadMainContext();
   for (let i = 0; i < 30; i++) {
-    context.handleClientErrorReport('s@x.com', { level: 'error', message: `err ${i}` });
+    context.handleClientErrorReport_('s@x.com', { level: 'error', message: `err ${i}` });
   }
   // 31 件目で RATE_LIMIT
-  const blocked = context.handleClientErrorReport('s@x.com', { level: 'error', message: 'over limit' });
+  const blocked = context.handleClientErrorReport_('s@x.com', { level: 'error', message: 'over limit' });
   assert.equal(blocked.success, false);
   assert.equal(blocked.error, 'RATE_LIMIT');
   // 1-30 はログに残るが 31 は残らない
@@ -210,10 +210,10 @@ test('handleClientErrorReport: rate-limits after 30 reports per email', () => {
 test('handleClientErrorReport: rate limits independent per email', () => {
   const { context } = loadMainContext();
   for (let i = 0; i < 30; i++) {
-    context.handleClientErrorReport('alice@x.com', { level: 'error', message: 'a' });
+    context.handleClientErrorReport_('alice@x.com', { level: 'error', message: 'a' });
   }
   // bob は影響なし
-  const bobRes = context.handleClientErrorReport('bob@x.com', { level: 'error', message: 'b' });
+  const bobRes = context.handleClientErrorReport_('bob@x.com', { level: 'error', message: 'b' });
   assert.equal(bobRes.success, true);
 });
 
@@ -232,14 +232,14 @@ test('handleClientErrorReport: cache failure still allows logging (best-effort)'
       }
     }
   });
-  const res = context.handleClientErrorReport('s@x.com', { level: 'error', message: 'msg' });
+  const res = context.handleClientErrorReport_('s@x.com', { level: 'error', message: 'msg' });
   assert.equal(res.success, true);
   assert.equal(logs.error.length, 1);
 });
 
 test('handleClientErrorReport: empty message still logs (degenerate case)', () => {
   const { context, logs } = loadMainContext();
-  const res = context.handleClientErrorReport('s@x.com', { level: 'error' });
+  const res = context.handleClientErrorReport_('s@x.com', { level: 'error' });
   assert.equal(res.success, true);
   // logs.error[0][0] = "[client/error] " (no context, empty message)
   assert.equal(logs.error.length, 1);
@@ -248,6 +248,6 @@ test('handleClientErrorReport: empty message still logs (degenerate case)', () =
 test('handleClientErrorReport: unknown email is allowed (sometimes called pre-auth)', () => {
   const { context } = loadMainContext();
   // pass '' as email — should still log (reporter shown as 'unknown')
-  const res = context.handleClientErrorReport('', { level: 'error', message: 'x' });
+  const res = context.handleClientErrorReport_('', { level: 'error', message: 'x' });
   assert.equal(res.success, true);
 });

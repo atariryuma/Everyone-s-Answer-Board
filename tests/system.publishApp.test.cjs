@@ -15,7 +15,7 @@ function loadSystemControllerContext(overrides = {}) {
     ...gasResponseStubs(),
     logError_: () => {},
     getCurrentEmail: () => 'teacher@example.com',
-    findUserByEmail: () => ({ userId: 'user-1', userEmail: 'teacher@example.com' }),
+    findUserByEmail_: () => ({ userId: 'user-1', userEmail: 'teacher@example.com' }),
     getUserConfig: () => ({
       success: true,
       config: {
@@ -26,7 +26,7 @@ function loadSystemControllerContext(overrides = {}) {
       }
     }),
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
-    saveUserConfig: () => ({ success: true, etag: 'etag-2', config: {} }),
+    saveUserConfig_: () => ({ success: true, etag: 'etag-2', config: {} }),
     sanitizeDisplaySettings: (settings) => {
       const result = {
         showNames: Boolean(settings.showNames),
@@ -70,7 +70,7 @@ test('publishApp: non-object config is rejected', () => {
 test('publishApp: requires etag when current config has etag', () => {
   let saveCalled = false;
   const context = loadSystemControllerContext({
-    saveUserConfig: () => {
+    saveUserConfig_: () => {
       saveCalled = true;
       return { success: true };
     }
@@ -91,7 +91,7 @@ test('publishApp: allowlist fields only and save with publish flags', () => {
   let savedPayload = null;
 
   const context = loadSystemControllerContext({
-    saveUserConfig: (_userId, config) => {
+    saveUserConfig_: (_userId, config) => {
       savedPayload = config;
       return {
         success: true,

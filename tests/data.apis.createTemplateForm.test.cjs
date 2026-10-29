@@ -1,5 +1,5 @@
 /**
- * createTemplateForm / createUserFolder / moveFileToFolder_ のテスト
+ * createTemplateForm / createUserFolder_ / moveFileToFolder_ のテスト
  *
  * Why: 可視化モード（M1/M2）連動テンプレートと、Drive 単一親モデル準拠の
  *      ファイル移動、オーナー絞り込み付きフォルダ検索を保証する。
@@ -143,13 +143,13 @@ function loadCtx(overrides = {}) {
     URL,
     ...gasResponseStubs(),
     getCurrentEmail: () => myEmail,
-    findUserByEmail: () => null,
-    findUserById: () => null,
-    findPublishedBoardOwner: () => null,
-    findUserBySpreadsheetId: () => null,
+    findUserByEmail_: () => null,
+    findUserById_: () => null,
+    findPublishedBoardOwner_: () => null,
+    findUserBySpreadsheetId_: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({}),
-    saveUserConfig: () => ({ success: true }),
+    saveUserConfig_: () => ({ success: true }),
     openSpreadsheet: () => null,
     // 管理パネルの処理は先生だけ (helpers.js)。既定は先生として呼ぶ。
     teacherOnlyError_: overrides.teacherOnlyError_ || (() => null),
@@ -228,8 +228,8 @@ function loadCtx(overrides = {}) {
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: myEmail, isAdmin: false }),
     getCachedProperty_: () => null,
-    saveToCacheWithSizeCheck: () => true,
-    emailToShortHash: () => 'h_xxxx',
+    saveToCacheWithSizeCheck_: () => true,
+    emailToShortHash_: () => 'h_xxxx',
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
     validateUrl: () => ({ isValid: true }),
     validateSpreadsheetId: () => true,
@@ -237,7 +237,7 @@ function loadCtx(overrides = {}) {
     extractReactions: () => ({}),
     extractHighlight: () => false,
     formatTimestamp: (v) => String(v || ''),
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     createDataServiceErrorResponse: (m) => ({ success: false, message: m }),
     isAdministrator: () => false,
     __driveState: driveState
@@ -705,7 +705,7 @@ test('createTemplateForm: moveTo() 非対応環境では addFile + removeFile �
 });
 
 // =====================================================================
-// createUserFolder: owner filter
+// createUserFolder_: owner filter
 // =====================================================================
 
 test('createUserFolder: 同名フォルダが他人所有なら無視して新規作成', () => {
@@ -735,7 +735,7 @@ test('createUserFolder: 同名フォルダが他人所有なら無視して新�
     }
   });
 
-  const folder = ctx.createUserFolder();
+  const folder = ctx.createUserFolder_();
   assert.ok(folder);
   // 他人のフォルダではなく、新規作成（オーナーが自分）
   const owner = folder.getOwner().getEmail();
@@ -767,7 +767,7 @@ test('createUserFolder: 自分所有のフォルダがあれば再利用', () =>
     }
   });
 
-  const folder = ctx.createUserFolder();
+  const folder = ctx.createUserFolder_();
   assert.equal(folder, mine);
   assert.equal(createCalled, false, 'must not create a new folder when own folder exists');
 });
@@ -802,7 +802,7 @@ test('createUserFolder: getOwner() が例外を投げても skip して次へ', 
     }
   });
 
-  const folder = ctx.createUserFolder();
+  const folder = ctx.createUserFolder_();
   assert.equal(folder, mine, 'should skip broken folder and pick the owned one');
 });
 
@@ -812,7 +812,7 @@ test('createUserFolder: getOwner() が例外を投げても skip して次へ', 
 //
 // Why: 過去の audit で "happy path しかテストされていない" と HIGH 指定された範囲。
 //      FormApp.create / SpreadsheetApp.create が throw した場合、setFormEmailCollectionVerified_
-//      が失敗した場合、createUserFolder が null を返した場合の挙動を pin する。
+//      が失敗した場合、createUserFolder_ が null を返した場合の挙動を pin する。
 
 test('createTemplateForm: FormApp.create が throw すると {success:false, error:...} を返す', () => {
   const ctx = loadCtx({
@@ -838,11 +838,11 @@ test('createTemplateForm: SpreadsheetApp.create が throw しても全体は {su
   assert.match(res.error, /フォーム作成に失敗/);
 });
 
-test('createTemplateForm: createUserFolder が null を返してもフォーム作成は成功し folderUrl は空', () => {
+test('createTemplateForm: createUserFolder_ が null を返してもフォーム作成は成功し folderUrl は空', () => {
   // moveFileToFolder_ は folder=null だと no-op、try-catch も無事通過する想定
   const ctx = loadCtx({
     DriveApp: {
-      // createUserFolder の内側で getOwner ループ → 一致無し → createFolder が null を返すケース
+      // createUserFolder_ の内側で getOwner ループ → 一致無し → createFolder が null を返すケース
       getFoldersByName: () => ({ hasNext: () => false, next: () => null }),
       createFolder: () => null,
       getFileById: (id) => makeFakeDriveFile(id, true),

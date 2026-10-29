@@ -1,7 +1,7 @@
 /**
- * canAccessTargetUser — 「第三者がこのユーザーのボードを読めるか」の唯一の関門。
+ * canAccessTargetUser_ — 「第三者がこのユーザーのボードを読めるか」の唯一の関門。
  *
- * Why ここを pin するか: findUserById → applyUserAccessControl → canAccessTargetUser が
+ * Why ここを pin するか: findUserById_ → applyUserAccessControl_ → canAccessTargetUser_ が
  *   viewer の cross-user read (getPublishedSheetData / getNotificationUpdate /
  *   リアクション) すべての根にある。ここの結論が doGet の結論とズレると、
  *   「画面では止まっているのに API 経由では読める」状態になる。
@@ -30,7 +30,7 @@ function loadCtx(overrides = {}) {
     isAdministrator: (e) => e === 'admin@example.com',
     getCachedProperty_: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     validateEmail: (e) => ({ isValid: true, sanitized: e, errors: [] }),
     safeJsonParse_: (t, fb) => { try { return JSON.parse(t); } catch (_) { return fb === undefined ? null : fb; } },
     // DataApis.js 側の実装 (GAS は単一グローバルスコープなので実行時は解決される)
@@ -56,25 +56,25 @@ const viewerCtx = { requestingUser: 'viewer@example.com', allowPublishedRead: tr
 
 test('canAccessTargetUser: 公開中のボードは第三者も読める', () => {
   const ctx = loadCtx();
-  assert.equal(ctx.canAccessTargetUser(target({ published: true }), viewerCtx), true);
+  assert.equal(ctx.canAccessTargetUser_(target({ published: true }), viewerCtx), true);
 });
 
 test('canAccessTargetUser: 非公開のボードは第三者から読めない', () => {
   const ctx = loadCtx();
-  assert.equal(ctx.canAccessTargetUser(target({ published: false }), viewerCtx), false);
+  assert.equal(ctx.canAccessTargetUser_(target({ published: false }), viewerCtx), false);
 });
 
 test('canAccessTargetUser: 無効化されたユーザーのボードは公開中でも第三者から読めない', () => {
   const ctx = loadCtx();
   // doGet (main.js) は isActive=false を「公開の強制終了」として扱う。
   //   データ層がこれを見ていないと、画面では止まるのに API 経由では読めてしまう。
-  assert.equal(ctx.canAccessTargetUser(target({ published: true, isActive: false }), viewerCtx), false);
+  assert.equal(ctx.canAccessTargetUser_(target({ published: true, isActive: false }), viewerCtx), false);
 });
 
 test('canAccessTargetUser: 無効化されていても本人は読める', () => {
   const ctx = loadCtx();
   assert.equal(
-    ctx.canAccessTargetUser(target({ published: true, isActive: false }),
+    ctx.canAccessTargetUser_(target({ published: true, isActive: false }),
       { requestingUser: 'owner@example.com', allowPublishedRead: true }),
     true
   );
@@ -83,7 +83,7 @@ test('canAccessTargetUser: 無効化されていても本人は読める', () =>
 test('canAccessTargetUser: 無効化されていても管理者は読める', () => {
   const ctx = loadCtx();
   assert.equal(
-    ctx.canAccessTargetUser(target({ published: true, isActive: false }),
+    ctx.canAccessTargetUser_(target({ published: true, isActive: false }),
       { requestingUser: 'admin@example.com', allowPublishedRead: true }),
     true
   );
@@ -92,13 +92,13 @@ test('canAccessTargetUser: 無効化されていても管理者は読める', ()
 test('canAccessTargetUser: isActive 未設定の既存行は巻き込まない', () => {
   const ctx = loadCtx();
   const legacy = { userId: 'u1', userEmail: 'owner@example.com', configJson: JSON.stringify({ isPublished: true }) };
-  assert.equal(ctx.canAccessTargetUser(legacy, viewerCtx), true);
+  assert.equal(ctx.canAccessTargetUser_(legacy, viewerCtx), true);
 });
 
 test('canAccessTargetUser: allowPublishedRead なしなら第三者は読めない (公開中でも)', () => {
   const ctx = loadCtx();
   assert.equal(
-    ctx.canAccessTargetUser(target({ published: true }), { requestingUser: 'viewer@example.com' }),
+    ctx.canAccessTargetUser_(target({ published: true }), { requestingUser: 'viewer@example.com' }),
     false
   );
 });
@@ -106,21 +106,21 @@ test('canAccessTargetUser: allowPublishedRead なしなら第三者は読めな�
 test('canAccessTargetUser: 本人はメールの大文字小文字が違っても読める', () => {
   const ctx = loadCtx();
   assert.equal(
-    ctx.canAccessTargetUser(target({ published: false, email: 'Owner@Example.com' }),
+    ctx.canAccessTargetUser_(target({ published: false, email: 'Owner@Example.com' }),
       { requestingUser: 'owner@example.com', allowPublishedRead: true }),
     true
   );
 });
 
 // =====================================================================
-// applyUserAccessControl の accessProbe: 「居ない」と「見せられない」を呼び出し元が区別できる
+// applyUserAccessControl_ の accessProbe: 「居ない」と「見せられない」を呼び出し元が区別できる
 // =====================================================================
 
 test('applyUserAccessControl: 非公開ボードを児童が開くと probe.denied が立ち、WARN は出さない', () => {
   const warns = [];
   const ctx = loadCtx({ console: { log: () => {}, warn: (...a) => warns.push(a), error: () => {} } });
   const probe = {};
-  const out = ctx.applyUserAccessControl(target({ published: false }), { ...viewerCtx, accessProbe: probe }, 'findUserById');
+  const out = ctx.applyUserAccessControl_(target({ published: false }), { ...viewerCtx, accessProbe: probe }, 'findUserById');
   assert.equal(out, null, '中身は返さない');
   assert.equal(probe.denied, true);
   assert.equal(warns.length, 0, '非公開は異常ではないので WARN にしない');
@@ -129,7 +129,7 @@ test('applyUserAccessControl: 非公開ボードを児童が開くと probe.deni
 test('applyUserAccessControl: 公開閲覧以外の拒否 (他人の管理操作) は従来どおり WARN を残す', () => {
   const warns = [];
   const ctx = loadCtx({ console: { log: () => {}, warn: (...a) => warns.push(a), error: () => {} } });
-  const out = ctx.applyUserAccessControl(target({ published: true }), { requestingUser: 'viewer@example.com' }, 'findUserById');
+  const out = ctx.applyUserAccessControl_(target({ published: true }), { requestingUser: 'viewer@example.com' }, 'findUserById');
   assert.equal(out, null);
   assert.equal(warns.length, 1);
 });

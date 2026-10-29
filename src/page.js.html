@@ -227,7 +227,7 @@
       this._clearAnswerCards();
     }
 
-    async executeWithRetry(operation, options = {}) {
+    async executeWithRetry_(operation, options = {}) {
       const {
         maxRetries = 3,
         baseDelay = 1000,
@@ -396,9 +396,9 @@
     setupMessageListeners() {
       // Why: ハンドラ参照を保持しないと destroy() 時に removeEventListener できず、
       //      SPA 的な再初期化や HMR で stale listener が累積するリークになる。
-      this.handlers.onWindowMessage = (event) => this.handleMessage(event.data);
-      window.addEventListener('message', this.handlers.onWindowMessage);
-
+      // window の message は受けない: 送り主を確かめられず (アプリ内に送る側も無い)、よそのページが
+      //   「回答フォーム」ボタンの行き先を偽のページに差し替えられた。同じ origin だけに届く
+      //   BroadcastChannel だけを使う。
       if (typeof BroadcastChannel !== 'undefined') {
         this.broadcastChannel = new BroadcastChannel('board-updates');
         this.handlers.onBroadcastMessage = (event) => this.handleMessage(event.data);
@@ -944,7 +944,7 @@
         }
       }
 
-      const promise = this.executeWithRetry(async () => {
+      const promise = this.executeWithRetry_(async () => {
         this.activeRequests++;
         try {
           const hasGas = typeof google !== 'undefined' && google.script && google.script.run;
@@ -1547,7 +1547,8 @@
         ? window.sharedUtilities.security.escapeHtml(String(title || ''))
         : String(title || '').replace(/</g, '&lt;');
       if (!window.notifications) return;
-      window.notifications.banner('', {
+      // banner は文が空だと何も出さないので、html を使うときも文を渡す (以前は空で、案内が出ていなかった)。
+      window.notifications.banner('新しいボードに切り替わりました', {
         html: '<strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>',
         duration: 5000,
       });
@@ -2769,9 +2770,6 @@
       }
       if (this.handlers.onScrollHeader) {
         window.removeEventListener('scroll', this.handlers.onScrollHeader);
-      }
-      if (this.handlers.onWindowMessage) {
-        window.removeEventListener('message', this.handlers.onWindowMessage);
       }
       if (this.broadcastChannel) {
         if (this.handlers.onBroadcastMessage) {
@@ -4836,7 +4834,7 @@
           throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        await this.executeWithRetry(async (attempt) => {
+        await this.executeWithRetry_(async (attempt) => {
 
           const response = await this.sendReactionToServer(rowIndex, reaction);
           await this.processResponse(item, response, reaction);
@@ -5352,7 +5350,7 @@
       this.__setHighlightBusy(true);
 
       try {
-        const res = await this.executeWithRetry(async (attempt) => {
+        const res = await this.executeWithRetry_(async (attempt) => {
 
           const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex, this.__rowExpectation(numericRowIndex));
 

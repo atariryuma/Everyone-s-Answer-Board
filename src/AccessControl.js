@@ -16,7 +16,7 @@
  *   - lesson review (mode=review) 閲覧
  *
  * 解放しない範囲 (owner / admin 専用に維持):
- *   - ボード設定の永続変更 (publishApp / saveUserConfig / column mapping / displaySettings)
+ *   - ボード設定の永続変更 (publishApp / saveUserConfig_ / column mapping / displaySettings)
  *   - 再公開 (republishMyBoard / publish from unpublished)
  *   - プロファイル管理 (loadProfile / deleteProfile / 別名保存)
  *   - lesson の作成 / 編集 / 削除 / archive
@@ -43,7 +43,7 @@ const COLLABORATOR_CACHE_TTL_NO_SEC = 600;
  * @param {string} viewerEmail - 判定対象のメール
  * @returns {boolean}
  */
-function isBoardCollaborator(targetUser, viewerEmail) {
+function isBoardCollaborator_(targetUser, viewerEmail) {
   if (!targetUser || !viewerEmail) return false;
   const norm = String(viewerEmail).toLowerCase().trim();
   if (!norm) return false;
@@ -53,7 +53,7 @@ function isBoardCollaborator(targetUser, viewerEmail) {
   let res;
   try {
     // targetUser (users シートの行) を preloaded で渡す。
-    //   Why: 渡さないと getUserConfig が findUserById を viewer (児童) の権限で引き直し、
+    //   Why: 渡さないと getUserConfig が findUserById_ を viewer (児童) の権限で引き直し、
     //   allowPublishedRead 無しなので必ず "findUserById: Access denied" を WARN に出しつつ
     //   default config を返していた。児童のページ表示ごとに 1 件、授業中は数十件の偽警告が
     //   本物の異常を埋めていた (2026-09-08)。行はもう手元にあるので引き直す理由がない。

@@ -1,17 +1,17 @@
 /**
  * @fileoverview SystemController - システム管理・診断・公開ライフサイクル。
- *   - URL システム: forceUrlSystemReset, getWebAppUrl (6h cache + saved fallback)
+ *   - URL システム: forceUrlSystemReset_, getWebAppUrl (6h cache + saved fallback)
  *   - 診断・監視: testSystemDiagnosis, performAutoRepair_
  *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
  *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
- *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection_, searchFormsByDrive_
- *   - DB: testDatabaseConnection, __ensureSheetWithHeaders_ (配置の初回にシートをそろえる)
+ *   - フォーム連携: validateAccess_, getFormInfo, detectFormConnection_, searchFormsByDrive_
+ *   - DB: testDatabaseConnection_, __ensureSheetWithHeaders_ (配置の初回にシートをそろえる)
  *
  * 公開状態の書き換えはここの publishApp と AdminApis.js の 2 関数 (republishMyBoard /
- * unpublishBoard) のみ。 __applyPublishStateChange に集約。
+ * unpublishBoard) のみ。 __applyPublishStateChange_ に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty_, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache_, teacherOnlyError_ */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail_, openSpreadsheet, getUserConfig, saveUserConfig_, openDatabase, getCachedProperty_, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache_, clearPropertyCache_, teacherOnlyError_ */
 
 /**
  * キャッシュ期間 (秒)
@@ -21,7 +21,7 @@ const CACHE_DURATION = {
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
   FORM_DATA: 30,       // 30秒 - フォームデータ行数キャッシュ（即時反映のため短期）
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
-  DATABASE_LONG: 600,  // 10分 - ヘッダー情報キャッシュ（列セットアップ時はinvalidateSheetHeadersCacheで明示的に無効化）
+  DATABASE_LONG: 600,  // 10分 - ヘッダー情報キャッシュ（列セットアップ時はinvalidateSheetHeadersCache_で明示的に無効化）
   USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
@@ -97,7 +97,7 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  * (`user_cache_<id>` 等) が動的なため **1 件も消えていなかった** (no-op なのに success を返す)。
  *
  * 本実装は version-bump 方式で「全体を一括無効化できる」cache 層を実際に invalidate する:
- *   - clearDatabaseUserCache(): USER_CACHE_VERSION を bump → 全 user cache エントリを一括失効
+ *   - clearDatabaseUserCache_(): USER_CACHE_VERSION を bump → 全 user cache エントリを一括失効
  *   - clearPropertyCache_(): in-memory PropertiesService LRU を全消去
  *   - _webAppUrlCache: in-memory web app URL cache をリセット
  *
@@ -110,8 +110,8 @@ __rootSys.SLEEP_MS = SLEEP_MS;
 function invalidateGlobalCaches_() {
   const results = [];
   try {
-    if (typeof clearDatabaseUserCache === 'function') {
-      clearDatabaseUserCache();
+    if (typeof clearDatabaseUserCache_ === 'function') {
+      clearDatabaseUserCache_();
       results.push('ユーザーキャッシュ無効化 (USER_CACHE_VERSION bump)');
     }
   } catch (e) {
@@ -140,7 +140,7 @@ function invalidateGlobalCaches_() {
  *
  * @returns {Object} リセット結果
  */
-function forceUrlSystemReset() {
+function forceUrlSystemReset_() {
   try {
     // Why (log level): 管理者が意図して呼ぶ保守操作 (Admin API の cacheReset) なので、
     //   異常を示す WARN ではなく INFO で残す。
@@ -282,7 +282,7 @@ function testSystemDiagnosis() {
     }
 
     try {
-      const dbTest = testDatabaseConnection();
+      const dbTest = testDatabaseConnection_();
       diagnostics.push({
         test: 'Database Connection',
         status: dbTest.success ? 'PASS' : 'FAIL',
@@ -375,7 +375,7 @@ function performAutoRepair_() {
     }
 
     try {
-      const dbTest = testDatabaseConnection();
+      const dbTest = testDatabaseConnection_();
       if (!dbTest.success) {
         repairResults.warnings.push(`データベース接続問題: ${dbTest.message}`);
       } else {
@@ -524,15 +524,15 @@ function publishApp(publishConfig) {
       return createErrorResponse('公開設定が必要です');
     }
 
-    const user = findUserByEmail(email, { requestingUser: email });
+    const user = findUserByEmail_(email, { requestingUser: email });
     if (!user) {
       logError_('publishApp', new Error('User not found'), { email });
       return createErrorResponse('ユーザーが見つかりません');
     }
 
     // Why getUserConfig (not getConfigOrDefault): publish は save パス。getConfigOrDefault は
-    //   findUserById の 429/cache miss で {} を返し、updatedConfig が現在の profile/
-    //   columnMapping を含まない最小オブジェクトになって saveUserConfig が全上書きする
+    //   findUserById_ の 429/cache miss で {} を返し、updatedConfig が現在の profile/
+    //   columnMapping を含まない最小オブジェクトになって saveUserConfig_ が全上書きする
     //   data-loss バグになる。さらに currentConfig.etag が undefined になるので楽観ロック
     //   (line 724) もスキップされ二重 publish が race する。
     const cfgRes = getUserConfig(user.userId, user);
@@ -612,8 +612,8 @@ function publishApp(publishConfig) {
     }
 
     // __allowPublishStateWrite: publishApp は publish 状態を書き換える正規経路 (3 関数の 1 つ)。
-    //   saveUserConfig の publish-state ガードを通過させる。
-    const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true, __allowPublishStateWrite: true });
+    //   saveUserConfig_ の publish-state ガードを通過させる。
+    const saveResult = saveUserConfig_(user.userId, updatedConfig, { isPublish: true, __allowPublishStateWrite: true });
 
     if (!saveResult.success) {
       logError_('publishApp.saveUserConfig', new Error(saveResult.message || 'save failed'));
@@ -625,8 +625,8 @@ function publishApp(publishConfig) {
       };
     }
 
-    // publish 遷移時の cache 即時 stale 化 (__applyPublishStateChange と共有の mechanism)。
-    //   saveUserConfig が primary のアクセス判定 cache は消すが、 profile 分 + board data version は
+    // publish 遷移時の cache 即時 stale 化 (__applyPublishStateChange_ と共有の mechanism)。
+    //   saveUserConfig_ が primary のアクセス判定 cache は消すが、 profile 分 + board data version は
     //   ここで明示。 再公開 (unpublish→republish) 時に viewer が stale/空データを見るのを防ぐ。
     if (typeof invalidateBoardCaches_ === 'function') {
       invalidateBoardCaches_(updatedConfig, user.userId);
@@ -940,7 +940,7 @@ function searchFormsByDrive_(spreadsheetId, sheetName) {
  * @param {string} spreadsheetId
  * @param {boolean} [autoAddEditor=true] - true 時、必要なら共有デフォルトを自動付与する
  */
-function validateAccess(spreadsheetId, autoAddEditor = true) {
+function validateAccess_(spreadsheetId, autoAddEditor = true) {
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { context: 'systemController' });
     if (!dataAccess || !dataAccess.spreadsheet) {
@@ -1166,7 +1166,7 @@ function getPerformanceMetrics(category = 'all', options = {}) {
     const metrics = {
       timestamp: new Date().toISOString(),
       collectionTime: null,
-      systemInfo: getSystemPerformanceInfo(),
+      systemInfo: getSystemPerformanceInfo_(),
       categories: {}
     };
 
@@ -1174,13 +1174,13 @@ function getPerformanceMetrics(category = 'all', options = {}) {
       metrics.categories.api = collectApiMetrics();
     }
     if (category === 'all' || category === 'cache') {
-      metrics.categories.cache = collectCacheMetrics();
+      metrics.categories.cache = collectCacheMetrics_();
     }
     if (category === 'all' || category === 'batch') {
-      metrics.categories.batch = collectBatchMetrics();
+      metrics.categories.batch = collectBatchMetrics_();
     }
     if (category === 'all' || category === 'error') {
-      metrics.categories.error = collectErrorMetrics(options);
+      metrics.categories.error = collectErrorMetrics_(options);
     }
 
     const endTime = Date.now();
@@ -1209,7 +1209,7 @@ function getPerformanceMetrics(category = 'all', options = {}) {
  * システム基本パフォーマンス情報を取得
  * @returns {Object} システム情報
  */
-function getSystemPerformanceInfo() {
+function getSystemPerformanceInfo_() {
   try {
     const startTime = Date.now();
 
@@ -1281,7 +1281,7 @@ function collectApiMetrics() {
  * キャッシュ効率メトリクスを収集
  * @returns {Object} キャッシュ統計
  */
-function collectCacheMetrics() {
+function collectCacheMetrics_() {
   try {
     const cache = CacheService.getScriptCache();
 
@@ -1330,7 +1330,7 @@ function collectCacheMetrics() {
  * バッチ処理効率メトリクスを収集
  * @returns {Object} バッチ処理統計
  */
-function collectBatchMetrics() {
+function collectBatchMetrics_() {
   try {
     const batchStats = {
       batchProcessingEnabled: true,
@@ -1372,7 +1372,7 @@ function collectBatchMetrics() {
  * @param {Object} options - 収集オプション
  * @returns {Object} エラー統計
  */
-function collectErrorMetrics(options = {}) {
+function collectErrorMetrics_(options = {}) {
   try {
     const recentWindowHours = Number(options.recentWindowHours || 24);
     const now = Date.now();
@@ -1508,7 +1508,7 @@ function diagnosePerformance(options = {}) {
  * データベース接続テスト（診断用）
  * @returns {Object} 接続テスト結果
  */
-function testDatabaseConnection() {
+function testDatabaseConnection_() {
   try {
     const spreadsheet = openDatabase();
     if (!spreadsheet) {

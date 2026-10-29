@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById, updateUser_, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty_, logError_, VALID_REACTION_MODES */
+/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById_, updateUser_, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty_, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -545,7 +545,7 @@ function getUserCacheKeys_(userId) {
  * 設定キャッシュクリア
  * @param {string} userId - ユーザーID
  */
-function clearConfigCache(userId) {
+function clearConfigCache_(userId) {
   try {
     CacheService.getScriptCache().removeAll(getUserCacheKeys_(userId));
   } catch (error) {
@@ -586,7 +586,7 @@ function hasCoreSystemProps() {
  * @param {Array} preloadedHeaders - 事前取得されたヘッダー配列（パフォーマンス最適化用）
  * @returns {string} 問題文テキスト
  */
-function getQuestionText(config, context = {}, preloadedHeaders = null) {
+function getQuestionText_(config, context = {}, preloadedHeaders = null) {
   try {
 
     const answerIndex = config?.columnMapping?.answer;
@@ -621,10 +621,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
             }
           }
         } catch (dataAccessError) {
-          console.warn('⚠️ getQuestionText: openSpreadsheet access failed:', dataAccessError.message);
+          console.warn('⚠️ getQuestionText_: openSpreadsheet access failed:', dataAccessError.message);
         }
       } catch (dynamicError) {
-        console.warn('⚠️ getQuestionText: Dynamic headers fetch failed:', dynamicError.message);
+        console.warn('⚠️ getQuestionText_: Dynamic headers fetch failed:', dynamicError.message);
       }
     }
 
@@ -656,7 +656,7 @@ function getUserConfig(userId, preloadedUser = null) {
   }
 
   try {
-    const user = preloadedUser || findUserById(userId, {
+    const user = preloadedUser || findUserById_(userId, {
       requestingUser: getCurrentEmail()
     });
     if (!user) {
@@ -682,7 +682,7 @@ function getUserConfig(userId, preloadedUser = null) {
     // __parseFailed = JSON 破損で default に fallback した状態。 read は success:true で
     //   default を返して graceful degradation するが、 write 経路がこの default を保存すると
     //   破損だが復旧可能だった原本を上書きしてしまう。 envelope に corrupted を surface し、
-    //   applyConfigPatch_ / __applyPublishStateChange が上書きを拒否できるようにする。
+    //   applyConfigPatch_ / __applyPublishStateChange_ が上書きを拒否できるようにする。
     return {
       success: true,
       config,
@@ -714,7 +714,7 @@ function getUserConfig(userId, preloadedUser = null) {
  * @param {Object} options - 保存オプション
  * @returns {Object} {success: boolean, message: string, data?: Object}
  */
-function saveUserConfig(userId, config, options = {}) {
+function saveUserConfig_(userId, config, options = {}) {
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
       success: false,
@@ -730,7 +730,7 @@ function saveUserConfig(userId, config, options = {}) {
   }
 
   try {
-    const user = findUserById(userId, { requestingUser: getCurrentEmail() });
+    const user = findUserById_(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       return {
         success: false,
@@ -793,7 +793,7 @@ function saveUserConfig(userId, config, options = {}) {
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
     // Why (publish lifecycle single-source-of-truth, v2865): config.isPublished / publishedAt は
-    //   __applyPublishStateChange と publishApp の 2 経路だけが書き換えてよい (CLAUDE.md の不変条件)。
+    //   __applyPublishStateChange_ と publishApp の 2 経路だけが書き換えてよい (CLAUDE.md の不変条件)。
     //   それ以外の save (frontend autosave / applyConfigPatch_ / profile 切替 / markWelcomeSeen 等) が
     //   stale な isPublished を運んできても、ここで現在永続化されている値で強制上書きし「公開状態は
     //   変えない」を保証する。strip ではなく現値で上書きするのは、 field を消すと
@@ -875,7 +875,7 @@ function saveUserConfig(userId, config, options = {}) {
       };
     }
 
-    clearConfigCache(userId);
+    clearConfigCache_(userId);
 
     // アクセス判定 (checkSpreadsheetAccess_) の 60 秒 cache は版を key に含むので、版を上げて古くする。
     //   公開状態以外の変更でも SS が差し替わることがある (profile 切替) ので、新旧両方の SS について上げる。

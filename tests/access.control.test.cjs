@@ -3,11 +3,11 @@
 // Utilities / SA pool helper / getUserConfig) を最小 stub で再現する。
 //
 // AccessControl.js の表面:
-//   - isBoardCollaborator(targetUser, viewerEmail)  … 公開エントリ (guard + config 取得 + Drive 委譲)
+//   - isBoardCollaborator_(targetUser, viewerEmail)  … 公開エントリ (guard + config 取得 + Drive 委譲)
 //   - __hasEditorPermissionViaDrive_(fileId, emailNorm) … DriveApp の編集者・持ち主 + cache (security 中核)
 //   - __emailHash_(email) … SHA-256 cache key (衝突で他人の editor 判定を継承しないため)
 //
-// 修正済みバグ (v2855 collaborator 認可): isBoardCollaborator は getUserConfig() の
+// 修正済みバグ (v2855 collaborator 認可): isBoardCollaborator_ は getUserConfig() の
 //   envelope {success, config:{spreadsheetId}} を .config で unwrap する。以前は envelope 直読みで
 //   ssId が常に undefined になり editor でも false を返していた (fail-closed = 権限過剰でなく不足)。
 //   corrupted config では fail-closed (認可を開かない)。
@@ -181,31 +181,31 @@ test('__hasEditorPermissionViaDrive_: cache key は fileId + emailHash で分離
 });
 
 // =====================================================================
-// isBoardCollaborator : guard 節 (null / owner / 正規化)
+// isBoardCollaborator_ : guard 節 (null / owner / 正規化)
 // =====================================================================
 
 test('isBoardCollaborator: targetUser / viewerEmail が欠けると false', () => {
   const ctx = loadCtx();
-  assert.equal(ctx.isBoardCollaborator(null, 'a@x.jp'), false);
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'o@x.jp' }, ''), false);
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'o@x.jp' }, null), false);
+  assert.equal(ctx.isBoardCollaborator_(null, 'a@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'o@x.jp' }, ''), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'o@x.jp' }, null), false);
 });
 
 test('isBoardCollaborator: owner 自身は collaborator でない (case-insensitive で false)', () => {
   const ctx = loadCtx({ getUserConfig: () => { throw new Error('should not reach config for owner'); } });
   const target = { userId: 'u1', userEmail: 'Owner@Naha.ed.jp' };
-  assert.equal(ctx.isBoardCollaborator(target, 'owner@naha.ed.jp'), false);
-  assert.equal(ctx.isBoardCollaborator(target, 'OWNER@NAHA.ED.JP'), false);
+  assert.equal(ctx.isBoardCollaborator_(target, 'owner@naha.ed.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_(target, 'OWNER@NAHA.ED.JP'), false);
 });
 
 test('isBoardCollaborator: getUserConfig が throw しても fail-closed で false', () => {
   const ctx = loadCtx({ getUserConfig: () => { throw new Error('config load boom'); } });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'o@x.jp' }, 'editor@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'o@x.jp' }, 'editor@x.jp'), false);
 });
 
 test('isBoardCollaborator: config に spreadsheetId が無ければ false', () => {
   const ctx = loadCtx({ getUserConfig: () => ({ success: true, config: {} }) });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'o@x.jp' }, 'editor@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'o@x.jp' }, 'editor@x.jp'), false);
 });
 
 // happy-path (v2855 collaborator 認可): getUserConfig は envelope {success, config:{spreadsheetId}}
@@ -219,7 +219,7 @@ test('isBoardCollaborator: envelope を unwrap し Drive editor を collaborator
     // editor として Drive 上は writer 権限を持つ
     drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), true);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), true);
 });
 
 test('isBoardCollaborator: SS に editor 権限が無い viewer は false (unwrap 後も権限判定は Drive 依存)', () => {
@@ -228,7 +228,7 @@ test('isBoardCollaborator: SS に editor 権限が無い viewer は false (unwra
     // editor@x.jp のみ writer。viewer@x.jp は permission list に不在
     drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'viewer@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'owner@x.jp' }, 'viewer@x.jp'), false);
 });
 
 test('isBoardCollaborator: getUserConfig が success:false なら false (config 取得失敗)', () => {
@@ -236,7 +236,7 @@ test('isBoardCollaborator: getUserConfig が success:false なら false (config 
     getUserConfig: () => ({ success: false, config: { spreadsheetId: 'SS1' }, message: 'User not found' }),
     drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
 });
 
 // corrupted config (JSON parse 失敗で default に fallback) は認可判定では fail-closed。
@@ -247,5 +247,5 @@ test('isBoardCollaborator: corrupted config は spreadsheetId が残っていて
     getUserConfig: () => ({ success: true, corrupted: true, config: { spreadsheetId: 'SS1' } }),
     drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
-  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
+  assert.equal(ctx.isBoardCollaborator_({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
 });

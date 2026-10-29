@@ -153,7 +153,7 @@
                           ▼
                   ┌───────────────────┐
                   │ DataService       │ ← 既存のまま
-                  │ fetchSpreadsheetData
+                  │ fetchSpreadsheetData_
                   └─────────┬─────────┘
                             │ items[]
                             ▼
@@ -584,7 +584,7 @@ CSS で：
 | 既存 | 流用先 | 修正の有無 |
 |---|---|---|
 | `getPublishedSheetData` 認可フロー | viz モードも同じエンドポイント | 無 |
-| `fetchSpreadsheetData` のバッチ/リトライ | そのまま | 無 |
+| `fetchSpreadsheetData_` のバッチ/リトライ | そのまま | 無 |
 | `columnMapping` の resolveColumnIndex | numericX/Y 追加だけ | 微 |
 | ポーリング基盤（5 秒間隔） | viz モードでも同じ | 無 |
 | `classFilter` / `sortOrder` | viz モードでも適用可（クラス別色分けに使える） | 無 |

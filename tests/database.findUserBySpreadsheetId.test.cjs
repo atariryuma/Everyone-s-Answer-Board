@@ -1,7 +1,7 @@
 /**
- * findUserBySpreadsheetId — cache versioning と JSON parse 耐性のテスト
+ * findUserBySpreadsheetId_ — cache versioning と JSON parse 耐性のテスト
  *
- * Why: commit 52bdd495 で「version findUserBySpreadsheetId cache key」を導入。
+ * Why: commit 52bdd495 で「version findUserBySpreadsheetId_ cache key」を導入。
  *      USER_CACHE_VERSION の bump が cache key を変更し、stale な cache を実質的に
  *      無効化する契約が race 防止の core。これが従来 untested だった (audit HIGH)。
  *      また configJson が壊れている user を skip して次へ進む挙動も pin する
@@ -29,6 +29,8 @@ function makeCache(initial = {}) {
 function loadCtx(overrides = {}) {
   const cache = overrides.cache || makeCache();
   const propsStore = overrides.propsStore || {};
+  // users の cache の版は CacheService の user_cache_ver (以前は Script Property)。テストの版を移す。
+  if (!cache._store.has('user_cache_ver')) cache._store.set('user_cache_ver', propsStore.USER_CACHE_VERSION || '0');
   const users = overrides.users || [];
 
   const context = {
@@ -50,11 +52,11 @@ function loadCtx(overrides = {}) {
     getCurrentEmail: () => 'a@example.com',
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     getCachedProperty_: (k) => (k in propsStore ? propsStore[k] : null),
     clearPropertyCache_: () => {},
     simpleHash: (s) => String(s).length,
-    saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
+    saveToCacheWithSizeCheck_: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
     safeJsonParse_: (text, fallback) => {
       const fb = (fallback === undefined ? null : fallback);
       if (text == null || text === '') return fb;
@@ -90,10 +92,10 @@ function user(id, spreadsheetId, extraConfig = {}) {
 
 test('findUserBySpreadsheetId: 非string / 空文字は null', () => {
   const ctx = loadCtx({ users: [user('u1', 'sheet-1')] });
-  assert.equal(ctx.findUserBySpreadsheetId(null), null);
-  assert.equal(ctx.findUserBySpreadsheetId(''), null);
-  assert.equal(ctx.findUserBySpreadsheetId(undefined), null);
-  assert.equal(ctx.findUserBySpreadsheetId(42), null);
+  assert.equal(ctx.findUserBySpreadsheetId_(null), null);
+  assert.equal(ctx.findUserBySpreadsheetId_(''), null);
+  assert.equal(ctx.findUserBySpreadsheetId_(undefined), null);
+  assert.equal(ctx.findUserBySpreadsheetId_(42), null);
 });
 
 // =====================================================================
@@ -106,7 +108,7 @@ test('findUserBySpreadsheetId: 一致 user を返す + cache に保存', () => {
     cache,
     users: [user('u1', 'sheet-A'), user('u2', 'sheet-B')]
   });
-  const found = ctx.findUserBySpreadsheetId('sheet-B');
+  const found = ctx.findUserBySpreadsheetId_('sheet-B');
   assert.ok(found);
   assert.equal(found.userId, 'u2');
 
@@ -127,7 +129,7 @@ test('findUserBySpreadsheetId: 見つからない場合 null + negative-cache', 
     cache,
     users: [user('u1', 'sheet-A')]
   });
-  const result = ctx.findUserBySpreadsheetId('sheet-NONEXISTENT');
+  const result = ctx.findUserBySpreadsheetId_('sheet-NONEXISTENT');
   assert.equal(result, null);
 
   const cacheKey = 'user_by_sheet_v0_sheet-NONEXISTENT';
@@ -148,16 +150,16 @@ test('findUserBySpreadsheetId: cache hit ならば getAllUsers_ を呼ばない'
     getAllUsers_: () => { getAllCalled++; return []; }
   });
 
-  const result = ctx.findUserBySpreadsheetId('sheet-X');
+  const result = ctx.findUserBySpreadsheetId_('sheet-X');
   assert.equal(result.userId, 'u-cached');
   assert.equal(getAllCalled, 0, 'cache hit must not hit DB');
 });
 
 // =====================================================================
-// USER_CACHE_VERSION 切替: 古い cache key を実質的に無効化
+// users の cache の版の切替: 古い cache key を実質的に無効化
 // =====================================================================
 
-test('findUserBySpreadsheetId: USER_CACHE_VERSION bump で古い cache が見えなくなる', () => {
+test('findUserBySpreadsheetId: 版が変わると古い cache が見えなくなる', () => {
   // 古い version の cache に「user-OLD」が入っているが、現 version は "7"
   const cache = makeCache({
     'user_by_sheet_v0_sheet-X': JSON.stringify({ userId: 'OLD', userEmail: 'old@x.com' })
@@ -168,7 +170,7 @@ test('findUserBySpreadsheetId: USER_CACHE_VERSION bump で古い cache が見え
     users: [user('NEW', 'sheet-X')]
   });
 
-  const result = ctx.findUserBySpreadsheetId('sheet-X');
+  const result = ctx.findUserBySpreadsheetId_('sheet-X');
   assert.equal(result.userId, 'NEW', 'version bump must invalidate old cache');
 
   // 新しい version の cache key が書き込まれる
@@ -186,7 +188,7 @@ test('findUserBySpreadsheetId: 同じ version (同じ key 名前空間) なら�
     getAllUsers_: () => { getAllCalled++; return []; }
   });
 
-  const result = ctx.findUserBySpreadsheetId('sheet-Y');
+  const result = ctx.findUserBySpreadsheetId_('sheet-Y');
   assert.equal(result.userId, 'CACHED');
   assert.equal(getAllCalled, 0);
 });
@@ -206,7 +208,7 @@ test('findUserBySpreadsheetId: { skipCache: true } で cache 読み書きをバ�
     getAllUsers_: () => { getAllCalled++; return [user('FRESH', 'sheet-Z')]; }
   });
 
-  const result = ctx.findUserBySpreadsheetId('sheet-Z', { skipCache: true });
+  const result = ctx.findUserBySpreadsheetId_('sheet-Z', { skipCache: true });
   assert.equal(result.userId, 'FRESH', 'skipCache must bypass cached value');
   assert.equal(getAllCalled, 1, 'skipCache must hit DB');
 
@@ -226,7 +228,7 @@ test('findUserBySpreadsheetId: 壊れた configJson の user は skip', () => {
       user('healthy', 'sheet-OK')
     ]
   });
-  const found = ctx.findUserBySpreadsheetId('sheet-OK');
+  const found = ctx.findUserBySpreadsheetId_('sheet-OK');
   assert.ok(found, 'should not crash on corrupted neighbor');
   assert.equal(found.userId, 'healthy');
 });
@@ -238,7 +240,7 @@ test('findUserBySpreadsheetId: configJson が undefined の user は default {} 
       user('with-sheet', 'sheet-W')
     ]
   });
-  const found = ctx.findUserBySpreadsheetId('sheet-W');
+  const found = ctx.findUserBySpreadsheetId_('sheet-W');
   assert.equal(found.userId, 'with-sheet');
 });
 
@@ -250,14 +252,14 @@ test('findUserBySpreadsheetId: getAllUsers_ が非配列を返したら null', (
   const ctx = loadCtx({
     getAllUsers_: () => null
   });
-  assert.equal(ctx.findUserBySpreadsheetId('sheet-X'), null);
+  assert.equal(ctx.findUserBySpreadsheetId_('sheet-X'), null);
 });
 
 test('findUserBySpreadsheetId: getAllUsers_ が throw したら null を返す (全体 try/catch)', () => {
   const ctx = loadCtx({
     getAllUsers_: () => { throw new Error('DB error'); }
   });
-  assert.equal(ctx.findUserBySpreadsheetId('sheet-X'), null);
+  assert.equal(ctx.findUserBySpreadsheetId_('sheet-X'), null);
 });
 
 // =====================================================================
@@ -275,7 +277,7 @@ test('findUserBySpreadsheetId: cache.put が throw しても見つけた user �
     cache: badCache,
     users: [user('u1', 'sheet-A')]
   });
-  const found = ctx.findUserBySpreadsheetId('sheet-A');
+  const found = ctx.findUserBySpreadsheetId_('sheet-A');
   assert.ok(found);
   assert.equal(found.userId, 'u1');
 });

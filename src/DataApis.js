@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, validateAccess_, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -68,7 +68,7 @@ function uploadLessonImage(base64Data, filename) {
       ? filename.trim().slice(0, 80).replace(/[^a-zA-Z0-9._\-ぁ-鿿]/g, '_')
       : ('image-' + Date.now() + '.' + ext);
     const blob = Utilities.newBlob(bytes, mimeType, safeName);
-    const folder = createUserFolder();
+    const folder = createUserFolder_();
     if (!folder) return createErrorResponse('Drive フォルダ作成に失敗しました');
     const file = folder.createFile(blob);
     return createSuccessResponse('uploaded', {
@@ -83,7 +83,7 @@ function uploadLessonImage(base64Data, filename) {
   }
 }
 
-function createUserFolder() {
+function createUserFolder_() {
   try {
     const folderName = 'みんなの回答ボード';
     const myEmail = Session.getActiveUser().getEmail();
@@ -393,7 +393,7 @@ function createTemplateForm(templateType, templateOptions) {
 
     let folderUrl = '';
     try {
-      const folder = createUserFolder();
+      const folder = createUserFolder_();
       if (folder) {
         folderUrl = folder.getUrl();
         moveFileToFolder_(DriveApp.getFileById(form.getId()), folder);
@@ -674,9 +674,9 @@ function customizeForm_(formIdOrUrl, schema) {
     //   次回 fetch 時にどちらにせよ headers は実際の sheet から取り直されるので無害。
     try {
       const destId = newSpreadsheetId || form.getDestinationId();
-      if (destId && typeof invalidateSheetHeadersCache === 'function') {
+      if (destId && typeof invalidateSheetHeadersCache_ === 'function') {
         ['フォームの回答 1', 'Form Responses 1', 'Sheet1'].forEach(sn => {
-          try { invalidateSheetHeadersCache(destId, sn); } catch (cacheErr) {
+          try { invalidateSheetHeadersCache_(destId, sn); } catch (cacheErr) {
             // sheet 名違いは normal: 配列の他要素で当たる
           }
         });
@@ -810,9 +810,9 @@ function processFormUrlInput(formUrl) {
 function validateHeaderIntegrity(targetUserId) {
   try {
     const currentEmail = getCurrentEmail();
-    let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: currentEmail }) : null;
+    let targetUser = targetUserId ? findUserById_(targetUserId, { requestingUser: currentEmail }) : null;
     if (!targetUser && currentEmail) {
-      targetUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
+      targetUser = findUserByEmail_(currentEmail, { requestingUser: currentEmail });
     }
 
     if (!targetUser) {
@@ -877,7 +877,7 @@ function validateHeaderIntegrity(targetUserId) {
  * server so the wire never sees the identity when identity is not permitted.
  * Admins and board owners always see everything (they can see raw sheet anyway).
  */
-// getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
+// getUserSheetData_ 失敗時に viewer へ返す標準 empty-board response。
 //   複数の read 経路で同一だったのを集約。
 function buildSheetDataErrorResult_(result) {
   if (result && result.busy) return result;   // BUSY はそのまま (受け手が busy で見分ける)
@@ -905,7 +905,7 @@ function buildSheetDataErrorResult_(result) {
 /**
  * 授業中はボードの見出しをフェーズの問いにする。
  *
- * Why: 見出しは「回答列のヘッダー」から作る (getQuestionText) が、授業モードの回答シートは
+ * Why: 見出しは「回答列のヘッダー」から作る (getQuestionText_) が、授業モードの回答シートは
  *   列名が「横軸」「縦軸」なので、ボードの上に「横軸」と出ていた。児童にも教師にも意味がない。
  *   授業中は問い (phase.question) が見出しの実体。無ければフェーズ名。
  *   授業中でなければ元の result を返す (掲示板モードに影響しない)。
@@ -1013,7 +1013,7 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     }
     // emailHash は両モードで載せる（揺らぎ追跡のため）
     if (typeof rawEmail === 'string' && rawEmail) {
-      cleaned.emailHash = emailToShortHash(rawEmail);
+      cleaned.emailHash = emailToShortHash_(rawEmail);
     }
     return cleaned;
   });
@@ -1073,8 +1073,8 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     viewerIsTeacher,
     // 閲覧者自身の仮名 (行の emailHash と同じ salt)。児童が分布の中で自分の点を見つけるため。
     //   自分のハッシュだけなので他者の同定には使えない。行の hash と同じ関数を 1 回呼ぶだけ。
-    viewerEmailHash: (viewerContext.email && typeof emailToShortHash === 'function')
-      ? (emailToShortHash(viewerContext.email) || null) : null,
+    viewerEmailHash: (viewerContext.email && typeof emailToShortHash_ === 'function')
+      ? (emailToShortHash_(viewerContext.email) || null) : null,
     // 授業中の現在フェーズ (null = 授業中でない)。undefined は「判定していない」(review 等)。
     ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {}),
     // stampede guard が「直前の結果」を返した (1 つ前の版)。受け手は読み直し保留を保つ。
@@ -1184,16 +1184,18 @@ function sameEmail_(a, b) {
 
 function bumpBoardDataVersion_(userId) {
   if (!userId || typeof CacheService === 'undefined') return;
+  // 番号を足すのではなく毎回新しい値にする。Why: 読んで +1 して書く形だと、児童の送信が重なったとき
+  //   2 人とも同じ番号を書き、後の送信の前に読んだ人がその番号で古いボードを覚え続けた。比べるのは
+  //   「前回と違うか」だけ (page.js.html __handleBoardVersion) なので、大小は要らない。
   try {
-    const cache = CacheService.getScriptCache();
-    const cur = Number(cache.get(BOARD_CACHE_KEYS_.DATA_VERSION + userId) || 0);
-    cache.put(BOARD_CACHE_KEYS_.DATA_VERSION + userId, String(cur + 1), 3600);
-  } catch (_) { /* ignore */ }
+    CacheService.getScriptCache().put(BOARD_CACHE_KEYS_.DATA_VERSION + userId,
+      Date.now().toString(36) + Math.random().toString(36).slice(2, 8), 3600);
+  } catch (_) { /* 呼び出し側 (submit 等) が失敗を warn に残す。ここで投げると書き込み自体が失敗扱いになる */ }
 }
 
 /**
  * publish 状態遷移時の board 関連 cache を一括無効化する (v2865 DRY)。
- *   publishApp と __applyPublishStateChange の 2 経路が共有する mechanism。
+ *   publishApp と __applyPublishStateChange_ の 2 経路が共有する mechanism。
  *   「いつ呼ぶか」(状態変化時のみ / publish 時のみ 等) は呼び出し側の policy で、 ここは
  *   「何を無効化するか」だけを持つ:
  *     - primary spreadsheetId + 旧 profiles の spreadsheetId のアクセス判定 cache
@@ -1243,7 +1245,7 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
   const key = boardDataCacheKey_(userId, options);
   const filter = options.classFilter || '_';
   const sort = options.sortBy || 'newest';
-  // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck に集約。
+  // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck_ に集約。
   //   partial (時間切れで途中まで) は cache しない: 欠けた板を 12 秒間全員に配ってしまう。
   const isCacheable = (res) => Boolean(res && res.success && !res.partial);
 
@@ -1257,7 +1259,7 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
       if (parsed) return parsed;
     } catch (_) { /* 壊れた値は読み直しで回復する */ }
     const fresh = loader();
-    if (isCacheable(fresh)) saveToCacheWithSizeCheck(key, packBoardDataForCache_(fresh), BOARD_DATA_CACHE_TTL_SEC);
+    if (isCacheable(fresh)) saveToCacheWithSizeCheck_(key, packBoardDataForCache_(fresh), BOARD_DATA_CACHE_TTL_SEC);
     return fresh;
   }
 
@@ -1317,7 +1319,7 @@ function prewarmBoardDataCache_(userId, teacherEmail, classes) {
   for (const classFilter of filters) {
     const options = { classFilter, sortBy: 'newest', includeTimestamp: true, adminMode: true, requestingUser: teacherEmail };
     const res = withBoardDataCache_(userId, options, () =>
-      getUserSheetData(userId, options, targetUser, config), { allowStale: false });
+      getUserSheetData_(userId, options, targetUser, config), { allowStale: false });
     if (res && res.success) out.warmed++; else out.failed++;
   }
   return out;
@@ -1337,7 +1339,7 @@ function resolveViewerBoardAccess_(targetUserId, email, isAdmin) {
   // accessProbe: 見つかったが見せられない (非公開 / 無効化) ときに denied が立つ。
   //   null の理由を分けるだけで、拒否したユーザーの中身は受け取らない。
   const accessProbe = {};
-  const targetUser = findPublishedBoardOwner(targetUserId, email, { preloadedAuth: { email, isAdmin }, accessProbe });
+  const targetUser = findPublishedBoardOwner_(targetUserId, email, { preloadedAuth: { email, isAdmin }, accessProbe });
   if (!targetUser) return { ok: false, reason: accessProbe.denied ? 'denied' : 'not_found' };
   const config = getConfigOrDefault(targetUser.userId, targetUser);
   const isOwnBoard = sameEmail_(targetUser.userEmail, email);
@@ -1422,9 +1424,9 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       const useCache = isViewerOnly || Boolean(lessonPhase);
       const cacheableResult = useCache
         ? withBoardDataCache_(targetUser.userId, options, () =>
-            getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig),
+            getUserSheetData_(targetUser.userId, options, targetUser, targetUserConfig),
             { allowStale: isViewerOnly })
-        : getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
+        : getUserSheetData_(targetUser.userId, options, targetUser, targetUserConfig);
 
       const result = cacheableResult;
 
@@ -1443,7 +1445,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       );
     }
 
-    const user = findUserByEmail(viewerEmail, {
+    const user = findUserByEmail_(viewerEmail, {
       requestingUser: viewerEmail,
       adminMode: isSystemAdmin,
       ignorePermissions: isSystemAdmin,
@@ -1472,7 +1474,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
     };
 
-    const result = getUserSheetData(user.userId, options, user, userConfig);
+    const result = getUserSheetData_(user.userId, options, user, userConfig);
 
     if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
@@ -1564,7 +1566,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     }
 
     // 合成 config: profile snapshot のフィールドを active 形に詰め替える。loadProfileForView と同じ
-    //   semantics だが、こちらは「保存せず」一時的に getUserSheetData に渡すだけ。
+    //   semantics だが、こちらは「保存せず」一時的に getUserSheetData_ に渡すだけ。
     const synthesized = {
       ...targetConfig,  // isPublished / userId 等を継承
       formUrl: p.formUrl || '',
@@ -1591,7 +1593,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
       preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
     };
 
-    const result = getUserSheetData(targetUserId, options, targetUser, synthesized);
+    const result = getUserSheetData_(targetUserId, options, targetUser, synthesized);
     if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
     return buildSafePublishedDataResult(result, synthesized, {
@@ -1625,7 +1627,7 @@ function saveConfig(config, options = {}) {
       return createAuthError();
     }
 
-    const user = findUserByEmail(userEmail, { requestingUser: userEmail });
+    const user = findUserByEmail_(userEmail, { requestingUser: userEmail });
 
     if (!user) {
       return createUserNotFoundError();
@@ -1635,7 +1637,7 @@ function saveConfig(config, options = {}) {
       { isDraft: true } :
       { isMainConfig: true };
 
-    const result = saveUserConfig(user.userId, config, saveOptions);
+    const result = saveUserConfig_(user.userId, config, saveOptions);
 
     return result;
 
@@ -1735,9 +1737,9 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const useCache = isViewerOnly || Boolean(lessonPhase);
     const userData = useCache
       ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
-          getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig),
+          getUserSheetData_(targetUser.userId, dataOptions, targetUser, targetConfig),
           { allowStale: isViewerOnly })
-      : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
+      : getUserSheetData_(targetUser.userId, dataOptions, targetUser, targetConfig);
 
     // 混んでいる間は「新着なし」で返す (lessonPhase / boardVersion は届ける)。失敗にすると
     //   児童の polling が backoff に入り、フェーズ切替の通知まで遅れる。
@@ -2072,7 +2074,7 @@ function setupReactionAndHighlightColumns_(spreadsheetId, sheetName, currentHead
     }
 
     if (columnsAdded.length > 0) {
-      invalidateSheetHeadersCache(spreadsheetId, sheetName);
+      invalidateSheetHeadersCache_(spreadsheetId, sheetName);
     }
 
     return {
@@ -2117,7 +2119,7 @@ function getActiveFormInfo(userId) {
 
     let targetUserId = userId;
     if (!targetUserId) {
-      const currentUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
+      const currentUser = findUserByEmail_(currentEmail, { requestingUser: currentEmail });
       if (!currentUser) {
         logError_('getActiveFormInfo', new Error('Current user not found'), { currentEmail });
         return {
@@ -2131,9 +2133,9 @@ function getActiveFormInfo(userId) {
     }
 
     // 生徒（non-editor, non-admin）でも公開ボードの formUrl を取得できるよう
-    // viewer-path helper を使う。findUserById を直接使うと allowPublishedRead:true を
+    // viewer-path helper を使う。findUserById_ を直接使うと allowPublishedRead:true を
     // 渡し忘れて silent failure を起こしやすいので、この経路では helper 経由で統一。
-    const targetUser = findPublishedBoardOwner(targetUserId, currentEmail);
+    const targetUser = findPublishedBoardOwner_(targetUserId, currentEmail);
     const config = getConfigOrDefault(targetUserId, targetUser);
 
     const hasFormUrl = !!(config.formUrl && config.formUrl.trim());

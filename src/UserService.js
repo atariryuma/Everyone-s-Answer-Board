@@ -17,7 +17,7 @@ function getUserInfoCacheKey(email) {
  * メールアドレスが変更されても sub は不変のため、アカウント同一性の判定に使用
  * @returns {Object|null} { googleId: string, email: string } or null
  */
-function getGoogleIdFromToken() {
+function getGoogleIdFromToken_() {
   try {
     const token = ScriptApp.getIdentityToken();
     if (!token) {

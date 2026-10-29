@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 const { gasResponseStubs } = require('./_helpers.cjs');
 
-// --- getGoogleIdFromToken tests ---
+// --- getGoogleIdFromToken_ tests ---
 
 function loadUserServiceContext(overrides = {}) {
   const context = {
@@ -14,15 +14,15 @@ function loadUserServiceContext(overrides = {}) {
     validateUrl: () => ({ isValid: true }),
     validateEmail: (e) => ({ isValid: !!e && e.includes('@') }),
     getCurrentEmail: () => 'user@example.com',
-    findUserByEmail: () => null,
-    findUserById: () => null,
-    findUserByGoogleId: () => null,
+    findUserByEmail_: () => null,
+    findUserById_: () => null,
+    findUserByGoogleId_: () => null,
     openSpreadsheet: () => null,
     updateUser_: () => ({ success: true }),
     getUserConfig: () => ({ success: true, config: {} }),
     isAdministrator: () => false,
     CACHE_DURATION: { LONG: 600, USER_INDIVIDUAL: 300 },
-    clearConfigCache: () => {},
+    clearConfigCache_: () => {},
     SYSTEM_LIMITS: { MAX_USERS: 100 },
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     ScriptApp: { getIdentityToken: () => null },
@@ -48,7 +48,7 @@ test('getGoogleIdFromToken: returns null when token is not available', () => {
   const ctx = loadUserServiceContext({
     ScriptApp: { getIdentityToken: () => null }
   });
-  const result = ctx.getGoogleIdFromToken();
+  const result = ctx.getGoogleIdFromToken_();
   assert.equal(result, null);
 });
 
@@ -57,7 +57,7 @@ test('getGoogleIdFromToken: extracts sub and email from valid JWT', () => {
   const ctx = loadUserServiceContext({
     ScriptApp: { getIdentityToken: () => mockToken }
   });
-  const result = ctx.getGoogleIdFromToken();
+  const result = ctx.getGoogleIdFromToken_();
   assert.equal(result.googleId, 'gid_123456789');
   assert.equal(result.email, 'user@example.com');
 });
@@ -67,7 +67,7 @@ test('getGoogleIdFromToken: returns null when sub is missing', () => {
   const ctx = loadUserServiceContext({
     ScriptApp: { getIdentityToken: () => mockToken }
   });
-  const result = ctx.getGoogleIdFromToken();
+  const result = ctx.getGoogleIdFromToken_();
   assert.equal(result, null);
 });
 
@@ -75,7 +75,7 @@ test('getGoogleIdFromToken: handles malformed JWT gracefully', () => {
   const ctx = loadUserServiceContext({
     ScriptApp: { getIdentityToken: () => 'not-a-jwt' }
   });
-  const result = ctx.getGoogleIdFromToken();
+  const result = ctx.getGoogleIdFromToken_();
   assert.equal(result, null);
 });
 
@@ -86,8 +86,8 @@ function loadUserApisContext(overrides = {}) {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     ...gasResponseStubs(),
     getCurrentEmail: () => 'newmail@example.com',
-    findUserByEmail: () => null,
-    findUserByGoogleId: () => null,
+    findUserByEmail_: () => null,
+    findUserByGoogleId_: () => null,
     // ログインして登録できるのはこの配置の先生だけ (processLoginAction)。既定は先生として呼ぶ。
     isAdministrator: () => true,
     getUserConfig: () => ({ success: true, config: {} }),
@@ -98,7 +98,7 @@ function loadUserApisContext(overrides = {}) {
       isActive: true
     }),
     updateUser_: () => ({ success: true }),
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' }),
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' }),
     getCachedProperty_: () => null,
     setCachedProperty_: () => {},
     getWebAppUrl: () => 'https://script.google.com/app',
@@ -125,13 +125,13 @@ test('processLoginAction: detects email change via googleId and updates user', (
 
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'newmail@example.com',
-    findUserByEmail: () => null, // new email not found
-    findUserByGoogleId: (gid, ctx) => {
+    findUserByEmail_: () => null, // new email not found
+    findUserByGoogleId_: (gid, ctx) => {
       assert.equal(ctx.skipAccessCheck, true, 'skipAccessCheck must be true for email migration');
       return gid === 'google-id-123' ? { ...oldUser } : null;
     },
     updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' })
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' })
   });
 
   const result = ctx.processLoginAction();
@@ -155,10 +155,10 @@ test('processLoginAction: updates ADMIN_EMAIL when admin email changes', () => {
 
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'new-admin@example.com',
-    findUserByEmail: () => null,
-    findUserByGoogleId: (gid, ctx) => gid === 'google-id-admin' ? { ...oldUser } : null,
+    findUserByEmail_: () => null,
+    findUserByGoogleId_: (gid, ctx) => gid === 'google-id-admin' ? { ...oldUser } : null,
     updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-admin', email: 'new-admin@example.com' }),
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-admin', email: 'new-admin@example.com' }),
     getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'old-admin@example.com' : null,
     setCachedProperty_: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
   });
@@ -179,10 +179,10 @@ test('processLoginAction: does not update ADMIN_EMAIL for non-admin email change
 
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'new-user@example.com',
-    findUserByEmail: () => null,
-    findUserByGoogleId: (gid, ctx) => gid === 'google-id-regular' ? { ...oldUser } : null,
+    findUserByEmail_: () => null,
+    findUserByGoogleId_: (gid, ctx) => gid === 'google-id-regular' ? { ...oldUser } : null,
     updateUser_: () => ({ success: true }),
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-regular', email: 'new-user@example.com' }),
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-regular', email: 'new-user@example.com' }),
     getCachedProperty_: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     setCachedProperty_: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
   });
@@ -203,8 +203,8 @@ test('processLoginAction: backfills googleId for existing user without it', () =
 
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'user@example.com',
-    findUserByEmail: () => ({ ...existingUser }),
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-456', email: 'user@example.com' }),
+    findUserByEmail_: () => ({ ...existingUser }),
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-456', email: 'user@example.com' }),
     updateUser_: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; }
   });
 
@@ -219,9 +219,9 @@ test('processLoginAction: creates new user with googleId when no match found', (
 
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'brand-new@example.com',
-    findUserByEmail: () => null,
-    findUserByGoogleId: () => null,
-    getGoogleIdFromToken: () => ({ googleId: 'google-id-789', email: 'brand-new@example.com' }),
+    findUserByEmail_: () => null,
+    findUserByGoogleId_: () => null,
+    getGoogleIdFromToken_: () => ({ googleId: 'google-id-789', email: 'brand-new@example.com' }),
     createUser_: (email, config, context) => {
       createdContext = context;
       return { userId: 'new-id', userEmail: email, googleId: context?.googleId || '' };
@@ -236,8 +236,8 @@ test('processLoginAction: creates new user with googleId when no match found', (
 test('processLoginAction: works gracefully when identity token is unavailable', () => {
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'user@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'user@example.com', isActive: true }),
-    getGoogleIdFromToken: () => null
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'user@example.com', isActive: true }),
+    getGoogleIdFromToken_: () => null
   });
 
   const result = ctx.processLoginAction();
@@ -311,9 +311,9 @@ test('getConfig: returns domain error when ensureDomainAccess denies', () => {
   assert.match(result.message, /管理者と同一ドメイン/);
 });
 
-test('getConfig: returns user-not-found when findUserByEmail returns null', () => {
+test('getConfig: returns user-not-found when findUserByEmail_ returns null', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => null
+    findUserByEmail_: () => null
   });
   const result = ctx.getConfig();
   assert.equal(result.success, false);
@@ -322,7 +322,7 @@ test('getConfig: returns user-not-found when findUserByEmail returns null', () =
 
 test('getConfig: returns config and userId on success', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' })
   });
   const result = ctx.getConfig();
@@ -356,7 +356,7 @@ test('checkUserAuthentication: returns domain-restricted when ensureDomainAccess
 
 test('checkUserAuthentication: reports authLevel=guest when user not in DB', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => null,
+    findUserByEmail_: () => null,
     isAdministrator: () => false
   });
   const result = ctx.checkUserAuthentication();
@@ -367,7 +367,7 @@ test('checkUserAuthentication: reports authLevel=guest when user not in DB', () 
 
 test('checkUserAuthentication: reports authLevel=user when found in DB', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
     isAdministrator: () => false
   });
   const result = ctx.checkUserAuthentication();
@@ -378,7 +378,7 @@ test('checkUserAuthentication: reports authLevel=user when found in DB', () => {
 test('checkUserAuthentication: reports authLevel=administrator for admins', () => {
   const ctx = loadUserApisContext({
     isAdministrator: () => true,
-    findUserByEmail: () => ({ userId: 'admin-id', userEmail: 'admin@example.com' })
+    findUserByEmail_: () => ({ userId: 'admin-id', userEmail: 'admin@example.com' })
   });
   const result = ctx.checkUserAuthentication();
   assert.equal(result.authLevel, 'administrator');
@@ -387,14 +387,14 @@ test('checkUserAuthentication: reports authLevel=administrator for admins', () =
 
 test('checkUserAuthentication: hasValidConfig reflects getUserConfig result', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
     getUserConfig: () => ({ success: true, config: {} })
   });
   const ok = ctx.checkUserAuthentication();
   assert.equal(ok.hasValidConfig, true);
 
   const ctx2 = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
     getUserConfig: () => ({ success: false })
   });
   const fail = ctx2.checkUserAuthentication();
@@ -403,7 +403,7 @@ test('checkUserAuthentication: hasValidConfig reflects getUserConfig result', ()
 
 test('checkUserAuthentication: swallows getUserConfig exceptions and reports hasValidConfig=false', () => {
   const ctx = loadUserApisContext({
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    findUserByEmail_: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
     getUserConfig: () => { throw new Error('config service down'); }
   });
   const result = ctx.checkUserAuthentication();

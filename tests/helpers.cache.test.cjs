@@ -274,7 +274,7 @@ test('simpleHash: empty string for null/non-object', () => {
   assert.equal(context.simpleHash(42), '');
 });
 
-// --- saveToCacheWithSizeCheck ---
+// --- saveToCacheWithSizeCheck_ ---
 
 test('saveToCacheWithSizeCheck: saves within size limit', () => {
   let putKey = null;
@@ -288,7 +288,7 @@ test('saveToCacheWithSizeCheck: saves within size limit', () => {
       })
     }
   });
-  const saved = context.saveToCacheWithSizeCheck('k1', { a: 1 }, 60);
+  const saved = context.saveToCacheWithSizeCheck_('k1', { a: 1 }, 60);
   assert.equal(saved, true);
   assert.equal(putKey, 'k1');
   assert.ok(putValue && putValue.includes('"a":1'));
@@ -306,7 +306,7 @@ test('saveToCacheWithSizeCheck: refuses data over maxSize', () => {
     }
   });
   const big = { x: 'a'.repeat(200000) };
-  const saved = context.saveToCacheWithSizeCheck('k1', big, 60);
+  const saved = context.saveToCacheWithSizeCheck_('k1', big, 60);
   assert.equal(saved, false);
   assert.equal(putCalled, false);
 });
@@ -321,7 +321,7 @@ test('saveToCacheWithSizeCheck: returns false when cache.put throws', () => {
       })
     }
   });
-  const saved = context.saveToCacheWithSizeCheck('k1', { a: 1 }, 60);
+  const saved = context.saveToCacheWithSizeCheck_('k1', { a: 1 }, 60);
   assert.equal(saved, false);
 });
 

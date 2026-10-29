@@ -51,8 +51,8 @@ function loadAdminContext(overrides = {}) {
     ...gasResponseStubs(),
     getCurrentEmail: () => 'admin@example.com',
     isAdministrator: () => true,
-    findUserByEmail: (email) => baseUsers.find(u => u.userEmail === email) || null,
-    findUserById: (id) => baseUsers.find(u => u.userId === id) || null,
+    findUserByEmail_: (email) => baseUsers.find(u => u.userEmail === email) || null,
+    findUserById_: (id) => baseUsers.find(u => u.userId === id) || null,
     getAllUsers_: () => baseUsers,
     updateUser_: () => ({ success: true }),
     // getUserConfig returns parsed config
@@ -65,7 +65,7 @@ function loadAdminContext(overrides = {}) {
         return { success: true, config: {} };
       }
     },
-    saveUserConfig: (userId, config, options) => {
+    saveUserConfig_: (userId, config, options) => {
       savedConfigs.set(userId, { config, options });
       // 既存配列も更新（テスト中での連続呼び出しに対応）
       const u = baseUsers.find(x => x.userId === userId);
@@ -77,7 +77,7 @@ function loadAdminContext(overrides = {}) {
     getBatchedAdminAuth: () => ({ success: true, email: 'admin@example.com', isAdmin: true }),
     testSystemDiagnosis: () => ({ success: true }),
     performAutoRepair_: () => ({ success: true }),
-    forceUrlSystemReset: () => ({ success: true }),
+    forceUrlSystemReset_: () => ({ success: true }),
     getPerformanceMetrics: (c) => ({ success: true, category: c }),
     diagnosePerformance: () => ({ success: true }),
     PropertiesService: {
@@ -327,7 +327,7 @@ test('setUserConfig: preserves boardMode through sanitization pipeline', () => {
 });
 
 // (boardMode invalid-value rejection is tested at the validators.js layer in
-//  tests/validators.test.cjs, since saveUserConfig is stubbed at this layer.)
+//  tests/validators.test.cjs, since saveUserConfig_ is stubbed at this layer.)
 
 // =====================================================================
 // bulkSetUserConfig
@@ -447,7 +447,7 @@ test('connectForm: links existing form to user config', () => {
   assert.equal(res.data.userId, 'u2');
   assert.equal(res.data.applied.formTitle, 'Existing Form');
   assert.equal(res.data.applied.spreadsheetId, 'exsheet1');
-  // 実際に saveUserConfig が呼ばれて config に反映
+  // 実際に saveUserConfig_ が呼ばれて config に反映
   const saved = ctx.__savedConfigs.get('u2').config;
   assert.equal(saved.formUrl, 'https://docs.google.com/forms/d/f1/viewform');
   assert.equal(saved.spreadsheetId, 'exsheet1');

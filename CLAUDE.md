@@ -124,7 +124,7 @@ main.js (doGet/doPost routing, auth)
   授業モードの授業がボードにつながって公開されている間だけ。users / lessons は `openDatabase` で直接読む
 
 - 判定は 60 秒 cache (不許可は 5 秒)。公開状態が変わったら `invalidateAccessDecisionCache_` で版を上げて古くする
-- ほかの先生 (共同編集者) はボード SS の編集者。`isBoardCollaborator` が DriveApp で編集者を読む (AccessControl.js)
+- ほかの先生 (共同編集者) はボード SS の編集者。`isBoardCollaborator_` が DriveApp で編集者を読む (AccessControl.js)
 - 同時に動かせる処理は先生 1 人あたり 30 本 (Apps Script の上限)。2026-10-29 に 60 本同時でもエラーなし
 
 **設計詳細**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
@@ -157,14 +157,19 @@ main.js (doGet/doPost routing, auth)
 
 | 層 | TTL | 用途 | 注意 |
 | -- | --- | ---- | ---- |
-| `getCachedProperty_(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | write は必ず `setCachedProperty_` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
-| `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, アクセス判定, rate-limit counter) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck()` 経由 |
+| `getCachedProperty_(key)` | **1 回の実行の中だけ** (メモリ、 50 件) | **config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | ADMIN_EMAIL / DATABASE_SPREADSHEET_ID は `Deployment.js` の焼き込みを返し、プロパティを読まない。 ほかの鍵は実行ごとに 1 回プロパティを読む (google.script.run の 1 呼び出し = 1 実行で、メモリは持ち越さない)。 write は `setCachedProperty_` 経由 |
+| `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, アクセス判定, rate-limit counter) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck_()` 経由 |
 | `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty_` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
+
+**先生として実行なので、児童 30 人の処理がすべて先生 1 人の 1 日の上限に数えられる** (プロパティの読み書き
+50 万回 / 日、同時実行 30)。5 秒おきに呼ばれる処理 (`getNotificationUpdate` など) でプロパティを読まない。
+実行をまたいで覚えたい値は CacheService に置く (例: users の cache の版 `user_cache_ver`、ボードの版)。
+版は番号を足さず毎回新しい値にする (重なった書き込みで取りこぼさない)。
 
 **判断フロー (新規 cache を書く時):**
 
 1. 永続 secret / 設定 → `PropertiesService.setProperty` (direct write) + 読みは `getCachedProperty_`
-2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck`
+2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck_`
 3. すでに `getCachedProperty_` で 30s memoize される config への参照 → 何もしない (透過的)
 
 ### Frontend
@@ -290,7 +295,11 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 - **名前が `_` で終わらない関数は、どれも児童の画面から `google.script.run` で呼べる。しかも先生の権限で動く**
   (先生として実行するため)。画面から呼ばせない処理は名前を `_` で終える。画面から呼ぶ管理パネルの処理は
   入口で `teacherOnlyError_()` を確かめる。呼び出し元を確かめない公開関数を足さない
-  (2026-10-29: `getCachedProperty` / `setCachedProperty` / 引っ越し / フォーム操作 / 利用者の登録が、児童から呼べた)
+  (2026-10-29: `getCachedProperty` / `setCachedProperty` / 引っ越し / フォーム操作 / 利用者の登録 / cache の書き込み
+  (`saveToCacheWithSizeCheck`) / 他の児童の名前を伏せずに読む処理が、児童から呼べた)
+- 公開関数は `scripts/public-functions.json` に載っているものだけ (`check:gas` 項目 15)。足すときは、画面から
+  呼ぶ入口か、児童が任意の引数で呼んでも書き込み・秘密の読み出し・重い処理が起きないことを確かめてから載せる
+- シートに書く児童の文は `__plainTextCell_` を通す (`=` で始まる文を数式にしない。他の児童のメールを外へ送れた)
 - **`Session.getActiveUser()` only** - never `getEffectiveUser()` (privilege escalation risk)
 - **Validate all inputs** - use validators.js functions before processing
 - **Sanitize HTML** - `textContent` not `innerHTML` for user content; use `escapeHtml()` if innerHTML required
@@ -310,7 +319,7 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 
 ### Board Publish Lifecycle (single source of truth)
 
-`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **3 関数のみ**。直接 saveUserConfig で書き換えてはいけない（DRY 違反 + テスト不可）：
+`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **3 関数のみ**。直接 saveUserConfig_ で書き換えてはいけない（DRY 違反 + テスト不可）：
 
 | 関数 | 場所 | 役割 |
 | ---- | ---- | ---- |
@@ -318,7 +327,7 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 | `republishMyBoard(options?)` | `AdminApis.js` | 所有者が自分のボードを再び公開する（state のみ） |
 | `unpublishBoard(targetUserId?, options?)` | `AdminApis.js` | 所有者 or 管理者がボードの公開を終了する |
 
-**統一不変条件**（`__applyPublishStateChange` で集約）：
+**統一不変条件**（`__applyPublishStateChange_` で集約）：
 
 - `publishedAt` は「現在の状態の発生時刻」（公開中 = now / 非公開 = null）
 - `lastAccessedAt` は変更時に touch

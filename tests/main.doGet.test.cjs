@@ -48,7 +48,7 @@ function loadDoGetContext(overrides = {}) {
     shouldEnforceDomainRestrictions: () => true,
     validateDomainAccess: () => ({ allowed: true }),
     getBatchedAdminData: () => ({ success: false, error: 'test error' }),
-    getBatchedViewerData: () => ({ success: false, error: 'test error' }),
+    getBatchedViewerData_: () => ({ success: false, error: 'test error' }),
     // main.js は DataApis.js の sameEmail_ を参照する (GAS は単一グローバルスコープ)
     sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     enhanceConfigWithDynamicUrls: (c) => c,
@@ -93,7 +93,7 @@ test('doGet: トップの案内は users を引かない (ボタンの出し分�
   const { context, templates } = loadDoGetContext({
     // getCurrentEmail は main.js 内で定義し直されるので、元の Session を差し替える。
     Session: { getActiveUser: () => ({ getEmail: () => 'child@example.com' }) },
-    findUserByEmail: () => { lookups++; return null; }
+    findUserByEmail_: () => { lookups++; return null; }
   });
   context.doGet(createGetEvent({}));
   assert.ok(templates.includes('AccessRestricted.html'));
@@ -209,15 +209,15 @@ test('doGet: null event defaults to main mode', () => {
 // 公開前でも編集者は実物を確認できる必要がある (確認のために一度児童へ公開する、
 // という運用を避ける)。児童には従来どおり「準備中」を返す。
 
-// main.js 内で定義される関数 (getCurrentEmail / getBatchedViewerData) は context override では
+// main.js 内で定義される関数 (getCurrentEmail / getBatchedViewerData_) は context override では
 // 上書きできないので、その依存を差し替える。
 function viewerStubs(email, { isPublished = false, isActive = true, isAdmin = false, isCollaborator = false } = {}) {
   return {
     Session: { getActiveUser: () => ({ getEmail: () => email }) },
     isAdministrator: (e) => isAdmin && e === email,
-    findPublishedBoardOwner: () => ({ userId: 'u1', userEmail: 'owner@example.com', isActive }),
+    findPublishedBoardOwner_: () => ({ userId: 'u1', userEmail: 'owner@example.com', isActive }),
     getConfigOrDefault: () => ({ isPublished, sheetName: 'Sheet1', displaySettings: {} }),
-    isBoardCollaborator: () => isCollaborator,
+    isBoardCollaborator_: () => isCollaborator,
     DEFAULT_DISPLAY_SETTINGS: {},
     VALIDATOR_BOARD_MODES: ['board']
   };
@@ -269,11 +269,11 @@ function loadTeacherMain({ email, loginOk = true }) {
         : { success: false, message: 'ユーザー登録に失敗しました' };
     },
     // getBatchedAdminData は main.js の実物が動くので、その下の data 層だけ用意する。
-    findUserById: (uid) => ({ userId: uid, userEmail: email, isActive: true }),
+    findUserById_: (uid) => ({ userId: uid, userEmail: email, isActive: true }),
     getConfigOrDefault: () => ({}),
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     VALIDATOR_BOARD_MODES: ['auto', 'matrix'],
-    findUserByEmail: () => null
+    findUserByEmail_: () => null
   });
   return { context, templates, loginCalls };
 }

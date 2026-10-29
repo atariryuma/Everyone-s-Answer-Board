@@ -3,7 +3,7 @@
  *   管理など）。クロスファイル依存は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser_, updateUser_, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty_, setCachedProperty_, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess, logError_ */
+/* global getCurrentEmail, findUserByEmail_, findUserByGoogleId_, isAdministrator, getUserConfig, getConfigOrDefault, createUser_, updateUser_, getGoogleIdFromToken_, getUserInfoCacheKey, getCachedProperty_, setCachedProperty_, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess, logError_ */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -45,7 +45,7 @@ function getConfig() {
       };
     }
 
-    const user = findUserByEmail(email, { requestingUser: email });
+    const user = findUserByEmail_(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
@@ -87,14 +87,14 @@ function processLoginAction() {
       return createErrorResponse('この配置の先生だけが使えます', null, { error: 'TEACHER_ONLY' });
     }
 
-    const tokenInfo = getGoogleIdFromToken();
+    const tokenInfo = getGoogleIdFromToken_();
     const googleId = tokenInfo?.googleId || '';
 
-    let user = findUserByEmail(email, { requestingUser: email });
+    let user = findUserByEmail_(email, { requestingUser: email });
 
     // Google Workspace管理者がメール変更した場合、sub(googleId)は不変なので旧ユーザーを特定できる
     if (!user && googleId) {
-      user = findUserByGoogleId(googleId, { requestingUser: email, skipAccessCheck: true });
+      user = findUserByGoogleId_(googleId, { requestingUser: email, skipAccessCheck: true });
       if (user) {
         const oldEmail = user.userEmail;
         const result = updateUser_(user.userId, { userEmail: email }, { skipAccessCheck: true });
@@ -203,7 +203,7 @@ function checkUserAuthentication() {
       };
     }
 
-    const user = findUserByEmail(email, { requestingUser: email });
+    const user = findUserByEmail_(email, { requestingUser: email });
     const userExists = !!user;
 
     const isAdminUser = isAdministrator(email);

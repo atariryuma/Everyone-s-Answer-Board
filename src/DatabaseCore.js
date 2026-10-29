@@ -6,7 +6,7 @@
  *   誰が何を見てよいかだけを checkSpreadsheetAccess_ が決める。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty_, clearPropertyCache_, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry_, getCachedProperty_, clearPropertyCache_, simpleHash, saveToCacheWithSizeCheck_, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
 
 // users シート書き込みの key 単位 lock (acquireCacheLock_ / helpers.js)。
 const USERS_LOCK_KEYS_ = Object.freeze({
@@ -18,7 +18,7 @@ const USERS_LOCK_KEYS_ = Object.freeze({
 // アクセス判定の短期 cache。key に「版」を含め、公開状態が変わったら版を上げて全 viewer 分を古くする。
 const ACCESS_CACHE_KEYS_ = Object.freeze({
   VERSION: 'access_ver:',   // + spreadsheetId
-  DECISION: 'access_'       // + 版 + spreadsheetId + email
+  DECISION: 'access_'       // + 版 + spreadsheetId (先生以外で共有)
 });
 
 /**
@@ -65,7 +65,9 @@ function checkSpreadsheetAccess_(spreadsheetId, context = 'unknown') {
     if (cache) {
       try { version = String(cache.get(ACCESS_CACHE_KEYS_.VERSION + spreadsheetId) || '0'); } catch (_) { /* 版が読めなければ 0 */ }
     }
-    const cacheKey = `${ACCESS_CACHE_KEYS_.DECISION}v${version}_${spreadsheetId}_${currentEmail || 'anon'}`;
+    // 先生以外の答えはシートだけで決まる (公開中のボードが指しているか) ので、児童ごとに分けず 1 つを共有する。
+    //   Why: 児童ごとに覚えると 30 人分が別々に切れ、そのたびに users の一覧を開いて全員の設定を読んでいた。
+    const cacheKey = `${ACCESS_CACHE_KEYS_.DECISION}v${version}_${spreadsheetId}`;
     if (cache) {
       try {
         const hit = cache.get(cacheKey);
@@ -81,7 +83,7 @@ function checkSpreadsheetAccess_(spreadsheetId, context = 'unknown') {
       return result;
     };
 
-    const owner = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
+    const owner = findUserBySpreadsheetId_(spreadsheetId, { skipCache: true });
     if (!owner) {
       console.warn('checkSpreadsheetAccess_: どのボードにも入っていないシート:', spreadsheetId.substring(0, 8), context);
       return remember({ allowed: false, reason: 'not on any board' });
@@ -140,7 +142,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
   try {
     spreadsheet = SpreadsheetApp.openById(spreadsheetId);
   } catch (openError) {
-    // 呼出元 (getUserSheetData 等) が 1 行 ERROR に集約する前提で WARN に降格。
+    // 呼出元 (getUserSheetData_ 等) が 1 行 ERROR に集約する前提で WARN に降格。
     console.warn('openSpreadsheet: スプレッドシート接続失敗', {
       spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
       error: openError.message
@@ -169,7 +171,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
  * @param {Object} context - アクセスコンテキスト
  * @returns {string|null} リクエストユーザーのメール
  */
-function resolveRequestingUser(context = {}) {
+function resolveRequestingUser_(context = {}) {
   if (context.requestingUser && typeof context.requestingUser === 'string' && context.requestingUser.trim()) {
     return context.requestingUser.trim();
   }
@@ -219,7 +221,7 @@ function isUserBoardPublished(targetUser) {
  * @param {Object} context - アクセスコンテキスト
  * @returns {boolean} アクセス許可されるか
  */
-function canAccessTargetUser(targetUser, context = {}) {
+function canAccessTargetUser_(targetUser, context = {}) {
   if (!targetUser) {
     return false;
   }
@@ -228,7 +230,7 @@ function canAccessTargetUser(targetUser, context = {}) {
     return true;
   }
 
-  const requestingUser = resolveRequestingUser(context);
+  const requestingUser = resolveRequestingUser_(context);
   if (!requestingUser) {
     return false;
   }
@@ -269,12 +271,12 @@ function canAccessTargetUser(targetUser, context = {}) {
  * @param {string} operation - 操作名
  * @returns {Object|null} 許可済みユーザーまたはnull
  */
-function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
+function applyUserAccessControl_(user, context = {}, operation = 'user_lookup') {
   if (!user) {
     return null;
   }
 
-  if (canAccessTargetUser(user, context)) {
+  if (canAccessTargetUser_(user, context)) {
     return user;
   }
 
@@ -289,7 +291,7 @@ function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
   //   だけで、異常ではない。授業の直前まで非公開にする運用では毎回出るので WARN にしない。
   if (context.allowPublishedRead === true) return null;
 
-  const requestingUser = resolveRequestingUser(context);
+  const requestingUser = resolveRequestingUser_(context);
   const maskedRequester = requestingUser ? `${requestingUser.split('@')[0]}@***` : 'N/A';
   const maskedTarget = user.userEmail ? `${String(user.userEmail).split('@')[0]}@***` : 'unknown';
   console.warn(`${operation}: Access denied`, {
@@ -307,16 +309,16 @@ function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
  * @param {string} context.requestingUser - リクエストユーザー（デバッグ用）
  * @returns {Object|null} User object
  */
-function findUserByEmail(email, context = {}) {
+function findUserByEmail_(email, context = {}) {
   if (!email || !validateEmail(email).isValid) return null;
-  return findUserByField('userEmail', email, { ...context, cacheKeyPrefix: 'user_by_email', label: 'findUserByEmail' });
+  return findUserByField_('userEmail', email, { ...context, cacheKeyPrefix: 'user_by_email', label: 'findUserByEmail' });
 }
 
 /**
  * ユーザーIDでユーザーを検索（strict: admin / 自分のみ許可）
  *
  * WRITE操作や管理者専用操作で使う。公開ボードを閲覧する生徒の経路では
- * 代わりに {@link findPublishedBoardOwner} を使うこと。これを逆に使うと
+ * 代わりに {@link findPublishedBoardOwner_} を使うこと。これを逆に使うと
  * 生徒から null が返り、「config 取得失敗 → default config → formUrl 消失」
  * のような silent failure が起きる（実際に発生した bug）。
  *
@@ -327,9 +329,9 @@ function findUserByEmail(email, context = {}) {
  * @param {boolean} [context.systemLookup] - サーバ内部の検索 (閲覧者の権限確認をしない)
  * @returns {Object|null} User object
  */
-function findUserById(userId, context = {}) {
+function findUserById_(userId, context = {}) {
   if (!userId) return null;
-  return findUserByField('userId', userId, { ...context, cacheKeyPrefix: 'user_by_id', label: 'findUserById' });
+  return findUserByField_('userId', userId, { ...context, cacheKeyPrefix: 'user_by_id', label: 'findUserById' });
 }
 
 /**
@@ -339,16 +341,16 @@ function findUserById(userId, context = {}) {
  * 生徒が他人のボードを見る経路で使う。これを使うと `allowPublishedRead: true` を
  * 渡し忘れる類の bug を根絶できる。
  *
- * WRITE 系や editor-only 操作では `findUserById` + 独自の editor gate を使うこと
+ * WRITE 系や editor-only 操作では `findUserById_` + 独自の editor gate を使うこと
  * （例: deleteAnswerRow、toggleHighlight）。
  *
  * @param {string} userId - 対象ボードオーナーの userId
  * @param {string} viewerEmail - 閲覧者のメールアドレス
  * @param {Object} [extra] - 追加 context（preloadedAuth 等）
  */
-function findPublishedBoardOwner(userId, viewerEmail, extra = {}) {
+function findPublishedBoardOwner_(userId, viewerEmail, extra = {}) {
   if (!userId) return null;
-  return findUserById(userId, {
+  return findUserById_(userId, {
     ...extra,
     requestingUser: viewerEmail,
     allowPublishedRead: true
@@ -362,11 +364,11 @@ function findPublishedBoardOwner(userId, viewerEmail, extra = {}) {
  * @param {Object} context - アクセスコンテキスト
  * @returns {Object|null} User object
  */
-function findUserByGoogleId(googleId, context = {}) {
+function findUserByGoogleId_(googleId, context = {}) {
   if (!googleId) return null;
   // Note: historically this path did not populate an individual cache entry, so
   // we explicitly opt out via cacheKeyPrefix=null to preserve behavior.
-  return findUserByField('googleId', googleId, { ...context, cacheKeyPrefix: null, label: 'findUserByGoogleId' });
+  return findUserByField_('googleId', googleId, { ...context, cacheKeyPrefix: null, label: 'findUserByGoogleId' });
 }
 
 /**
@@ -378,19 +380,19 @@ function findUserByGoogleId(googleId, context = {}) {
  *                          内部用の cacheKeyPrefix (null で個別キャッシュ無効) と label を受け取る
  * @returns {Object|null} アクセス制御適用済みのユーザー、または null
  */
-function findUserByField(fieldName, fieldValue, context = {}) {
+function findUserByField_(fieldName, fieldValue, context = {}) {
   const { cacheKeyPrefix = null, label = `findUserBy_${fieldName}` } = context;
 
   try {
     let individualCacheKey = null;
     if (cacheKeyPrefix) {
-      const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
+      const cacheVersion = userCacheVersion_();
       individualCacheKey = `${cacheKeyPrefix}_v${cacheVersion}_${fieldValue}`;
       try {
         const cached = CacheService.getScriptCache().get(individualCacheKey);
         if (cached) {
           const cachedUser = JSON.parse(cached);
-          return applyUserAccessControl(cachedUser, context, label);
+          return applyUserAccessControl_(cachedUser, context, label);
         }
       } catch (individualCacheError) {
         logError_(label + '.individualCache', individualCacheError);
@@ -405,19 +407,19 @@ function findUserByField(fieldName, fieldValue, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find((u) => u[fieldName] === fieldValue);
         if (user) {
-          const allowedUser = applyUserAccessControl(user, context, label);
+          const allowedUser = applyUserAccessControl_(user, context, label);
           if (!allowedUser) return null;
           if (individualCacheKey) {
-            saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+            saveToCacheWithSizeCheck_(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
           }
           return allowedUser;
         }
         // 一覧 (users シート全体、activeOnly=false) が取れているのに居ないなら、居ない。
         //   Why: 以前はここから users シートを直接読み直していた (寸法 + ヘッダ + TextFinder +
-        //   該当行 = 数 read)。users に居ない児童の findUserByEmail (checkUserAuthentication /
+        //   該当行 = 数 read)。users に居ない児童の findUserByEmail_ (checkUserAuthentication /
         //   getActiveFormInfo / validateHeaderIntegrity) が毎回それを払い、授業中の 30 人分が
         //   users シートの 429 の一因だった (2026-09-08)。一覧は USER_CACHE_VERSION 付きの
-        //   cache なので、作成直後のユーザーも clearDatabaseUserCache の bump で次の読みから見える。
+        //   cache なので、作成直後のユーザーも clearDatabaseUserCache_ の bump で次の読みから見える。
         return null;
       }
     } catch (cacheError) {
@@ -484,10 +486,10 @@ function findUserByField(fieldName, fieldValue, context = {}) {
     if (foundRow) {
       const row = sheet.getRange(foundRow, 1, 1, headerRow.length).getValues()[0];
       const user = createUserObjectFromRow(row, headerRow);
-      const allowedUser = applyUserAccessControl(user, context, label);
+      const allowedUser = applyUserAccessControl_(user, context, label);
       if (!allowedUser) return null;
       if (individualCacheKey) {
-        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+        saveToCacheWithSizeCheck_(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
       }
       return allowedUser;
     }
@@ -501,10 +503,10 @@ function findUserByField(fieldName, fieldValue, context = {}) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][columnIndex] === fieldValue) {
         const user = createUserObjectFromRow(data[i], headers);
-        const allowedUser = applyUserAccessControl(user, context, label);
+        const allowedUser = applyUserAccessControl_(user, context, label);
         if (!allowedUser) return null;
         if (individualCacheKey) {
-          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+          saveToCacheWithSizeCheck_(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
         }
         return allowedUser;
       }
@@ -547,11 +549,7 @@ function createUser_(email, initialConfig = {}, context = {}) {
 
     const currentEmail = getCurrentEmail();
 
-    // 直前に別インスタンスが同じ email を作っていても、この V8 インスタンスの 30 秒 memo には
-    //   古い USER_CACHE_VERSION が残っている。memo を捨てて最新 version の一覧で存在確認する
-    //   (捨てないと二重タブで同じ児童の行が 2 つできる)。
-    clearPropertyCache_('USER_CACHE_VERSION');
-    const existingUser = findUserByEmail(email, {
+    const existingUser = findUserByEmail_(email, {
       requestingUser: currentEmail
     });
     if (existingUser) {
@@ -624,7 +622,7 @@ function createUser_(email, initialConfig = {}, context = {}) {
       lastModified: now
     };
 
-    clearDatabaseUserCache();
+    clearDatabaseUserCache_();
 
     return user;
 
@@ -659,7 +657,7 @@ function getAllUsers_(options = {}, context = {}) {
       return [];
     }
 
-    const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
+    const cacheVersion = userCacheVersion_();
     const cacheSuffix = `${simpleHash(options)}_${context.systemLookup ? 'sys' : 'norm'}`;
     const cacheKey = `all_users_v${cacheVersion}_${cacheSuffix}`;
     const skipCache = context.skipCache || false;
@@ -703,13 +701,13 @@ function getAllUsers_(options = {}, context = {}) {
     if (skipCache) return loadUsersFromSheet();
 
     // Why: 100+ユーザでJSONが100KB超えるとCacheService.putが黙って失敗する。
-    //      saveToCacheWithSizeCheckでサイズ超過を検出しログに残す。
+    //      saveToCacheWithSizeCheck_でサイズ超過を検出しログに残す。
     const isCacheable = (users) => Array.isArray(users) && users.length > 0;
 
     // stampede 防止: config 保存 (USER_CACHE_VERSION bump) の直後は全 viewer の個別 cache も
     //   同時に miss し、30 人分の polling が一斉に users シートを読んでいた。1 件だけが読み、
     //   残りは最大 1.2 秒待って埋まった cache を読む。stale (直前の一覧) は返さない:
-    //   findUserByField が古い configJson を個別 cache (15 分) に固定してしまうため。
+    //   findUserByField_ が古い configJson を個別 cache (15 分) に固定してしまうため。
     if (typeof withStampedeGuard_ === 'function') {
       return withStampedeGuard_({
         key: cacheKey,
@@ -737,7 +735,7 @@ function getAllUsers_(options = {}, context = {}) {
       logError_('getAllUsers.cacheRead', cacheError);
     }
     const users = loadUsersFromSheet();
-    if (isCacheable(users)) saveToCacheWithSizeCheck(cacheKey, users, CACHE_DURATION.DATABASE_LONG);
+    if (isCacheable(users)) saveToCacheWithSizeCheck_(cacheKey, users, CACHE_DURATION.DATABASE_LONG);
     return users;
   } catch (error) {
     logError_('getAllUsers', error);
@@ -749,17 +747,33 @@ function getAllUsers_(options = {}, context = {}) {
  * データベースユーザーキャッシュをクリア（ユーザー作成・更新・削除時）
  * シンプルなバージョニング戦略でキャッシュを無効化
  */
-function clearDatabaseUserCache() {
+function clearDatabaseUserCache_() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const currentVersion = parseInt(props.getProperty('USER_CACHE_VERSION') || '0');
-    const newVersion = currentVersion + 1;
-
-    props.setProperty('USER_CACHE_VERSION', newVersion.toString());
-
-    clearPropertyCache_('USER_CACHE_VERSION');
+    CacheService.getScriptCache().put(USER_CACHE_VERSION_KEY_, newUserCacheVersion_(), 21600);
   } catch (error) {
     logError_('clearDatabaseUserCache', error);
+  }
+}
+
+// users の cache の版。key に版を含め、書き込みのたびに新しい版にして全員分を一度に古くする。
+//   Why CacheService か: 以前は Script Property に置いており、児童の 5 秒おきの確認のたびに
+//   プロパティを読んでいた (先生として実行なので全員分が先生 1 人の 1 日の上限に数えられる)。
+//   版が消えていたら (cache の追い出し) 新しい版を作る = 全員が 1 度読み直すだけで、古い値は見ない。
+//   番号を足すのではなく毎回新しい値にするので、書き込みが重なっても取りこぼさない。
+const USER_CACHE_VERSION_KEY_ = 'user_cache_ver';
+function newUserCacheVersion_() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function userCacheVersion_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const current = cache.get(USER_CACHE_VERSION_KEY_);
+    if (current) return current;
+    const fresh = newUserCacheVersion_();
+    cache.put(USER_CACHE_VERSION_KEY_, fresh, 21600);
+    return fresh;
+  } catch (_) {
+    return 'nocache';   // cache 不通なら版も効かないが、そのとき個別の cache も読めないので古い値は出ない
   }
 }
 
@@ -819,7 +833,7 @@ function updateUser_(userId, updates, context = {}) {
     }
 
     const requestingUser = context.requestingUser || getCurrentEmail();
-    const targetUser = findUserById(userId, {
+    const targetUser = findUserById_(userId, {
       ...context,
       requestingUser
     });
@@ -858,7 +872,7 @@ function updateUser_(userId, updates, context = {}) {
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
         // 楽観ロック (compare-and-set) は lock の「中」で、いま読んだ行に対して行う。
-        //   Why: saveUserConfig は etag を cache 済の user から比べていたので、2 つの保存
+        //   Why: saveUserConfig_ は etag を cache 済の user から比べていたので、2 つの保存
         //   (教師の自動保存とフェーズ切替) が同じ etag を見て両方通り、後の書き込みが前の
         //   変更を飲み込んでいた。ここで現物の configJson の etag と比べれば、負けた側は
         //   etag_mismatch を受けて読み直せる。expectedEtag が無い呼び出しは従来どおり。
@@ -881,7 +895,7 @@ function updateUser_(userId, updates, context = {}) {
         }
 
         // 内容が同じ書き込みは省く (2026-10 監査)。
-        //   Why: 書き込みのたびに clearDatabaseUserCache が USER_CACHE_VERSION を上げ、児童 30 人分の
+        //   Why: 書き込みのたびに clearDatabaseUserCache_ が USER_CACHE_VERSION を上げ、児童 30 人分の
         //   user cache が一斉に落ちて次の poll が users シートを読み直す (stampede guard で 1 read に
         //   抑えてはいる)。lastAccessedAt / etag しか違わない保存 (同じ内容の再保存、同じ patch の
         //   再適用) で version を上げる理由は無い。cache 済の user ではなく、いま読んだ行と比べる
@@ -934,7 +948,7 @@ function updateUser_(userId, updates, context = {}) {
           sheet.getRange(i + 1, minCol, 1, colSpan).setValues([currentRowData]);
         }
 
-        clearDatabaseUserCache();
+        clearDatabaseUserCache_();
 
         return { success: true };
       }
@@ -999,14 +1013,14 @@ function __stableStringify_(v) {
  * @param {number} context.cacheTtl - キャッシュTTL秒数（デフォルト: 300秒）
  * @returns {Object|null} User object or null if not found
  */
-function findUserBySpreadsheetId(spreadsheetId, context = {}) {
+function findUserBySpreadsheetId_(spreadsheetId, context = {}) {
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       console.warn('findUserBySpreadsheetId: Invalid spreadsheetId provided:', typeof spreadsheetId);
       return null;
     }
 
-    const cacheVersion = getCachedProperty_('USER_CACHE_VERSION') || '0';
+    const cacheVersion = userCacheVersion_();
     const cacheKey = `user_by_sheet_v${cacheVersion}_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
@@ -1060,7 +1074,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
           return user;
         }
       } catch (parseError) {
-        console.warn(`findUserBySpreadsheetId: Failed to parse configJSON for user ${user.userId}:`, parseError.message);
+        console.warn(`findUserBySpreadsheetId_: Failed to parse configJSON for user ${user.userId}:`, parseError.message);
         continue;
       }
     }

@@ -1,5 +1,5 @@
 /**
- * executeWithRetry / isRetryableError tests
+ * executeWithRetry_ / isRetryableError tests
  *
  * Why: これらは DatabaseCore.fetchSheetsAPIWithRetry や DataApis.getSheetNameFromGid 等の
  *      backbone。Naha GCP の 429 storm に対する load-bearing なリトライ戦略だが、
@@ -36,14 +36,14 @@ function loadMainCtx(overrides = {}) {
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     ...gasResponseStubs(),
-    findUserByEmail: () => null,
-    findUserById: () => null,
-    findPublishedBoardOwner: () => null,
+    findUserByEmail_: () => null,
+    findUserById_: () => null,
+    findPublishedBoardOwner_: () => null,
     getCachedProperty_: () => null,
     setCachedProperty_: () => {},
     isAdministrator: () => false,
     getConfigOrDefault: () => ({}),
-    getUserSheetData: () => ({}),
+    getUserSheetData_: () => ({}),
     addReaction: () => ({}),
     toggleHighlight: () => ({}),
     enhanceConfigWithDynamicUrls: (c) => c,
@@ -52,7 +52,7 @@ function loadMainCtx(overrides = {}) {
     dispatchAdminOperation: () => ({ success: true }),
     timingSafeEqual: (a, b) => a === b,
     hasCoreSystemProps: () => true,
-    getQuestionText: () => '',
+    getQuestionText_: () => '',
     getWebAppUrl: () => 'https://example.com',
     publishApp: () => ({ success: true }),
     __sleeps: sleeps
@@ -94,7 +94,7 @@ test('isRetryableError: permission / not found / authentication failed はリト
 test('isRetryableError: 非冪等 write (:append) の失敗はリトライしない (H3)', () => {
   // Why: :append は非冪等。5xx/network 断は commit 済か判定不能で、盲目 retry は重複行を生む。
   //   fetchSheetsAPIWithRetry が idempotent=false のとき "non-idempotent" を含むメッセージを
-  //   throw し、それを non-retryable にすることで executeWithRetry の再実行を止める。
+  //   throw し、それを non-retryable にすることで executeWithRetry_ の再実行を止める。
   const { isRetryableError } = loadMainCtx();
   assert.equal(isRetryableError('non-idempotent write failed (no retry): API returned 503: backend error'), false);
   assert.equal(isRetryableError('non-idempotent write aborted (no retry): connection reset'), false);
@@ -184,13 +184,13 @@ test('evaluateDomainRestriction: enforce 必要 + validateDomainAccess が allow
 });
 
 // =====================================================================
-// executeWithRetry — リトライ戦略
+// executeWithRetry_ — リトライ戦略
 // =====================================================================
 
 test('executeWithRetry: 初回成功時は operation を 1 回だけ呼び結果を返す', () => {
   const ctx = loadMainCtx();
   let calls = 0;
-  const result = ctx.executeWithRetry(() => { calls++; return 'ok'; });
+  const result = ctx.executeWithRetry_(() => { calls++; return 'ok'; });
   assert.equal(result, 'ok');
   assert.equal(calls, 1);
   assert.equal(ctx.__sleeps.length, 0, 'no sleep on first-try success');
@@ -199,7 +199,7 @@ test('executeWithRetry: 初回成功時は operation を 1 回だけ呼び結果
 test('executeWithRetry: retryable error → 再試行して 2 回目で成功', () => {
   const ctx = loadMainCtx();
   let calls = 0;
-  const result = ctx.executeWithRetry(() => {
+  const result = ctx.executeWithRetry_(() => {
     calls++;
     if (calls === 1) throw new Error('Network timeout');
     return 'recovered';
@@ -213,7 +213,7 @@ test('executeWithRetry: non-retryable error → 即座に throw、リトライ�
   const ctx = loadMainCtx();
   let calls = 0;
   assert.throws(
-    () => ctx.executeWithRetry(() => { calls++; throw new Error('Permission denied'); }),
+    () => ctx.executeWithRetry_(() => { calls++; throw new Error('Permission denied'); }),
     /Permission denied/
   );
   assert.equal(calls, 1, 'non-retryable error must not trigger retry');
@@ -224,7 +224,7 @@ test('executeWithRetry: maxRetries 到達 → lastError を throw', () => {
   const ctx = loadMainCtx();
   let calls = 0;
   assert.throws(
-    () => ctx.executeWithRetry(
+    () => ctx.executeWithRetry_(
       () => { calls++; throw new Error('Network timeout'); },
       { maxRetries: 3 }
     ),
@@ -237,7 +237,7 @@ test('executeWithRetry: maxRetries 到達 → lastError を throw', () => {
 test('executeWithRetry: 429 error は initialDelay * 2 で開始 (doubled backoff)', () => {
   const ctx = loadMainCtx();
   let calls = 0;
-  ctx.executeWithRetry(() => {
+  ctx.executeWithRetry_(() => {
     calls++;
     if (calls < 3) throw new Error('Quota exceeded (429)');
     return 'ok';
@@ -253,7 +253,7 @@ test('executeWithRetry: 429 error は initialDelay * 2 で開始 (doubled backof
 test('executeWithRetry: 通常エラーは initialDelay で開始 (no doubling)', () => {
   const ctx = loadMainCtx();
   let calls = 0;
-  ctx.executeWithRetry(() => {
+  ctx.executeWithRetry_(() => {
     calls++;
     if (calls < 3) throw new Error('Network connection reset');
     return 'ok';
@@ -266,7 +266,7 @@ test('executeWithRetry: 通常エラーは initialDelay で開始 (no doubling)'
 test('executeWithRetry: maxDelay を超える backoff は cap される', () => {
   const ctx = loadMainCtx();
   let calls = 0;
-  ctx.executeWithRetry(() => {
+  ctx.executeWithRetry_(() => {
     calls++;
     if (calls < 5) throw new Error('Network timeout');
     return 'ok';
@@ -278,11 +278,11 @@ test('executeWithRetry: maxDelay を超える backoff は cap される', () => 
 
 test('executeWithRetry: operation が string を throw しても lastError として保持', () => {
   // Why: throw 'string' は JS で許可されており、error.message が undefined になる。
-  //      executeWithRetry は String(error) でフォールバックする実装になっているはず。
+  //      executeWithRetry_ は String(error) でフォールバックする実装になっているはず。
   const ctx = loadMainCtx();
   let calls = 0;
   assert.throws(
-    () => ctx.executeWithRetry(() => {
+    () => ctx.executeWithRetry_(() => {
       calls++;
       throw 'string error: timeout';
     }, { maxRetries: 2 }),
@@ -298,7 +298,7 @@ test('executeWithRetry: maxRetries=1 は再試行ゼロ (1 回試して失敗で
   const ctx = loadMainCtx();
   let calls = 0;
   assert.throws(
-    () => ctx.executeWithRetry(
+    () => ctx.executeWithRetry_(
       () => { calls++; throw new Error('Network timeout'); },
       { maxRetries: 1 }
     ),
@@ -312,10 +312,10 @@ test('executeWithRetry: operation の戻り値が undefined / null でも正常 
   // Why: 過去に retry コードで「成功 = truthy」と誤判定するバグがあった。
   //      undefined や null を返す operation も第1試行で return する契約を pin。
   const ctx = loadMainCtx();
-  assert.equal(ctx.executeWithRetry(() => undefined), undefined);
-  assert.equal(ctx.executeWithRetry(() => null), null);
-  assert.equal(ctx.executeWithRetry(() => 0), 0);
-  assert.equal(ctx.executeWithRetry(() => false), false);
+  assert.equal(ctx.executeWithRetry_(() => undefined), undefined);
+  assert.equal(ctx.executeWithRetry_(() => null), null);
+  assert.equal(ctx.executeWithRetry_(() => 0), 0);
+  assert.equal(ctx.executeWithRetry_(() => false), false);
 });
 
 test('executeWithRetry: operationName がログ出力に使われる (副次効果テスト)', () => {
@@ -325,7 +325,7 @@ test('executeWithRetry: operationName がログ出力に使われる (副次効�
     console: { log: () => {}, warn: (...a) => warnLogs.push(a.join(' ')), error: (...a) => errorLogs.push(a.join(' ')) }
   });
   assert.throws(
-    () => ctx.executeWithRetry(
+    () => ctx.executeWithRetry_(
       () => { throw new Error('Network timeout'); },
       { maxRetries: 3, operationName: 'MyCustomOp' }
     ),

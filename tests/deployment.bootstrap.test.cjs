@@ -63,3 +63,17 @@ test('焼き込みが空 (リポジトリの Deployment.js のまま): 何もし
   assert.deepEqual(props, {});
   assert.deepEqual(ensured, []);
 });
+
+test('getCachedProperty_: 管理者と DB は焼き込みから返し、プロパティを読まない (児童の確認ごとに読まない)', () => {
+  const reads = [];
+  const { context } = loadHelpers({ props: { ADMIN_EMAIL: 'old@example.com', OTHER: 'x' } });
+  const orig = context.PropertiesService.getScriptProperties;
+  context.PropertiesService.getScriptProperties = () => {
+    const p = orig();
+    return Object.assign({}, p, { getProperty: (k) => { reads.push(k); return p.getProperty(k); } });
+  };
+  assert.equal(context.getCachedProperty_('ADMIN_EMAIL'), 'teacher@example.com', '焼き込みが先に効く (小文字)');
+  assert.equal(context.getCachedProperty_('DATABASE_SPREADSHEET_ID'), 'teacher-ss');
+  assert.deepEqual(reads, []);
+  assert.equal(context.getCachedProperty_('OTHER'), 'x', 'ほかの鍵はプロパティから');
+});

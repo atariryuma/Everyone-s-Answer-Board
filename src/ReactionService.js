@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global resolveColumnIndex, emailToShortHash, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_, resolveReactionMode */
+/* global resolveColumnIndex, emailToShortHash_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -77,13 +77,13 @@ function resolveRowIdentity_(rowIdentity, headers, config) {
   if (!Array.isArray(headers) || headers.length === 0) return null;
   const mapping = (config && config.columnMapping) || {};
   if (rowIdentity.field === 'email' && typeof rowIdentity.hash === 'string' && rowIdentity.hash) {
-    if (typeof resolveColumnIndex !== 'function' || typeof emailToShortHash !== 'function') return null;
+    if (typeof resolveColumnIndex !== 'function' || typeof emailToShortHash_ !== 'function') return null;
     const idx = resolveColumnIndex(headers, 'email', mapping).index;
     if (!(idx >= 0)) return null;
     return {
       column: idx + 1, kind: 'emailHash',
       matches: (actual) => {
-        const h = emailToShortHash(String(actual || ''));
+        const h = emailToShortHash_(String(actual || ''));
         // 行に email が無い (匿名回答) ときは判定できないので通す
         return !h || h === rowIdentity.hash;
       }
@@ -154,8 +154,8 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
   //   viewer の通常リアクション (requireEditor!==true) では published flag だけで判定。
   //   これで 700 生徒 × polling の hot path で無駄な Drive API trigger を回避。
   if (options.requireEditor === true) {
-    return typeof isBoardCollaborator === 'function'
-      && isBoardCollaborator(targetUser, actorEmail);
+    return typeof isBoardCollaborator_ === 'function'
+      && isBoardCollaborator_(targetUser, actorEmail);
   }
 
   return Boolean(config && config.isPublished);
@@ -266,8 +266,8 @@ function processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, prel
           }
         });
         // ヘッダー cache を invalidate (他の concurrent callers が stale を見ないように)
-        if (typeof invalidateSheetHeadersCache === 'function') {
-          try { invalidateSheetHeadersCache(sheet.getParent().getId(), sheet.getName()); }
+        if (typeof invalidateSheetHeadersCache_ === 'function') {
+          try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
           catch (_) { /* best effort */ }
         }
       } catch (provError) {
@@ -428,8 +428,8 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
       headers.push('HIGHLIGHT');
       highlightColIndex = newCol - 1;
       provisioned = true;
-      if (typeof invalidateSheetHeadersCache === 'function') {
-        try { invalidateSheetHeadersCache(sheet.getParent().getId(), sheet.getName()); }
+      if (typeof invalidateSheetHeadersCache_ === 'function') {
+        try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
         catch (_) { /* cache 不通は機能的に無害 (10 分で切れる) */ }
       }
     } catch (provError) {
@@ -712,7 +712,7 @@ function executeBoardRowOperation(options) {
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
-    const targetUser = findPublishedBoardOwner(targetUserId, actorEmail, { preloadedAuth });
+    const targetUser = findPublishedBoardOwner_(targetUserId, actorEmail, { preloadedAuth });
     if (!targetUser) return createErrorResponse('Target user not found');
 
     const config = getConfigOrDefault(targetUserId, targetUser);
@@ -785,7 +785,7 @@ function executeBoardRowOperation(options) {
       // に publish 状態を再確認し、 viewer (= non-admin non-owner) からの write を再度 gate。
       // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard と同じ判定基準)。
       if (!isAdmin && !sameEmail_(targetUser.userEmail, actorEmail)) {
-        const refreshedUser = findPublishedBoardOwner(targetUserId, actorEmail, { preloadedAuth });
+        const refreshedUser = findPublishedBoardOwner_(targetUserId, actorEmail, { preloadedAuth });
         if (!refreshedUser) {
           return createErrorResponse('ボードの公開が終了しました');
         }

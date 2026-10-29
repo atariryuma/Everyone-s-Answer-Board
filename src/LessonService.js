@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -420,7 +420,7 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
     const found = __findLessonById_(lessonId);
     if (!found || !found.lesson) return createErrorResponse('lesson not found', null, { error: 'LESSON_NOT_FOUND' });
     if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
-      // Why lowercase: ConfigService.saveUserConfig / AdminApis.__applyPublishStateChange と
+      // Why lowercase: ConfigService.saveUserConfig_ / AdminApis.__applyPublishStateChange_ と
       //   同じ 'etag_mismatch' code に統一。frontend (AdminPanel.js.html) も 1 種類の
       //   コードのみ判定すれば良い (Error envelope audit recommendation #2)。
       return {
@@ -506,16 +506,16 @@ function __requireLessonOwner_(userId, lessonId, options) {
   const email = getCurrentEmail();
   if (!email) return { error: createAuthError() };
 
-  const callerUser = findUserByEmail(email, { requestingUser: email });
+  const callerUser = findUserByEmail_(email, { requestingUser: email });
   if (!callerUser) return { error: createUserNotFoundError() };
 
   const isAdmin = isAdministrator(email);
   let isCollaborator = false;
   if (!isAdmin && callerUser.userId !== userId) {
     if (allowCollaborator) {
-      const targetUser = (typeof findUserById === 'function') ? findUserById(userId) : null;
-      if (targetUser && typeof isBoardCollaborator === 'function'
-          && isBoardCollaborator(targetUser, email)) {
+      const targetUser = (typeof findUserById_ === 'function') ? findUserById_(userId) : null;
+      if (targetUser && typeof isBoardCollaborator_ === 'function'
+          && isBoardCollaborator_(targetUser, email)) {
         isCollaborator = true;
       }
     }
@@ -2067,7 +2067,7 @@ function closeLessonForms(userId, lessonId) {
  *   - currentLessonStartedAt から 5 分以上経過 (< 5 分はデモ操作とみなして skip)
  *   - 回答が 1 件以上 (0 件 = 授業として成立してない)
  *
- *   __applyPublishStateChange の同 save 内で呼ばれ、archived=true なら
+ *   __applyPublishStateChange_ の同 save 内で呼ばれ、archived=true なら
  *   呼び出し側で activeLessonId / currentLessonStartedAt をクリアする。
  *
  * @returns {Object} { archived: boolean, lessonId?: string, reason?: string }
@@ -2218,7 +2218,7 @@ function dailyLessonArchiveSweep() {
  * lesson 関連の time-based trigger を冪等にインストール。
  *   今は呼び出し元が無い (呼んでいた setupApp は初期設定画面ごと廃止した)。既に同名トリガーが居れば何もしない。
  */
-function installLessonTriggers() {
+function installLessonTriggers_() {
   try {
     if (typeof ScriptApp === 'undefined' || !ScriptApp.getProjectTriggers) return;
     const existing = ScriptApp.getProjectTriggers();
@@ -2365,18 +2365,18 @@ function recaptureLessonArchive(userId, lessonId, phaseIndex) {
 /**
  * 児童 (viewer) 視点でボード所有者の config を読む。
  *
- * Why getConfigOrDefault(targetUserId) を直接呼ばないか: 中の findUserById は
+ * Why getConfigOrDefault(targetUserId) を直接呼ばないか: 中の findUserById_ は
  *   owner/admin 専用の厳格 ACL で、児童が他人のボードを見ると Access denied → 空 config
  *   になる。すると activeLessonId が消え、「授業なし」= 通常ボード (4 象限) が児童に出て
  *   入力画面が出ない・入力フェーズの他者マスクも効かない・投稿も拒否される、が同時に起きた
- *   (教師には正しく見えるので気付きにくい)。公開ボードは findPublishedBoardOwner で引く。
+ *   (教師には正しく見えるので気付きにくい)。公開ボードは findPublishedBoardOwner_ で引く。
  *   併せて、拒否経路は cache に乗らず polling ごとに users シートを読んでいたので、
  *   429 の誘発源でもあった。
  */
 function __viewerBoardConfig_(targetUserId) {
   if (!targetUserId) return {};
-  if (typeof findPublishedBoardOwner === 'function') {
-    const owner = findPublishedBoardOwner(targetUserId, getCurrentEmail());
+  if (typeof findPublishedBoardOwner_ === 'function') {
+    const owner = findPublishedBoardOwner_(targetUserId, getCurrentEmail());
     if (!owner) return {};
     return getConfigOrDefault(owner.userId, owner);
   }
@@ -2434,11 +2434,11 @@ function __getViewerLessonPhase_(targetUserId, opts) {
         return parsed && parsed.phase ? parsed.phase : null;
       } catch (_) { return null; /* 直前の値も無ければ従来どおり「授業なし」 */ }
     }
-    if (typeof saveToCacheWithSizeCheck === 'function') {
+    if (typeof saveToCacheWithSizeCheck_ === 'function') {
       // null (授業中でない) も cache する。掲示板モードの polling で毎回 config を読まないため。
-      if (!fresh) saveToCacheWithSizeCheck(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
+      if (!fresh) saveToCacheWithSizeCheck_(cacheKey, { phase }, LESSON_PHASE_CACHE_TTL_S);
       // 読み込み失敗時の代わりに返す「直前に分かっていたフェーズ」。
-      saveToCacheWithSizeCheck(cacheKey + ':last', { phase }, LESSON_PHASE_LAST_TTL_S);
+      saveToCacheWithSizeCheck_(cacheKey + ':last', { phase }, LESSON_PHASE_LAST_TTL_S);
     }
     return phase;
   } catch (error) {
@@ -2506,6 +2506,14 @@ function __validateLessonScale_(value) {
   const rounded = Math.round(n);
   if (rounded < LESSON_SCALE_MIN || rounded > LESSON_SCALE_MAX) return null;
   return rounded;
+}
+
+// シートに書く児童の文。= + - @ で始まると Sheets が数式として扱うので、頭に ' を付けて文字として書く
+//   (読むときは ' が付かない)。Why: 理由欄に =IMAGE("https://…"&TEXTJOIN(…B2:D200)) と書くと、先生が
+//   シートを開いたときに学級全員のメール・名前を外へ送れた (2026-10-29 のレビュー)。
+function __plainTextCell_(value) {
+  const s = String(value == null ? '' : value);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
 }
 
 // 児童が書くテキストの正規化。制御文字を落とし、長さで切る。
@@ -2626,12 +2634,12 @@ function submitLessonAnswer(targetUserId, payload) {
     const row = [
       new Date().toISOString(),
       actorEmail,
-      __resolveSubmitClass_(p.class, lessonJson),
-      __sanitizeLessonText_(p.name, 50),
+      __plainTextCell_(__resolveSubmitClass_(p.class, lessonJson)),
+      __plainTextCell_(__sanitizeLessonText_(p.name, 50)),
       x,
       (y === null) ? '' : y,
-      reason,
-      addedInsight
+      __plainTextCell_(reason),
+      __plainTextCell_(addedInsight)
     ];
 
     const existingRow = __findOwnLessonRow_(sheet, actorEmail);
@@ -2651,6 +2659,11 @@ function submitLessonAnswer(targetUserId, payload) {
       ms: Date.now() - startedAt
     })));
 
+    // 足した行がボードの読み取りに入るよう、行数の覚え (30 秒) も捨てる。Why: 版を上げても行数を
+    //   古いまま覚えていると、新しい行の手前で読むのをやめ、送った回答が最大 30 秒ボードに出なかった。
+    if (existingRow <= 0 && typeof invalidateSheetRowCountCache_ === 'function') {   // 行を足した (更新ではない)
+      invalidateSheetRowCountCache_(phaseDef.spreadsheetId, phaseDef.sheetName);
+    }
     // browse フェーズを見ている他の児童の画面に反映されるよう board cache を落とす。
     if (typeof bumpBoardDataVersion_ === 'function') {
       try {
@@ -3090,8 +3103,8 @@ function __readAllLessonRows_(phaseDef, opts) {
         if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
       } catch (_) { /* 壊れた値は読み直しで回復する */ }
       const loaded = __loadLessonRowsFromSheet_(phaseDef, opts);
-      if (Array.isArray(loaded) && typeof saveToCacheWithSizeCheck === 'function') {
-        saveToCacheWithSizeCheck(cacheKey, loaded, LESSON_ROWS_CACHE_TTL_S);
+      if (Array.isArray(loaded) && typeof saveToCacheWithSizeCheck_ === 'function') {
+        saveToCacheWithSizeCheck_(cacheKey, loaded, LESSON_ROWS_CACHE_TTL_S);
       }
       return Array.isArray(loaded) ? loaded : [];
     }

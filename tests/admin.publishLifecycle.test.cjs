@@ -35,16 +35,16 @@ function loadAdminContext(overrides = {}) {
     getCurrentEmail: () => 'owner@example.com',
     isAdministrator: () => true,
     getWebAppUrl: () => 'https://example.com/exec',
-    findUserById: (id) => users.find(u => u.userId === id),
-    findUserByEmail: (email) => users.find(u => u.userEmail === email),
-    // Why getUserConfig (not getConfigOrDefault): __applyPublishStateChange uses
+    findUserById_: (id) => users.find(u => u.userId === id),
+    findUserByEmail_: (email) => users.find(u => u.userEmail === email),
+    // Why getUserConfig (not getConfigOrDefault): __applyPublishStateChange_ uses
     //   getUserConfig envelope to detect 429/cache-miss and refuse destructive overwrite.
     //   (旧 getConfigOrDefault stub は v2757 で不要に。)
     getUserConfig: (userId) => ({
       success: true,
       config: savedConfigs[userId] || { isPublished: false, publishedAt: null }
     }),
-    saveUserConfig: (userId, config) => {
+    saveUserConfig_: (userId, config) => {
       savedConfigs[userId] = { ...config, etag: 'etag_' + Date.now() + '_' + Math.random() };
       return { success: true, etag: savedConfigs[userId].etag, config: savedConfigs[userId] };
     },
@@ -130,12 +130,12 @@ test('republishMyBoard: rejects with etag_mismatch when sourceEtag differs', () 
   assert.equal(result.error, 'etag_mismatch');
 });
 
-test('sourceEtag 未指定でも saveUserConfig の etag_mismatch を surface する (RMW窓の並行更新)', () => {
+test('sourceEtag 未指定でも saveUserConfig_ の etag_mismatch を surface する (RMW窓の並行更新)', () => {
   // sourceEtag を渡さない caller でも、 read(L158)→save の間に別 writer が config を
-  //   変えていれば saveUserConfig が継承 etag で conflict を返す。 これを汎用エラーに
+  //   変えていれば saveUserConfig_ が継承 etag で conflict を返す。 これを汎用エラーに
   //   埋もれさせず構造化して返すこと (publishApp と対称)。
   const ctx = loadAdminContext({
-    saveUserConfig: () => ({
+    saveUserConfig_: () => ({
       success: false,
       error: 'etag_mismatch',
       message: 'Configuration has been modified by another user',
@@ -184,7 +184,7 @@ test('unpublishBoard: rejects non-admin attempting to unpublish other user', () 
   const ctx = loadAdminContext({
     isAdministrator: () => false,
     getCurrentEmail: () => 'student@example.com',
-    findUserByEmail: () => null
+    findUserByEmail_: () => null
   });
   ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
 
@@ -199,8 +199,8 @@ test('unpublishBoard: collaborator (SS editor) can unpublish other user board', 
   const ctx = loadAdminContext({
     isAdministrator: () => false,
     getCurrentEmail: () => 'collab@example.com',
-    findUserByEmail: () => null,
-    isBoardCollaborator: (user, email) => email === 'collab@example.com'
+    findUserByEmail_: () => null,
+    isBoardCollaborator_: (user, email) => email === 'collab@example.com'
   });
   ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
 
@@ -214,13 +214,13 @@ test('republishMyBoard: collaborator CANNOT publish other user board (write op b
   const ctx = loadAdminContext({
     isAdministrator: () => false,
     getCurrentEmail: () => 'collab@example.com',
-    findUserByEmail: () => null,
-    isBoardCollaborator: (user, email) => email === 'collab@example.com'
+    findUserByEmail_: () => null,
+    isBoardCollaborator_: (user, email) => email === 'collab@example.com'
   });
   ctx.__savedConfigs['owner1'] = { isPublished: false, publishedAt: null };
 
   // republishMyBoard は自分のボードに対する操作なので、collaborator は other user に対しては
-  // findUserByEmail (caller resolution) で fail → user not found
+  // findUserByEmail_ (caller resolution) で fail → user not found
   const result = ctx.republishMyBoard();
   assert.equal(result.success, false);
 });
@@ -273,8 +273,8 @@ test('dispatch: republishMyBoard via dispatcher works', () => {
 // =====================================================================
 // 対象ユーザー解決: 見つからないときに「自分」へすり替えない (v2895)
 //
-// 本番の findUserById は admin/本人のみ通す strict ACL なので、collaborator が
-// 他人の userId を渡すと null になる。旧実装はそこで findUserByEmail(自分) に
+// 本番の findUserById_ は admin/本人のみ通す strict ACL なので、collaborator が
+// 他人の userId を渡すと null になる。旧実装はそこで findUserByEmail_(自分) に
 // フォールバックしており、「他人のボードを止めるつもりが自分のボードを止める」
 // 事故が起きうる状態だった (collaborator の緊急停止が無意味になる)。
 // =====================================================================
@@ -282,14 +282,14 @@ test('dispatch: republishMyBoard via dispatcher works', () => {
 // 本番の ACL を再現する stub: 呼び出し元が admin/本人でなければ null を返す。
 function strictUserLookup(users, callerEmail, { isAdmin = false } = {}) {
   return {
-    findUserById: (id, ctx) => {
+    findUserById_: (id, ctx) => {
       const u = users.find(x => x.userId === id);
       if (!u) return null;
       const requester = (ctx && ctx.requestingUser) || callerEmail;
       if (isAdmin || u.userEmail === requester) return u;
       return null;   // strict: 他人の record は引けない
     },
-    findUserByEmail: (email) => users.find(u => u.userEmail === email) || null
+    findUserByEmail_: (email) => users.find(u => u.userEmail === email) || null
   };
 }
 
@@ -302,9 +302,9 @@ test('unpublishBoard: collaborator の指定が自分のボードにすり替わ
     users,
     isAdministrator: () => false,
     getCurrentEmail: () => 'collab@example.com',
-    isBoardCollaborator: (user, email) => email === 'collab@example.com',
+    isBoardCollaborator_: (user, email) => email === 'collab@example.com',
     // 公開中のボードは published-read 経路で引ける (本番と同じ)
-    findPublishedBoardOwner: (id) => users.find(u => u.userId === id) || null
+    findPublishedBoardOwner_: (id) => users.find(u => u.userId === id) || null
   }, strictUserLookup(users, 'collab@example.com')));
 
   ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
@@ -327,8 +327,8 @@ test('unpublishBoard: 引けない userId は「自分」ではなく not found 
     users,
     isAdministrator: () => false,
     getCurrentEmail: () => 'stranger@example.com',
-    isBoardCollaborator: () => false,
-    findPublishedBoardOwner: () => null   // 非公開なので published-read でも引けない
+    isBoardCollaborator_: () => false,
+    findPublishedBoardOwner_: () => null   // 非公開なので published-read でも引けない
   }, strictUserLookup(users, 'stranger@example.com')));
 
   ctx.__savedConfigs['stranger1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
@@ -344,7 +344,7 @@ test('unpublishBoard: targetUserId 未指定なら従来どおり自分のボー
     users,
     isAdministrator: () => false,
     getCurrentEmail: () => 'owner@example.com',
-    isBoardCollaborator: () => false
+    isBoardCollaborator_: () => false
   }, strictUserLookup(users, 'owner@example.com')));
 
   ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };

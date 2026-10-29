@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global createErrorResponse, formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, sheetsApiBackoffMs_ */
+/* global createErrorResponse, formatTimestamp, getQuestionText_, findUserById_, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, sheetsApiBackoffMs_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -13,7 +13,7 @@
  * @param {Object} [preloadedConfig] - 既に取得済みの config
  * @returns {Object} レスポンスオブジェクト
  */
-function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
+function getUserSheetData_(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
   const startTime = Date.now();
 
   let user = null;
@@ -21,7 +21,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
   try {
 
-    user = preloadedUser || findUserById(userId, { requestingUser: getCurrentEmail() });
+    user = preloadedUser || findUserById_(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       logError_('DataService.getUserSheetData', new Error('ユーザーが見つかりません'), { userId });
       return {
@@ -40,7 +40,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     }
 
     if (!config.spreadsheetId) {
-      console.warn('[WARN] DataService.getUserSheetData: Spreadsheet ID not configured', { userId });
+      console.warn('[WARN] DataService.getUserSheetData_: Spreadsheet ID not configured', { userId });
       return {
         success: false,
         message: 'スプレッドシートが設定されていません',
@@ -50,11 +50,11 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       };
     }
 
-    const result = fetchSpreadsheetData(config, options);
+    const result = fetchSpreadsheetData_(config, options);
 
     if (result.success) {
       const preloadedHeaders = result.headers;
-      const questionText = getQuestionText(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
+      const questionText = getQuestionText_(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
 
       return {
         ...result,
@@ -100,12 +100,12 @@ function resolveTimestampIndex(headers) {
  * @param {Object} config
  * @returns {{sheet:Sheet, spreadsheet:Spreadsheet}}
  */
-function connectToSpreadsheetSheet(config) {
+function connectToSpreadsheetSheet_(config) {
   const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'connectToSpreadsheetSheet' });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
     // Why: openSpreadsheet が既に WARN ログを出しているので二重ログしない。
-    //      ここでは throw だけ行い、最上位（getUserSheetData）の catch で
+    //      ここでは throw だけ行い、最上位（getUserSheetData_）の catch で
     //      1 行にまとめて ERROR ログを出す。
     throw new Error(`スプレッドシートアクセスに失敗しました: ${config.spreadsheetId}`);
   }
@@ -170,7 +170,7 @@ function getSheetHeaders(sheet) {
  * Why: getSheetHeadersは10分キャッシュするため、列セットアップ直後に新しい列が見えず
  *      「リアクション列が見つかりません」エラーが発生するのを防ぐ。
  */
-function invalidateSheetHeadersCache(spreadsheetId, sheetName) {
+function invalidateSheetHeadersCache_(spreadsheetId, sheetName) {
   if (!spreadsheetId || !sheetName) return;
   try {
     const cacheKey = `sheet_headers_${spreadsheetId}_${sheetName}`;
@@ -188,7 +188,7 @@ function sheetRowCountCacheKey_(spreadsheetId, sheetName) {
  * 行数キャッシュを明示的に無効化 (行を削除した直後に呼ぶ)。
  * Why: 30 秒の行数 cache が残ると、削除直後の再読込が消えた行まで読みにいく。
  */
-function invalidateSheetRowCountCache(spreadsheetId, sheetName) {
+function invalidateSheetRowCountCache_(spreadsheetId, sheetName) {
   if (!spreadsheetId || !sheetName) return;
   try {
     CacheService.getScriptCache().remove(sheetRowCountCacheKey_(spreadsheetId, sheetName));
@@ -243,7 +243,7 @@ function getSheetInfo(sheet) {
 }
 
 // 1 回の読みで扱う行数の上限。values API は 1 応答で数千行を返せる (100KB の cache 上限は
-//   saveToCacheWithSizeCheck が別途守る)。
+//   saveToCacheWithSizeCheck_ が別途守る)。
 const SINGLE_READ_MAX_ROWS = 2000;
 
 // 読みの分割方針 (429 対策)。
@@ -413,16 +413,16 @@ function processBatchData(ctx) {
  * @param {Object} config
  * @param {Object} options
  */
-function fetchSpreadsheetData(config, options = {}) {
+function fetchSpreadsheetData_(config, options = {}) {
   const startTime = Date.now();
 
-  const { sheet } = connectToSpreadsheetSheet(config);
+  const { sheet } = connectToSpreadsheetSheet_(config);
   const { lastRow, lastCol, headers } = getSheetInfo(sheet);
   // 見出しが読めていない (429 で [] / 寸法の既定値だけ) なら、このボードを「空」と判定できない。
   //   回答シートは必ず見出し行を持つ (Form / 授業の両方が作る) ので、空の見出し = 読み込み失敗。
   //   BUSY (success:false) を返して cache させない。失敗は 8 秒覚えられ、児童は次の poll で読み直す。
   if (!Array.isArray(headers) || headers.length === 0) {
-    console.warn('DataService.fetchSpreadsheetData: headers unavailable (quota?)', { sheetName: config.sheetName });
+    console.warn('DataService.fetchSpreadsheetData_: headers unavailable (quota?)', { sheetName: config.sheetName });
     return busySheetDataResult_(config.sheetName);
   }
   const ctx = { sheet, headers, lastRow, lastCol, config, options, startTime };
@@ -431,7 +431,7 @@ function fetchSpreadsheetData(config, options = {}) {
   // 読めずに飛ばした範囲がある結果は「このボードの中身」ではない。成功として返すと cache に
   //   乗って全員に配られる。混雑として返し、次の poll で読み直させる。
   if (ctx.readFailures > 0) {
-    console.warn('DataService.fetchSpreadsheetData: partial read (skipped batches), returning BUSY', {
+    console.warn('DataService.fetchSpreadsheetData_: partial read (skipped batches), returning BUSY', {
       sheetName: config.sheetName, readFailures: ctx.readFailures, rows: processedData.length
     });
     return busySheetDataResult_(config.sheetName);
@@ -688,7 +688,7 @@ function toComparableTimestamp_(v) {
 function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
   try {
     const currentEmail = getCurrentEmail();
-    const user = findUserById(userId, { requestingUser: currentEmail });
+    const user = findUserById_(userId, { requestingUser: currentEmail });
 
     if (!user) {
       logError_('deleteAnswerRow', new Error('User not found'), { userId });
@@ -752,7 +752,7 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     // 削除で下の行が 1 つ繰り上がる。cache に古い行が残ると、次の読込が消えた行の番号で
     //   回答を持ち続け、2 個目の削除が「対象の回答が変更されています」で止まる (2026-09-08)。
     //   行数 cache (30 秒) とボード data cache (version) の両方を捨てる。
-    invalidateSheetRowCountCache(spreadsheetId, sheetName);
+    invalidateSheetRowCountCache_(spreadsheetId, sheetName);
     if (typeof bumpBoardDataVersion_ === 'function') {
       try { bumpBoardDataVersion_(userId); }
       catch (cacheErr) {

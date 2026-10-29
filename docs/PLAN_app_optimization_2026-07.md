@@ -90,7 +90,7 @@
    - **(a) API 境界 response** で、builder の出力 shape が現行 shape の**上位集合** (フィールド追加のみ・削除/改名なし) になる → builder に置換
    - **(b) 内部サービス envelope** (呼び出し側が特定フィールドを直接読む) → **触らない**
 2. 置換ごとに、その関数の呼び出し側 (フロントの runServer 受け側 + テスト) を grep し、読んでいるフィールドが置換後も存在することを確認する。
-3. `npm test` が通ったら次のファイルへ: **ConfigService.js → SystemController.js** の順 (それぞれ別コミット)。ConfigService は `getUserConfig`/`saveUserConfig` の envelope が (b) に該当するものが多い — 無理に置換せず、(a) に該当するものだけでよい。**置換件数ゼロでも「調査の結果 (b) ばかりだった」なら、それを最終レポートに書いて正当に skip する**。
+3. `npm test` が通ったら次のファイルへ: **ConfigService.js → SystemController.js** の順 (それぞれ別コミット)。ConfigService は `getUserConfig`/`saveUserConfig_` の envelope が (b) に該当するものが多い — 無理に置換せず、(a) に該当するものだけでよい。**置換件数ゼロでも「調査の結果 (b) ばかりだった」なら、それを最終レポートに書いて正当に skip する**。
 4. DataApis.js の `error` フィールド名不一致 (例: L154 `{success:false, error: ..., forms: []}`) は、builder の `createErrorResponse(message, data, extraFields)` が message と error を両方立てるので置換候補。同様に (a)/(b) 分類してから。
 
 **任意 (時間があれば)**: `isValidFormUrl` (DataApis.js:2098) を validators.js へ移設し `/* global */` を更新。挙動は 1 文字も変えない。

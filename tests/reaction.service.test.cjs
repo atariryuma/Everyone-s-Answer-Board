@@ -88,11 +88,11 @@ function loadReactionContext(overrides = {}) {
     ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     isAdministrator: (email) => email === 'admin@example.com',
-    findUserBySpreadsheetId: () => null,
-    findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
-    // findPublishedBoardOwner は DatabaseCore の helper。テストでは findUserById と同等でよい。
-    findPublishedBoardOwner: (userId, viewerEmail, extra = {}) =>
-      (context.findUserById ? context.findUserById(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
+    findUserBySpreadsheetId_: () => null,
+    findUserById_: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
+    // findPublishedBoardOwner_ は DatabaseCore の helper。テストでは findUserById_ と同等でよい。
+    findPublishedBoardOwner_: (userId, viewerEmail, extra = {}) =>
+      (context.findUserById_ ? context.findUserById_(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
     getUserConfig: () => ({ success: true, config: {} }),
     // 既定は「リアクションを使う」ボード (reactionMode 未指定は「使わない」になるため明示する)。
     getConfigOrDefault: () => ({
@@ -539,7 +539,7 @@ test('canActOnTargetBoard: requireEditor allows owner', () => {
 test('canActOnTargetBoard: collaborator (SS editor) allowed on requireEditor (v2855)', () => {
   // ボード SS の editor として共有された共同教師は highlight/unpublish 等の editor 操作を実行可能。
   const ctx = loadReactionContext({
-    isBoardCollaborator: (targetUser, email) => email === 'collab@example.com'
+    isBoardCollaborator_: (targetUser, email) => email === 'collab@example.com'
   });
   const ok = ctx.canActOnTargetBoard(
     'collab@example.com',
@@ -553,7 +553,7 @@ test('canActOnTargetBoard: collaborator (SS editor) allowed on requireEditor (v2
 test('canActOnTargetBoard: non-collaborator viewer still blocked on requireEditor', () => {
   // SS editor として登録されていない viewer は requireEditor を pass しない。
   const ctx = loadReactionContext({
-    isBoardCollaborator: () => false
+    isBoardCollaborator_: () => false
   });
   const ok = ctx.canActOnTargetBoard(
     'viewer@example.com',
@@ -697,7 +697,7 @@ test('addReaction: parses "row_N" format', () => {
 
 test('addReaction: rejects when target user not found', () => {
   const ctx = buildAddReactionContext({
-    overrides: { findUserById: () => null }
+    overrides: { findUserById_: () => null }
   });
   const result = ctx.addReaction('ghost', 2, 'LIKE');
   assert.equal(result.success, false);
@@ -718,7 +718,7 @@ test('addReaction: denies non-owner on unpublished board', () => {
     overrides: {
       getCurrentEmail: () => 'stranger@example.com',
       getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: false }),
-      findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' })
+      findUserById_: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' })
     }
   });
   const result = ctx.addReaction('owner-1', 2, 'LIKE');
@@ -811,9 +811,9 @@ function buildToggleHighlightContext({ sheet, cache, lock, overrides = {} } = {}
     lock: lock || createMockLock(),
     // toggleHighlight は editor-only なので、デフォルトでは actor を owner にして
     // 権限チェックを通過させる。権限バグを検証したい個別テストは overrides で
-    // getCurrentEmail / findUserById を差し替える。
+    // getCurrentEmail / findUserById_ を差し替える。
     getCurrentEmail: () => 'owner@example.com',
-    findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
+    findUserById_: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
     openSpreadsheet: () => ({
       spreadsheet: { getSheetByName: (name) => (name === 'Sheet1' ? actualSheet : null) }
     }),
@@ -852,7 +852,7 @@ test('toggleHighlight: rejects unauthorized actor', () => {
     overrides: {
       getCurrentEmail: () => 'stranger@example.com',
       getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: false }),
-      findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' })
+      findUserById_: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' })
     }
   });
   const result = ctx.toggleHighlight('owner-1', 2);
@@ -874,7 +874,7 @@ test('toggleHighlight: rejects published-board viewer (editor-only gate)', () =>
       getCurrentEmail: () => 'student@example.com',
       isAdministrator: () => false,
       getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true }),
-      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+      findUserById_: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
     }
   });
   const result = ctx.toggleHighlight('owner-1', 2);
@@ -896,7 +896,7 @@ test('toggleHighlight: allows board owner even on unpublished board', () => {
       getCurrentEmail: () => 'teacher@example.com',
       isAdministrator: () => false,
       getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: false }),
-      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+      findUserById_: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
     }
   });
   const result = ctx.toggleHighlight('owner-1', 2);
@@ -917,7 +917,7 @@ test('addReaction: still allows published-board viewer (viewer op is open)', () 
       getCurrentEmail: () => 'student@example.com',
       isAdministrator: () => false,
       getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true, displaySettings: { reactionMode: 'color' } }),
-      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+      findUserById_: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
     }
   });
   const result = ctx.addReaction('owner-1', 2, 'LIKE');

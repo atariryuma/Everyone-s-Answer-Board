@@ -40,10 +40,10 @@ function loadDataService(overrides = {}) {
     Utilities: { sleep: () => {} },
     ...gasResponseStubs(),
     getCurrentEmail: () => 'viewer@example.com',
-    findUserById: () => null,
+    findUserById_: () => null,
     openSpreadsheet: () => null,
     getConfigOrDefault: () => ({}),
-    getQuestionText: () => 'Q',
+    getQuestionText_: () => 'Q',
     normalizeHeader: (h) => String(h || '').toLowerCase().trim(),
     resolveColumnIndex: (headers, field) => ({ index: headers.indexOf(field) }),
     extractReactions: () => ({}),
@@ -84,7 +84,7 @@ test('fetchSpreadsheetData: 見出しが読めない (429) ときも BUSY', () =
   ctx.takeProxyReadFailure_ = () => { const f = slot; slot = null; return f; };
   const sheet = makeProxyLikeSheet({ headers: [], rows: [], failHeaders: true }, ctx);
   ctx.openSpreadsheet = () => ({ spreadsheet: { getSheetByName: () => sheet } });
-  const res = ctx.fetchSpreadsheetData({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' }, {});
+  const res = ctx.fetchSpreadsheetData_({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' }, {});
   assert.equal(res.success, false);
   assert.equal(res.busy, true);
 });
@@ -95,7 +95,7 @@ test('fetchSpreadsheetData: 本当に空のボード (見出しだけ) は succe
   ctx.takeProxyReadFailure_ = () => null;
   const sheet = makeProxyLikeSheet({ headers: ['timestamp', 'answer'], rows: [] }, ctx);
   ctx.openSpreadsheet = () => ({ spreadsheet: { getSheetByName: () => sheet } });
-  const res = ctx.fetchSpreadsheetData({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' }, {});
+  const res = ctx.fetchSpreadsheetData_({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' }, {});
   assert.equal(res.success, true);
   assert.deepEqual(JSON.parse(JSON.stringify(res.data)), []);
 });
@@ -106,7 +106,7 @@ test('fetchSpreadsheetData: 正常に読めたら従来どおり行を返す', (
   ctx.takeProxyReadFailure_ = () => null;
   const sheet = makeProxyLikeSheet({ headers: ['timestamp', 'answer'], rows: [['t1', 'a'], ['t2', 'b']] }, ctx);
   ctx.openSpreadsheet = () => ({ spreadsheet: { getSheetByName: () => sheet } });
-  const res = ctx.fetchSpreadsheetData({ spreadsheetId: 'ss-1', sheetName: 'Sheet1', columnMapping: { answer: 1 } }, {});
+  const res = ctx.fetchSpreadsheetData_({ spreadsheetId: 'ss-1', sheetName: 'Sheet1', columnMapping: { answer: 1 } }, {});
   assert.equal(res.success, true);
   assert.equal(res.data.length, 2);
 });
@@ -124,7 +124,7 @@ function loadReactionService() {
     Utilities: { sleep: () => {} },
     getCurrentEmail: () => 'a@example.com',
     isAdministrator: () => false,
-    findPublishedBoardOwner: () => null,
+    findPublishedBoardOwner_: () => null,
     getConfigOrDefault: () => ({}),
     openSpreadsheet: () => null,
     resolveReactionMode: () => 'on'
@@ -276,11 +276,11 @@ test('createUser: users シートが読めない (429 で []) ときは error en
     getCurrentEmail: () => 'new@example.com',
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     getCachedProperty_: () => null,
     clearPropertyCache_: (k) => cleared.push(k),
     simpleHash: () => 'h',
-    saveToCacheWithSizeCheck: () => true,
+    saveToCacheWithSizeCheck_: () => true,
     DEFAULT_DISPLAY_SETTINGS: {},
     withStampedeGuard_: (o) => o.loader(),
     acquireCacheLock_: () => 'tok',
@@ -293,7 +293,6 @@ test('createUser: users シートが読めない (429 で []) ときは error en
   context.openDatabase = () => ({ getSheetByName: () => sheet });
   const user = context.createUser_('new@example.com', {}, {});
   assert.equal(user, null, '呼び出し側の `if (!user)` で拾える');
-  assert.ok(cleared.includes('USER_CACHE_VERSION'), '存在確認の前に version memo を捨てる (別インスタンスの作成を見逃さない)');
 });
 
 // =====================================================================

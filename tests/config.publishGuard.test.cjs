@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 /**
- * Tests for the publish-state single-source-of-truth guard in saveUserConfig (v2865).
+ * Tests for the publish-state single-source-of-truth guard in saveUserConfig_ (v2865).
  *
  * Invariant (CLAUDE.md): config.isPublished / publishedAt may only be written by the 4
  *   lifecycle functions (publishApp / republishMyBoard / unpublishBoard /
@@ -37,9 +37,9 @@ function loadConfigContext(persistedConfig) {
     getCachedProperty_: () => null,
     getCurrentEmail: () => 'owner@example.com',
     isAdministrator: () => false,
-    findUserById: () => user,
-    findUserByEmail: () => user,
-    findUserBySpreadsheetId: () => null,
+    findUserById_: () => user,
+    findUserByEmail_: () => user,
+    findUserBySpreadsheetId_: () => null,
     validateConfigUserId: () => true,
     // permissive validator: pass every field through (mirrors validators.js isPublished passthrough)
     validateConfig: (cfg) => ({ isValid: true, errors: [], warnings: [], sanitized: { ...cfg } }),
@@ -55,7 +55,7 @@ function loadConfigContext(persistedConfig) {
 
 test('guard: non-sentinel save CANNOT unpublish a published board (forces persisted true)', () => {
   const ctx = loadConfigContext({ isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z', spreadsheetId: 'sheet1' });
-  const res = ctx.saveUserConfig('u1', { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1' });
+  const res = ctx.saveUserConfig_('u1', { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1' });
   assert.equal(res.success, true);
   const saved = ctx.__getSaved();
   assert.equal(saved.isPublished, true, 'published state must be preserved');
@@ -64,7 +64,7 @@ test('guard: non-sentinel save CANNOT unpublish a published board (forces persis
 
 test('guard: non-sentinel save CANNOT publish an unpublished board (forces persisted false)', () => {
   const ctx = loadConfigContext({ isPublished: false, publishedAt: null, spreadsheetId: 'sheet1' });
-  const res = ctx.saveUserConfig('u1', { isPublished: true, publishedAt: '2026-05-31T00:00:00.000Z', spreadsheetId: 'sheet1' });
+  const res = ctx.saveUserConfig_('u1', { isPublished: true, publishedAt: '2026-05-31T00:00:00.000Z', spreadsheetId: 'sheet1' });
   assert.equal(res.success, true);
   const saved = ctx.__getSaved();
   assert.equal(saved.isPublished, false, 'unpublished state must be preserved');
@@ -73,7 +73,7 @@ test('guard: non-sentinel save CANNOT publish an unpublished board (forces persi
 
 test('guard: __allowPublishStateWrite honors the new published state', () => {
   const ctx = loadConfigContext({ isPublished: false, publishedAt: null, spreadsheetId: 'sheet1' });
-  const res = ctx.saveUserConfig('u1',
+  const res = ctx.saveUserConfig_('u1',
     { isPublished: true, publishedAt: '2026-05-31T00:00:00.000Z', spreadsheetId: 'sheet1' },
     { __allowPublishStateWrite: true });
   assert.equal(res.success, true);
@@ -84,7 +84,7 @@ test('guard: __allowPublishStateWrite honors the new published state', () => {
 
 test('guard: __allowPublishStateWrite honors unpublish (publishedAt null)', () => {
   const ctx = loadConfigContext({ isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z', spreadsheetId: 'sheet1' });
-  const res = ctx.saveUserConfig('u1',
+  const res = ctx.saveUserConfig_('u1',
     { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1' },
     { __allowPublishStateWrite: true });
   assert.equal(res.success, true);
@@ -95,7 +95,7 @@ test('guard: __allowPublishStateWrite honors unpublish (publishedAt null)', () =
 
 test('guard: brand-new config (no persisted) defaults to unpublished on non-sentinel save', () => {
   const ctx = loadConfigContext(null);
-  const res = ctx.saveUserConfig('u1', { isPublished: true, spreadsheetId: 'sheet1' });
+  const res = ctx.saveUserConfig_('u1', { isPublished: true, spreadsheetId: 'sheet1' });
   assert.equal(res.success, true);
   const saved = ctx.__getSaved();
   assert.equal(saved.isPublished, false, 'new board must start unpublished without a lifecycle write');
@@ -104,7 +104,7 @@ test('guard: brand-new config (no persisted) defaults to unpublished on non-sent
 
 test('guard: non-publish fields still save normally on non-sentinel save', () => {
   const ctx = loadConfigContext({ isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z', spreadsheetId: 'sheet1' });
-  const res = ctx.saveUserConfig('u1', { isPublished: false, spreadsheetId: 'sheet1', sheetName: 'NewSheet' });
+  const res = ctx.saveUserConfig_('u1', { isPublished: false, spreadsheetId: 'sheet1', sheetName: 'NewSheet' });
   assert.equal(res.success, true);
   const saved = ctx.__getSaved();
   assert.equal(saved.sheetName, 'NewSheet', 'ordinary fields must persist');
@@ -115,10 +115,10 @@ test('saveUserConfig: updateUser_ が unchanged を返したら永続済の etag
   // Why: 内容が同じ保存で新しい etag を返すと、client がそれを持ち、次の保存が etag_mismatch になる。
   const ctx = loadConfigContext({ isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' });
   let cleared = false;
-  ctx.clearConfigCache = () => { cleared = true; };
+  ctx.clearConfigCache_ = () => { cleared = true; };
   ctx.updateUser_ = () => ({ success: true, unchanged: true, currentEtag: 'persisted_etag',
     currentConfig: { isPublished: false, publishedAt: null, spreadsheetId: 'sheet1', etag: 'persisted_etag' } });
-  const res = ctx.saveUserConfig('u1', { spreadsheetId: 'sheet1', etag: 'persisted_etag' });
+  const res = ctx.saveUserConfig_('u1', { spreadsheetId: 'sheet1', etag: 'persisted_etag' });
   assert.equal(res.success, true);
   assert.equal(res.unchanged, true);
   assert.equal(res.etag, 'persisted_etag');

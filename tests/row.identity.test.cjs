@@ -55,7 +55,7 @@ function loadReaction(overrides = {}) {
     Utilities: { sleep: () => {} },
     getCurrentEmail: () => 'viewer@example.com',
     isAdministrator: () => false,
-    findPublishedBoardOwner: () => null,
+    findPublishedBoardOwner_: () => null,
     getConfigOrDefault: () => ({}),
     openSpreadsheet: () => null,
     resolveReactionMode: () => 'count',
@@ -65,7 +65,7 @@ function loadReaction(overrides = {}) {
       const idx = headers.findIndex((h) => String(h).toLowerCase().includes(field === 'email' ? 'mail' : field));
       return { index: idx };
     },
-    emailToShortHash: (email) => (email ? 'h_' + String(email).trim().toLowerCase() : null),
+    emailToShortHash_: (email) => (email ? 'h_' + String(email).trim().toLowerCase() : null),
     ...overrides
   };
   vm.createContext(context);
@@ -118,7 +118,7 @@ test('executeBoardRowOperation: 行がずれていたら書かずに ROW_CHANGED
     })
   };
   const ctx = loadReaction({
-    findPublishedBoardOwner: () => ({ userId: 'owner', userEmail: 'owner@example.com' }),
+    findPublishedBoardOwner_: () => ({ userId: 'owner', userEmail: 'owner@example.com' }),
     getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'S', isPublished: true, displaySettings: { reactionMode: 'count' } }),
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     getSheetHeaders: () => ({ headers: data[0] })
@@ -165,7 +165,7 @@ test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (1
     getCurrentEmail: () => 'admin@example.com',
     isAdministrator: () => true,
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     DEFAULT_DISPLAY_SETTINGS: {}
   });
   vm.runInContext(SRC('DatabaseCore.js'), helpersCtx, { filename: 'DatabaseCore.js' });

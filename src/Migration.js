@@ -18,12 +18,12 @@
  *   - 元の本体のデータは消さない (写すだけ)
  */
 
-/* global getCachedProperty_, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __nativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
+/* global getCachedProperty_, findUserByEmail_, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __nativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, __plainTextCell_, createErrorResponse, createSuccessResponse, logError_ */
 
 // 引っ越し先の持ち主 (この配置の先生)。登録がまだなら先に管理パネルを開いてもらう。
 function __migrationOwner_() {
   const adminEmail = getCachedProperty_('ADMIN_EMAIL');
-  const user = adminEmail ? findUserByEmail(adminEmail, { requestingUser: adminEmail }) : null;
+  const user = adminEmail ? findUserByEmail_(adminEmail, { requestingUser: adminEmail }) : null;
   if (!user || !user.userId) {
     return { error: createErrorResponse('先に先生のアカウントで管理パネルを 1 度開いてください (登録がまだです)', null, { error: 'OWNER_NOT_REGISTERED' }) };
   }
@@ -191,6 +191,8 @@ function migrateImportLessonAnswers_(params) {
         row[COL.cls] = Object.prototype.hasOwnProperty.call(classMap, cls) ? String(classMap[cls]) : cls;
         const t = row[COL.ts] instanceof Date ? row[COL.ts] : new Date(String(row[COL.ts] || ''));
         if (!isNaN(t.getTime())) row[COL.ts] = new Date(t.getTime() + shiftMs).toISOString();
+        // 児童の文 (学級 / 名前 / 理由 / 加わったこと) は数式として書かない (submitLessonAnswer と同じ)。
+        [COL.cls, 3, 6, 7].forEach((c) => { if (typeof row[c] === 'string') row[c] = __plainTextCell_(row[c]); });
         latest.set(keyOf(row[COL.email], row[COL.cls]), row);
       });
       const rows = [];

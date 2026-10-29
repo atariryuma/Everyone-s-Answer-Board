@@ -48,11 +48,11 @@ function loadDatabaseContext(overrides = {}) {
     getCurrentEmail: overrides.getCurrentEmail || (() => overrides.currentEmail || 'actor@example.com'),
     isAdministrator: overrides.isAdministrator || (() => false),
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     getCachedProperty_: (k) => (k in propsStore ? propsStore[k] : null),
     clearPropertyCache_: () => {},
     simpleHash: (s) => String(s).length,
-    saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
+    saveToCacheWithSizeCheck_: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
     safeJsonParse_: (text, fallback) => {
       const fb = (fallback === undefined ? null : fallback);
       if (text == null || text === '') return fb;
@@ -80,7 +80,7 @@ const openByIdRecorder = () => {
 };
 // ボードの持ち主の検索と公開状態を差し替える (DatabaseCore の関数はグローバルなので後から上書きできる)。
 function withBoards(ctx, boards) {
-  ctx.findUserBySpreadsheetId = (id) => boards[id] || null;
+  ctx.findUserBySpreadsheetId_ = (id) => boards[id] || null;
   ctx.isUserBoardPublished = (user) => Boolean(user && user.published);
   return ctx;
 }
@@ -177,4 +177,16 @@ test('openDatabase: 先生のスプレッドシートを直接開く / 開けな
     propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' }
   });
   assert.equal(broken.openDatabase(), null);
+});
+
+test('checkSpreadsheetAccess_: 先生以外の判定は児童ごとに分けず、シートごとに 1 つを共有する', () => {
+  let lookups = 0;
+  let email = 'child1@example.com';
+  const ctx = loadDatabaseContext({ getCurrentEmail: () => email });
+  ctx.findUserBySpreadsheetId_ = () => { lookups++; return { userId: 'u1', published: true }; };
+  ctx.isUserBoardPublished = (u) => Boolean(u && u.published);
+  assert.equal(ctx.checkSpreadsheetAccess_('board-ss').allowed, true);
+  email = 'child2@example.com';
+  assert.equal(ctx.checkSpreadsheetAccess_('board-ss').allowed, true);
+  assert.equal(lookups, 1, '2 人目は覚えた判定を使う (users の一覧を読み直さない)');
 });

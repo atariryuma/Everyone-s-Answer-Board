@@ -3307,7 +3307,8 @@
           const stateLabel = l.state === 'draft'? '下書き'
             : l.state === 'active'? ('実行中' + (l.currentPhaseName ? ' · ' + window.sharedUtilities.security.escapeHtml(l.currentPhaseName) : '') + boardNote)
             : '完了';
-          const dateStr = l.createdAt ? l.createdAt.slice(0, 10) : '';
+          const dateStr = window.sharedUtilities.security.escapeHtml(l.createdAt ? String(l.createdAt).slice(0, 10) : '');
+          const safeState = ['draft', 'active', 'completed'].indexOf(l.state) >= 0 ? l.state : 'draft';
           const safeName = window.sharedUtilities.security.escapeHtml(l.name || '無題');
           const safeId = window.sharedUtilities.security.escapeHtml(l.lessonId);
           const action = l.state === 'completed'? '振り返り'                       : l.state === 'active'? '続きから'                       : '編集';
@@ -3326,9 +3327,9 @@
                <svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"></use></svg>削除する</button>`
           ].join('');
           return `<li>
-            <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
+            <span class="lesson-state-badge state-${safeState}">${stateLabel}</span>
             <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
-            <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
+            <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${safeState}">${action}</button>
             <details class="lesson-row-menu">
               <summary title="その他の操作" aria-label="その他の操作">
                 <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
@@ -4611,7 +4612,7 @@
         };
         const labelFor = (t) => {
           const opt = PHASE_TEMPLATE_OPTIONS.find((o) => o.value === t);
-          return opt ? opt.label : t;
+          return esc(opt ? opt.label : String(t || ''));
         };
         phaseListEl.innerHTML = phases.map((p, i) => (
           '<li class="confirm-phase-row">' +

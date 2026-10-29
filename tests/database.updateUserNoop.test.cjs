@@ -1,7 +1,7 @@
 /**
- * updateUser_: 内容が同じ書き込みは DB に書かず USER_CACHE_VERSION も上げない (2026-10 監査)。
+ * updateUser_: 内容が同じ書き込みは DB に書かず users の cache の版も変えない (2026-10 監査)。
  *
- * Why: 書き込みのたびに clearDatabaseUserCache が version を上げ、児童 30 人分の user cache が
+ * Why: 書き込みのたびに clearDatabaseUserCache_ が version を上げ、児童 30 人分の user cache が
  *   一斉に落ちて次の poll が users シートを読み直していた。lastAccessedAt / etag しか違わない
  *   保存 (同じ内容の再保存、同じ patch の再適用) で version を上げる理由は無い。
  */
@@ -57,18 +57,21 @@ function loadCtx(sheet) {
     getCachedProperty_: (k) => (k === 'USER_CACHE_VERSION' ? (props.USER_CACHE_VERSION || '0') : null),
     clearPropertyCache_: () => {},
     getUserConfig: () => ({ success: true, config: {} }),
-    executeWithRetry: (fn) => fn(),
+    executeWithRetry_: (fn) => fn(),
     validateEmail: (e) => ({ isValid: /.+@.+/.test(String(e || '')), sanitized: e, errors: [] }),
     safeJsonParse_: (t, fb) => { try { return JSON.parse(t); } catch (_) { return fb === undefined ? null : fb; } },
     sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     simpleHash: (o) => Object.keys(o || {}).sort().map((k) => `${k}:${o[k]}`).join('|'),
-    saveToCacheWithSizeCheck: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
+    saveToCacheWithSizeCheck_: (k, v) => { store.set(k, JSON.stringify(v)); return true; },
     acquireCacheLock_: () => 'tok',
     releaseCacheLock_: () => {}
   };
   vm.createContext(context);
   vm.runInContext(DB_SOURCE, context, { filename: 'DatabaseCore.js' });
   context.openDatabase = () => ({ getSheetByName: (n) => (n === 'users' ? sheet : null) });
+  context.__store = store;
+  // users の cache の版は CacheService (user_cache_ver)。先に版を置き、書いたかどうかを値の変化で見る。
+  store.set('user_cache_ver', 'v-before');
   return { ctx: context, props };
 }
 
@@ -88,7 +91,7 @@ test('updateUser: lastAccessedAt / etag だけが違う configJson は書かず�
   assert.equal(res.currentEtag, 'old_etag', '永続済の etag を返す (client が次の保存で使う)');
   assert.equal(res.currentConfig.etag, 'old_etag');
   assert.equal(sheet.calls.setValues.length, 0, 'シートに書かない');
-  assert.equal(props.USER_CACHE_VERSION, undefined, 'USER_CACHE_VERSION を上げない');
+  assert.equal(ctx.__store.get('user_cache_ver'), 'v-before', 'users の cache の版を変えない');
 });
 
 test('updateUser: 内容が違えば従来どおり書いて version を上げる', () => {
@@ -99,7 +102,7 @@ test('updateUser: 内容が違えば従来どおり書いて version を上げ�
   assert.equal(res.success, true);
   assert.ok(!res.unchanged);
   assert.equal(sheet.calls.setValues.length, 1);
-  assert.equal(props.USER_CACHE_VERSION, '1');
+  assert.notEqual(ctx.__store.get('user_cache_ver'), 'v-before', 'users の cache の版を新しくする');
 });
 
 test('updateUser: 配列の中身の違い (profile 追加) は差分として書く', () => {

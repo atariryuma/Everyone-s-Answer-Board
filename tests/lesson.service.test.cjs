@@ -116,7 +116,7 @@ function loadLessonContext(overrides = {}) {
     getCachedProperty_: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
     getCurrentEmail: () => 'teacher@example.com',
     isAdministrator: (email) => email === 'admin@example.com',
-    findUserByEmail: (email) => email === 'teacher@example.com' ? { userId: 'u1', userEmail: email } : null,
+    findUserByEmail_: (email) => email === 'teacher@example.com' ? { userId: 'u1', userEmail: email } : null,
     createTemplateForm: overrides.createTemplateForm || ((templateType, templateOptions) => {
       formCreations.push({ templateType, templateOptions: templateOptions || null });
       return {
@@ -842,7 +842,7 @@ test('installLessonTriggers: 既存トリガーがあれば skip (idempotent)', 
       }
     }
   });
-  context.installLessonTriggers();
+  context.installLessonTriggers_();
   assert.equal(createCount, 0, '既存トリガーがあるのに新規作成された');
 });
 
@@ -864,7 +864,7 @@ test('installLessonTriggers: トリガーが無ければ 1 つ作成', () => {
       })
     }
   });
-  context.installLessonTriggers();
+  context.installLessonTriggers_();
   assert.equal(createCount, 1);
   assert.equal(scheduledHour, 23);
 });

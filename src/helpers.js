@@ -1,6 +1,6 @@
 /**
  * @fileoverview 共通ヘルパー: PropertiesService キャッシュ、レスポンスビルダー、
- *   認証ショートカット、emailToShortHash（仮名化）。
+ *   認証ショートカット、emailToShortHash_（仮名化）。
  */
 
 /* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
@@ -8,8 +8,22 @@
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
+// 配置に焼き込んだ値 (Deployment.js)。この 2 つはプロパティより先に効く (プロパティを読まない)。
+//   Why: 先生として実行するので、児童 30 人の 5 秒おきの確認がすべて先生 1 人の「プロパティの読み書き
+//   1 日 50 万回」に数えられる。isAdministrator と openDatabase は毎回呼ばれるので、ここで読まずに済ませる。
+//   管理者のメールを変えるときは Deployment.js を焼き直す (deploy-single.js の adminEmail を直して deploy)。
+function bakedDeploymentProperty_(key) {
+  if (typeof DEPLOY_ADMIN_EMAIL === 'undefined') return null;
+  if (key === 'ADMIN_EMAIL' && DEPLOY_ADMIN_EMAIL) return String(DEPLOY_ADMIN_EMAIL).trim().toLowerCase();
+  if (key === 'DATABASE_SPREADSHEET_ID' && DEPLOY_DATABASE_SPREADSHEET_ID) return String(DEPLOY_DATABASE_SPREADSHEET_ID);
+  return null;
+}
+
 // PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
+//   メモリは 1 回の実行 (google.script.run の 1 呼び出し) の中だけで効く。実行をまたいでは残らない。
 function getCachedProperty_(key) {
+  const baked = bakedDeploymentProperty_(key);
+  if (baked) return baked;
   const now = Date.now();
   const cached = RUNTIME_PROPERTIES_CACHE[key];
 
@@ -42,7 +56,9 @@ function getCachedProperty_(key) {
  */
 function ensureDeploymentBootstrap_() {
   if (typeof DEPLOY_ADMIN_EMAIL === 'undefined' || !DEPLOY_ADMIN_EMAIL || !DEPLOY_DATABASE_SPREADSHEET_ID) return;
-  if (getCachedProperty_('ADMIN_EMAIL') && getCachedProperty_('DATABASE_SPREADSHEET_ID')) return;
+  // プロパティそのものを見る (getCachedProperty_ はこの 2 つを焼き込みから返すので、そろったか分からない)。
+  const props0 = PropertiesService.getScriptProperties();
+  if (props0.getProperty('ADMIN_EMAIL') && props0.getProperty('DATABASE_SPREADSHEET_ID')) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return;   // 同時に開いた別の人がそろえている。次の呼び出しで済んでいる
   try {
@@ -107,17 +123,17 @@ function setCachedProperty_(key, value) {
  * @param {number} ttl - 秒
  * @param {number} [maxSize=100000]
  */
-function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
+function saveToCacheWithSizeCheck_(cacheKey, data, ttl, maxSize = 100000) {
   try {
     const dataJson = JSON.stringify(data);
     if (dataJson.length > maxSize) {
-      console.warn(`saveToCacheWithSizeCheck: Data too large for cache (${dataJson.length} bytes, max ${maxSize})`);
+      console.warn(`saveToCacheWithSizeCheck_: Data too large for cache (${dataJson.length} bytes, max ${maxSize})`);
       return false;
     }
     CacheService.getScriptCache().put(cacheKey, dataJson, ttl);
     return true;
   } catch (saveError) {
-    console.warn(`saveToCacheWithSizeCheck: Cache save failed for key "${cacheKey}":`, saveError.message);
+    console.warn(`saveToCacheWithSizeCheck_: Cache save failed for key "${cacheKey}":`, saveError.message);
     return false;
   }
 }
@@ -332,8 +348,8 @@ function withStampedeGuard_(opts) {
     if (isCacheable(fresh)) {
       // pack は 1 回だけ (gzip 等のコストを latest の分まで二重に払わない)。
       const packed = pack(fresh);
-      saveToCacheWithSizeCheck(key, packed, opts.ttl);
-      if (latestKey) saveToCacheWithSizeCheck(latestKey, packed, latestTtl);
+      saveToCacheWithSizeCheck_(key, packed, opts.ttl);
+      if (latestKey) saveToCacheWithSizeCheck_(latestKey, packed, latestTtl);
     } else if (failKey) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }
@@ -600,13 +616,13 @@ function teacherOnlyError_() {
  * ログから追えなかった。
  *
  * @param {string} userId - ユーザーID
- * @param {Object} [user] - 事前取得済みユーザー（findUserById 再実行を避けるため）
+ * @param {Object} [user] - 事前取得済みユーザー（findUserById_ 再実行を避けるため）
  * @returns {Object} config（失敗時は空オブジェクト）
  */
 function getConfigOrDefault(userId, user) {
   const result = getUserConfig(userId, user);
   if (!result.success) {
-    // 生徒が他人のボードを見るときに findUserById が拒否されると message が来る。
+    // 生徒が他人のボードを見るときに findUserById_ が拒否されると message が来る。
     // Why WARN not ERROR: 呼び出し元が empty config でも壊れない設計なので fatal ではない。
     //                     ただし silent だとバグに気付けないので痕跡は残す。
     console.warn('getConfigOrDefault: returning empty config', {
@@ -645,7 +661,7 @@ const DEFAULT_DISPLAY_SETTINGS = { showNames: false, showReactions: false, theme
  * @param {string} email - メールアドレス
  * @returns {string|null} 8文字hex、入力空ならnull
  */
-function emailToShortHash(email) {
+function emailToShortHash_(email) {
   if (!email || typeof email !== 'string') return null;
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) return null;
