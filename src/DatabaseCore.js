@@ -883,7 +883,7 @@ function reverifyServiceAccountInPool(slotKey) {
 }
 
 /**
- * Secondary slot の SA を削除。 primary は削除不可 (差替は setupApp 経由)。
+ * Secondary slot の SA を削除。 primary は削除不可 (差替は Script Property SERVICE_ACCOUNT_CREDS を直接書き換える)。
  * GCP 側の key revoke は別途 (誤削除からの復旧の余地を残す)。
  */
 function removeServiceAccountFromPool(slotKey) {
@@ -1379,7 +1379,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
     //   テナント中で取り違えていた (別の授業の見出し・行数が児童のボードに出る)。
     getParent: () => ({ getId: () => sheetId }),
     // 行削除 (batchUpdate deleteDimension)。SpreadsheetApp の Sheet#deleteRows(rowPosition, howMany) 互換。
-    //   Why: deleteUser / 授業の削除は DB シートの行を消す。DB は常に SA 経由で開くので、
+    //   Why: 授業の削除は DB シートの行を消す。DB は常に SA 経由で開くので、
     //   proxy にこれが無いと TypeError (deleteRows is not a function) になり、教師 (DB の
     //   編集権を持たない) は授業を削除できなかった。sheetId は寸法と同じ metadata 読みで得る。
     deleteRows: (rowPosition, howMany) => {
@@ -1921,7 +1921,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
 function createUser(email, initialConfig = {}, context = {}) {
   // email 単位の lock。別の児童の初回ログインは互いに待たない (30 人の初回ログインが
   //   1 本ずつ直列になり、10 秒で諦めた児童が「ユーザー登録に失敗」になっていた)。
-  //   同じ email の二重作成 (二重タブ) だけを 1 本に絞る。構造変更 (deleteUser) 中は待つ。
+  //   同じ email の二重作成 (二重タブ) だけを 1 本に絞る。構造変更 (行の削除) の lock が立っていれば待つ。
   let lockKey = null;
   let lockToken = null;
 
@@ -2479,90 +2479,3 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
   }
 }
 
-/**
- * ユーザーを削除（CLAUDE.md準拠 - Admin専用）
- * @param {string} userId - ユーザーID
- * @param {string} reason - 削除理由
- * @param {Object} context - アクセスコンテキスト
- * @returns {Object} Delete operation result
- */
-function deleteUser(userId, reason = '', context = {}) {
-  // 行削除は行番号をずらすので「構造変更 lock」を取る。createUser / updateUser はこの lock が
-  //   立っている間は書かない (blockedBy)。読んだ行番号に別ユーザーの行を書く事故を防ぐ。
-  let lockToken = null;
-
-  try {
-    const currentEmail = getCurrentEmail();
-    const isAdmin = isAdministrator(currentEmail);
-
-    if (!isAdmin && !context.forceServiceAccount) {
-      console.warn('deleteUser: Non-admin user attempting user deletion:', userId);
-      return createErrorResponse('Insufficient permissions for user deletion');
-    }
-
-    lockToken = acquireCacheLock_(USERS_LOCK_KEYS_.STRUCT, { ttlSec: 60, waitMs: 10000 });
-    if (!lockToken) {
-      console.warn('deleteUser: Lock timeout - concurrent user modification detected');
-      return createErrorResponse('Concurrent modification in progress. Please retry.');
-    }
-    // 進行中の行更新 (lock 取得前に始まったもの) が終わるのを少し待つ。
-    //   更新側は数百 ms〜数秒なので 1.5 秒で十分。
-    if (typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function') Utilities.sleep(1500);
-
-    const spreadsheet = openDatabase();
-    if (!spreadsheet) {
-      console.warn('deleteUser: Database access failed');
-      return createErrorResponse('Database access failed');
-    }
-
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      console.warn('deleteUser: Users sheet not found');
-      return createErrorResponse('Users sheet not found');
-    }
-
-    const data = sheet.getDataRange().getValues();
-    if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
-      console.warn('deleteUser: users sheet read returned no rows (quota?)', { userId });
-      return createErrorResponse('users シートを読み取れませんでした (Sheets API quota の可能性)。少し待って再試行してください');
-    }
-    const [headers] = data;
-    const userIdColumnIndex = headers.indexOf('userId');
-
-    if (userIdColumnIndex === -1) {
-      console.warn('deleteUser: UserId column not found');
-      return createErrorResponse('UserId column not found');
-    }
-
-    const rowsToDelete = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][userIdColumnIndex] === userId) {
-        rowsToDelete.push(i + 1); // シート行番号（1-indexed）
-      }
-    }
-
-    if (rowsToDelete.length === 0) {
-      console.warn('deleteUser: User not found:', userId);
-      return createErrorResponse('User not found');
-    }
-
-    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
-      sheet.deleteRows(rowsToDelete[i], 1);
-    }
-
-    clearDatabaseUserCache();
-
-    return {
-      success: true,
-      userId,
-      deleted: true,
-      deletedRows: rowsToDelete.length,
-      reason: reason || 'No reason provided'
-    };
-  } catch (error) {
-    logError_('deleteUser', error);
-    return createErrorResponse(error.message);
-  } finally {
-    releaseCacheLock_(USERS_LOCK_KEYS_.STRUCT, lockToken);
-  }
-}

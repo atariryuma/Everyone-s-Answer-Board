@@ -112,7 +112,7 @@ function __lessonsSheetExists_(spreadsheet) {
 
 // 回答アーカイブシートの handle。__getLessonsSheet_ と同じ lazy bootstrap 方式。
 //   createIfMissing の SpreadsheetApp 経路は呼び出し元に DB の編集権があるときだけ通る
-//   (setup 済みテナントでは setupApp が ensure 済みなので、実運用でここが走ることは稀)。
+//   (先生専用の配置では ensureSingleTenantBootstrap_ が ensure 済みなので、実運用でここが走ることは稀)。
 function __getResponsesSheet_(opts) {
   const spreadsheet = openDatabase();
   if (!spreadsheet) return null;
@@ -2167,7 +2167,7 @@ function __maybeAutoArchiveLesson_(targetUser, currentConfig) {
  *   (2026-09 は 4 クラス 3 週間)。「最終回答から 4 時間で終了」「ボードを非公開にしたら終了」の
  *   safety net は Form 経由の 1 コマ授業を想定したもので、授業モードに当たると翌朝には授業が
  *   勝手に終わっていて、児童の ● → ★ の続きが取れなくなる。
- *   本番ではこれまで trigger が未設置だったため踏んでいないが、setupApp を再実行した瞬間に
+ *   本番ではこれまで trigger が未設置だったため踏んでいないが、trigger を設置した瞬間に
  *   設置されるので、判定として明示する。
  *   lesson 行が読めない (429 等) ときも対象外に倒す: 読めないときに終了させる理由はない。
  */
@@ -2261,7 +2261,7 @@ function dailyLessonArchiveSweep() {
 
 /**
  * lesson 関連の time-based trigger を冪等にインストール。
- *   setupApp から呼ばれる。既に同名トリガーが居れば何もしない。
+ *   今は呼び出し元が無い (呼んでいた setupApp は初期設定画面ごと廃止した)。既に同名トリガーが居れば何もしない。
  */
 function installLessonTriggers() {
   try {
