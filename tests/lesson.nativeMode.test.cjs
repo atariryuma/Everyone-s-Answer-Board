@@ -1948,3 +1948,135 @@ test('先生専用: 同じ名前の授業 (複製など) はシートが混ざ�
   assert.ok(names.includes('ロレンゾの友達（2）｜1 考える'), names.join(' / '));
   assert.equal(first.nativeSheetPrefix, 'ロレンゾの友達');
 });
+
+// =====================================================================
+// 引っ越し (Migration.js): 共有の本体の授業を先生専用の配置へ取り込む
+// =====================================================================
+
+const MIGRATION_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/Migration.js'), 'utf8');
+
+// 先生のスプレッドシート (db-id) と、元の授業の回答スプレッドシート (old-native) を用意する。
+function loadMigration({ singleTenant = true } = {}) {
+  const h = loadContext();
+  vm.runInContext(MIGRATION_SOURCE, h.context, { filename: 'Migration.js' });
+  const dbSheets = new Map();
+  const makeSs = (id, sheets) => ({
+    getId: () => id,
+    getSheets: () => Array.from(sheets.values()),
+    getSheetByName: (n) => sheets.get(n) || null,
+    deleteSheet: (s) => { for (const [k, v] of sheets) if (v === s) sheets.delete(k); }
+  });
+  const dbSs = makeSs('db-id', dbSheets);
+  const oldSheets = new Map();
+  const oldSs = makeSs('old-native', oldSheets);
+  const addOldSheet = (name, rows) => {
+    const s = createSheet(['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと'], name);
+    rows.forEach(r => s._data.push(r));
+    // copyTo: 先生のスプレッドシートに「〜のコピー」として足し、setName で名前を変えられる。
+    s.copyTo = (dest) => {
+      let curName = name + ' のコピー';
+      const copy = createSheet([], curName);
+      copy._data.length = 0;
+      s._data.forEach(r => copy._data.push(r.slice()));
+      copy.getName = () => curName;
+      copy.setName = (n) => { dbSheets.delete(curName); curName = n; dbSheets.set(n, copy); return copy; };
+      copy.getParent = () => dest;
+      dbSheets.set(curName, copy);
+      return copy;
+    };
+    oldSheets.set(name, s);
+  };
+  h.context.isSingleTenant_ = () => singleTenant;
+  h.context.getCachedProperty = (k) => ({ DATABASE_SPREADSHEET_ID: 'db-id', ADMIN_EMAIL: 'teacher@example.com' })[k] || null;
+  h.context.SpreadsheetApp.openById = (id) => (id === 'db-id' ? dbSs : id === 'old-native' ? oldSs : null);
+  const responses = () => h.context.openDatabase().getSheetByName('lesson_responses')._data;
+  return { h, dbSheets, addOldSheet, responses };
+}
+
+function exportedNativeLesson() {
+  return {
+    lessonId: 'lesson_old_1', userId: 'old-uid', name: 'てこのはたらき', state: 'completed',
+    createdAt: '2026-10-27T00:00:00.000Z', startedAt: '2026-10-28T00:00:00.000Z', endedAt: '2026-10-28T03:00:00.000Z',
+    lessonJson: {
+      template: 'dialogue-reconsider-5phase', inputMode: 'native', classes: ['6年1組'],
+      nativeSpreadsheetId: 'old-native',
+      phases: [
+        { name: '考える', screenRole: 'input', spreadsheetId: 'old-native', sheetName: 'phase1' },
+        { name: '出会う', screenRole: 'browse', spreadsheetId: 'old-native', sheetName: 'phase2' },
+        { name: 'もう一度考える', screenRole: 'reinput' }   // まだ始めていない
+      ],
+      profileTransitions: [{ ts: 't', from: null, to: 0 }, { ts: 't', from: 0, to: 1 }],
+      snapshots: [{
+        phaseIndex: 0, phaseName: '考える', rowCount: 2, sheet: 'lesson_responses', startRow: 40,
+        rows: [
+          { rowIndex: 2, timestamp: '2026-10-28T00:10:00Z', class: '6年1組', answer: 2, reason: 'r1', numericX: 2, numericY: 4 },
+          { rowIndex: 3, timestamp: '2026-10-28T00:11:00Z', class: '6年1組', answer: 5, reason: 'r2', numericX: 5, numericY: 1 }
+        ]
+      }]
+    }
+  };
+}
+
+test('引っ越し: 授業モードの授業を、先生のスプレッドシートとアーカイブごと取り込む', () => {
+  const { h, dbSheets, addOldSheet, responses } = loadMigration();
+  addOldSheet('phase1', [['t', 'a@x', '6年1組', '', 2, 4, 'r1', '']]);
+  addOldSheet('phase2', []);
+  const before = responses().length;
+  const res = h.context.migrateImportLesson(exportedNativeLesson());
+  assert.equal(res.success, true, res.message);
+  assert.equal(res.data.sheets, 2);
+  assert.equal(res.data.archiveRows, 2);
+  // 回答シートは「授業名｜番号 フェーズ名」で先生のスプレッドシートへ (中身ごと)
+  assert.deepEqual(Array.from(dbSheets.keys()), ['てこのはたらき｜1 考える', 'てこのはたらき｜2 出会う']);
+  assert.equal(dbSheets.get('てこのはたらき｜1 考える')._data[1][6], 'r1');
+  // 授業の行: 持ち主はこの配置の先生、参照先は新しいシート、元の場所は meta に残る
+  const row = h.lessonsSheet._data[h.lessonsSheet._data.length - 1];
+  assert.equal(row[0], 'lesson_old_1');
+  assert.equal(row[1], 'u1');
+  const lj = JSON.parse(row[10]);
+  assert.equal(lj.nativeSpreadsheetId, 'db-id');
+  assert.equal(lj.phases[0].sheetName, 'てこのはたらき｜1 考える');
+  assert.equal(lj.phases[2].sheetName, undefined, '始めていないフェーズはそのまま');
+  assert.equal(lj.meta.migratedFrom.nativeSpreadsheetId, 'old-native');
+  // アーカイブは lesson_responses に書き直し、snapshot にはポインタだけ
+  assert.equal(responses().length, before + 2);
+  assert.equal(lj.snapshots[0].rows.length, 0);
+  assert.equal(lj.snapshots[0].rowCount, 2);
+  assert.equal(lj.snapshots[0].startRow, before + 1);
+});
+
+test('引っ越し: 同じ授業をもう一度流しても二重にならない', () => {
+  const { h, dbSheets, addOldSheet, responses } = loadMigration();
+  addOldSheet('phase1', []);
+  addOldSheet('phase2', []);
+  h.context.migrateImportLesson(exportedNativeLesson());
+  const rowsBefore = h.lessonsSheet._data.length;
+  const respBefore = responses().length;
+  const res = h.context.migrateImportLesson(exportedNativeLesson());
+  assert.equal(res.success, true);
+  assert.equal(res.data.skipped, true);
+  assert.equal(h.lessonsSheet._data.length, rowsBefore);
+  assert.equal(responses().length, respBefore);
+  assert.equal(dbSheets.size, 2);
+});
+
+test('引っ越し: 先生専用の配置でなければ断る', () => {
+  const { h } = loadMigration({ singleTenant: false });
+  const res = h.context.migrateImportLesson(exportedNativeLesson());
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'NOT_SINGLE_TENANT');
+});
+
+test('引っ越し: 読み戻せていないアーカイブがあれば止め、その回に写したシートは消す', () => {
+  const { h, dbSheets, addOldSheet } = loadMigration();
+  addOldSheet('phase1', []);
+  addOldSheet('phase2', []);
+  const lesson = exportedNativeLesson();
+  lesson.lessonJson.snapshots[0].rows = [];   // 元で読み戻せなかった (rowCount は 2 のまま)
+  const rowsBefore = h.lessonsSheet._data.length;
+  const res = h.context.migrateImportLesson(lesson);
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'MIGRATION_FAILED');
+  assert.equal(dbSheets.size, 0, '写したシートが残っている');
+  assert.equal(h.lessonsSheet._data.length, rowsBefore, '授業の行を書いてはいけない');
+});

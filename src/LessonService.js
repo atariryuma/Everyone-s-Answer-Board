@@ -1329,6 +1329,23 @@ function __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName) {
   const ssId = getCachedProperty('DATABASE_SPREADSHEET_ID');
   if (!ssId) return null;
   const ss = SpreadsheetApp.openById(ssId);
+  lessonJson.nativeSpreadsheetId = ssId;
+  const sheetName = __singleNativeSheetName_(ss, lessonJson, phaseIdx, lessonName);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    // appendRow は表の範囲を推定して列がずれることがあるので、1 行目に直接書く。
+    sheet.getRange(1, 1, 1, LESSON_NATIVE_SHEET_HEADERS.length).setValues([LESSON_NATIVE_SHEET_HEADERS]);
+  }
+  return { spreadsheetId: ssId, sheetName };
+}
+
+/**
+ * 先生専用の配置で、授業のフェーズのシート名「授業名｜番号 フェーズ名」を決める。
+ * 授業名の部分 (nativeSheetPrefix) は授業に 1 回だけ決めて lessonJson に残す。
+ * 本体からの引っ越し (Migration.js) も同じ名前の付け方を使う。
+ */
+function __singleNativeSheetName_(ss, lessonJson, phaseIdx, lessonName) {
   // シート名に使えない文字 ([ ] * ? / \ :) を外し、長さも抑える (シート名の上限は 100 文字)。
   const clean = (s) => String(s || '').replace(/[[\]*?/\\:]/g, ' ').replace(/\s+/g, ' ').trim();
   let prefix = lessonJson.nativeSheetPrefix || '';
@@ -1341,17 +1358,9 @@ function __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName) {
     }
     lessonJson.nativeSheetPrefix = prefix;
   }
-  lessonJson.nativeSpreadsheetId = ssId;
   const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
   const phaseName = clean((phases[phaseIdx] && phases[phaseIdx].name) || ('フェーズ' + (phaseIdx + 1)));
-  const sheetName = (prefix + '｜' + (phaseIdx + 1) + ' ' + phaseName).slice(0, 100);
-  let sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-    // appendRow は表の範囲を推定して列がずれることがあるので、1 行目に直接書く。
-    sheet.getRange(1, 1, 1, LESSON_NATIVE_SHEET_HEADERS.length).setValues([LESSON_NATIVE_SHEET_HEADERS]);
-  }
-  return { spreadsheetId: ssId, sheetName };
+  return (prefix + '｜' + (phaseIdx + 1) + ' ' + phaseName).slice(0, 100);
 }
 
 /**

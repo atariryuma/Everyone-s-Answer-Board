@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson, migrateImportConfig */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -1439,6 +1439,15 @@ function dispatchAdminOperation(operation, params) {
       { const e = reqStr('lessonId'); if (e) return e; }
       if (!Number.isInteger(params.phaseIndex)) return createErrorResponse('phaseIndex (整数) が必要です');
       return recaptureLessonArchive(params.userId, params.lessonId, params.phaseIndex);
+    }
+    // 共有の本体から先生専用の配置への引っ越し (Migration.js / scripts/migrate-to-single.js)
+    case 'migrate.importLesson': {
+      { const e = reqObj('lesson'); if (e) return e; }
+      return migrateImportLesson(params.lesson);
+    }
+    case 'migrate.importConfig': {
+      { const e = reqObj('config'); if (e) return e; }
+      return migrateImportConfig(params.config);
     }
     default:
       return createErrorResponse(`Unknown operation: ${op}`, null, { error: 'UNKNOWN_OPERATION' });
