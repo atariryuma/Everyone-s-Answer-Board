@@ -3,7 +3,7 @@
  *   認証ショートカット、emailToShortHash（仮名化）。
  */
 
-/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_TENANCY, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
+/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
@@ -35,29 +35,13 @@ function getCachedProperty(key) {
 }
 
 /**
- * 先生 1 人専用の配置か (Script Property `TENANCY` = 'single')。
+ * 配置の初回に、必要なプロパティと DB のシートをそろえる (2 回目以降は何もしない)。doGet の入口で呼ぶ。
  *
- * Why: 2026-10-29 10:20 ごろから、児童アカウントは「開いた人として実行」の Apps Script を
- *   中身に関係なく開けなくなった (管理側の設定)。先生ごとに 1 つ「先生として実行」で配置すれば、
- *   児童は自分の権限を何も使わない。そのとき SA pool は要らない: 実行者 = 先生 = すべての
- *   スプレッドシートの持ち主なので、openById で直接開ける。
- *   「誰が何を見てよいか」の判定 (validateServiceAccountUsage) は変えず、開く経路だけを切り替える。
- * @returns {boolean}
- */
-function isSingleTenant_() {
-  if (typeof DEPLOY_TENANCY !== 'undefined' && DEPLOY_TENANCY === 'single') return true;
-  return String(getCachedProperty('TENANCY') || '').trim().toLowerCase() === 'single';
-}
-
-/**
- * 先生専用の配置で、初回に必要なプロパティと DB のシートをそろえる (2 回目以降は何もしない)。
- * doGet / doPost の入口で呼ぶ。本体 (DEPLOY_TENANCY が空) では即 return。
- *
- * 管理者と DB は Tenancy.js に焼き込まれた値だけを使う (開いた人からは決めない)。
+ * 管理者と DB は Deployment.js に焼き込まれた値だけを使う (開いた人からは決めない)。
  * プロパティが既にあれば上書きしない (先生が後から変えた値を守る)。
  */
-function ensureSingleTenantBootstrap_() {
-  if (typeof DEPLOY_TENANCY === 'undefined' || DEPLOY_TENANCY !== 'single') return;
+function ensureDeploymentBootstrap_() {
+  if (typeof DEPLOY_ADMIN_EMAIL === 'undefined' || !DEPLOY_ADMIN_EMAIL || !DEPLOY_DATABASE_SPREADSHEET_ID) return;
   if (getCachedProperty('ADMIN_EMAIL') && getCachedProperty('DATABASE_SPREADSHEET_ID')) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return;   // 同時に開いた別の人がそろえている。次の呼び出しで済んでいる
@@ -73,7 +57,6 @@ function ensureSingleTenantBootstrap_() {
       __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
       setCachedProperty('DATABASE_SPREADSHEET_ID', DEPLOY_DATABASE_SPREADSHEET_ID);
     }
-    if (!props.getProperty('TENANCY')) setCachedProperty('TENANCY', 'single');
   } finally {
     lock.releaseLock();
   }
@@ -260,7 +243,6 @@ function fullJitterBackoffMs_(attempt, baseMs, capMs, random) {
  * @param {number} [opts.waitTries=3] - 待つ回数
  * @param {*} [opts.busyValue] - 指定すると「自分で読む」代わりにこの値を返す (flight 中 / 直前の失敗中)
  * @param {number} [opts.failTtl=0] - loader の結果が cache 不可だったことを覚える秒数 (0 = 覚えない)
- * @param {Function} [opts.isSharedFailure] - 失敗を「全員の失敗」として覚えてよいか (default: 常に true)。
  *   呼び出した人だけの理由 (許可不足など) の失敗を覚えると、他の全員まで failTtl 秒 busy になる
  * @param {Function} [opts.pack] - cache に書く直前に loader の結果を変換する (圧縮表現など)。
  *   戻り値は JSON 化できる値。unpack と対で渡す
@@ -281,7 +263,6 @@ function withStampedeGuard_(opts) {
   const latestKey = opts.latestKey || null;
   const latestTtl = Number(opts.latestTtl) || 60;
   const isCacheable = typeof opts.isCacheable === 'function' ? opts.isCacheable : (v) => Boolean(v);
-  const isSharedFailure = typeof opts.isSharedFailure === 'function' ? opts.isSharedFailure : () => true;
   const pack = typeof opts.pack === 'function' ? opts.pack : (v) => v;
   const unpack = typeof opts.unpack === 'function' ? opts.unpack : (v) => v;
   const read = (k) => {
@@ -353,12 +334,12 @@ function withStampedeGuard_(opts) {
       const packed = pack(fresh);
       saveToCacheWithSizeCheck(key, packed, opts.ttl);
       if (latestKey) saveToCacheWithSizeCheck(latestKey, packed, latestTtl);
-    } else if (failKey && isSharedFailure(fresh)) {
+    } else if (failKey) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }
   } finally {
     // loader が throw したときもフラグは外す (外さないと flightTtl 秒間、全員が待つ)。
-    if (claimed && !loaded && failKey && isSharedFailure(undefined)) {
+    if (claimed && !loaded && failKey) {
       try { cache.put(failKey, '1', failTtl); } catch (_) { /* 覚えられなければ次の read が読み直すだけ */ }
     }
     if (claimed) {
@@ -371,7 +352,7 @@ function withStampedeGuard_(opts) {
 /**
  * key 単位の短期 lock (ScriptCache が保持者、ScriptLock は check+put をアトミックにする数 ms だけ)。
  *
- * Why: createUser / updateUser は以前 ScriptLock を「users シートの read → write」の間 (SA 経由で
+ * Why: createUser / updateUser は以前 ScriptLock を「users シートの read → write」の間 (当時は
  *   1〜3 秒、429 なら 15 秒超) ずっと握っていた。ScriptLock はスクリプト全体で 1 本なので、
  *   その間に来たリアクション (acquireRowLock_ の tryLock 800ms) や授業の操作は全て
  *   「同時処理中」で失敗していた。教師が設定を保存するたびに児童 30 人の 👍 が落ちる。

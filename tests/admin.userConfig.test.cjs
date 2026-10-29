@@ -333,49 +333,6 @@ test('setUserConfig: preserves boardMode through sanitization pipeline', () => {
 // bulkSetUserConfig
 // =====================================================================
 
-test('bulkSetUserConfig: dryRun returns matched count without writes', () => {
-  const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
-    patch: { allowResubmit: true },
-    dryRun: true
-  });
-  assert.equal(res.success, true);
-  assert.equal(res.data.matchedCount, 3);
-  // 書き込みは発生しない
-  assert.equal(ctx.__savedConfigs.size, 0);
-});
-
-test('bulkSetUserConfig: filter isPublished=false matches subset', () => {
-  const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
-    patch: { allowResubmit: true },
-    filter: { isPublished: false },
-    dryRun: true
-  });
-  // u2 (isPublished:false) と u3 (configJson:null → isPublished:undefined → false 扱い) がマッチ
-  assert.equal(res.data.matchedCount, 2);
-});
-
-test('bulkSetUserConfig: applies patch to matched users', () => {
-  const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
-    patch: { allowResubmit: true },
-    filter: { emailContains: 'a@' }
-  });
-  assert.equal(res.success, true);
-  assert.equal(res.data.appliedTo, 1);
-  assert.equal(ctx.__savedConfigs.size, 1);
-});
-
-test('bulkSetUserConfig: rejects non-object patch', () => {
-  const ctx = loadAdminContext();
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', { patch: null });
-  assert.equal(res.success, false);
-});
-
 // =====================================================================
 // runColumnAnalysis
 // =====================================================================
@@ -603,51 +560,11 @@ test('customizeForm: accepts formUrl alternative', () => {
 // bulkSetUserConfig: offset/limit paging + 時間切れ (6 分制限の内側で返す)
 // =====================================================================
 
-test('bulkSetUserConfig: offset/limit で区切り、続きがあれば nextOffset を返す', () => {
+test('applyConfigPatch_: replaceKeys の columnMapping は丸ごと差し替え、前のシートの列を残さない', () => {
   const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  const first = ctx.dispatchAdminOperation('bulkSetUserConfig', {
-    patch: { allowResubmit: true }, offset: 0, limit: 2
-  });
-  assert.equal(first.success, true);
-  assert.equal(first.data.processed, 2);
-  assert.equal(first.data.nextOffset, 2);
-  assert.equal(first.data.complete, false);
-  assert.equal(first.data.matchedCount, 3);
-  assert.match(first.message, /--offset 2/);
-
-  const second = ctx.dispatchAdminOperation('bulkSetUserConfig', {
-    patch: { allowResubmit: true }, offset: first.data.nextOffset, limit: 2
-  });
-  assert.equal(second.data.processed, 1);
-  assert.equal(second.data.nextOffset, null);
-  assert.equal(second.data.complete, true);
-});
-
-test('bulkSetUserConfig: offset/limit 無しは全件 (従来どおり) で complete=true', () => {
-  const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', { patch: { allowResubmit: true } });
-  assert.equal(res.data.processed, 3);
-  assert.equal(res.data.nextOffset, null);
-  assert.equal(res.data.complete, true);
-});
-
-test('bulkSetUserConfig: 時間予算を使い切ったら途中で返し、止まった位置を nextOffset に出す', () => {
-  const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
-  // 1 件目の処理で時計を予算の先へ進める
-  const realNow = Date.now;
-  let calls = 0;
-  const origApply = ctx.applyConfigPatch_;
-  ctx.applyConfigPatch_ = (...args) => {
-    calls++;
-    ctx.Date = { now: () => realNow() + 10 * 60 * 1000 };
-    return origApply(...args);
-  };
-  const res = ctx.dispatchAdminOperation('bulkSetUserConfig', { patch: { allowResubmit: true } });
-  assert.equal(calls, 1, '2 件目に入る前に予算超過を見て止まる');
-  assert.equal(res.data.processed, 1);
-  assert.equal(res.data.nextOffset, 1);
-  assert.equal(res.data.complete, false);
+  // 既存 (u1) の割り当ては answer:3 / reason:4 を持つ。別の回答シートへ切り替える patch には reason が無い。
+  const r = ctx.applyConfigPatch_('u1', { columnMapping: { answer: 4, numericX: 4 } }, { publish: false, replaceKeys: ['columnMapping'] });
+  assert.equal(r.success, true, r.message);
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.columnMapping)), { answer: 4, numericX: 4 });
 });

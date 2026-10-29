@@ -743,7 +743,6 @@ function executeBoardRowOperation(options) {
 
     // Spreadsheetのオープンとシート取得は読取操作で競合しない。
     // ロック保持時間を最小化するためクリティカルセクション外で実行する。
-    // accessMode 自動判定: owner = openById、viewer/admin = SA pool 経由。
     const dataAccess = openSpreadsheet(config.spreadsheetId, {
       context: openContext
     });

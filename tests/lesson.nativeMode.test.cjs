@@ -74,7 +74,6 @@ function loadContext(overrides = {}) {
   const responsesSheet = createSheet(RESPONSES_HEADERS, 'lesson_responses');
   // native 回答スプレッドシート (授業に 1 つ、フェーズごとに 1 シート)。
   const nativeSheets = new Map();
-  const sharingCalls = [];
   const editorsAdded = [];
   const cacheBumps = [];
   // ボードの data version (DataApis の bump/get と同じ働き)。回答シートの行 cache の key に入る。
@@ -109,22 +108,19 @@ function loadContext(overrides = {}) {
         : ({ getSheetByName: (name) => name === 'lessons' ? lessonsSheet : null }),
       create: () => nativeSs
     },
-    // 児童は SS 直接権限を持たないので、本番では SA pool 経由で開かれる。
-    // 本物の openSpreadsheet は { spreadsheet, auth, accessMode, getSheet(name) } を返す。
+    // 本物の openSpreadsheet は { spreadsheet, getSheet(name) } を返す。
     //   偽物が中身を直接返していたため、getSheetByName 誤用が本番まで素通りした。
     openSpreadsheet: overrides.openSpreadsheet || (() => ({
       spreadsheet: nativeSs,
-      auth: { isValid: true },
-      accessMode: 'sa',
       getSheet: (name) => nativeSs.getSheetByName(name)
     })),
-    applySpreadsheetSharingDefaults: (id) => { sharingCalls.push(id); return { saAdded: true }; },
     bumpBoardDataVersion_: (uid) => { cacheBumps.push(uid); boardVersions.set(uid, (boardVersions.get(uid) || 0) + 1); },
     getBoardDataVersion_: (uid) => String(boardVersions.get(uid) || 0),
     LESSONS_SHEET_HEADERS: LESSONS_HEADERS,
     LESSON_RESPONSES_SHEET_HEADERS: RESPONSES_HEADERS,
     deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
-    getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
+    // 先生のスプレッドシート (DB) に授業の回答シートも入る。テストでは回答シートの入れ物と同じものにする。
+    getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'native_ss_1' : null,
     getCurrentEmail: () => currentEmail,
     isAdministrator: (email) => email === 'admin@example.com',
     findUserByEmail: (email) => (email === 'teacher@example.com')
@@ -153,9 +149,13 @@ function loadContext(overrides = {}) {
   vm.createContext(context);
   vm.runInContext(LESSON_SOURCE, context, { filename: 'LessonService.js' });
   vm.runInContext(REACTION_SOURCE, context, { filename: 'ReactionService.js' });
+  // 回答シートの名前は「授業名｜番号 フェーズ名」(__nativeSheetName_)。多くのテストはフェーズの
+  //   見分けだけを見るので phaseN に置き換える。名前の付け方そのものは useRealSheetNames で確かめる。
+  context.__realNativeSheetName_ = context.__nativeSheetName_;
+  context.__nativeSheetName_ = (ss, lessonJson, phaseIdx) => `phase${phaseIdx + 1}`;
 
   return {
-    context, lessonsSheet, nativeSheets, sharingCalls, cacheBumps, editorsAdded, boardConfig,
+    context, lessonsSheet, nativeSheets, cacheBumps, editorsAdded, boardConfig,
     setEmail: (e) => { currentEmail = e; }
   };
 }
@@ -212,18 +212,10 @@ test('startLesson: native は Form を作らず、フェーズごとに回答シ
   assert.ok(lessonId);
 });
 
-test('startLesson: native 回答シートに SA pool 共有を当てる (児童の投稿経路が開く)', () => {
+test('startLesson: 先生のスプレッドシートに足すので、共有も editor 追加もしない', () => {
   const h = loadContext();
   startNativeLesson(h);
-  assert.deepEqual(h.sharingCalls, ['native_ss_1']);
-});
-
-test('startLesson: 回答シートにボード所有者を editor として加える', () => {
-  const h = loadContext();
-  startNativeLesson(h);
-  // owner は自分のボードを openById で開く経路を通るので、編集権が無いと
-  //   管理者が代理で開始したときに教師自身のボードが開けなくなる。
-  assert.deepEqual(Array.from(h.editorsAdded), ['teacher@example.com']);
+  assert.deepEqual(Array.from(h.editorsAdded), []);
 });
 
 test('startLesson: native シートは Form 回答シートと同じ列構成で作られる', () => {
@@ -1072,28 +1064,16 @@ test('getLessonReviewGrid: 授業後に通常の検証で開けなくても、�
   assert.equal(res.data.students.length, 3);
 });
 
-test('getLessonReviewGrid: 授業後でも管理者は SA pool 経由で読める', () => {
+test('getLessonReviewGrid: 授業後でも管理者 (先生として実行) はシートを直接開いて読める', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   seedThreeStudents(h, lessonId);
-  h.context.openSpreadsheet = () => null;
-  const realOpenById = h.context.SpreadsheetApp.openById;
-  const opened = [];
-  h.context.openSpreadsheetViaServiceAccount = (id) => {
-    opened.push(id);
-    return realOpenById(id);
-  };
-  // 管理者の openById は使わない (他人の Drive に直接権限を持たない前提)。
-  h.context.SpreadsheetApp.openById = (id) => {
-    if (id === 'native_ss_1') throw new Error('admin must not openById the teacher sheet');
-    return realOpenById(id);
-  };
+  h.context.openSpreadsheet = () => null;   // どのボードの設定もこのシートを指していない
   h.setEmail('admin@example.com');
 
   const res = h.context.getLessonReviewGrid('u1', lessonId);
   assert.equal(res.success, true, res.message);
   assert.equal(res.data.students.length, 3);
-  assert.ok(opened.includes('native_ss_1'));
 });
 
 test('授業中の回答一覧は授業後の経路を使わない (開けなければ空のまま)', () => {
@@ -1850,21 +1830,7 @@ test('教師の回答一覧: 「未提出」も対象クラスだけで数える
   assert.deepEqual(pending, ['today1@example.com']);
 });
 
-test('submitLessonAnswer: シートが読めなかった理由が許可不足なら、混み合いではなく直し方を返す', () => {
-  const h = loadContext();
-  const lessonId = startNativeLesson(h);
-  h.context.getConfigOrDefault = withActiveLesson(lessonId);
-  h.context.authorizationScopeFailureSeen_ = () => true;
-  h.context.AUTH_SCOPE_GUIDANCE = '許可がそろっていません。すべての項目にチェックしてください';
-  // 行の読み取りを失敗させる (許可不足で UrlFetch が落ちると SA proxy は [] を返す)
-  h.nativeSheets.forEach((sh) => { sh.getDataRange = () => ({ getValues: () => [] }); });
-  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'a' });
-  assert.equal(res.success, false);
-  assert.equal(res.error, 'AUTH_REQUIRED');
-  assert.match(res.message, /すべての項目にチェック/);
-});
-
-test('submitLessonAnswer: 許可不足でない読み取り失敗は、従来どおり「混み合っています」', () => {
+test('submitLessonAnswer: シートが読めなかったときは「混み合っています」', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   h.context.getConfigOrDefault = withActiveLesson(lessonId);
@@ -1905,40 +1871,36 @@ test('getLessonLiveAnswers: ボードにつながっていれば従来どおり�
 });
 
 // =====================================================================
-// 先生専用の配置 (isSingleTenant_): 授業ごとにスプレッドシートを作らず、
+// 回答シートの名前: 授業ごとにスプレッドシートを作らず、
 //   先生のスプレッドシート (DATABASE_SPREADSHEET_ID) に「授業名｜番号 フェーズ名」のシートを足す
 // =====================================================================
 
-function useSingleTenant(h) {
-  const orig = h.context.SpreadsheetApp.openById;
-  h.context.isSingleTenant_ = () => true;
-  // 先生のスプレッドシート (db-id) を、テスト用の回答シート群と同じ入れ物として見せる。
-  h.context.SpreadsheetApp.openById = (id) => (id === 'db-id' ? orig('native_ss_1') : orig(id));
-  h.context.SpreadsheetApp.create = () => { throw new Error('先生専用では SpreadsheetApp.create を呼ばない'); };
+function useRealSheetNames(h) {
+  h.context.__nativeSheetName_ = h.context.__realNativeSheetName_;
+  h.context.SpreadsheetApp.create = () => { throw new Error('授業ごとに SpreadsheetApp.create を呼ばない'); };
 }
 
-test('先生専用: native の回答シートは先生のスプレッドシートに授業名つきで作られる', () => {
+test('回答シート: native の回答シートは先生のスプレッドシートに授業名つきで作られる', () => {
   const h = loadContext();
-  useSingleTenant(h);
+  useRealSheetNames(h);
   startNativeLesson(h);
   assert.deepEqual(Array.from(h.nativeSheets.keys()), [
     'ロレンゾの友達｜1 考える', 'ロレンゾの友達｜2 出会う', 'ロレンゾの友達｜3 議論する',
     'ロレンゾの友達｜4 もう一度考える', 'ロレンゾの友達｜5 ふりかえる'
   ]);
   const lessonJson = JSON.parse(h.lessonsSheet._data[1][10]);
-  assert.equal(lessonJson.nativeSpreadsheetId, 'db-id');
-  assert.equal(Array.from(lessonJson.phases).every(p => p.spreadsheetId === 'db-id'), true);
+  assert.equal(lessonJson.nativeSpreadsheetId, 'native_ss_1');
+  assert.equal(Array.from(lessonJson.phases).every(p => p.spreadsheetId === 'native_ss_1'), true);
   // 列は本体の native シートと同じ (ボード・見取りが無分岐で読める)。
   assert.deepEqual(Array.from(h.nativeSheets.get('ロレンゾの友達｜1 考える')._data[0]),
     ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '横軸', '縦軸', '理由', '加わったこと']);
-  // 実行者 = 先生 = 持ち主なので、共有設定も addEditor も要らない。
-  assert.deepEqual(h.sharingCalls, []);
+  // 実行者 = 先生 = 持ち主なので、addEditor も要らない。
   assert.deepEqual(Array.from(h.editorsAdded), []);
 });
 
-test('先生専用: 同じ名前の授業 (複製など) はシートが混ざらないよう「（2）」を付ける', () => {
+test('回答シート: 同じ名前の授業 (複製など) はシートが混ざらないよう「（2）」を付ける', () => {
   const h = loadContext();
-  useSingleTenant(h);
+  useRealSheetNames(h);
   startNativeLesson(h);
   // 1 つ目を終えてから、同じ名前の授業をもう 1 つ始める。
   const first = JSON.parse(h.lessonsSheet._data[1][10]);
@@ -1956,7 +1918,7 @@ test('先生専用: 同じ名前の授業 (複製など) はシートが混ざ�
 const MIGRATION_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/Migration.js'), 'utf8');
 
 // 先生のスプレッドシート (db-id) と、元の授業の回答スプレッドシート (old-native) を用意する。
-function loadMigration({ singleTenant = true } = {}) {
+function loadMigration() {
   const h = loadContext();
   vm.runInContext(MIGRATION_SOURCE, h.context, { filename: 'Migration.js' });
   const dbSheets = new Map();
@@ -1986,8 +1948,8 @@ function loadMigration({ singleTenant = true } = {}) {
     };
     oldSheets.set(name, s);
   };
-  h.context.isSingleTenant_ = () => singleTenant;
   h.context.getCachedProperty = (k) => ({ DATABASE_SPREADSHEET_ID: 'db-id', ADMIN_EMAIL: 'teacher@example.com' })[k] || null;
+  h.context.__nativeSheetName_ = h.context.__realNativeSheetName_;
   h.context.SpreadsheetApp.openById = (id) => (id === 'db-id' ? dbSs : id === 'old-native' ? oldSs : null);
   const responses = () => h.context.openDatabase().getSheetByName('lesson_responses')._data;
   return { h, dbSheets, addOldSheet, responses };
@@ -2058,13 +2020,6 @@ test('引っ越し: 同じ授業をもう一度流しても二重にならない
   assert.equal(h.lessonsSheet._data.length, rowsBefore);
   assert.equal(responses().length, respBefore);
   assert.equal(dbSheets.size, 2);
-});
-
-test('引っ越し: 先生専用の配置でなければ断る', () => {
-  const { h } = loadMigration({ singleTenant: false });
-  const res = h.context.migrateImportLesson(exportedNativeLesson());
-  assert.equal(res.success, false);
-  assert.equal(res.error, 'NOT_SINGLE_TENANT');
 });
 
 test('引っ越し: 読み戻せていないアーカイブがあれば止め、その回に写したシートは消す', () => {
@@ -2138,4 +2093,16 @@ test('回答の合流: 試しに数えるだけなら書かず、もう一度流
   assert.equal(again.data.sheets[0].imported, 0);
   assert.equal(again.data.sheets[0].alreadyThere, 2);
   assert.equal(dest().length, before + 2);
+});
+
+test('フォームの授業のフェーズ: 作ったフォームの割り当てを渡し、持っていない古いフェーズは割り当てに触れない', () => {
+  const h = loadContext();
+  const lessonJson = { inputMode: 'form', phases: [] };
+  const withMapping = { name: '議論のまえ', formTemplate: 'numberline', spreadsheetId: 'f1', sheetName: 'フォームの回答 1',
+    columnMapping: { email: 1, class: 2, name: 3, answer: 4, numericX: 4, reason: 5 } };
+  const legacy = { name: '議論のあと', formTemplate: 'numberline', spreadsheetId: 'f2', sheetName: 'フォームの回答 1' };
+  lessonJson.phases = [withMapping, legacy];
+  assert.equal(h.context.__buildPhaseConfigPatch_(withMapping, lessonJson, 'l1').columnMapping.numericX, 4);
+  assert.equal('columnMapping' in h.context.__buildPhaseConfigPatch_(legacy, lessonJson, 'l1'), false,
+    '空の組を渡すと保存の検証で落ちる (授業を始められない)');
 });

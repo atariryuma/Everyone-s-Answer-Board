@@ -87,7 +87,10 @@ function makeFakeSpreadsheet(title) {
     _name: title,
     getId: function () { return this._id; },
     getUrl: function () { return 'https://docs.google.com/spreadsheets/d/' + this._id + '/edit'; },
-    getName: function () { return this._name; }
+    getName: function () { return this._name; },
+    _meta: [],
+    addDeveloperMetadata: function (key, value) { this._meta.push({ getKey: () => key, getValue: () => value }); return this; },
+    getDeveloperMetadata: function () { return this._meta.slice(); }
   };
 }
 
@@ -152,6 +155,7 @@ function loadCtx(overrides = {}) {
       create: (title) => {
         const ss = makeFakeSpreadsheet(title);
         driveState.files[ss.getId()] = makeFakeDriveFile(ss.getId(), true);
+        ctx.__lastSpreadsheet = ss;
         return ss;
       },
       openById: () => { throw new Error('not stubbed'); }
@@ -905,4 +909,46 @@ test('createTemplateForm: UrlFetchApp.fetch が throw した場合もフォー�
   const res = ctx.createTemplateForm('board');
   assert.equal(res.success, true);
   assert.equal(collectEmailCalls.length, 1, 'fallback path executed');
+});
+
+// =====================================================================
+// 作ったフォームの列の割り当て: 作った時点で決まる (推定しない)
+// =====================================================================
+
+const TEMPLATE_HEADERS = {
+  matrix: ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'X軸', 'Y軸', '理由'],
+  numberline: ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'いまのあなたの立場は？', '理由'],
+  pie: ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'あなたの選択', '理由'],
+  board: ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '回答', '理由']
+};
+
+test('createTemplateForm: 種類ごとの列の割り当てを返し、回答シートに種類を書き添える', () => {
+  for (const type of Object.keys(TEMPLATE_HEADERS)) {
+    const ctx = loadCtx();
+    const res = ctx.createTemplateForm(type);
+    assert.equal(res.success, true, type);
+    const m = JSON.parse(JSON.stringify(res.columnMapping));
+    const headers = TEMPLATE_HEADERS[type];
+    assert.equal(headers[m.reason], '理由', type + ': 理由の列');
+    assert.equal(headers[m.class], 'クラス', type);
+    assert.equal(headers[m.name], '名前', type);
+    assert.equal(m.answer, 4, type);
+    if (type === 'matrix') { assert.equal(m.numericX, 4); assert.equal(m.numericY, 5); }
+    if (type === 'numberline') { assert.equal(m.numericX, 4); assert.equal(m.numericY, undefined); }
+    const meta = ctx.__lastSpreadsheet.getDeveloperMetadata().map(x => [x.getKey(), x.getValue()]);
+    assert.deepEqual(JSON.parse(JSON.stringify(meta)), [['answerBoardTemplate', type]]);
+  }
+});
+
+test('readTemplateColumnMapping_: 見出しが作ったときの並びなら割り当てを返し、ずれていたら推定に回す', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('matrix');
+  const ss = ctx.__lastSpreadsheet;
+  const got = ctx.readTemplateColumnMapping_(ss, TEMPLATE_HEADERS.matrix.concat(['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']));
+  assert.equal(got.numericY, 5);
+  // 先生が理由の前に質問を足した = 列がずれた
+  const shifted = ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'X軸', 'Y軸', '感想', '理由'];
+  assert.equal(ctx.readTemplateColumnMapping_(ss, shifted), null);
+  // 書き添えの無いシート (先生が自分で作ったフォーム)
+  assert.equal(ctx.readTemplateColumnMapping_(makeFakeSpreadsheet('x'), TEMPLATE_HEADERS.matrix), null);
 });

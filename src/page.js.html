@@ -1296,32 +1296,12 @@
             this.__handleBoardClosed();
             return;
           }
-          // 許可不足は待っても直らない。直し方を 1 度だけ出す (polling は backoff で続ける)。
-          this.__noticeAuthorizationMissing(error);
         }
 
         // 進行中に stop → start されていたら、新しいチェーンに任せる (2 本にしない)。
         if (gen !== this.polling.gen) return;
         this.schedulePollingCheck();
       }, interval);
-    }
-
-    /**
-     * サーバが「許可がそろっていない」(AUTH_REQUIRED) と返したときに、直し方を 1 度だけ出す。
-     *   Why: 許可の項目を外した児童は、読み込みも送信も黙って失敗していた (2026-10-21/22)。
-     *   開く前に判定する方式は誤判定で全員を止めたので、実際に失敗したときだけ知らせる。
-     */
-    __noticeAuthorizationMissing(errorOrResponse) {
-      const msg = String((errorOrResponse && (errorOrResponse.message || errorOrResponse.error)) || '');
-      if (!/許可がそろっていません|AUTH_REQUIRED/.test(msg)) return false;
-      if (this.state.__authNoticeShown) return true;
-      this.state.__authNoticeShown = true;
-      try {
-        if (window.notifications && typeof window.notifications.banner === 'function') {
-          window.notifications.banner('このアプリの許可がそろっていません。ブラウザを閉じてから開き直し、許可の画面ですべての項目にチェックしてください', { duration: 0 });
-        }
-      } catch (_) { /* 知らせられなくても、送信時のメッセージで同じ直し方が出る */ }
-      return true;
     }
 
     __isTerminalPollError(error) {
@@ -3587,7 +3567,6 @@
           return;
         }
         if (!result || !result.success) {
-          if (this.__noticeAuthorizationMissing(result)) return;
           this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
           return;
         }

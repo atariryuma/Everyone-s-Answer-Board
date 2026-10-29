@@ -2,7 +2,6 @@
  * 共通: OAuth トークン取得 + HTTP リクエスト
  */
 const { execSync, execFileSync } = require('child_process');
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -75,44 +74,6 @@ function getAccessToken(tokenName) {
 /**
  * HTTPS POST with JSON body, returns parsed JSON
  */
-function postJSON(url, body, token) {
-  return new Promise((resolve, reject) => {
-    const data = typeof body === 'string' ? body : JSON.stringify(body);
-    const parsed = new URL(url);
-    const options = {
-      hostname: parsed.hostname,
-      path: parsed.pathname + parsed.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => { body += chunk; });
-      res.on('end', () => {
-        // Follow redirects for GAS (302 → GET with same path)
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          postJSON(res.headers.location, data, token).then(resolve).catch(reject);
-          return;
-        }
-        try {
-          resolve(JSON.parse(body));
-        } catch (e) {
-          reject(new Error(`Invalid JSON response (HTTP ${res.statusCode}): ${body.substring(0, 200)}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.write(data);
-    req.end();
-  });
-}
-
 /**
  * Sync HTTP JSON request via python3 urllib.
  *
@@ -170,6 +131,7 @@ function postJSONSync(url, body, token) {
   return requestJSON('POST', url, body, token);
 }
 
+// 共有の本体 (引っ越し元) の admin API の送り先。scripts/migrate-to-single.js だけが使う。
 function getConfig(env) {
   const filename = env ? `config.${env}.json` : 'config.json';
   const configPath = path.join(__dirname, '..', filename);
@@ -179,24 +141,4 @@ function getConfig(env) {
   return JSON.parse(fs.readFileSync(configPath, 'utf8'));
 }
 
-function parseEnvFromArgs(args) {
-  const idx = args.indexOf('--env');
-  if (idx === -1) return { env: null, remainingArgs: args };
-  const env = args[idx + 1];
-  if (!env) throw new Error('--env requires a value (e.g. --env open)');
-  const remainingArgs = [...args.slice(0, idx), ...args.slice(idx + 2)];
-  return { env, remainingArgs };
-}
-
-/**
- * Load everything an Apps-Script REST-API script needs: per-env config,
- * scriptId from .clasp.json, and a fresh OAuth token.
- */
-function loadScriptContext(env) {
-  const config = getConfig(env);
-  const claspJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), '.clasp.json'), 'utf8'));
-  const token = getAccessToken(config.tokenName);
-  return { config, scriptId: claspJson.scriptId, token };
-}
-
-module.exports = { getAccessToken, postJSON, postJSONSync, requestJSON, getConfig, parseEnvFromArgs, loadScriptContext };
+module.exports = { getAccessToken, postJSONSync, requestJSON, getConfig };

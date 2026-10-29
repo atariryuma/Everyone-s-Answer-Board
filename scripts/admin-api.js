@@ -1,8 +1,11 @@
 /**
- * Admin API クライアント
+ * Admin API クライアント (先生ごとの配置に送る)
  *
  * Usage:
- *   npm run api -- <operation> [--key value ...] [--json '{"...":"..."}'] [--file path.json]
+ *   npm run api -- <operation> [--tenant <名前>] [--key value ...] [--json '{"...":"..."}'] [--file path.json]
+ *
+ * 送り先は scripts/single-tenants.json (deploy-single.js が書く) の配置。--tenant を省くと、
+ *   検証用 (extraFiles 付き) を除いた最初の配置に送る。API キーは配置ごとに single-tenants.json にある。
  *
  * Examples:
  *   npm run api -- getAppStatus
@@ -16,7 +19,6 @@
  *   npm run api -- getUserConfig --userId adb24b94-...
  *   npm run api -- exportConfigs --file backup.json    # ファイルへ保存
  *   npm run api -- setUserConfig --userId <uuid> --patch '{"displaySettings":{"boardMode":"numberline"}}'
- *   npm run api -- bulkSetUserConfig --filter '{"isPublished":false}' --patch '{...}' --dryRun
  *   npm run api -- runColumnAnalysis --userId <uuid>
  *   npm run api -- previewBoard --userId <uuid>
  *
@@ -41,11 +43,11 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { getAccessToken, postJSONSync, getConfig, parseEnvFromArgs } = require('./lib/gas-auth');
+const { getAccessToken, postJSONSync } = require('./lib/gas-auth');
 
 const OPERATIONS = [
   // user / app
-  'getUsers', 'toggleUserActive', 'toggleUserBoard',
+  'getUsers',
   // Board publish lifecycle (unified)
   'unpublishBoard', 'republishMyBoard',
   'getLogs', 'disableApp', 'enableApp', 'getAppStatus',
@@ -56,7 +58,7 @@ const OPERATIONS = [
   'getProperty', 'setProperty', 'listProperties',
   // user config (v2)
   'findUser', 'getUserConfig', 'exportConfigs',
-  'setUserConfig', 'bulkSetUserConfig',
+  'setUserConfig',
   'runColumnAnalysis', 'previewBoard', 'exportBoardData',
   // Form operations (v3)
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm', 'customizeForm',
@@ -65,13 +67,6 @@ const OPERATIONS = [
   'appendRows', 'clearDataRows', 'setSheetHeader',
   // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
   'renameDriveFile',
-  // SS sharing repair (v7) — SA editor 共有が抜けた既存 SS の遡及修復
-  'repairSpreadsheetSharing',
-  // SA pool management (v8 / v2782+) — 700 人スケール時の SA 拡張運用
-  'listServiceAccountPool', 'getServiceAccountUsage',
-  'addServiceAccountToPool', 'addServiceAccountsToPoolBatch',
-  'reverifyServiceAccountInPool', 'removeServiceAccountFromPool',
-  'migrateBoardSharing',
   // Lesson workspace — wizard / runner / replay / archive
   // (唯一の定義は src/AdminApis.js の dispatchAdminOperation。ここはその --help ミラー)
   'lesson.create', 'lesson.updateDraft', 'lesson.start',
@@ -79,7 +74,25 @@ const OPERATIONS = [
   'lesson.list', 'lesson.review', 'lesson.reviewGrid', 'lesson.delete',
   'lesson.duplicate', 'lesson.templates', 'lesson.knownClasses',
   'lesson.closeForms', 'lesson.reorderPhases', 'lesson.recaptureArchive',
+  'lesson.liveAnswers', 'lesson.toggleHighlight',
+  // 共有の本体からの引っ越し (scripts/migrate-to-single.js)
+  'migrate.importLesson', 'migrate.importConfig', 'migrate.importLessonAnswers',
 ];
+
+// 送り先の配置を single-tenants.json から選ぶ。
+function resolveTenant(args) {
+  const i = args.indexOf('--tenant');
+  const name = i >= 0 ? args[i + 1] : null;
+  const rest = i >= 0 ? args.slice(0, i).concat(args.slice(i + 2)) : args;
+  const file = path.join(__dirname, 'single-tenants.json');
+  if (!fs.existsSync(file)) throw new Error('scripts/single-tenants.json がありません (deploy-single.js create で作る)');
+  const tenants = JSON.parse(fs.readFileSync(file, 'utf8')).tenants || [];
+  const tenant = name ? tenants.find((t) => t.name === name) : tenants.find((t) => !(t.extraFiles || []).length);
+  if (!tenant) throw new Error(name ? `配置「${name}」がありません` : '送り先の配置がありません');
+  if (!tenant.apiKey) throw new Error(`配置「${tenant.name}」の API キーがありません (setupApiKey を先に)`);
+  const url = `https://script.google.com/a/macros/${tenant.adminEmail.split('@')[1]}/s/${tenant.deploymentId}/exec`;
+  return { tenant, url, rest };
+}
 
 /**
  * Parse args supporting:
@@ -175,9 +188,9 @@ function parseArgs(args) {
   return { operation, params, outputPath };
 }
 
-const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
-if (!remainingArgs[0] || remainingArgs[0] === '--help' || remainingArgs[0] === '-h') {
-  console.log('Usage: npm run api -- <operation> [--env <env>] [--key value ...]');
+const argv = process.argv.slice(2);
+if (!argv[0] || argv[0] === '--help' || argv[0] === '-h') {
+  console.log('Usage: npm run api -- <operation> [--tenant <名前>] [--key value ...]');
   console.log('\nOperations:');
   OPERATIONS.forEach(op => console.log(`  ${op}`));
   console.log('\nJSON-aware flags: --json --patch --filter --options');
@@ -186,7 +199,6 @@ if (!remainingArgs[0] || remainingArgs[0] === '--help' || remainingArgs[0] === '
   console.log("  npm run api -- findUser --email teacher@example.com");
   console.log("  npm run api -- setUserConfig --userId <uuid> --patch '{\"displaySettings\":{\"boardMode\":\"numberline\"}}'");
   console.log("  npm run api -- exportConfigs --output configs.json");
-  console.log("  npm run api -- bulkSetUserConfig --filter '{\"isPublished\":false}' --patch '{\"allowResubmit\":true}' --dryRun");
   console.log('\nLesson workspace (Phase 1+2):');
   console.log("  npm run api -- lesson.list --userId <uuid>");
   console.log("  npm run api -- lesson.create --userId <uuid> --name '5/15 道徳テスト' --template doutoku-3phase");
@@ -200,13 +212,12 @@ if (!remainingArgs[0] || remainingArgs[0] === '--help' || remainingArgs[0] === '
   process.exit(0);
 }
 
-const { operation, params, outputPath } = parseArgs(remainingArgs);
-
 try {
-  const config = getConfig(env);
-  const token = getAccessToken(config.tokenName);
-  const payload = { action: 'adminApi', apiKey: config.apiKey, operation, params };
-  const json = postJSONSync(config.prodUrl, payload, token);
+  const { tenant, url, rest } = resolveTenant(argv);
+  const { operation, params, outputPath } = parseArgs(rest);
+  const token = getAccessToken(tenant.user || 'organization');
+  const payload = { action: 'adminApi', apiKey: tenant.apiKey, operation, params };
+  const json = postJSONSync(url, payload, token);
   const formatted = JSON.stringify(json, null, 2);
   if (outputPath) {
     fs.writeFileSync(path.resolve(outputPath), formatted);

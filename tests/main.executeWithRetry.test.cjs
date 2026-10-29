@@ -341,13 +341,3 @@ test('isRetryableError: 許可不足 (日本語の権限エラー) は投げ直�
   assert.equal(ctx.isRetryableError('その操作を実行するには承認が必要です。'), false);
 });
 
-test('isAuthorizationScopeError_ / 失敗の印: 実際に起きた権限エラーだけを数える', () => {
-  const ctx = loadMainCtx();
-  assert.equal(ctx.isAuthorizationScopeError_(new Error('UrlFetchApp.fetch を呼び出す権限がありません。必要な権限: https://www.googleapis.com/auth/script.external_request')), true);
-  assert.equal(ctx.isAuthorizationScopeError_(new Error('Quota exceeded (429)')), false);
-  assert.equal(ctx.authorizationScopeFailureSeen_(), false);
-  ctx.noteAuthorizationScopeFailure_(new Error('Quota exceeded (429)'));
-  assert.equal(ctx.authorizationScopeFailureSeen_(), false, '429 では立てない');
-  ctx.noteAuthorizationScopeFailure_(new Error('UrlFetchApp.fetch を呼び出す権限がありません'));
-  assert.equal(ctx.authorizationScopeFailureSeen_(), true);
-});

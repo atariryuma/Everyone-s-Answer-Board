@@ -19,112 +19,50 @@ Everyone's Answer Boardは、Googleフォームの回答をリアルタイムで
   児童画面の権能を切り替える。Google フォームを介さない native 入力にも対応
 - リアクション機能（いいね、なるほど等）
 - ハイライト機能
-- 管理者ダッシュボード
-- 複数ユーザー・複数ボード対応
+- 管理パネル（ボードの設定・授業の作成と進行・見取りグリッド）
+- 複数ボード（プロファイル）の切り替え
 
 ### 技術スタック
 
 - **バックエンド**: Google Apps Script (V8 runtime)
 - **フロントエンド**: HTML + Tailwind CSS + Vanilla JavaScript
-- **データストア**: Google Sheets
-- **認証**: Google OAuth 2.0（Session.getActiveUser）
-- **デプロイ**: clasp CLI
+- **データストア**: 先生のスプレッドシート 1 つ（Google Sheets）
+- **実行**: 先生ごとの配置を「先生として実行」（児童は自分の権限を使わない）
+- **認証**: Session.getActiveUser（組織のドメイン内のみ）
+- **デプロイ**: clasp CLI（`scripts/deploy-single.js`）
 
 ---
 
-## システム管理者向け: デプロイ手順
+## 先生ごとの配置
+
+先生ごとに、先生の Drive のスプレッドシートに紐づいたアプリを「先生として実行」で配置する。
+データ（ボードの設定・授業・回答）はそのスプレッドシート 1 つに入る。サービスアカウントや共有の DB は使わない。
 
 ### 前提条件
 
-- Google Workspace アカウント（組織管理者権限推奨）
-- Node.js 20以上（package.json の `engines` と一致）
-- npm
+- Node.js 20 以上
+- 学校の Google Workspace アカウントで `clasp login` 済み（`~/.clasprc.json` の名前を `--user` に渡す）
 
-### Step 1: リポジトリのクローンと依存関係のインストール
+### 先生を足す
 
 ```bash
 git clone https://github.com/atariryuma/Everyone-s-Answer-Board.git
 cd Everyone-s-Answer-Board
 npm install
+npm run deploy:single -- create --name <名前> --adminEmail <先生のメール> --user organization
 ```
 
-### Step 2: Google Cloud Console でプロジェクト設定
+1. 表示された URL を、その先生のアカウントで 1 度開いて「許可」を押す
+2. 管理パネルが出れば準備完了（初回にプロパティと DB のシートが自動でそろう。ログイン・初期設定の画面は無い）
+3. 児童には管理パネルの「ボードを開く」の URL（`?mode=view&userId=...`）を配る
 
-1. [Google Cloud Console](https://console.cloud.google.com/) にアクセス
-2. 新しいプロジェクトを作成（または既存プロジェクトを選択）
-3. **APIs & Services** > **Enable APIs and Services** で以下を有効化:
-   - Google Sheets API
-   - Google Drive API
-   - Google Forms API
-   - Apps Script API
-
-### Step 3: サービスアカウントの作成
-
-1. **APIs & Services** > **Credentials** > **Create Credentials** > **Service Account**
-2. サービスアカウント名を入力（例: `answer-board-service`）
-3. 作成後、**Keys** タブで **Add Key** > **Create new key** > **JSON** を選択
-4. ダウンロードしたJSONファイルを安全に保管（後で使用）
-
-### Step 4: clasp のセットアップ
+### 更新する
 
 ```bash
-# clasp にログイン（Googleアカウント認証）
-npx clasp login
-
-# 新しいGASプロジェクトを作成
-npx clasp create --type webapp --title "Everyone's Answer Board"
-
-# または既存プロジェクトに接続
-cp .clasp.json.template .clasp.json
-# .clasp.json を編集して scriptId を設定
+npm test
+npm run deploy             # 全員の配置を更新（URL はそのまま）
+npm run api -- systemDiagnosis
 ```
-
-### Step 5: データベーススプレッドシートの準備
-
-1. [Google Sheets](https://sheets.google.com/) で新しいスプレッドシートを作成
-2. シート名を `users` に変更
-3. 1行目にヘッダーを追加:
-   ```
-   userId | userEmail | googleId | isActive | configJson | lastModified | createdAt
-   ```
-4. スプレッドシートIDをメモ（URLの `/d/` と `/edit` の間の文字列）
-5. サービスアカウントのメールアドレス（`xxx@xxx.iam.gserviceaccount.com`）を編集者として共有
-
-### Step 6: コードのデプロイ
-
-```bash
-npm run push        # GASにコードをプッシュ
-npm run deploy:prod # 本番デプロイ（URL維持）
-```
-
-### Step 7: スクリプトプロパティの設定
-
-GASエディタで **プロジェクトの設定** > **スクリプトプロパティ** を開き、以下を設定:
-
-| プロパティ名 | 値 |
-| ----------- | --- |
-| `ADMIN_EMAIL` | 管理者のメールアドレス |
-| `DATABASE_SPREADSHEET_ID` | Step 5で作成したスプレッドシートのID |
-| `SERVICE_ACCOUNT_CREDS` | Step 3でダウンロードしたJSONの内容（全文貼り付け） |
-| `ADMIN_API_KEY` | 任意の秘密文字列（16文字以上、CLIツール認証用） |
-
-### Step 8: 初回デプロイ（GASエディタから）
-
-初回のみGASエディタでの操作が必要です（2回目以降は `npm run deploy:prod` で完結）。
-
-1. [GASエディタ](https://script.google.com/) でプロジェクトを開く
-2. **デプロイ** > **新しいデプロイ**
-3. **種類の選択** で **ウェブアプリ** を選択
-4. 設定:
-   - **次のユーザーとして実行**: **ウェブアプリにアクセスしているユーザー**
-   - **アクセスできるユーザー**: 組織のポリシーに合わせて選択
-5. **デプロイ** をクリック
-
-### Step 9: 初期設定の確認
-
-1. `npm run api -- systemDiagnosis` で、システム設定と DB 接続が正しく読み込まれていることを確認
-2. 先生専用の配置 (`scripts/deploy-single.js`) では、先生がデプロイURLを開くとそのまま管理パネルが開く
-   （ログイン画面・初期設定画面・アプリ設定画面はない。停止 / 再開は `npm run api -- disableApp` / `enableApp`）
 
 ---
 
@@ -136,18 +74,19 @@ GASエディタで **プロジェクトの設定** > **スクリプトプロパ�
 Everyone-s-Answer-Board/
 ├── src/                      # GAS ソースコード
 │   ├── main.js              # エントリーポイント、認証
+│   ├── Deployment.js        # 配置ごとの先生と DB（リポジトリでは空。配置時に焼き込む）
 │   ├── SystemController.js  # システム管理
-│   ├── DatabaseCore.js      # データベース操作
+│   ├── DatabaseCore.js      # users シートとアクセス判定
 │   ├── *Service.js          # ビジネスロジック
 │   ├── *Apis.js             # API エンドポイント
 │   └── *.html               # フロントエンド
-├── tests/                    # ユニットテスト（1075件、node:test）
+├── tests/                    # ユニットテスト（node:test）
 ├── scripts/                  # CLIツール
-│   ├── admin-api.js         # 本番API操作
-│   ├── deploy-prod.js       # URL維持デプロイ
-│   ├── logs.js              # Cloud Logging取得
+│   ├── deploy-single.js     # 先生ごとの配置（create / deploy）
+│   ├── admin-api.js         # 配置への管理用コマンド
+│   ├── migrate-to-single.js # 共有の本体からの引っ越し
+│   ├── verify/              # 検証用の配置でだけ使う入口と、端から端までの検証
 │   └── lib/gas-auth.js      # 共通認証モジュール
-├── .clasp.json.template     # clasp 設定テンプレート
 ├── CLAUDE.md                # AI開発ガイド
 └── README.md
 ```
@@ -155,48 +94,27 @@ Everyone-s-Answer-Board/
 ### 開発コマンド
 
 ```bash
-# 開発
-npm test                  # テスト実行（node:test）
-npm run push              # GASにコードをプッシュ
-npm run deploy:prod       # 本番デプロイ（URL維持、pushも含む）
-npm run deploy            # 新しいURLでデプロイ（テスト用）
-npm run pull              # GASからコードを取得
-npm run logs              # GAS実行ログを確認
+npm test                                   # テスト実行（node:test）
+npm run deploy:single -- deploy --name t260781p-verify   # 検証用の配置へ
+npm run verify:e2e -- t260781p-verify      # 画面の機能を端から端まで（54 項目）
+npm run deploy                             # 全員の配置を更新
 
-# 2 テナント運用（那覇市 = default / 沖縄県 = open 環境）
-npm run deploy:all        # 那覇 → 沖縄 を順に本番デプロイ（推奨・ドリフト防止）
-npm run push:open         # open 環境へプッシュ
-npm run deploy:open       # open 環境のみ本番デプロイ（URL維持）
-npm run api:open -- systemDiagnosis   # open 環境の状態確認
-npm run logs:open         # open 環境のログ確認
-
-# 本番運用
-npm run api -- systemDiagnosis     # システム診断
-npm run api -- getUsers            # ユーザー一覧
-npm run api -- getAppStatus        # アプリ状態
-npm run api -- getLogs --limit 20  # セキュリティログ
-npm run api -- perfMetrics         # パフォーマンス
-npm run api -- listProperties      # Script Properties一覧
-npm run logs:cloud                 # Cloud Logging（直近の警告/エラー）
-npm run logs:cloud -- --severity ERROR --hours 24  # エラーのみ
+npm run api -- systemDiagnosis             # システム診断
+npm run api -- getAppStatus                # アプリ状態
+npm run api -- getLogs --limit 20          # セキュリティログ
+npm run api -- listProperties              # Script Properties一覧
 ```
 
 ### 開発ワークフロー
 
 ```text
-コード編集 → npm test → npm run deploy:prod → git commit → git push
-                                                              ↓
-                                                    GitHub CI（構文チェック+テスト）
+コード編集 → npm test → 検証用の配置 + verify:e2e → npm run deploy → git commit → git push
+                                                                          ↓
+                                                                GitHub CI（構文チェック+テスト）
 ```
 
 - **CI**: 構文チェック + lint（error）+ テスト（品質ゲート）
-- **デプロイ**: ローカルの `deploy:prod` で実行（CLIから本番URLを維持して更新）
 - **テスト**: pre-commit フックで自動実行（`npm install` 時に自動有効化。テスト失敗時はコミットをブロック）
-
-> **2 テナント構成の注意**: 本番は GAS プロジェクトが 2 つ（那覇市 = default / 沖縄県 = open）。
-> `npm run deploy:prod` は那覇市版のみを更新するため、沖縄県版が旧コードのまま残るドリフトが起きやすい。
-> src 変更時は `npm run deploy:all`（那覇→沖縄を順にデプロイ）で両方まとめて反映するのが安全。
-> 環境切替は `scripts/env-switch.js` が担う。
 
 ### GAS保守ルール
 
@@ -210,34 +128,20 @@ npm run logs:cloud -- --severity ERROR --hours 24  # エラーのみ
 
 ## トラブルシューティング
 
-### よくある問題
-
-**Q: デプロイ後にアクセスできない**
-- スクリプトプロパティが正しく設定されているか確認
-- サービスアカウントがスプレッドシートに共有されているか確認
+**Q: 開くと「このアプリはまだ準備できていません」**
+- 先生のアカウントで 1 度開いて許可したか確認（初回にプロパティがそろう）
 - `npm run api -- systemDiagnosis` で診断を実行
 
-**Q: ログインできない**
-- `ADMIN_EMAIL` が正しく設定されているか確認
-- ドメイン制限が有効な場合、同一ドメインのアカウントでアクセス
+**Q: 児童が「アクセスが制限されています」になる**
+- 配った URL に `?mode=view&userId=...` が付いているか確認（付いていないトップの URL は先生用）
+- ボードが「公開中」か確認
 
 **Q: データが表示されない**
-- `DATABASE_SPREADSHEET_ID` が正しいか確認
-- `users` シートが存在するか確認
-- `npm run api -- getUsers` でユーザー状態を確認
-
-**Q: リアクションがエラーになる**
-
-- `npm run logs:cloud -- --severity ERROR --hours 1` でエラーログを確認
-- スプレッドシートの共有設定（同一ドメイン内の編集権限）を確認
+- `npm run api -- getUserConfig --userId <uuid>` でボードの設定（spreadsheetId / sheetName）を確認
 
 ### ログの確認
 
-```bash
-npm run logs:cloud                              # 直近の警告/エラー
-npm run logs:cloud -- --severity INFO --hours 24 # 過去24時間の全ログ
-npm run logs:cloud -- --function doPost          # 特定関数のログ
-```
+先生ごとの配置の実行ログは、スプレッドシート → 拡張機能 → Apps Script の「実行数」で見る。
 
 ---
 

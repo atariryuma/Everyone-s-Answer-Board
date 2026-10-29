@@ -65,7 +65,7 @@ window.ErrorHandler = {
     console.error(`[Frontend ErrorHandler] ${context}:`, errorInfo);
 
     // Why: フロントエラーをサーバに転送して Cloud Logging に集約。
-    //      これ無しでは CLI (npm run logs:cloud) から児童端末の問題が完全に不可視。
+    //      これ無しでは児童端末の問題がサーバの実行ログから完全に不可視。
     //      送信失敗してもローカル console.error は既に出ているので、Promise の
     //      reject は握りつぶす（無限ループ防止）。
     try {

@@ -1898,7 +1898,6 @@
       if (validationDetails.connectionVerified === false) {
         userMessage = 'フォームの回答先への接続に失敗しました。';
         suggestions.push('フォームの編集権限があることを確認してください');
-        suggestions.push('サービスアカウントに編集者権限が付与されているか確認してください');
 
         if (validationDetails.connectionError) {
           suggestions.push(`詳細: ${validationDetails.connectionError}`);

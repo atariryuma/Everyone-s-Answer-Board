@@ -224,20 +224,6 @@ test('待ち時間は 30 回呼ぶと散らばる (全員が同じ瞬間に投�
 });
 
 // =====================================================================
-// isSharedFailure: 呼び出した人だけの理由の失敗は、全員の失敗として覚えない
-// =====================================================================
-
-test('withStampedeGuard_: isSharedFailure が false なら失敗を覚えない (他の人を busy にしない)', () => {
-  const { context, store } = loadContext();
-  const out = context.withStampedeGuard_({
-    key: 'k1', ttl: 10, failTtl: 8, busyValue: { busy: true },
-    isCacheable: (v) => Boolean(v && v.success),
-    isSharedFailure: () => false,
-    loader: () => ({ success: false })
-  });
-  assert.equal(out.success, false);
-  assert.equal(store.has('k1:fail'), false);
-});
 
 test('withStampedeGuard_: 既定 (共有の失敗) なら従来どおり失敗を覚える', () => {
   const { context, store } = loadContext();

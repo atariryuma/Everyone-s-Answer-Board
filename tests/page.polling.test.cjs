@@ -1312,16 +1312,6 @@ test('__refetchIfTargetClassChanged: 対象クラスが届いたら 1 回だけ�
   assert.equal(instance.elements.classFilter.value, 'x', '同じなら触らない');
 });
 
-test('__noticeAuthorizationMissing: AUTH_REQUIRED のときだけ 1 度知らせる', () => {
-  const { instance, ctx } = makeInstance();
-  const banners = [];
-  ctx.window.notifications = { banner: (m) => banners.push(m) };
-  assert.equal(instance.__noticeAuthorizationMissing({ message: 'Data access failed' }), false);
-  assert.equal(instance.__noticeAuthorizationMissing({ success: false, error: 'AUTH_REQUIRED', message: '許可がそろっていません' }), true);
-  instance.__noticeAuthorizationMissing(new Error('このアプリの許可がそろっていません'));
-  assert.equal(banners.length, 1);
-});
-
 test('クラス既定: 授業が終わったら (対象クラスが消えたら) 教師のボードは「すべて」に戻る', () => {
   const { instance } = makeFilterInstance({ isEditor: true });
   instance.state.lessonPhase = { lessonId: 'l1', phaseIndex: 4, screenRole: 'reflect', classes: ['6年2組'] };

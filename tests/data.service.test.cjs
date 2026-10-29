@@ -524,30 +524,6 @@ test('processBatchData: batch read error is handled gracefully (regression: erro
   assert.equal(result.length, 0, '読めなかったバッチはスキップされ 0 行になる');
 });
 
-test('processBatchData: 許可不足 (権限エラー) は残りのバッチを読まずにやめる (投げ直しで時間を使わない)', () => {
-  let reads = 0;
-  const sleeps = [];
-  const ctx = loadDataServiceContext({
-    resolveColumnIndex: (headers, type, mapping) => ({ index: mapping && typeof mapping[type] === 'number' ? mapping[type] : -1 }),
-    isAuthorizationScopeError_: (m) => /権限がありません/.test(String(m && m.message || m)),
-    Utilities: { sleep: (ms) => sleeps.push(ms) }
-  });
-  const sheet = {
-    getName: () => 'Sheet1',
-    getParent: () => ({ getId: () => 'ss-auth' }),
-    getLastRow: () => 400,
-    getLastColumn: () => 2,
-    getRange: () => ({ getValues: () => { reads++; throw new Error('UrlFetchApp.fetch を呼び出す権限がありません'); } })
-  };
-  const result = ctx.processBatchData({
-    sheet, headers: ['Timestamp', 'Answer'], lastRow: 400, lastCol: 2,
-    config: { columnMapping: { answer: 1 } }, options: {}, user: null, startTime: Date.now()
-  });
-  assert.equal(result.length, 0);
-  assert.equal(reads, 1, '1 回目の権限エラーでやめる');
-  assert.equal(sleeps.length, 0, '待たない');
-});
-
 // =====================================================================
 // deleteLinkedFormResponseByTimestamp
 // =====================================================================

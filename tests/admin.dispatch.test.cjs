@@ -73,20 +73,6 @@ test('dispatch: getUsers returns success', () => {
   assert.equal(result.success, true);
 });
 
-test('dispatch: toggleUserActive requires targetUserId', () => {
-  const ctx = loadAdminContext();
-  const result = ctx.dispatchAdminOperation('toggleUserActive', {});
-  assert.equal(result.success, false);
-  assert.match(result.message, /targetUserId/);
-});
-
-test('dispatch: toggleUserBoard requires targetUserId', () => {
-  const ctx = loadAdminContext();
-  const result = ctx.dispatchAdminOperation('toggleUserBoard', {});
-  assert.equal(result.success, false);
-  assert.match(result.message, /targetUserId/);
-});
-
 // --- App Control ---
 
 test('dispatch: getAppStatus returns success', () => {

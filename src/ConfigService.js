@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global invalidateSaValidationCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES, isSingleTenant_ */
+/* global invalidateAccessDecisionCache_, getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_, VALID_REACTION_MODES */
 
 /**
  * デフォルト設定取得
@@ -554,44 +554,22 @@ function clearConfigCache(userId) {
 }
 
 /**
- * コアシステムプロパティ確認 - 3つの必須項目をすべてチェック
+ * 配置が使える状態か (管理者のメールと DB にするスプレッドシートがそろっているか)。
  *
  * Why cache: doGet のどのモードでも少なくとも 1 回呼ばれる hot path。
- *   生の PropertiesService 読み取りを 3 回 + JSON.parse していたのを、
- *   getCachedProperty (30s メモリキャッシュ) に乗せ替える。
- *   setCachedProperty 経由の書き込みで個別キーは即 invalidation されるので、
- *   セットアップ直後の false → true 反映も問題ない。
+ *   getCachedProperty (30s メモリキャッシュ) に乗せる。setCachedProperty 経由の書き込みで
+ *   個別キーは即 invalidation されるので、配置直後の false → true 反映も問題ない。
  *
- * @returns {boolean} 3つすべて存在すれば true
+ * @returns {boolean}
  */
 function hasCoreSystemProps() {
   try {
     const adminEmail = getCachedProperty('ADMIN_EMAIL');
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    // 先生専用の配置は SA pool を使わない (すべて先生の権限で直接開く) ので鍵は要らない。
-    if (typeof isSingleTenant_ === 'function' && isSingleTenant_()) return Boolean(adminEmail && dbId);
-    const creds = getCachedProperty('SERVICE_ACCOUNT_CREDS');
-
-    if (!adminEmail || !dbId || !creds) {
-      console.warn('hasCoreSystemProps: 必須項目不足', {
-        hasAdmin: !!adminEmail,
-        hasDb: !!dbId,
-        hasCreds: !!creds
-      });
+    if (!adminEmail || !dbId) {
+      console.warn('hasCoreSystemProps: 必須項目不足', { hasAdmin: !!adminEmail, hasDb: !!dbId });
       return false;
     }
-
-    try {
-      const parsed = JSON.parse(creds);
-      if (!parsed || typeof parsed !== 'object' || !parsed.client_email) {
-        console.warn('hasCoreSystemProps: SERVICE_ACCOUNT_CREDS JSON不正');
-        return false;
-      }
-    } catch (jsonError) {
-      console.warn('hasCoreSystemProps: SERVICE_ACCOUNT_CREDS JSON解析失敗', jsonError.message);
-      return false;
-    }
-
     return true;
   } catch (error) {
     logError_('hasCoreSystemProps', error);
@@ -629,7 +607,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
 
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
-        // accessMode 自動判定: owner = openById、viewer/admin = SA pool 経由。
         try {
           const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'configService.questionText' });
           const { spreadsheet } = dataAccess;
@@ -900,17 +877,15 @@ function saveUserConfig(userId, config, options = {}) {
 
     clearConfigCache(userId);
 
-    // validateServiceAccountUsage の 60 秒 cache は `sa_validation_v<ver>_<ssId>_<email>` という
-    //   key で、version を bump しないと消えない (旧コードの `sa_validation_${ssId}` remove は
-    //   どの key にも当たらない no-op だった)。公開状態以外の変更でも SS が差し替わることがある
-    //   (profile 切替) ので、新旧両方の SS について version を上げる。
+    // アクセス判定 (checkSpreadsheetAccess_) の 60 秒 cache は版を key に含むので、版を上げて古くする。
+    //   公開状態以外の変更でも SS が差し替わることがある (profile 切替) ので、新旧両方の SS について上げる。
     const ssIds = new Set();
     if (cleanedConfig.spreadsheetId) ssIds.add(cleanedConfig.spreadsheetId);
     if (persistedConfig && persistedConfig.spreadsheetId) ssIds.add(persistedConfig.spreadsheetId);
-    if (typeof invalidateSaValidationCache_ === 'function') {
+    if (typeof invalidateAccessDecisionCache_ === 'function') {
       ssIds.forEach((id) => {
-        try { invalidateSaValidationCache_(id); }
-        catch (cacheRemoveError) { console.warn('saveUserConfig: Failed to clear SA validation cache:', cacheRemoveError.message); }
+        try { invalidateAccessDecisionCache_(id); }
+        catch (cacheRemoveError) { console.warn('saveUserConfig: Failed to clear access decision cache:', cacheRemoveError.message); }
       });
     }
 

@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * 先生 1 人専用の配置 (スプレッドシート紐づけ・先生として実行) を作る / 更新する。
+ * 先生ごとの配置 (スプレッドシート紐づけ・先生として実行) を作る / 更新する。これが唯一の配置の道具。
  *
  * Why: 2026-10-29 10:20 ごろから、児童アカウントは「開いた人として実行」の Apps Script を
- *   中身に関係なく開けなくなった (管理側の設定)。本体のコード (src/) をそのまま使い、
- *   次の 2 ファイルだけを差し替えて、先生ごとに「先生として実行」で配置する。
- *     - appsscript.json: webapp.executeAs = USER_DEPLOYING (先生として実行)
- *     - Tenancy.js: DEPLOY_TENANCY = 'single' と、その先生のメール・DB にするスプレッドシート
- *   画面・機能は本体と同じ。違いは「データが先生のスプレッドシート 1 つに入る」ことだけ。
+ *   中身に関係なく開けなくなった (管理側の設定)。src/ をそのまま、先生ごとに「先生として実行」
+ *   (src/appsscript.json の webapp) で配置する。差し替えるのは Deployment.js だけ:
+ *   その先生のメールと、データを入れるスプレッドシート (DB) を焼き込む。
  *
  * 使い方:
  *   node scripts/deploy-single.js create --name <名前> --adminEmail <先生のメール> [--user organization]
@@ -67,7 +65,7 @@ function checkGeneratedFresh() {
   }
 }
 
-// src/ を写し、2 ファイルだけ差し替える。
+// src/ を写し、Deployment.js だけ差し替える。
 function stage(tenant) {
   const dir = path.join(STAGE_ROOT, tenant.name);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -76,15 +74,17 @@ function stage(tenant) {
     if (!/\.(js|html)$/.test(f)) continue;
     fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
   }
-  const manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'appsscript.json'), 'utf8'));
-  manifest.webapp = { executeAs: 'USER_DEPLOYING', access: 'DOMAIN' };
-  fs.writeFileSync(path.join(dir, 'appsscript.json'), JSON.stringify(manifest, null, 2) + '\n');
+  fs.copyFileSync(path.join(SRC, 'appsscript.json'), path.join(dir, 'appsscript.json'));
   const str = (v) => JSON.stringify(String(v || ''));
-  fs.writeFileSync(path.join(dir, 'Tenancy.js'),
-    '// scripts/deploy-single.js が書いたファイル (先生専用の配置)。src/Tenancy.js の説明を参照。\n' +
-    `const DEPLOY_TENANCY = 'single';\n` +
+  fs.writeFileSync(path.join(dir, 'Deployment.js'),
+    '// scripts/deploy-single.js が書いたファイル。src/Deployment.js の説明を参照。\n' +
     `const DEPLOY_ADMIN_EMAIL = ${str(tenant.adminEmail)};\n` +
     `const DEPLOY_DATABASE_SPREADSHEET_ID = ${str(tenant.spreadsheetId)};\n`);
+  // 検証用の配置にだけ足すファイル (single-tenants.json の extraFiles、リポジトリからの相対パス)。
+  //   例: scripts/verify/DevInvoke.js (画面の処理を admin API から直接呼ぶ入口)。本番の先生には付けない。
+  for (const rel of tenant.extraFiles || []) {
+    fs.copyFileSync(path.join(ROOT, rel), path.join(dir, path.basename(rel)));
+  }
   fs.writeFileSync(path.join(dir, '.claspignore'), '**/**\n!appsscript.json\n!*.js\n!*.html\n');
   if (tenant.scriptId) {
     fs.writeFileSync(path.join(dir, '.clasp.json'), JSON.stringify({ scriptId: tenant.scriptId, rootDir: '' }, null, 2));

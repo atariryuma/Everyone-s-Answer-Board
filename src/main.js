@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureSingleTenantBootstrap_, isSingleTenant_, processLoginAction */
+/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator, submitLessonAnswer, sameEmail_, findPublishedBoardOwner, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -121,7 +121,7 @@ function createAccessRestrictedTemplate(email, isAppDisabled = false, message = 
 function doGet(e) {
   try {
     // 先生専用の配置なら初回だけプロパティと DB のシートをそろえる (本体では何もしない)。
-    if (typeof ensureSingleTenantBootstrap_ === 'function') ensureSingleTenantBootstrap_();
+    if (typeof ensureDeploymentBootstrap_ === 'function') ensureDeploymentBootstrap_();
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
@@ -143,7 +143,7 @@ function doGet(e) {
     }
 
     // 必須プロパティがそろっていなければ案内だけ出す。先生専用の配置では
-    //   ensureSingleTenantBootstrap_ (上) がそろえるので、ここに来るのは配置の失敗時だけ。
+    //   ensureDeploymentBootstrap_ (上) がそろえるので、ここに来るのは配置の失敗時だけ。
     const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
     if (!setupDone) {
       return createAccessRestrictedTemplate(currentEmail, false, 'このアプリはまだ準備できていません。管理者に連絡してください。');
@@ -355,16 +355,15 @@ function handleReviewMode_(params, currentEmail) {
 }
 
 function handleMainMode_(params, currentEmail) {
-  // 先生専用の配置 (isSingleTenant_) では使う先生は 1 人なので、先生が開いたら登録
-  //   (processLoginAction) を済ませて管理パネルを直接開く。ログイン画面・アプリ設定画面は
-  //   これに置き換えて廃止した (未知の mode=login / setup / appSetup もここに来る)。
-  //   児童など先生以外は案内だけ。
-  if (typeof isSingleTenant_ === 'function' && isSingleTenant_() && currentEmail && isAdministrator(currentEmail)) {
+  // 使う先生は 1 人なので、先生が開いたら登録 (processLoginAction) を済ませて管理パネルを
+  //   直接開く。ログイン画面・アプリ設定画面はこれに置き換えて廃止した (未知の mode=login /
+  //   setup / appSetup もここに来る)。児童など先生以外は案内だけ。
+  if (currentEmail && isAdministrator(currentEmail)) {
     const login = processLoginAction();
     const userId = login && login.success && login.data && login.data.userId;
     if (userId) return handleAdminMode_({ userId }, currentEmail);
     // 登録に失敗したら案内の画面に戻す。開き直せば登録をやり直すので、痕跡だけ残す。
-    console.warn('handleMainMode_: single-tenant auto login failed:', login && login.message);
+    console.warn('handleMainMode_: auto login failed:', login && login.message);
   }
   return createAccessRestrictedTemplate(currentEmail);
 }
@@ -749,7 +748,7 @@ const DO_POST_ACTION_HANDLERS = {
  *
  * Why: GAS Cloud Logging only captures server-side console.* calls. Errors thrown
  *   inside page.js.html / AdminPanel.js.html otherwise live only in the browser's
- *   DevTools console and are invisible to CLI debugging (`npm run logs:cloud`).
+ *   DevTools console and are invisible otherwise (they show up in the Apps Script executions log).
  *   This handler logs structured client error info via console.error so it shows
  *   up alongside backend logs.
  *
@@ -829,7 +828,7 @@ function handleClientErrorReport(email, payload) {
     const userAgent = cap(payload.userAgent, 200);
 
     // Why: console.error にすることで Cloud Logging の severity が ERROR になり、
-    //      `npm run logs:cloud --severity ERROR` で即座に拾える。
+    //      Apps Script の「実行数」で拾える。
     //      `[client]` prefix で backend ログとの区別を可能にし、`signatureOf` の
     //      集計でも別グループになる。
     const tag = `[client/${level}]`;
@@ -1113,32 +1112,6 @@ function executeWithRetry(operation, options = {}) {
  * @param {string} errorMessage - Error message to analyze
  * @returns {boolean} True if error is retryable
  */
-/**
- * 利用者の許可不足 (OAuth scope が一部だけ) による失敗か。
- *
- * Why 判定ではなく「起きた失敗」で見るか: 2026-10-22 に、開く前に許可の有無を判定する方式
- *   (getAuthorizationInfo) を入れたら、使わない項目を外しているだけの児童 9 人を誤って止めた。
- *   ここは実際に UrlFetch 等が権限エラーで落ちたときだけ true になるので、誤判定で止めない。
- * @param {*} error - Error か文字列
- */
-function isAuthorizationScopeError_(error) {
-  const msg = String((error && error.message) || error || '');
-  return /権限がありません|承認が必要|script\.external_request|Authorization is required/i.test(msg);
-}
-
-// この実行の中で許可不足の失敗が起きたか (読み込みが空になった理由を、画面へ伝えるため)。
-//   GAS は 1 リクエスト = 1 実行なので、実行をまたいで残ることはない。
-let AUTH_SCOPE_FAILURE_SEEN_ = false;
-function noteAuthorizationScopeFailure_(error) {
-  if (isAuthorizationScopeError_(error)) AUTH_SCOPE_FAILURE_SEEN_ = true;
-}
-function authorizationScopeFailureSeen_() {
-  return AUTH_SCOPE_FAILURE_SEEN_;
-}
-
-// 児童に見せる直し方 (サーバのどこから返しても同じ文にする)。
-const AUTH_SCOPE_GUIDANCE = 'このアプリの許可がそろっていません。ブラウザを閉じてから開き直し、出てきた許可の画面ですべての項目にチェックしてください';
-
 function isRetryableError(errorMessage) {
   if (!errorMessage || typeof errorMessage !== 'string') {
     return false;

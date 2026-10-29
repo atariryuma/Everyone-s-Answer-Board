@@ -2,7 +2,7 @@
  * @fileoverview 共有の本体 (サイロ型マルチテナント) から、先生専用の配置へ引っ越す。
  *
  * Why: 2026-10-29、児童は「開いた人として実行」の Apps Script を開けなくなり、先生ごとに
- *   「先生として実行」で配置し直した (isSingleTenant_)。これまでの授業・アーカイブ・ボードの
+ *   「先生として実行」で配置し直した。これまでの授業・アーカイブ・ボードの
  *   設定を新しい配置へ移す。元の DB は先生から見えない (SA にだけ共有) ので、元の本体の
  *   admin API で読み出したもの (lesson.review / getUserConfig) を、この admin API で受け取る。
  *   relay は scripts/migrate-to-single.js。
@@ -11,20 +11,17 @@
  *   - 何度流しても二重にならない (同じ lessonId は飛ばす)。途中で失敗したら、その回に写した
  *     シートは消して半端を残さない
  *   - 授業モードの回答シートは先生のスプレッドシートへ「授業名｜番号 フェーズ名」で写す
- *     (新しく作る授業と同じ名前の付け方 = __singleNativeSheetName_)。元の場所は meta.migratedFrom に残す
+ *     (新しく作る授業と同じ名前の付け方 = __nativeSheetName_)。元の場所は meta.migratedFrom に残す
  *   - フォームで集めた回答シートは、フォームが回答先として掴んでいるので動かさない (参照だけ引き継ぐ)
  *   - アーカイブは lesson_responses に 1 件 1 行で書き直し、snapshot にはポインタだけ残す
  *   - 公開状態は publish lifecycle の関数 (republishMyBoard) でだけ変える
  *   - 元の本体のデータは消さない (写すだけ)
  */
 
-/* global isSingleTenant_, getCachedProperty, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __singleNativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
+/* global getCachedProperty, findUserByEmail, __findLessonById_, __createLessonRow_, __writeArchiveRows_, __nativeSheetName_, __withLessonLock_, applyConfigPatch_, republishMyBoard, advanceLessonPhase, bumpBoardDataVersion_, LESSON_NATIVE_SHEET_HEADERS, createErrorResponse, createSuccessResponse, logError_ */
 
 // 引っ越し先の持ち主 (この配置の先生)。登録がまだなら先に管理パネルを開いてもらう。
 function __migrationOwner_() {
-  if (!(typeof isSingleTenant_ === 'function' && isSingleTenant_())) {
-    return { error: createErrorResponse('先生専用の配置でだけ使えます', null, { error: 'NOT_SINGLE_TENANT' }) };
-  }
   const adminEmail = getCachedProperty('ADMIN_EMAIL');
   const user = adminEmail ? findUserByEmail(adminEmail, { requestingUser: adminEmail }) : null;
   if (!user || !user.userId) {
@@ -65,7 +62,7 @@ function migrateImportLesson(lesson) {
         if (!phase || !phase.sheetName) return;   // まだ始めていないフェーズ
         const srcSheet = src.getSheetByName(phase.sheetName);
         if (!srcSheet) throw new Error('元の回答シートが見つかりません: ' + phase.sheetName);
-        const name = __singleNativeSheetName_(ss, lessonJson, i, lesson.name);
+        const name = __nativeSheetName_(ss, lessonJson, i, lesson.name);
         const dest = srcSheet.copyTo(ss);
         dest.setName(name);
         copied.push(dest);

@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE, sheetsCircuitRetryAfterMs_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -381,6 +381,12 @@ function createTemplateForm(templateType, templateOptions) {
 
     const ss = SpreadsheetApp.create(formTitle + ' (回答)');
     form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+    // 回答シートの列の並びはここで決めたので、種類を書き添えておく (getColumnAnalysis が読む)。
+    try {
+      ss.addDeveloperMetadata(TEMPLATE_DEVELOPER_METADATA_KEY_, type);
+    } catch (metaErr) {
+      logError_('createTemplateForm:addDeveloperMetadata', metaErr);
+    }
 
     let folderUrl = '';
     try {
@@ -394,20 +400,6 @@ function createTemplateForm(templateType, templateOptions) {
       console.warn('フォルダ作成/移動エラー（処理は続行）:', folderError.message);
     }
 
-    // SS 共有デフォルト適用：サービスアカウント editor + ドメイン共有。
-    // Why: サーバ側 DatabaseCore は Sheets REST API + Service Account JWT で SS を読む。
-    //   未共有のままだと view モードで `getPublishedSheetData` が 403 で落ちる。
-    //   作成直後に必ず適用し、教師の手動共有作業を不要にする。fail-soft。
-    let sharingResult = null;
-    try {
-      sharingResult = applySpreadsheetSharingDefaults(ss.getId());
-      if (sharingResult && sharingResult.errors && sharingResult.errors.length) {
-        console.warn('createTemplateForm sharing warnings:', sharingResult.errors.join(' / '));
-      }
-    } catch (sharingError) {
-      console.warn('SS 共有設定エラー（処理は続行）:', sharingError.message);
-    }
-
     return {
       success: true,
       formUrl: form.getPublishedUrl(),
@@ -415,8 +407,8 @@ function createTemplateForm(templateType, templateOptions) {
       formId: form.getId(),
       formTitle: formTitle,
       templateType: type,
+      columnMapping: templateColumnMapping_(type),
       spreadsheetId: ss.getId(),
-      sharing: sharingResult,
       spreadsheetUrl: ss.getUrl(),
       spreadsheetName: ss.getName(),
       sheetName: 'フォームの回答 1',
@@ -428,6 +420,37 @@ function createTemplateForm(templateType, templateOptions) {
   } catch (error) {
     logError_('createTemplateForm', error);
     return createErrorResponse('フォーム作成に失敗しました: ' + error.message);
+  }
+}
+
+// アプリが作ったフォーム (createTemplateForm) の回答シートの列の割り当て。
+//   列の並びは createTemplateForm が決めている: 0 タイムスタンプ / 1 メールアドレス / 2 クラス /
+//   3 名前 / 4〜 種類ごとの問い / その次が理由。推定に任せると、回答が 0〜数件のうちは尺度の列を
+//   数値と見分けられず (2026-10-29 の検証)、公開もフォームの授業の開始もできなかった。
+const TEMPLATE_DEVELOPER_METADATA_KEY_ = 'answerBoardTemplate';
+
+function templateColumnMapping_(type) {
+  const base = { email: 1, class: 2, name: 3 };
+  if (type === 'matrix') return Object.assign(base, { answer: 4, numericX: 4, numericY: 5, reason: 6 });
+  if (type === 'numberline') return Object.assign(base, { answer: 4, numericX: 4, reason: 5 });
+  return Object.assign(base, { answer: 4, reason: 5 });   // board / pie: 選択 + 理由
+}
+
+// 回答シートに書き添えた種類から割り当てを返す。先生がフォームに質問を足して列がずれていたら
+//   (見出しが上の並びと合わない) 使わない = 今までどおり推定する。
+function readTemplateColumnMapping_(spreadsheet, headers) {
+  try {
+    if (!spreadsheet || typeof spreadsheet.getDeveloperMetadata !== 'function') return null;
+    const meta = spreadsheet.getDeveloperMetadata().find(m => m.getKey() === TEMPLATE_DEVELOPER_METADATA_KEY_);
+    const type = meta ? String(meta.getValue() || '') : '';
+    if (!TEMPLATE_LABELS[type]) return null;
+    const mapping = templateColumnMapping_(type);
+    const h = (i) => String((headers || [])[i] == null ? '' : headers[i]).trim();
+    const sameLayout = /メール/.test(h(1)) && h(2) === 'クラス' && h(3) === '名前' && h(mapping.reason) === '理由';
+    return sameLayout ? mapping : null;
+  } catch (error) {
+    console.warn('readTemplateColumnMapping_: 書き添えた種類を読めませんでした (推定に回す):', error && error.message);
+    return null;
   }
 }
 
@@ -627,16 +650,6 @@ function customizeForm(formIdOrUrl, schema) {
           form.setDestination(FormApp.DestinationType.SPREADSHEET, newSs.getId());
           newSpreadsheetId = newSs.getId();
 
-          // 新 SS にも共有デフォルト適用 (createTemplateForm と同じ理由)。
-          // ここを忘れると customizeForm 経由で再生成された SS だけ view が 403 で死ぬ。
-          try {
-            const sr = applySpreadsheetSharingDefaults(newSpreadsheetId);
-            if (sr && sr.errors && sr.errors.length) {
-              console.warn('customizeForm sharing warnings:', sr.errors.join(' / '));
-            }
-          } catch (sharingError) {
-            console.warn('customizeForm SS 共有設定エラー（処理は続行）:', sharingError.message);
-          }
 
           // 旧 SS をトラッシュへ移動（即削除でなく Drive ゴミ箱経由で 30 日猶予）
           if (oldDestId && oldDestId !== newSpreadsheetId) {
@@ -742,15 +755,6 @@ function processFormUrlInput(formUrl) {
         form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
         wasCreated = true;
 
-        // 新規 SS 共有設定 (SA pool 全員を editor 追加) — viewer 経路の 403 防止。
-        try {
-          const sr = applySpreadsheetSharingDefaults(spreadsheetId);
-          if (sr && sr.errors && sr.errors.length) {
-            console.warn('processFormUrlInput sharing warnings:', sr.errors.join(' / '));
-          }
-        } catch (sharingErr) {
-          console.warn('processFormUrlInput SS 共有設定エラー（処理は続行）:', sharingErr.message);
-        }
       } catch (e) {
         logError_('connectDataSource.SpreadsheetApp.create', e);
         return createErrorResponse('スプレッドシートの作成に失敗しました: ' + e.message);
@@ -762,16 +766,6 @@ function processFormUrlInput(formUrl) {
       } catch (e) {
         logError_('connectDataSource.SpreadsheetApp.openById', e);
         return createErrorResponse(`回答先スプレッドシートにアクセスできません: ${e.message}`);
-      }
-      // 既存 SS 取込み時にも SA pool 全員を editor 追加。 これがないと viewer 経路 (SA pool) で
-      // 403 になるが、 教師の手作業 Form 取込みは「動いて当然」 期待なので fail-soft で続行。
-      try {
-        const sr = applySpreadsheetSharingDefaults(spreadsheetId);
-        if (sr && sr.errors && sr.errors.length) {
-          console.warn('processFormUrlInput existing-SS sharing warnings:', sr.errors.join(' / '));
-        }
-      } catch (sharingErr) {
-        console.warn('processFormUrlInput existing-SS 共有設定エラー（処理は続行）:', sharingErr.message);
       }
     }
 
@@ -881,10 +875,6 @@ function validateHeaderIntegrity(targetUserId) {
 // getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
 //   複数の read 経路で同一だったのを集約。
 function buildSheetDataErrorResult_(result) {
-  // 読めなかった理由が利用者の許可不足なら、BUSY (待てば直る) ではなく直し方を返す。
-  if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
-    return createErrorResponse(AUTH_SCOPE_GUIDANCE, [], { error: 'AUTH_REQUIRED', sheetName: '', header: '許可が必要です' });
-  }
   if (result && result.busy) return result;   // BUSY はそのまま (受け手が busy で見分ける)
   return {
     success: false,
@@ -1182,8 +1172,7 @@ function getBoardDataVersion_(userId) {
 }
 
 // email は大文字小文字を区別しない。 owner 判定 (isOwnBoard) で case 差により所有者を
-// viewer と誤判定 → 非公開ボードで誤って deny するのを防ぐ。 DatabaseCore の
-// validateServiceAccountUsage と同じ正規化基準で揃える。
+// viewer と誤判定 → 非公開ボードで誤って deny するのを防ぐ。
 function sameEmail_(a, b) {
   return String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim();
 }
@@ -1202,7 +1191,7 @@ function bumpBoardDataVersion_(userId) {
  *   publishApp と __applyPublishStateChange の 2 経路が共有する mechanism。
  *   「いつ呼ぶか」(状態変化時のみ / publish 時のみ 等) は呼び出し側の policy で、 ここは
  *   「何を無効化するか」だけを持つ:
- *     - primary spreadsheetId + 旧 profiles の spreadsheetId の sa_validation cache
+ *     - primary spreadsheetId + 旧 profiles の spreadsheetId のアクセス判定 cache
  *     - userId 単位の board data version (全 filter/sort を一度に stale 化)
  *   typeof guard は GAS multi-file 環境で別ファイルの helper が test 単独 load 時に未定義でも
  *   落ちないため (既存 bumpBoardDataVersion_ 呼び出しと同じ方針)。
@@ -1210,14 +1199,14 @@ function bumpBoardDataVersion_(userId) {
  * @param {string} userId
  */
 function invalidateBoardCaches_(config, userId) {
-  if (config && typeof invalidateSaValidationCache_ === 'function') {
+  if (config && typeof invalidateAccessDecisionCache_ === 'function') {
     if (config.spreadsheetId) {
-      try { invalidateSaValidationCache_(config.spreadsheetId); } catch (_) { /* ignore */ }
+      try { invalidateAccessDecisionCache_(config.spreadsheetId); } catch (_) { /* ignore */ }
     }
     if (Array.isArray(config.profiles)) {
       for (const p of config.profiles) {
         if (p && p.spreadsheetId) {
-          try { invalidateSaValidationCache_(p.spreadsheetId); } catch (_) { /* ignore */ }
+          try { invalidateAccessDecisionCache_(p.spreadsheetId); } catch (_) { /* ignore */ }
         }
       }
     }
@@ -1287,9 +1276,6 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     waitMs: 500,
     waitTries: 6,
     failTtl: BOARD_DATA_FAIL_TTL_SEC,
-    // 読んだ児童の許可不足で落ちたなら、ボードが混んでいるわけではない。覚えると、その 1 人の
-    //   せいで他の全員が 8 秒 busy になる (許可不足の児童が先に読みに来た回だけ起きる)。
-    isSharedFailure: () => !(typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()),
     busyValue: boardDataBusyResult_(),
     pack: packBoardDataForCache_,
     unpack: unpackBoardDataFromCache_
@@ -1748,20 +1734,13 @@ function getNotificationUpdate(targetUserId, options = {}) {
           { allowStale: isViewerOnly })
       : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
 
-    // 読めなかった理由が利用者の許可不足なら、「混雑」として黙らず直し方を返す (待っても直らない)。
-    //   busy より先に見る: 許可不足の読み取り失敗は BUSY (一部読めず) の形でも届く。
-    if ((!userData || !userData.success || userData.busy)
-        && typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
-      return createErrorResponse(AUTH_SCOPE_GUIDANCE, null, { error: 'AUTH_REQUIRED' });
-    }
     // 混んでいる間は「新着なし」で返す (lessonPhase / boardVersion は届ける)。失敗にすると
     //   児童の polling が backoff に入り、フェーズ切替の通知まで遅れる。
     if (userData && userData.busy) {
       // 何 ms 後に来てほしいかを添える (HTTP の Retry-After 相当。google.script.run は
-      //   ヘッダを渡せないので応答の項目で返す)。直前の失敗を覚えている間 (8 秒) や breaker が
-      //   開いている間に来ても、読まずに busy を返すだけなので、その間は問い合わせを控えてもらう。
-      const retryAfterMs = Math.max(BOARD_DATA_FAIL_TTL_SEC * 1000,
-        (typeof sheetsCircuitRetryAfterMs_ === 'function') ? sheetsCircuitRetryAfterMs_() : 0);
+      //   ヘッダを渡せないので応答の項目で返す)。直前の失敗を覚えている間 (8 秒) に来ても、
+      //   読まずに busy を返すだけなので、その間は問い合わせを控えてもらう。
+      const retryAfterMs = BOARD_DATA_FAIL_TTL_SEC * 1000;
       return Object.assign(envelope, { hasNewContent: false, boardBusy: true, retryAfterMs });
     }
     if (userData && userData.stale) envelope.boardStale = true;
@@ -1797,8 +1776,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
  *
  * これがないと、 setup 系エンドポイント (getColumnAnalysis / connectDataSource) に任意の
  * spreadsheetId を渡すだけで、 (1) 他人の公開ボード SS のヘッダ + サンプル 10 行 (email 列含む
- * 生データ) を SA pool 経由で読める、 (2) SA pool editor 共有を勝手に適用できる、 という
- * 情報漏えい / 副作用が起きる。 admin は他ユーザーの SS を扱う正当な必要があるため例外。
+ * 生データ) を読める、 という情報漏えいが起きる。 admin (先生) は自分の SS を扱うので例外。
  *
  * @param {string} spreadsheetId
  * @returns {boolean}
@@ -1837,12 +1815,6 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
     }
 
-    // SA pool 全員を editor 追加して board の cross-user 経路 (viewer/admin) を有効化。
-    try {
-      applySpreadsheetSharingDefaults(spreadsheetId);
-    } catch (sharingError) {
-      console.warn('connectDataSource: SA sharing setup failed (non-critical):', sharingError.message);
-    }
 
     if (batchOperations && Array.isArray(batchOperations)) {
       return processDataSourceOperations(spreadsheetId, sheetName, batchOperations);
@@ -1939,7 +1911,7 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     }
 
     // 所有者検証: 列分析は setup/owner 操作。 任意 SS の生サンプル (email 列含む) を
-    //   非所有者が SA pool 経由で読めてしまう穴を塞ぐ。 admin は cross-user 分析が正当。
+    //   非所有者が読めてしまう穴を塞ぐ。 admin (先生) は自分の SS を分析するので通す。
     if (!isAdministrator(email) && !callerCanAccessSpreadsheet_(spreadsheetId)) {
       console.warn('getColumnAnalysis: caller lacks access to spreadsheet:', `${email.split('@')[0]}@***`);
       return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
@@ -1951,14 +1923,14 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
       if (!dataAccess) {
         return {
           success: false,
-          error: 'スプレッドシートにアクセスできません。 管理者の場合は「再 verify」 を試すか、 設定を確認してください。'
+          error: 'スプレッドシートを開けませんでした。フォームの回答先が削除されていないか確認してください。'
         };
       }
     } catch (accessError) {
       console.warn('getColumnAnalysis: Spreadsheet access failed for user:', `${email.split('@')[0]}@***`, accessError.message);
       return {
         success: false,
-        error: 'スプレッドシートにアクセス権がありません。 管理者の場合は SA pool の状態を確認してください。'
+        error: 'スプレッドシートを開けませんでした。しばらくしてからもう一度お試しください。'
       };
     }
 
@@ -1992,8 +1964,11 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     const diagnostics = performIntegratedColumnDiagnostics(headers, {
       sampleData, boardMode, includeNumericScale: true
     });
-    const mergedMapping = { ...(diagnostics.recommendedMapping || {}) };
+    // アプリが作ったフォームなら列の意味は決まっている (推定より優先)。
+    const templateMapping = readTemplateColumnMapping_(dataAccess.spreadsheet, headers);
+    const mergedMapping = { ...(templateMapping || diagnostics.recommendedMapping || {}) };
     const mergedConfidence = { ...(diagnostics.confidence || {}) };
+    if (templateMapping) Object.keys(templateMapping).forEach((k) => { mergedConfidence[k] = 100; });
     const numericCandidates = Array.isArray(diagnostics.numericScaleCandidates)
       ? diagnostics.numericScaleCandidates
       : [];
@@ -2078,9 +2053,7 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
         };
       }
 
-    // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet は
-    //   circuit breaker + SA pool failover + retry を一括で提供する。 直接呼びで envelope を
-    //   バイパスすると 429 storm 時に簡単にロックアウトする。
+    // openSpreadsheet を通す: 開かせてよいか (checkSpreadsheetAccess_) を判定してから開く。
     const dataAccess = openSpreadsheet(spreadsheetId, { context: 'addReactionColumns' });
     if (!dataAccess) {
       throw new Error(`Cannot open spreadsheet ${spreadsheetId}`);
@@ -2225,25 +2198,19 @@ function isValidFormUrl(url) {
   if (!url || typeof url !== 'string') {
     return false;
   }
-
-  try {
-    const urlObj = new URL(url.trim());
-
-    if (urlObj.protocol !== 'https:') {
-      return false;
-    }
-
-    const validHosts = ['docs.google.com', 'forms.gle'];
-    const isValidHost = validHosts.includes(urlObj.hostname);
-
-    if (urlObj.hostname === 'docs.google.com') {
-      return urlObj.pathname.includes('/forms/') || urlObj.pathname.includes('/viewform');
-    }
-
-    return isValidHost;
-  } catch {
+  // URL クラスは使わない: Apps Script の V8 には無く、new URL が ReferenceError → catch で
+  //   どんな URL も false になっていた (管理パネルにフォームの URL を貼ると必ず
+  //   「GoogleフォームのURLを入力してください」。Node のテストには URL があるので通っていた)。
+  const m = url.trim().match(/^https:\/\/([^/?#:@]+)(?::\d+)?(?=[/?#]|$)([^?#]*)/i);
+  if (!m) {
     return false;
   }
+  const hostname = m[1].toLowerCase();
+  const pathname = m[2];
+  if (hostname === 'docs.google.com') {
+    return pathname.includes('/forms/') || pathname.includes('/viewform');
+  }
+  return hostname === 'forms.gle';
 }
 
 /**

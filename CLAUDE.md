@@ -22,61 +22,53 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run push              # Push code to GAS
-npm run pull              # Pull from GAS
-npm run logs              # View execution logs
-npm test                  # Run all tests
-npm run deploy:prod       # URL維持で本番デプロイ（pushも含む）
-npm run deploy            # 新しいURLでデプロイ（テスト用）
+npm test                                 # Run all tests
 node --test tests/main.doPost.test.cjs   # Run a single test file
+npm run deploy                           # 全員の配置を更新 (URL はそのまま。deploy-single.js deploy --all)
+npm run deploy:single -- deploy --name <名前>   # 1 人分だけ更新
+npm run deploy:single -- create --name <名前> --adminEmail <先生のメール>   # 先生を足す
+npm run verify:e2e -- t260781p-verify    # 検証用の配置で画面の機能を端から端まで動かす (54 項目)
 ```
 
-**Dev workflow**: Edit locally → `npm test` → `npm run deploy:prod` → Git commit → `git push`
+**配置の形**: 先生ごとに 1 つ、先生の Drive のスプレッドシートに紐づいたアプリを「先生として実行」で配置する
+(`src/appsscript.json` の `webapp.executeAs = USER_DEPLOYING`)。データ (users / lessons / 授業の回答シート) は
+そのスプレッドシート 1 つに入る。配置ごとに違うのは `src/Deployment.js` (先生のメールと DB の SS ID) だけで、
+`scripts/deploy-single.js` が焼き込む。先生ごとの値は `scripts/single-tenants.json` (git に入れない)。
+Why: 2026-10-29 から児童アカウントは「開いた人として実行」の Apps Script を一切開けない (管理側の設定)。
 
-**CI** (.github/workflows/ci.yml): Syntax check + `npm run lint:errors` + `npm test`（品質ゲートのみ。デプロイはローカルの `deploy:prod` で行う）
+**Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name t260781p-verify` →
+`npm run verify:e2e -- t260781p-verify` → `npm run deploy` → Git commit → `git push`
 
-**2 テナント構成**: 本番は GAS 2 つ（那覇市 = default / 沖縄県 = open）。`deploy:prod` は那覇市のみを更新する。両方まとめて反映するには `npm run deploy:all`（那覇→沖縄を順にデプロイ）を使う。沖縄県のみは `npm run deploy:open`（`push:open` / `api:open` / `logs:open` も同様）。沖縄県の deploy 忘れによる旧コードドリフトを防ぐため、src 変更時は `deploy:all` 推奨。
+**検証用の配置** (`t260781p-verify`): `extraFiles: ["scripts/verify/DevInvoke.js"]` 付き。admin API の `dev.invoke` で
+画面が `google.script.run` で呼ぶ処理を名前で呼べる (児童のふりは `as`)。本番の先生には付けない。
+
+**CI** (.github/workflows/ci.yml): Syntax check + `npm run lint:errors` + `npm test`（品質ゲートのみ。配置はローカルで行う）
 
 ---
 
-## Admin API (本番アプリの状態取得・操作)
+## Admin API (配置の状態取得・操作)
 
 doPost の `adminApi` アクションに API キー認証でアクセス。ディスパッチャーは `src/AdminApis.js:dispatchAdminOperation()`。
+`npm run api` の送り先は `single-tenants.json` の配置 (`--tenant <名前>`、省略時は検証用を除く最初の配置)。
 
 ```bash
 npm run api -- systemDiagnosis                # DB接続・設定・デプロイ状態の健康診断
 npm run api -- getLogs --limit 20             # セキュリティログ
-npm run api -- getUsers                       # 全ユーザー一覧と設定状態
+npm run api -- getUserConfig --userId X       # ボードの設定
 npm run api -- setUserConfig --userId X --patch '{...}'  # config パッチ適用
 npm run api -- previewBoard --userId X        # viewer 視点の公開ボードプレビュー
 ```
 
 **いつ使うか:**
 
-- デプロイ後 → `systemDiagnosis` で本番が壊れていないか確認
+- 配置の後 → `systemDiagnosis` で壊れていないか確認
 - エラー調査時 → `getLogs` でセキュリティログ、`perfMetrics` でボトルネック特定
-- ユーザー問題の調査 → `getUsers` で設定状態を確認
 - 設定変更後 → `listProperties` で反映を確認
 
-**全コマンド一覧**（ユーザー/ボード CRUD、Script Properties、SA pool 管理、Form 操作 v3、負荷検証）: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-2。
+**実行ログ**: 先生ごとの配置は既定の GCP project で動くので、Cloud Logging を CLI から読めない。
+Apps Script エディタの「実行数」で見る。フロントエンドのエラーも `reportClientError` で同じ場所に出る。
 
----
-
-## Cloud Logging (実行ログの取得・分析)
-
-GCP の Cloud Logging API から GAS 実行ログを直接取得する。ブラウザ不要。
-
-```bash
-npm run logs:cloud -- --severity ERROR --hours 24   # 直近24hのエラー
-npm run logs:cloud -- --user 35t22                  # 特定ユーザーでフィルタ
-npm run logs:tail                                   # 直近10分 ERROR（デプロイ直後の確認）
-```
-
-**デフォルトで自分の deployment に絞る**: 那覇市版の GCP project は別 GAS アプリ (students/events_202604) と同居しており、そちらの ERROR が紛れ込む。`config.prodDeployId` で事前フィルタするため、デフォルトでは自アプリのログのみ返る。全アプリ見たい場合は `--all-deployments`。
-
-**フロントエンドエラーも収集される**: `window.error` / `unhandledrejection` / `ErrorHandler.logError` は `reportClientError` doPost アクション経由で Cloud Logging に流れる（`[client/error]` プレフィックス）。`?debug=1` を付けると `console.log/warn` も収集（20件/セッション上限）。
-
-**全 CLI オプション一覧**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-1。
+**全コマンド一覧**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-2。
 
 ---
 
@@ -112,25 +104,27 @@ main.js (doGet/doPost routing, auth)
 
 - **Apis files** group endpoints by domain (AdminApis, UserApis, DataApis)
 - **Service files** contain pure business logic (ConfigService, DataService, UserService, ReactionService)
-- **DatabaseCore.js**: All spreadsheet I/O, SA pool (round-robin + cooldown + 2-tier token cache), circuit breaker, `executeWithRetry`
-- **SharingHelper.js**: SS 共有設定 (SA pool 全員を editor 追加; 旧 domain-wide sharing は廃止)
+- **DatabaseCore.js**: users シートの CRUD と、スプレッドシートを開くときのアクセス判定 (`checkSpreadsheetAccess_` → `SpreadsheetApp.openById`)
 - **SystemController.js**: System diagnostics, performance monitoring, deployment management (`publishApp` with etag conflict detection)
 - **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty` (30s TTL cache for PropertiesService)
 - **validators.js**: All input validation functions
 
-### SA Pool アーキテクチャ
+### アクセス (誰が何を開けるか)
 
-「通常 Google Form 同等」セキュリティモデル: viewer (生徒) は SS 直接権限を持たず Web App 経由のみ、owner (教師) は自分の SS を `openById` 直接。cross-user アクセス (viewer 閲覧 / admin 管理) を **SA pool** (round-robin + 30s cooldown) が担う。
+先生として実行するので、読み書きはすべて `SpreadsheetApp.openById` で直接行う (実行者 = 先生 = すべてのシートの持ち主)。
+サービスアカウント・Sheets API の直叩き・共有設定は使わない。「誰に見せてよいか」だけを `checkSpreadsheetAccess_`
+(DatabaseCore.js) が決める:
 
-**アクセスモード自動振り分け** (`validateServiceAccountUsage` → `accessMode`, `openSpreadsheet` が経路判定):
+| 呼び出し元 | DB | 公開中のボードのシート | 非公開のボードのシート | どのボードにも無いシート |
+| ---------- | -- | ---------------------- | ---------------------- | ------------------------ |
+| **先生 (管理者)** | 可 | 可 | 可 | 可 (作ったばかりのフォームの回答先など) |
+| **児童・ほかの先生** | 可 | 可 | 不可 | 不可 |
 
-| Caller | DB | own board | 他人公開 | 他人非公開 |
-| ------ | -- | --------- | -------- | ---------- |
-| **owner (editor)** | sa | **own (openById)** | sa | denied |
-| **admin** | sa | **own** | sa | sa |
-| **viewer (生徒)** | sa | — | sa | denied |
+- 判定は 60 秒 cache (不許可は 5 秒)。公開状態が変わったら `invalidateAccessDecisionCache_` で版を上げて古くする
+- ほかの先生 (共同編集者) はボード SS の編集者。`isBoardCollaborator` が DriveApp で編集者を読む (AccessControl.js)
+- 同時に動かせる処理は先生 1 人あたり 30 本 (Apps Script の上限)。2026-10-29 に 60 本同時でもエラーなし
 
-**設計詳細** (round-robin / cooldown / 2 段 token cache / per-row CAS lock / board data cache / sa_validation invalidate / 負荷検証): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+**設計詳細**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### Theme / Color アーキテクチャ
 
@@ -160,9 +154,9 @@ main.js (doGet/doPost routing, auth)
 
 | 層 | TTL | 用途 | 注意 |
 | -- | --- | ---- | ---- |
-| `getCachedProperty(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID, SA creds 等) | write は必ず `setCachedProperty` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
-| `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, SA tokens, rate-limit counter, 429 cooldown) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck()` 経由 |
-| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (SA creds JSON, ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
+| `getCachedProperty(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID 等) | write は必ず `setCachedProperty` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
+| `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, アクセス判定, rate-limit counter) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck()` 経由 |
+| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js` 参照) |
 
 **判断フロー (新規 cache を書く時):**
 
@@ -210,7 +204,11 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 
 ### Data Store
 
-Google Sheets as database via service account. `users` sheet stores user records; each user's board config is in a JSON `configJson` column (see `src/SystemController.js` `USERS_SHEET_HEADERS`).
+先生のスプレッドシートが DB。`users` シート (先生 1 人分) の `configJson` 列にボードの設定、`lessons` / `lesson_responses` に授業とアーカイブ、授業モードの回答シートは「授業名｜番号 フェーズ名」で同じスプレッドシートに入る (see `src/SystemController.js` `USERS_SHEET_HEADERS`)。
+
+アプリが作ったフォーム (`createTemplateForm`) は回答シートの列の並びが決まっているので、作った時点の割り当て
+(`templateColumnMapping_`) を使い、推定しない (回答 0 件では尺度の列を数値と見分けられないため)。
+回答シートには種類を developer metadata で書き添え、`getColumnAnalysis` が見出しの並びを確かめて使う。
 
 ### Visualization Modes
 
@@ -301,18 +299,17 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 - `publishApp` accepts only allowlisted fields with `etag` conflict detection - maintain both
 - `doPost` actions are allowlist-managed; adding an action requires adding its input validation simultaneously
 - Include order は `scripts/gen-pagehead.js` の `ORDER` で定義。変更は独立コミットで
-- **生成物を手で編集しない** - `src/UtilityStyles.css.html` (`gen:utilities`) と `src/SharedPageHead.html` (`gen:pagehead`) は生成物。元ファイルを直したら再生成する。`deploy:prod` の preflight と CI が鮮度を検証する
+- **生成物を手で編集しない** - `src/UtilityStyles.css.html` (`gen:utilities`) と `src/SharedPageHead.html` (`gen:pagehead`) は生成物。元ファイルを直したら再生成する。`deploy-single.js` の preflight と CI が鮮度を検証する
 
 ### Board Publish Lifecycle (single source of truth)
 
-`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **4 関数のみ**。直接 saveUserConfig で書き換えてはいけない（DRY 違反 + テスト不可）：
+`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **3 関数のみ**。直接 saveUserConfig で書き換えてはいけない（DRY 違反 + テスト不可）：
 
 | 関数 | 場所 | 役割 |
 | ---- | ---- | ---- |
 | `publishApp(publishConfig)` | `SystemController.js` | 初回公開 / 設定差し替えを伴う公開（allowlist + etag 検証） |
 | `republishMyBoard(options?)` | `AdminApis.js` | 所有者が自分のボードを再び公開する（state のみ） |
 | `unpublishBoard(targetUserId?, options?)` | `AdminApis.js` | 所有者 or 管理者がボードの公開を終了する |
-| `toggleUserBoardStatus(targetUserId, options?)` | `AdminApis.js` | 管理者が他ユーザーのボード公開状態を toggle する |
 
 **統一不変条件**（`__applyPublishStateChange` で集約）：
 
@@ -339,24 +336,20 @@ Tests run in Node.js using `node:test` (no frameworks). GAS globals are stubbed 
 
 ## clasp + Git
 
-- **Never commit**: `.clasp.json`, `.clasprc.json` (contain sensitive scriptId/credentials)
-- **Do commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`, `.clasp.json.template`
+- **Never commit**: `.clasp.json`, `.clasprc.json`, `scripts/single-tenants.json` (scriptId / API キー / 先生ごとの値)
+- **Do commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`
+- 配置は `.single-stage/<名前>/` で組み立てて clasp に渡す (`-P . -I .` 必須。付けないと親の `.clasp.json` を拾う)
 - File extension: `.js` locally (clasp convention), shows as `.gs` in GAS editor
 
 ### Required Script Properties
 
-Set via GAS editor (先生専用の配置では `ADMIN_EMAIL` / `DATABASE_SPREADSHEET_ID` を `ensureSingleTenantBootstrap_` が `Tenancy.js` の値で初回に入れる):
+配置の初回に `ensureDeploymentBootstrap_` が `Deployment.js` の値から入れる (手で入れる必要はない):
 
 | Property | Description |
 | -------- | ----------- |
-| `ADMIN_EMAIL` | Administrator email address |
-| `DATABASE_SPREADSHEET_ID` | Main database spreadsheet ID |
-| `SERVICE_ACCOUNT_CREDS` | Primary SA JSON credentials |
-| `SERVICE_ACCOUNT_CREDS_2` 〜 `_10` | (Optional) SA pool secondaries (700人スケールで 3-5 個推奨) |
-| `GOOGLE_CLIENT_ID` | (Optional) OAuth client ID |
-| `ADMIN_API_KEY` | Admin API authentication key |
-
-SA pool のセキュリティモデル・アクセス経路の詳細は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+| `ADMIN_EMAIL` | この配置の先生 (管理者) |
+| `DATABASE_SPREADSHEET_ID` | 先生のスプレッドシート (DB) |
+| `ADMIN_API_KEY` | Admin API の鍵 (初回に `setupApiKey` で決める。`single-tenants.json` に控える) |
 
 ---
 

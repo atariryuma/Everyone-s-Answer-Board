@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global isSingleTenant_, acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, openSpreadsheetViaServiceAccount, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, applySpreadsheetSharingDefaults, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_, authorizationScopeFailureSeen_, AUTH_SCOPE_GUIDANCE */
+/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, getUserConfig, findPublishedBoardOwner, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, bumpBoardDataVersion_, emailToShortHash, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck, withStampedeGuard_, prewarmBoardDataCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -111,16 +111,13 @@ function __lessonsSheetExists_(spreadsheet) {
 }
 
 // 回答アーカイブシートの handle。__getLessonsSheet_ と同じ lazy bootstrap 方式。
-//   createIfMissing の SpreadsheetApp 経路は呼び出し元に DB の編集権があるときだけ通る
-//   (先生専用の配置では ensureSingleTenantBootstrap_ が ensure 済みなので、実運用でここが走ることは稀)。
+//   (ensureDeploymentBootstrap_ が配置の初回にそろえるので、実運用で作る側が走ることは稀)。
 function __getResponsesSheet_(opts) {
   const spreadsheet = openDatabase();
   if (!spreadsheet) return null;
   if (!__dbSheetExists_(spreadsheet, LESSON_RESPONSES_SHEET)) {
     if (!opts || !opts.createIfMissing) return null;
     try {
-      // SA proxy の insertSheet (batchUpdate) を優先: 呼び出し元の権限に依らず動く。
-      //   proxy でない native Spreadsheet (setup 経路) でも同名 API があるので共通で呼べる。
       const newSheet = spreadsheet.insertSheet(LESSON_RESPONSES_SHEET);
       if (newSheet && newSheet.appendRow) newSheet.appendRow(LESSON_RESPONSES_SHEET_HEADERS);
     } catch (createErr) {
@@ -140,8 +137,7 @@ function __getResponsesSheet_(opts) {
  * @returns {Object|null} { sheet, startRow, rowCount } / 書けなければ null
  *
  * 整合性の要:
- *   - 追記は 1 回の呼び出しで行う (SA proxy の appendRows = values:append は連続範囲を保証)。
- *   - proxy 経由でない sheet (test / native) には getLastRow → setValues で fallback する。
+ *   - 追記は 1 回の setValues で行う (getLastRow の次の行から連続した範囲)。
  *   - 再 capture 時に旧範囲の行は残る (孤児行)。ポインタが差し替わるだけなので無害で、
  *     読み出しは lessonId + phaseIndex を照合するため誤読もしない。
  */
@@ -162,21 +158,27 @@ function __writeArchiveRows_(lessonId, phaseIndex, projectedRows) {
     (typeof r.numericX === 'number') ? r.numericX : '',
     (typeof r.numericY === 'number') ? r.numericY : ''
   ]);
+  // 行を決めて書く間だけ key の lock を取る (フェーズ送りと終了が重なっても範囲がかぶらない)。
+  //   ScriptLock にしないのは、呼び出し側が __withLessonLock_ の中にいることがあるため (入れ子にしない)。
+  const lockToken = (typeof acquireCacheLock_ === 'function')
+    ? acquireCacheLock_(LESSON_RESPONSES_APPEND_LOCK_, { ttlSec: 30, waitMs: 10000 })
+    : 'nolock';
+  if (!lockToken) {
+    console.warn('__writeArchiveRows_: 追記の順番待ちが長すぎて書けませんでした', { lessonId, phaseIndex });
+    return null;
+  }
   try {
-    if (typeof sheet.appendRows === 'function') {
-      const res = sheet.appendRows(values);
-      if (!res || !(res.startRow > 0)) return null;
-      return { sheet: LESSON_RESPONSES_SHEET, startRow: res.startRow, rowCount: values.length };
-    }
-    // fallback (test harness / native Sheet): 単一実行内なので getLastRow → setValues で足りる
     const startRow = sheet.getLastRow() + 1;
     sheet.getRange(startRow, 1, values.length, values[0].length).setValues(values);
     return { sheet: LESSON_RESPONSES_SHEET, startRow, rowCount: values.length };
   } catch (err) {
     logError_('__writeArchiveRows_', err);
     return null;
+  } finally {
+    if (typeof releaseCacheLock_ === 'function') releaseCacheLock_(LESSON_RESPONSES_APPEND_LOCK_, lockToken);
   }
 }
+const LESSON_RESPONSES_APPEND_LOCK_ = 'lesson_responses_append_lock';
 
 function __getLessonsSheet_(opts) {
   const spreadsheet = openDatabase();
@@ -184,9 +186,7 @@ function __getLessonsSheet_(opts) {
   const exists = __lessonsSheetExists_(spreadsheet);
   if (!exists) {
     if (!opts || !opts.createIfMissing) return null;
-    // Lazy bootstrap: 既存 DB に lessons sheet が無いケース (Phase 1+2 デプロイ前に
-    //   セットアップされた tenant) で初回 write 時に作成する。SpreadsheetApp 経由は
-    //   呼び出し元 (admin) の権限で動くため SA token 不要。
+    // Lazy bootstrap: DB に lessons sheet が無いとき、初回 write 時に作る。
     try {
       const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
       if (!dbId) return null;
@@ -245,7 +245,6 @@ function __rowToLesson_(row, cols) {
  * Why 1 回か: 以前は getLastRow (寸法) + TextFinder + header + 該当行 の 4 呼び出しで
  *   1 件を引いていた。lessons はテナントあたり数十行なので、全行を 1 回で読んで
  *   メモリ上で探す方が Sheets API の read 回数が 1/4 になる (quota は read 回数で数える)。
- *   SA proxy の getDataRange は values API の「実データ範囲」を返すので空グリッドは読まない。
  * @returns {{sheet:Object, cols:Object, rows:Array}|null} rows[i] はシートの i+2 行目
  */
 function __readLessonsTable_() {
@@ -483,23 +482,7 @@ function __deleteLessonRow_(lessonId) {
     try {
       const found = __findLessonById_(lessonId);
       if (!found || !found.lesson) return createErrorResponse('LESSON_NOT_FOUND');
-      // DB は SA 経由で開いている (found.sheet は SA proxy)。proxy の deleteRows (batchUpdate) で消す。
-      //   Why: 旧コードは SpreadsheetApp.openById(DB) を呼び出し元の権限で開いていた。DB シートの
-      //   編集権を持つのは管理者だけなので、教師 (所有者) の「削除」は毎回権限エラーになっていた。
-      const proxySheet = found.sheet;
-      if (proxySheet && typeof proxySheet.deleteRows === 'function') {
-        proxySheet.deleteRows(found.rowIndex, 1);
-      } else if (proxySheet && typeof proxySheet.deleteRow === 'function') {
-        proxySheet.deleteRow(found.rowIndex);
-      } else {
-        // 旧経路 (admin が DB の editor のときだけ通る)
-        const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
-        if (!dbId) return createErrorResponse('DATABASE_NOT_CONFIGURED');
-        const ss = SpreadsheetApp.openById(dbId);
-        const sheet = ss.getSheetByName('lessons');
-        if (!sheet) return createErrorResponse('LESSONS_SHEET_NOT_FOUND');
-        sheet.deleteRow(found.rowIndex);
-      }
+      found.sheet.deleteRow(found.rowIndex);
       __invalidateLessonRecord_(lessonId);
       return { success: true };
     } catch (error) {
@@ -1171,7 +1154,7 @@ function __notOnBoardResponse_(boardLessonId) {
 function __attachBoardToLessonPhase_(userId, lessonId, lessonJson, phaseIdx, switched) {
   const phase = (lessonJson.phases || [])[phaseIdx];
   __setFormAcceptingResponses_(phase, true);
-  const result = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phase, lessonJson, lessonId), { publish: false });
+  const result = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phase, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
   if (!result.success) return result;
   if (switched && typeof bumpBoardDataVersion_ === 'function') {
     try { bumpBoardDataVersion_(userId); } catch (e) {
@@ -1253,84 +1236,22 @@ function __templateToBoardMode_(formTemplate) {
 /**
  * native phase 用の回答シートを用意する。
  *
- * 1 授業 = 1 スプレッドシート、1 フェーズ = 1 シート。
+ * 授業ごとにスプレッドシートを作らず、先生のスプレッドシート (DATABASE_SPREADSHEET_ID) に
+ * 「授業名｜番号 フェーズ名」のシートを足す (1 フェーズ = 1 シート)。
  * Why フェーズごとにシートを分けるか: 「最初の考え」と「いまの考え」は別の記録であって
  *   同じ列の上書きではない。分けておけば片方が消えることがなく、フェーズ内では
  *   1 児童 1 行が保証されるので突合も単純になる。
+ * Why 先生のスプレッドシートに入れるか: 先生が自分の授業の記録を 1 つのファイルで見渡せる
+ *   (ユーザー要望 2026-10-29)。実行者 = 先生 = 持ち主なので共有設定も addEditor も要らない。
  *
  * @returns {{spreadsheetId:string, sheetName:string}|null}
  */
-function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName, ownerEmail) {
-  if (typeof isSingleTenant_ === 'function' && isSingleTenant_()) return __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName);
-  // スプレッドシートは授業に 1 つ。既に作ってあれば使い回す (resume 時の二重作成防止)。
-  let ssId = lessonJson.nativeSpreadsheetId || '';
-  let ss = null;
-  if (ssId) {
-    try {
-      ss = SpreadsheetApp.openById(ssId);
-    } catch (openErr) {
-      logError_('__ensureNativeAnswerSheet_:open', openErr);
-      ss = null;
-      ssId = '';
-    }
-  }
-  if (!ss) {
-    ss = SpreadsheetApp.create(`「${lessonName || '授業'}」の回答`);
-    ssId = ss.getId();
-    lessonJson.nativeSpreadsheetId = ssId;
-    // 児童の投稿は SA pool 経由で書かれる (児童は SS への直接権限を持たない)。
-    //   Form 回答シートと同じ共有既定を当てないと、投稿が権限エラーで落ちる。
-    try {
-      applySpreadsheetSharingDefaults(ssId);
-    } catch (shareErr) {
-      logError_('__ensureNativeAnswerSheet_:share', shareErr);
-    }
-    // ボードの所有者 (教師) を editor に加える。
-    //   Why 必須か: SpreadsheetApp.create は「実行した人」の Drive に作る。管理者が
-    //   教師の代わりに授業を開始すると、教師が所有しない SS がボードの参照先になる。
-    //   owner は自分のボードを openById で直接開く経路を通る (SA を使わない) ので、
-    //   編集権が無いと教師自身のボードが開けなくなる。作成者本人なら no-op。
-    if (ownerEmail) {
-      try {
-        ss.addEditor(ownerEmail);
-      } catch (ownerErr) {
-        logError_('__ensureNativeAnswerSheet_:owner', ownerErr);
-      }
-    }
-  }
-
-  const sheetName = `phase${phaseIdx + 1}`;
-  let sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    // 1 枚目は create 時の既定シートを流用して名前を変える (空シートを残さない)。
-    const sheets = ss.getSheets();
-    if (sheets.length === 1 && sheets[0].getLastRow() === 0) {
-      sheet = sheets[0].setName(sheetName);
-    } else {
-      sheet = ss.insertSheet(sheetName);
-    }
-    sheet.appendRow(LESSON_NATIVE_SHEET_HEADERS);
-  }
-  return { spreadsheetId: ssId, sheetName };
-}
-
-/**
- * 先生専用の配置 (isSingleTenant_) では、授業ごとにスプレッドシートを作らず、
- * 先生のスプレッドシート (DATABASE_SPREADSHEET_ID) に「授業名｜フェーズ名」のシートを足す。
- *
- * Why: 先生が自分の授業の記録を 1 つのファイルで見渡せるようにする (ユーザー要望 2026-10-29)。
- *   実行者 = 先生 = 持ち主なので共有設定も addEditor も要らない。
- *   シート名の頭 (nativeSheetPrefix) は授業に 1 回だけ決めて lessonJson に残す。同じ名前の授業
- *   (複製など) とシートが混ざらないよう、既に使われていれば「（2）」を付ける。
- *
- * @returns {{spreadsheetId:string, sheetName:string}|null}
- */
-function __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName) {
+function __ensureNativeAnswerSheet_(lessonJson, phaseIdx, lessonName) {
   const ssId = getCachedProperty('DATABASE_SPREADSHEET_ID');
   if (!ssId) return null;
   const ss = SpreadsheetApp.openById(ssId);
   lessonJson.nativeSpreadsheetId = ssId;
-  const sheetName = __singleNativeSheetName_(ss, lessonJson, phaseIdx, lessonName);
+  const sheetName = __nativeSheetName_(ss, lessonJson, phaseIdx, lessonName);
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
@@ -1345,7 +1266,7 @@ function __ensureNativeAnswerSheetSingle_(lessonJson, phaseIdx, lessonName) {
  * 授業名の部分 (nativeSheetPrefix) は授業に 1 回だけ決めて lessonJson に残す。
  * 本体からの引っ越し (Migration.js) も同じ名前の付け方を使う。
  */
-function __singleNativeSheetName_(ss, lessonJson, phaseIdx, lessonName) {
+function __nativeSheetName_(ss, lessonJson, phaseIdx, lessonName) {
   // シート名に使えない文字 ([ ] * ? / \ :) を外し、長さも抑える (シート名の上限は 100 文字)。
   const clean = (s) => String(s || '').replace(/[[\]*?/\\:]/g, ' ').replace(/\s+/g, ' ').trim();
   let prefix = lessonJson.nativeSheetPrefix || '';
@@ -1445,11 +1366,16 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     spreadsheetId: phase.spreadsheetId,
     sheetName: phase.sheetName,
     formTitle: (lessonJson && lessonJson.name) || phase.name,
-    columnMapping: phase.columnMapping || {},
     displaySettings,
     allowResubmit,
     activeLessonId: lessonId
   };
+  // 列の割り当ては、そのフェーズの回答シートの列の意味の組 (applyConfigPatch_ が丸ごと差し替える)。
+  //   作ったフォームなら作った時点で決まっている (startLesson が createTemplateForm から受け取る)。
+  //   持っていない古いフェーズだけ、いまの割り当てを残す (空の組で上書きすると保存が落ちる)。
+  if (phase.columnMapping && Object.keys(phase.columnMapping).length) {
+    patch.columnMapping = phase.columnMapping;
+  }
   // native phase はシートを我々が作っているので列の意味が確定している。
   //   推定 (inferColumnRoles) を通さず固定 index を渡す = 推定ミスが起きない。
   if (__isNativePhase_(phase, lessonJson)) {
@@ -1671,10 +1597,6 @@ function startLesson(userId, lessonId) {
       //     - lowLabel/highLabel/xLow/xHigh/yLow/yHigh: 線形尺度の両端ラベル
       //     - choices: pie/board の選択肢
       const lessonName = (found && found.lesson && found.lesson.name) || '';
-      // 授業モードの回答シートを、ボード所有者 (教師) が必ず開けるようにするため。
-      //   管理者が代理で開始したときも教師のボードが壊れない。
-      const boardOwner = (typeof findUserById === 'function') ? findUserById(userId) : null;
-      const boardOwnerEmail = (boardOwner && boardOwner.userEmail) || '';
       const sharedClasses = (lessonJson && Array.isArray(lessonJson.classes)) ? lessonJson.classes : [];
       // 揺らぎ追跡: lesson レベルの allowResubmit を全 phase に適用 (議論前後の意見変化を取りたい)。
       //   phase 個別に templateOptions.allowResubmit があればそれを優先。
@@ -1702,7 +1624,7 @@ function startLesson(userId, lessonId) {
           phase.columnMapping = __nativeColumnMapping_(phase.formTemplate);
           if (phase.sheetName) continue; // resume: シートは作成済み
           try {
-            const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName, boardOwnerEmail);
+            const native = __ensureNativeAnswerSheet_(lessonJson, i, lessonName);
             phase.spreadsheetId = native.spreadsheetId;
             phase.sheetName = native.sheetName;
             phase.columnMapping = __nativeColumnMapping_(phase.formTemplate);
@@ -1744,6 +1666,8 @@ function startLesson(userId, lessonId) {
         phase.formUrl = formResult.formUrl || formResult.formData?.formUrl || '';
         phase.spreadsheetId = formResult.spreadsheetId || '';
         phase.sheetName = formResult.sheetName || 'フォームの回答 1';
+        // 作ったフォームの列の意味は決まっている (推定しない = 回答 0 件でもボードに出せる)。
+        if (formResult.columnMapping) phase.columnMapping = formResult.columnMapping;
 
         // Form を「受付中」にするのは phase 0 のみ。i>0 は close。
         __setFormAcceptingResponses_(phase, i === 0);
@@ -1757,7 +1681,7 @@ function startLesson(userId, lessonId) {
 
       // Phase 0 を user config に反映 → 既存 view 経路で即座に board 表示可能。
       //   publishApp を呼ばず applyConfigPatch_ で直接 merge (高速 + lifecycle 干渉なし)。
-      const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phases[0], lessonJson, lessonId), { publish: false });
+      const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(phases[0], lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
       if (!patchResult.success) {
         // Patch 失敗時も Form は既に作成済み。state は draft のまま、lessonJson は最新で書く。
         __updateLessonRow_(lessonId, { lessonJson });
@@ -1897,7 +1821,7 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
 
     // user config を次フェーズに切替 (board が即座に新フェーズに対応; 冪等)
     const target = phases[toIdx];
-    const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false });
+    const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
     if (!patchResult.success) {
       // 授業 (lesson row) は既に次フェーズ。もう一度同じフェーズを押せば config だけ再適用される。
       return createErrorResponse(
@@ -1975,7 +1899,7 @@ function reopenLesson(userId, lessonId) {
       __buildPhaseConfigPatch_(phases[idx], lessonJson, lessonId),
       { currentLessonStartedAt: new Date().toISOString() }
     );
-    const patchResult = applyConfigPatch_(userId, patch, { publish: false });
+    const patchResult = applyConfigPatch_(userId, patch, { publish: false, replaceKeys: ['columnMapping'] });
     if (!patchResult.success) {
       return createErrorResponse(`再開しましたが board 設定の切替に失敗しました: ${patchResult.message || 'unknown'}`);
     }
@@ -2188,14 +2112,14 @@ function __isManualEndLesson_(lessonId) {
  * Why: unpublish し忘れて翌日になったケースの safety net。
  *   currentLessonStartedAt が立っているユーザーを enumerate し、
  *   最終回答から LESSON_DAILY_STALE_HOURS 以上経過していれば auto-archive。
- *   isPublished は touch しない (公開ライフサイクル 4 関数のみが扱う規約)。
+ *   isPublished は touch しない (公開ライフサイクル 3 関数のみが扱う規約)。
  *   marker のクリアは applyConfigPatch_ 経由で行う。
  */
 function dailyLessonArchiveSweep() {
   const summary = { scanned: 0, archived: 0, skipped: 0, errors: 0 };
   try {
     if (typeof getAllUsers !== 'function') return summary;
-    const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
+    const users = getAllUsers({ activeOnly: false }, { systemLookup: true });
     const staleThresholdMs = LESSON_DAILY_STALE_HOURS * 60 * 60 * 1000;
     const now = Date.now();
 
@@ -2564,15 +2488,14 @@ function __sanitizeLessonText_(value, maxLen) {
 }
 
 // 同一フェーズ内の自分の行番号 (1-based) を返す。無ければ -1。
-//   全行を 1 回で読む。以前は寸法 (getLastRow) + email 列の 2 read だったが、SA proxy の
-//   getLastRow は metadata read を 1 回払う。行は 1 児童 1 行 (数十行) なので全列読みのほうが安い。
+//   全行を 1 回で読む (行は 1 児童 1 行 = 数十行なので、寸法と email 列を別々に読むより安い)。
 function __findOwnLessonRow_(sheet, actorEmail) {
   try {
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     const target = String(actorEmail || '').trim().toLowerCase();
     // 同じ児童の行が複数あれば最後の行 (最新の送信) を採用する。読む側 (__readOwnLessonAnswer_) と
     //   揃える。復旧で行を移した直後など、重複行が残っていても置き直しが最新に当たるように。
-    // 見出し行すら無い = 読めなかった (SA proxy は 429 で [] を返す)。「自分の行は無い」と混同して
+    // 見出し行すら無い = 読めなかった。「自分の行は無い」と混同して
     //   appendRow すると、既に送っていた児童の行が 2 つになる (分布に点が 2 つ出る)。
     if (data.length === 0) return LESSON_ROW_READ_FAILED;
     let found = -1;
@@ -2663,8 +2586,7 @@ function submitLessonAnswer(targetUserId, payload) {
     if (!reason) return refuse('EMPTY_REASON', '理由を書いてください');
     const addedInsight = __sanitizeLessonText_(p.addedInsight);
 
-    // openSpreadsheet は { spreadsheet, auth, accessMode, getSheet(name) } を返す。
-    //   SA proxy / native のどちらでも getSheet() 経由で取ること。
+    // openSpreadsheet は { spreadsheet, getSheet(name) } を返す (開かせてよいかを判定済み)。
     const access = openSpreadsheet(phaseDef.spreadsheetId, { context: 'lesson_submit' });
     if (!access) return refuse('SHEET_OPEN_FAILED', '回答シートを開けませんでした');
     const sheet = access.getSheet(phaseDef.sheetName);
@@ -2683,10 +2605,6 @@ function submitLessonAnswer(targetUserId, payload) {
 
     const existingRow = __findOwnLessonRow_(sheet, actorEmail);
     if (existingRow === LESSON_ROW_READ_FAILED) {
-      // 読めなかった理由が許可不足なら、待っても直らない。直し方を返す (2026-10-21/22 に児童 1〜2 人)。
-      if (typeof authorizationScopeFailureSeen_ === 'function' && authorizationScopeFailureSeen_()) {
-        return refuse('AUTH_REQUIRED', AUTH_SCOPE_GUIDANCE);
-      }
       return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
     }
     let writtenRow = existingRow;
@@ -2751,16 +2669,9 @@ function __lessonSubmitLogFields_(f) {
   return parts.join(' ');
 }
 
-// appendRow の戻りから書いた行番号を取る。SA proxy は API 応答 (updates.updatedRange) を返し、
-//   SpreadsheetApp の Sheet は行番号を返さないので getLastRow で補う。取れなければ -1。
+// appendRow の戻り (Sheet) から書いた行番号を取る (ログ用)。取れなければ -1。
 function __lessonAppendedRow_(res) {
   try {
-    if (res && typeof res.getContentText === 'function') {
-      const body = safeJsonParse_(res.getContentText(), {});
-      const range = (body && body.updates && body.updates.updatedRange) || '';
-      const m = /![A-Z]+(\d+)/.exec(range);
-      return m ? Number(m[1]) : -1;
-    }
     if (res && typeof res.getLastRow === 'function') return res.getLastRow();
   } catch (_) { /* 行番号はログ用。取れなくても送信は成功している */ }
   return -1;
@@ -3172,12 +3083,11 @@ function __readAllLessonRows_(phaseDef, opts) {
 }
 
 /**
- * 終わった授業の回答シートを、所有者 (教師) か管理者として開く。授業後の見取りグリッド専用。
+ * 終わった授業の回答シートを開く。授業後の見取りグリッド専用。
  *
- * Why: 授業中はボードの config がこのシートを指すので openSpreadsheet の検証
- *   (validateServiceAccountUsage) が通る。授業が終わって config が戻ると、どのユーザーの
- *   config もこのシートを指さなくなり「Target user not found」で拒否される。その結果、
- *   教師が授業後に見取りグリッドを開くと、エラーも出ずに「回答なし」になっていた。
+ * Why openSpreadsheet を通さないか: 授業が終わるとどのボードの設定もこのシートを指さなくなり、
+ *   共同編集者 (ほかの先生) は checkSpreadsheetAccess_ で「どのボードにも入っていない」と
+ *   断られる。見てよいかは呼び出し側の __requireLessonOwner_ が決めている。
  *
  * 前提: 呼び出し側が __requireLessonOwner_ を通し、spreadsheetId は lessonJson 由来
  *   (クライアント入力ではない)。名前が _ で終わるので google.script.run からは呼べない。
@@ -3187,14 +3097,7 @@ function __readAllLessonRows_(phaseDef, opts) {
  */
 function __openEndedLessonSheet_(spreadsheetId) {
   try {
-    // 先生専用の配置では実行者 = 先生 = 持ち主なので、管理者でも直接開ける (SA pool は無い)。
-    if (isAdministrator(getCurrentEmail()) && !(typeof isSingleTenant_ === 'function' && isSingleTenant_())) {
-      // 管理者は他人の Drive に直接権限を持たないので SA pool 経由 (回答シートは開始時に共有済み)。
-      const proxy = (typeof openSpreadsheetViaServiceAccount === 'function')
-        ? openSpreadsheetViaServiceAccount(spreadsheetId) : null;
-      return proxy ? { getSheet: (name) => proxy.getSheetByName(name) } : null;
-    }
-    // 所有者は回答シートの編集者 (startLesson で addEditor 済み) なので直接開ける。
+    // 先生として実行するので、先生のシートはどれも直接開ける。
     const ss = SpreadsheetApp.openById(spreadsheetId);
     return { getSheet: (name) => ss.getSheetByName(name) };
   } catch (error) {
@@ -3215,7 +3118,7 @@ function __loadLessonRowsFromSheet_(phaseDef, opts) {
     if (!access) return null;
     const sheet = access.getSheet(phaseDef.sheetName);
     if (!sheet) return null;
-    // 全行を 1 回で読む。SA proxy の getDataRange は実データ範囲だけを返す (空グリッドを読まない)。
+    // 全行を 1 回で読む。
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
     if (data.length === 0) return null;
     // HIGHLIGHT 列はボードのハイライト操作が初回に末尾へ足す (processHighlightDirect) ので、

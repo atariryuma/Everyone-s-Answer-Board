@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson, migrateImportConfig, migrateImportLessonAnswers */
+/* global TEMPLATE_BOARD_MODES, getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, getActiveLessonNav, endLesson, reopenLesson, reorderLessonPhases, listLessons, getLessonForReview, getLessonReviewGrid, closeLessonForms, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, recaptureLessonArchive, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_, migrateImportLesson, migrateImportConfig, migrateImportLessonAnswers */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -41,8 +41,7 @@ function assertManagedSpreadsheet_(spreadsheetId) {
   try {
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     if (dbId && spreadsheetId === dbId) return null;
-    const boardIds = (typeof getAllBoardSpreadsheetIds === 'function') ? getAllBoardSpreadsheetIds() : [];
-    if (Array.isArray(boardIds) && boardIds.indexOf(spreadsheetId) !== -1) return null;
+    if (__boardSpreadsheetIds_().indexOf(spreadsheetId) !== -1) return null;
     return createErrorResponse('指定された spreadsheetId は app 管理下のボードではありません (操作を拒否)');
   } catch (err) {
     logError_('assertManagedSpreadsheet_', err);
@@ -51,6 +50,19 @@ function assertManagedSpreadsheet_(spreadsheetId) {
   }
 }
 
+// ボードの設定 (いまのボードと保存したプロファイル) が指しているスプレッドシート。
+function __boardSpreadsheetIds_() {
+  const ids = new Set();
+  (getAllUsers({ activeOnly: false }, { systemLookup: true }) || []).forEach((u) => {
+    const cfg = u && u.configJson ? safeJsonParse_(u.configJson, null) : null;
+    if (!cfg) return;
+    if (typeof cfg.spreadsheetId === 'string' && cfg.spreadsheetId) ids.add(cfg.spreadsheetId);
+    (Array.isArray(cfg.profiles) ? cfg.profiles : []).forEach((p) => {
+      if (p && typeof p.spreadsheetId === 'string' && p.spreadsheetId) ids.add(p.spreadsheetId);
+    });
+  });
+  return Array.from(ids);
+}
 
 // admin API の対象ユーザー解決: params.userId 指定があればそのユーザー、無ければ
 //   呼び出し元 (gcloud user) の userId に自動解決。見つからなければ null。
@@ -69,7 +81,7 @@ function getAdminUsers() {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
 
-    const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
+    const users = getAllUsers({ activeOnly: false }, { systemLookup: true });
     return {
       success: true,
       users: users || []
@@ -80,44 +92,8 @@ function getAdminUsers() {
   }
 }
 
-/**
- * Toggle user active status for admin - system admin only
- * @param {string} targetUserId - Target user ID
- * @returns {Object} Toggle result
- */
-function toggleUserActiveStatus(targetUserId) {
-  try {
-    const auth = requireAdmin();
-    if (!auth) return createAdminRequiredError();
-    const email = auth.email;
-
-    const targetUser = findUserById(targetUserId, { requestingUser: email });
-    if (!targetUser) {
-      return createUserNotFoundError();
-    }
-
-    // Diff-only update so concurrent configJson writes aren't clobbered.
-    const newIsActive = !targetUser.isActive;
-    const result = updateUser(targetUserId, { isActive: newIsActive });
-    if (result.success) {
-      return {
-        success: true,
-        message: `ユーザー状態を${newIsActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
-        userId: targetUserId,
-        newStatus: newIsActive,
-        timestamp: new Date().toISOString()
-      };
-    } else {
-      return createErrorResponse('ユーザー状態の更新に失敗しました');
-    }
-  } catch (error) {
-    logError_('toggleUserActiveStatus', error);
-    return createExceptionResponse(error);
-  }
-}
-
 // =====================================================================
-// 公開ライフサイクル: __applyPublishStateChange を通じて isPublished を書く 4 操作
+// 公開ライフサイクル: __applyPublishStateChange を通じて isPublished を書く 3 操作
 // （publishApp は SystemController.js 側）。詳細仕様: CLAUDE.md の同見出し節。
 // =====================================================================
 
@@ -126,10 +102,9 @@ function toggleUserActiveStatus(targetUserId) {
  * publishedAt のセマンティクスを「常に現在の状態を反映」に統一する。
  *
  * @param {string|null} targetUserId - 対象ユーザーID（null = 現在のユーザー）
- * @param {boolean|'toggle'} newState - true=公開 / false=非公開 / 'toggle'=反転
+ * @param {boolean} newState - true=公開 / false=非公開
  * @param {Object} [options]
  * @param {string} [options.sourceEtag] - 楽観ロック用 etag。指定時は不一致で reject
- * @param {boolean} [options.requireAdmin] - true なら管理者以外は reject（toggleUserBoard 用）
  * @returns {Object} { success, message, userId, isPublished, publishedAt, etag, redirectUrl }
  */
 function __applyPublishStateChange(targetUserId, newState, options = {}) {
@@ -157,11 +132,8 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   const isAdmin = isAdministrator(email);
   const isOwnBoard = sameEmail_(targetUser.userEmail, email);
 
-  if (options.requireAdmin && !isAdmin) {
-    return createErrorResponse('この操作には管理者権限が必要です');
-  }
   // v2855+: collaborator (ボード SS の editor) は unpublish (緊急停止) のみ許可。
-  //   publish 再開や toggle は owner / admin のみ — 「閉じる方向」 だけ collaborator OK。
+  //   publish 再開は owner / admin のみ — 「閉じる方向」 だけ collaborator OK。
   if (!isAdmin && !isOwnBoard) {
     const isUnpublishingOnly = (newState === false)
       && typeof isBoardCollaborator === 'function'
@@ -198,16 +170,14 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   }
 
   // 目標状態の決定
-  const targetIsPublished = (newState === 'toggle')
-    ? !currentConfig.isPublished
-    : Boolean(newState);
+  const targetIsPublished = Boolean(newState);
   const wasPublished = currentConfig.isPublished === true;
   const now = new Date().toISOString();
 
   const updatedConfig = { ...currentConfig };
   updatedConfig.isPublished = targetIsPublished;
   // publishedAt は「現在の状態の発生時刻」を反映。
-  // 公開中は now、非公開化時は null。これにより 4 関数間でセマンティクスが揃う。
+  // 公開中は now、非公開化時は null。これにより 3 関数間でセマンティクスが揃う。
   updatedConfig.publishedAt = targetIsPublished ? now : null;
   updatedConfig.lastAccessedAt = now;
 
@@ -226,7 +196,7 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   //   この conflict を汎用エラーに埋もれさせず、 publishApp と同じく構造化して surface し、
   //   フロントが再読み込みを促せるようにする (caller に sourceEtag を強制せず非破壊で対称化)。
   // __allowPublishStateWrite: この関数は publish 状態を書き換える正規経路の 1 つ。
-  //   saveUserConfig の publish-state ガードを通過させる (CLAUDE.md の 4 関数不変条件)。
+  //   saveUserConfig の publish-state ガードを通過させる (CLAUDE.md の 3 関数不変条件)。
   const saveResult = saveUserConfig(targetUser.userId, updatedConfig, { __allowPublishStateWrite: true });
   if (!saveResult.success) {
     if (saveResult.error === 'etag_mismatch') {
@@ -241,8 +211,8 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
   }
 
-  // 2 階層の cache を即時 stale 化 (sa_validation 60s + board data 12s)。 状態が実際に変わった
-  //   ときのみ (toggle no-op で 100+ viewer の cache を捨てないため)。 mechanism は publishApp と
+  // 2 階層の cache を即時 stale 化 (アクセス判定 60s + board data 12s)。 状態が実際に変わった
+  //   ときのみ (変化なしで 100+ viewer の cache を捨てないため)。 mechanism は publishApp と
   //   共有の invalidateBoardCaches_ (DataApis.js)。 typeof guard は test 単独 load 吸収用。
   if (wasPublished !== targetIsPublished && typeof invalidateBoardCaches_ === 'function') {
     invalidateBoardCaches_(currentConfig, targetUser.userId);
@@ -261,25 +231,6 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     etag: saveResult.etag || null,
     redirectUrl
   };
-}
-
-/**
- * 管理者が他ユーザーのボード公開状態を toggle する。
- * @param {string} targetUserId - 対象ユーザーID（必須）
- * @param {Object} [options] - { sourceEtag }
- * @returns {Object} __applyPublishStateChange の戻り値
- */
-function toggleUserBoardStatus(targetUserId, options = {}) {
-  try {
-    if (!targetUserId) return createErrorResponse('targetUserId is required');
-    return __applyPublishStateChange(targetUserId, 'toggle', {
-      sourceEtag: options.sourceEtag,
-      requireAdmin: true
-    });
-  } catch (error) {
-    logError_('toggleUserBoardStatus', error);
-    return createExceptionResponse(error);
-  }
 }
 
 /**
@@ -601,14 +552,6 @@ function dispatchAdminOperation(operation, params) {
     case 'getUsers':
       return getAdminUsers();
 
-    case 'toggleUserActive':
-      { const e = reqStr('targetUserId'); if (e) return e; }
-      return toggleUserActiveStatus(params.targetUserId);
-
-    case 'toggleUserBoard':
-      { const e = reqStr('targetUserId'); if (e) return e; }
-      return toggleUserBoardStatus(params.targetUserId, { sourceEtag: params.etag });
-
     // --- Board Publish Lifecycle (unified ops) ---
     // Why: CLI/Admin から個別操作を直接呼べるよう dispatcher 経由でも提供。
     //   publishApp は config 差し替えを伴うため main.js の専用 case で別ルート。
@@ -752,50 +695,6 @@ function dispatchAdminOperation(operation, params) {
       });
     }
 
-    case 'bulkSetUserConfig': {
-      // 全ユーザーに同じ patch を適用。dryRun で影響範囲を見られる。
-      // Why: 「6 年全クラスに同じ軸ラベル一括展開」など、運用上の bulk 操作用。
-      { const e = reqObj('patch'); if (e) return e; }
-      const dryRun = Boolean(params.dryRun);
-      const targetFilter = params.filter || {};
-      const usersResult = getAdminUsers();
-      if (!usersResult.success) return usersResult;
-      const users = usersResult.users || [];
-      const matched = users.filter(u => matchesUserFilter_(u, targetFilter));
-      if (dryRun) {
-        return createSuccessResponse('Dry run', {
-          matchedCount: matched.length,
-          totalUsers: users.length,
-          sample: matched.slice(0, 5).map(u => ({ userId: u.userId, userEmail: u.userEmail }))
-        });
-      }
-      // 1 ユーザーの patch は users シートの read + write (SA 経由で 2〜4 秒) なので、
-      //   100 人を超えると GAS の 6 分制限に当たる。offset/limit で区切り、時間切れが近づいたら
-      //   途中で返して nextOffset を示す (呼び出し側が続きから再実行する)。
-      const page = __adminLoopPage_(matched, params);
-      const results = [];
-      let stoppedAt = null;
-      for (let i = page.offset; i < page.end; i++) {
-        if (__adminLoopOverBudget_(page.deadline)) { stoppedAt = i; break; }
-        const u = matched[i];
-        const r = applyConfigPatch_(u.userId, params.patch, { publish: false });
-        results.push({ userId: u.userId, userEmail: u.userEmail, success: r.success, message: r.message });
-      }
-      const okCount = results.filter(r => r.success).length;
-      const nextOffset = stoppedAt !== null ? stoppedAt : (page.end < matched.length ? page.end : null);
-      return createSuccessResponse(`bulkSetUserConfig: ${okCount}/${results.length} succeeded` +
-        (nextOffset !== null ? ` (${nextOffset}/${matched.length} まで。--offset ${nextOffset} で続きを実行)` : ''), {
-        results,
-        appliedTo: okCount,
-        failedCount: results.length - okCount,
-        matchedCount: matched.length,
-        offset: page.offset,
-        processed: results.length,
-        nextOffset,
-        complete: nextOffset === null
-      });
-    }
-
     case 'runColumnAnalysis': {
       // Why: フロントのみで実行できた列分析を CLI からも実行可能に。
       //      列マッピング自動検出 + numericScaleCandidates を CLI でレビューできる。
@@ -898,7 +797,7 @@ function dispatchAdminOperation(operation, params) {
         spreadsheetId: procResult.spreadsheetId || '',
         sheetName: procResult.sheetName || 'フォームの回答 1'
       };
-      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
+      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false, replaceKeys: ['columnMapping'] });
       // config 保存が失敗したら全体を失敗として返す。 旧実装は top-level success:true で
       //   失敗を nested configSave に埋もれさせており、 .success を見る CLI が「接続済」と
       //   誤認していた。
@@ -955,12 +854,13 @@ function dispatchAdminOperation(operation, params) {
         formUrl: createResult.formUrl || '',
         formTitle: createResult.formTitle || '',
         spreadsheetId: createResult.spreadsheetId || '',
-        sheetName: createResult.sheetName || 'フォームの回答 1'
+        sheetName: createResult.sheetName || 'フォームの回答 1',
+        columnMapping: createResult.columnMapping
       };
       if (templateType === 'numberline' || templateType === 'matrix' || templateType === 'pie') {
         patch.displaySettings = { boardMode: templateType };
       }
-      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
+      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false, replaceKeys: ['columnMapping'] });
       // Form は作成済だが config 保存が失敗した場合は全体を失敗として返す (created は同梱して
       //   作成済 Form URL を呼び出し側に残す)。 top-level success に保存結果を反映する。
       if (!saveResult.success) {
@@ -979,123 +879,6 @@ function dispatchAdminOperation(operation, params) {
         applied: patch,
         configSave: { success: saveResult.success, message: saveResult.message }
       });
-    }
-
-    // --- Multi-board Profile Operations ---
-    // Why: 1 ユーザーが複数 Forms を切替えて使えるよう、設定スナップショットの
-    //      CRUD を CLI から実行可能にする。教師が「導入アンケート」「本時の議論」
-    //      「振り返り」と複数 board を事前に登録して、授業中に切替えるユースケース。
-    case 'repairSpreadsheetSharing': {
-      // SA pool 全員を editor として追加する遡及修復 (v2782 以前作成の SS や、 後から SA を
-      // pool 追加した場合に必要)。
-      //   npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>
-      { const e = reqStr('spreadsheetId'); if (e) return e; }
-      try {
-        const result = applySpreadsheetSharingDefaults(params.spreadsheetId);
-        return createSuccessResponse('Spreadsheet sharing repaired', {
-          spreadsheetId: params.spreadsheetId,
-          saAdded: result.saAdded,
-          saEmails: result.saEmails || [],
-          errors: result.errors
-        });
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    // ===== SA pool 管理 (v2782+) =====
-    case 'listServiceAccountPool': {
-      try {
-        return (typeof listServiceAccountPool === 'function')
-          ? listServiceAccountPool()
-          : createErrorResponse('listServiceAccountPool not available');
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'getServiceAccountUsage': {
-      try {
-        return (typeof getServiceAccountUsage === 'function')
-          ? getServiceAccountUsage()
-          : createErrorResponse('getServiceAccountUsage not available');
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'addServiceAccountToPool': {
-      // 1 個の SA JSON を pool に登録。 戻り値の verified を見て UI に反映する。
-      //   npm run api -- addServiceAccountToPool --json '<SA JSON>'
-      { const e = reqStr('json'); if (e) return e; }
-      try {
-        if (typeof addServiceAccountToPool !== 'function') {
-          return createErrorResponse('addServiceAccountToPool not available');
-        }
-        return addServiceAccountToPool(params.json);
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'addServiceAccountsToPoolBatch': {
-      // 複数 SA JSON を一括登録 (改行区切り or `}\n{` 連結 or array)。
-      const inputs = params.inputs || params.json;
-      if (!inputs) return createErrorResponse('inputs (string or array) is required');
-      try {
-        if (typeof addServiceAccountsToPoolBatch !== 'function') {
-          return createErrorResponse('addServiceAccountsToPoolBatch not available');
-        }
-        return addServiceAccountsToPoolBatch(inputs);
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'reverifyServiceAccountInPool': {
-      // 共有反映待ちで verified=false だった SA を再確認。
-      const slot = params.slot || params.slotKey;
-      if (!slot) return createErrorResponse('slot (e.g. "SERVICE_ACCOUNT_CREDS_2") is required');
-      try {
-        if (typeof reverifyServiceAccountInPool !== 'function') {
-          return createErrorResponse('reverifyServiceAccountInPool not available');
-        }
-        return reverifyServiceAccountInPool(slot);
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'removeServiceAccountFromPool': {
-      // Secondary slot の SA を削除 (primary は別経路で差替)。
-      const slot = params.slot || params.slotKey;
-      if (!slot) return createErrorResponse('slot (e.g. "SERVICE_ACCOUNT_CREDS_2") is required');
-      try {
-        if (typeof removeServiceAccountFromPool !== 'function') {
-          return createErrorResponse('removeServiceAccountFromPool not available');
-        }
-        return removeServiceAccountFromPool(slot);
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
-    }
-
-    case 'migrateBoardSharing': {
-      // v2782 以前作成のボード SS を一括クリーンアップする。
-      //   1) SA pool 全員を editor として追加 (board が SA pool 経由で動くようにする)
-      //   2) DOMAIN_WITH_LINK 共有を revoke (Drive bleed を解消)
-      // dryRun=true で実際の変更なしに対象 SS のリストだけ確認可能。
-      //   npm run api -- migrateBoardSharing --dryRun true
-      //   npm run api -- migrateBoardSharing
-      const dryRun = params.dryRun === true || params.dryRun === 'true';
-      try {
-        if (typeof migrateBoardSharing !== 'function') {
-          return createErrorResponse('migrateBoardSharing not available');
-        }
-        return migrateBoardSharing({ dryRun, offset: params.offset, limit: params.limit });
-      } catch (e) {
-        return createExceptionResponse(e);
-      }
     }
 
     case 'setSheetHeader': {
@@ -1459,6 +1242,12 @@ function dispatchAdminOperation(operation, params) {
       return migrateImportLessonAnswers(params);
     }
     default:
+      // 検証用の配置にだけ入る入口 (scripts/verify/DevInvoke.js を scripts/deploy-single.js の
+      //   extraFiles で足す)。src には定義が無いので、本番では常に Unknown operation になる。
+      if (typeof globalThis.__devAdminOperation_ === 'function') {
+        const dev = globalThis.__devAdminOperation_(op, params);
+        if (dev) return dev;
+      }
       return createErrorResponse(`Unknown operation: ${op}`, null, { error: 'UNKNOWN_OPERATION' });
   }
 }
@@ -1491,49 +1280,6 @@ function redactUserForApi_(user) {
   };
 }
 
-// 管理者専用の全ユーザー / 全ボードのループを GAS の 6 分制限の内側で区切る。
-//   Why: bulkSetUserConfig / migrateBoardSharing は 1 件ごとに Sheets / Drive を数回叩く
-//   (SA 経由で 2〜4 秒)。ユーザーが 100 人を超えると 1 回の実行で終わらず、途中で
-//   タイムアウトして「どこまで反映されたか」が分からなくなる (2026-10 監査)。
-//   offset / limit で範囲を区切り、deadline を過ぎたら途中で返して nextOffset を示す。
-const ADMIN_LOOP_BUDGET_MS_ = 4.5 * 60 * 1000;
-
-/**
- * @param {Array} items - 全対象
- * @param {Object} params - offset / limit (文字列でも可)
- * @returns {{offset:number, end:number, deadline:number}}
- */
-function __adminLoopPage_(items, params) {
-  const total = Array.isArray(items) ? items.length : 0;
-  const rawOffset = Number(params && params.offset);
-  const rawLimit = Number(params && params.limit);
-  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.min(Math.floor(rawOffset), total) : 0;
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : total;
-  return { offset, end: Math.min(offset + limit, total), deadline: Date.now() + ADMIN_LOOP_BUDGET_MS_ };
-}
-
-function __adminLoopOverBudget_(deadline) {
-  return Date.now() >= deadline;
-}
-
-/**
- * ユーザーフィルタ判定。`bulkSetUserConfig` 用。
- * Why: target を全件か一部に絞るシンプルな機構。複雑な条件は将来追加。
- *   filter = { isActive: true, isPublished: false, emailContains: "naha" }
- */
-function matchesUserFilter_(user, filter) {
-  if (!filter || typeof filter !== 'object') return true;
-  if (filter.isActive !== undefined && Boolean(user.isActive) !== Boolean(filter.isActive)) return false;
-  if (filter.emailContains && typeof filter.emailContains === 'string') {
-    if (!String(user.userEmail || '').toLowerCase().includes(filter.emailContains.toLowerCase())) return false;
-  }
-  if (filter.isPublished !== undefined) {
-    const cfg = safeJsonParse_(user.configJson, null);
-    if (!cfg) return !filter.isPublished;  // parse 不能 = unpublished 扱い
-    if (Boolean(cfg.isPublished) !== Boolean(filter.isPublished)) return false;
-  }
-  return true;
-}
 
 /**
  * 既存 config に patch を deep-merge して保存する。
@@ -1551,7 +1297,7 @@ function applyConfigPatch_(userId, patch, options) {
   if (!userId || typeof userId !== 'string') {
     return createErrorResponse('userId is required');
   }
-  // isPublished/publishedAt は publish lifecycle (4 関数) だけが書き換えてよいので patch から除外。
+  // isPublished/publishedAt は publish lifecycle (3 関数) だけが書き換えてよいので patch から除外。
   //   deepMerge_ が cur.config 側の現値を保持するため data-loss なし。最終 backstop は
   //   saveUserConfig の __allowPublishStateWrite ガード。
   const PROTECTED = ['userId', 'userEmail', 'googleId', 'createdAt', 'etag', 'isPublished', 'publishedAt'];
@@ -1571,6 +1317,14 @@ function applyConfigPatch_(userId, patch, options) {
     return createErrorResponse('設定データが破損しているため上書きを中止しました。設定の復旧が必要です。');
   }
   const merged = deepMerge_(cur.config || {}, safePatch);
+  // options.replaceKeys の項目は混ぜずに丸ごと差し替える (別の回答シートへ切り替えるときの
+  //   columnMapping)。Why: 列の割り当ては「その回答シートの列の意味」の組で、前のシートの列
+  //   (matrix の numericY など) が残ると、新しいシートの別の列を縦軸として読んでしまう。
+  //   CLI の setUserConfig は従来どおり部分更新 (null でその列だけ消す) なので既定では混ぜる。
+  ((options && options.replaceKeys) || []).forEach((k) => {
+    const v = safePatch[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) merged[k] = { ...v };
+  });
   merged.userId = userId;
 
   // Save through existing sanitizing pipeline (validateAndSanitizeConfig handles everything)
@@ -1605,85 +1359,6 @@ function deepMerge_(target, source) {
   return out;
 }
 
-// =========================================================================
-// migrateBoardSharing - v2782 以前作成ボードの共有設定一括クリーンアップ
-// =========================================================================
-
-/**
- * 全 users.config の spreadsheetId を走査し、 以下を一括適用する:
- *   1. SA pool 全員を editor として追加 (board が SA pool 経由で動くようにする)
- *   2. DOMAIN_WITH_LINK / DOMAIN 共有を revoke (Drive bleed と直接編集を解消)
- *
- * 冪等。 何度呼んでも安全。 各 SS の処理は fail-soft (1 つの SS で失敗しても他を続行)。
- *
- * @param {Object} [options]
- * @param {boolean} [options.dryRun=false] - true なら共有変更なし、 対象 SS リストのみ返す
- * @param {number} [options.offset=0] - 何件目から処理するか (前回の nextOffset)
- * @param {number} [options.limit] - 1 回で処理する最大件数 (省略は全件。時間切れなら途中で返す)
- * @returns {Object} 結果サマリ (nextOffset が非 null なら続きがある)
- */
-function migrateBoardSharing(options = {}) {
-  const dryRun = options.dryRun === true;
-
-  const ssIds = getAllBoardSpreadsheetIds();
-  if (ssIds.length === 0) {
-    return createSuccessResponse('No board spreadsheets found', { total: 0, processed: [], dryRun, nextOffset: null, complete: true });
-  }
-
-  const processed = [];
-  let saAddedCount = 0;
-  let domainRevokedCount = 0;
-  let errorCount = 0;
-  const page = __adminLoopPage_(ssIds, options);
-  let stoppedAt = null;
-
-  for (let i = page.offset; i < page.end; i++) {
-    if (!dryRun && __adminLoopOverBudget_(page.deadline)) { stoppedAt = i; break; }
-    const ssId = ssIds[i];
-    const entry = { spreadsheetId: ssId, saEmails: [], domainRevoked: false, errors: [] };
-
-    if (dryRun) {
-      processed.push(entry);
-      continue;
-    }
-
-    // 1) SA pool 全員を editor 追加
-    try {
-      const shareResult = applySpreadsheetSharingDefaults(ssId);
-      entry.saEmails = (shareResult && shareResult.saEmails) || [];
-      if (shareResult && shareResult.errors && shareResult.errors.length) {
-        entry.errors.push(...shareResult.errors);
-      }
-      if (entry.saEmails.length > 0) saAddedCount++;
-    } catch (shareError) {
-      entry.errors.push('SA share: ' + (shareError.message || shareError));
-    }
-
-    // 2) DOMAIN_WITH_LINK / DOMAIN 共有を revoke
-    try {
-      const revoked = revokeDomainSharing_(ssId);
-      if (revoked.success) {
-        entry.domainRevoked = true;
-        if (revoked.changed) domainRevokedCount++;
-      } else if (revoked.error) {
-        entry.errors.push('Revoke: ' + revoked.error);
-      }
-    } catch (revokeError) {
-      entry.errors.push('Revoke: ' + (revokeError.message || revokeError));
-    }
-
-    if (entry.errors.length > 0) errorCount++;
-    processed.push(entry);
-  }
-
-  const nextOffset = stoppedAt !== null ? stoppedAt : (page.end < ssIds.length ? page.end : null);
-  const suffix = nextOffset !== null ? ` (${nextOffset}/${ssIds.length} まで。--offset ${nextOffset} で続きを実行)` : '';
-  return createSuccessResponse(
-    (dryRun ? `Dry run: ${processed.length} board SS would be processed` : `${processed.length} board SS processed`) + suffix,
-    { total: ssIds.length, offset: page.offset, processedCount: processed.length, nextOffset, complete: nextOffset === null,
-      saAddedCount, domainRevokedCount, errorCount, dryRun, processed }
-  );
-}
 
 /**
  * SS の DOMAIN_WITH_LINK / DOMAIN 共有を revoke する。

@@ -30,7 +30,7 @@
 
   /**
    * Viz レンダラの成功テレメトリ。各モードを初回描画したとき 1 回だけ Cloud Logging に
-   * 送る。CLI から `npm run logs:cloud --severity INFO` で全機能が動いていることを確認可能。
+   * 送る。Apps Script の「実行数」で全機能が動いていることを確認できる。
    *
    * Why: ログから「全機能が使えるか」を判定するため、サイレントな fallback を可視化する。
    *      reportClientError の rate limit (30件/5min/email) を消費しないよう、初回のみ。

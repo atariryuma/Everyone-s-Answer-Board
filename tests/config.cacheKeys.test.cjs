@@ -270,34 +270,23 @@ test('getDefaultConfig: returns shape with required fields', () => {
 
 // --- hasCoreSystemProps ---
 
-test('hasCoreSystemProps: true when all three properties present', () => {
+test('hasCoreSystemProps: 管理者と DB がそろえば true (サービスアカウントの鍵は要らない)', () => {
   const { context } = loadConfigContext({
-    props: {
-      ADMIN_EMAIL: 'admin@example.com',
-      DATABASE_SPREADSHEET_ID: 'db-id',
-      SERVICE_ACCOUNT_CREDS: '{"client_email":"sa@..."}'
-    }
+    props: { ADMIN_EMAIL: 'admin@example.com', DATABASE_SPREADSHEET_ID: 'db-id' }
   });
   assert.equal(context.hasCoreSystemProps(), true);
 });
 
 test('hasCoreSystemProps: false when ADMIN_EMAIL missing', () => {
   const { context } = loadConfigContext({
-    props: { DATABASE_SPREADSHEET_ID: 'db', SERVICE_ACCOUNT_CREDS: '{}' }
+    props: { DATABASE_SPREADSHEET_ID: 'db' }
   });
   assert.equal(context.hasCoreSystemProps(), false);
 });
 
 test('hasCoreSystemProps: false when DATABASE_SPREADSHEET_ID missing', () => {
   const { context } = loadConfigContext({
-    props: { ADMIN_EMAIL: 'a@x.com', SERVICE_ACCOUNT_CREDS: '{}' }
-  });
-  assert.equal(context.hasCoreSystemProps(), false);
-});
-
-test('hasCoreSystemProps: false when SERVICE_ACCOUNT_CREDS missing', () => {
-  const { context } = loadConfigContext({
-    props: { ADMIN_EMAIL: 'a@x.com', DATABASE_SPREADSHEET_ID: 'db' }
+    props: { ADMIN_EMAIL: 'a@x.com' }
   });
   assert.equal(context.hasCoreSystemProps(), false);
 });
@@ -482,16 +471,6 @@ test('sanitizeDisplaySettings: reactionMode を保持し showReactions を導出
 });
 
 // 先生専用の配置 (isSingleTenant_) は SA pool を使わないので、SA の鍵が無くても設定済み。
-test('hasCoreSystemProps: 先生専用なら SERVICE_ACCOUNT_CREDS が無くても true', () => {
-  const { context } = loadConfigContext({
-    props: { ADMIN_EMAIL: 'teacher@example.com', DATABASE_SPREADSHEET_ID: 'db-id' }
-  });
-  context.isSingleTenant_ = () => true;
-  assert.equal(context.hasCoreSystemProps(), true);
-  context.isSingleTenant_ = () => false;
-  assert.equal(context.hasCoreSystemProps(), false, '本体 (みんなで 1 つ) では今までどおり鍵が要る');
-});
-
 test('hasCoreSystemProps: 先生専用でも ADMIN_EMAIL と DB が無ければ false', () => {
   const { context } = loadConfigContext({ props: { ADMIN_EMAIL: 'teacher@example.com' } });
   context.isSingleTenant_ = () => true;

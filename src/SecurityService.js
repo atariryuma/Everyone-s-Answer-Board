@@ -3,8 +3,7 @@
  *   - extractDomainSafely / isSystemSetupComplete / shouldEnforceDomainRestrictions
  *   - validateDomainAccess (admin ドメインと一致するかチェック)
  *
- * 入力検証は validators.js、 認可は main.js requireAdmin / DatabaseCore.js access control、
- * SA pool 管理は DatabaseCore.js に分離されている (混同しないこと)。
+ * 入力検証は validators.js、 認可は main.js requireAdmin / DatabaseCore.js checkSpreadsheetAccess_。
  */
 
 /* global getCachedProperty, hasCoreSystemProps */
@@ -41,8 +40,7 @@ function isSystemSetupComplete() {
     const props = PropertiesService.getScriptProperties();
     const hasAdmin = !!props.getProperty('ADMIN_EMAIL');
     const hasDb = !!props.getProperty('DATABASE_SPREADSHEET_ID');
-    const hasCreds = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
-    return hasAdmin && hasDb && hasCreds;
+    return hasAdmin && hasDb;
   } catch (error) {
     console.warn('isSystemSetupComplete: Failed to evaluate setup status:', error.message);
     return false;

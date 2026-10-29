@@ -77,21 +77,6 @@ function makeProxyLikeSheet({ headers, rows, failRows = false, failHeaders = fal
   };
 }
 
-test('fetchSpreadsheetData: 行の読みが 429 で [] になったとき、「回答 0 件」の成功ではなく BUSY を返す', () => {
-  const ctx = loadDataService();
-  // DatabaseCore の失敗 slot と同じ最小実装
-  let slot = null;
-  ctx.noteProxyReadFailure_ = (label, err) => { slot = { label, message: err.message }; };
-  ctx.takeProxyReadFailure_ = () => { const f = slot; slot = null; return f; };
-  const sheet = makeProxyLikeSheet({ headers: ['timestamp', 'answer'], rows: [['t1', 'a']], failRows: true }, ctx);
-  ctx.openSpreadsheet = () => ({ spreadsheet: { getSheetByName: () => sheet } });
-
-  const res = ctx.fetchSpreadsheetData({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' }, {});
-  assert.equal(res.success, false);
-  assert.equal(res.busy, true, '混雑として返す (失敗ではない)');
-  assert.equal(res.error, 'BUSY');
-});
-
 test('fetchSpreadsheetData: 見出しが読めない (429) ときも BUSY', () => {
   const ctx = loadDataService();
   let slot = null;

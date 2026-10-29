@@ -8,7 +8,6 @@ const { gasResponseStubs } = require('./_helpers.cjs');
 function loadDataApisContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
-    URL,
     ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     findUserByEmail: () => null,
@@ -79,6 +78,19 @@ test('sameEmail_: case/whitespace を無視して一致 (owner 誤判定防止)'
 test('isValidFormUrl: accepts docs.google.com forms URL', () => {
   const ctx = loadDataApisContext();
   assert.equal(ctx.isValidFormUrl('https://docs.google.com/forms/d/e/1FAIpQLSd.../viewform'), true);
+});
+
+test('isValidFormUrl: Apps Script と同じく URL クラスが無くても判定できる (編集用 URL も通る)', () => {
+  const ctx = loadDataApisContext();
+  assert.equal(typeof ctx.URL, 'undefined', 'テストの環境に URL を入れない (GAS の V8 には無い)');
+  assert.equal(ctx.isValidFormUrl('https://docs.google.com/forms/d/abc123/edit?usp=drivesdk'), true);
+  assert.equal(ctx.isValidFormUrl('  https://docs.google.com/forms/d/e/x/viewform  '), true);
+});
+
+test('isValidFormUrl: ホストの後ろに @ を付けた紛らわしい URL は通さない', () => {
+  const ctx = loadDataApisContext();
+  assert.equal(ctx.isValidFormUrl('https://docs.google.com@evil.example.com/forms/x'), false);
+  assert.equal(ctx.isValidFormUrl('https://forms.gle@evil.example.com/x'), false);
 });
 
 test('isValidFormUrl: accepts forms.gle short URL', () => {
@@ -756,27 +768,6 @@ test('connectDataSource: 非所有者は SA 共有適用前に拒否 (副作用�
   assert.equal(sharingAttempted, false, '権限チェックで弾き SA 共有を適用しない');
 });
 
-test('connectDataSource: applies SA pool sharing defaults but tolerates failure', () => {
-  // v2782+: domain-wide sharing was replaced by SA pool editor add.
-  let sharingAttempted = false;
-  let analysisCalled = false;
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    applySpreadsheetSharingDefaults: () => {
-      sharingAttempted = true;
-      throw new Error('sharing denied');
-    }
-  });
-  ctx.getColumnAnalysis = () => {
-    analysisCalled = true;
-    return { success: true, mapping: {}, headers: [] };
-  };
-  const result = ctx.connectDataSource('ss-1', 'Sheet1');
-  assert.equal(sharingAttempted, true);
-  assert.equal(analysisCalled, true, 'Sharing failure must not block the rest of the flow');
-  assert.equal(result.success, true);
-});
-
 test('connectDataSource: delegates to getColumnAnalysis when no batch operations', () => {
   let capturedArgs = null;
   const ctx = loadDataApisContext({
@@ -906,7 +897,7 @@ test('getColumnAnalysis: returns error when openSpreadsheet returns null', () =>
   });
   const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
   assert.equal(result.success, false);
-  assert.match(result.error, /アクセスできません/);
+  assert.match(result.error, /開けませんでした/);
 });
 
 test('getColumnAnalysis: returns error when openSpreadsheet throws', () => {
@@ -916,7 +907,7 @@ test('getColumnAnalysis: returns error when openSpreadsheet throws', () => {
   });
   const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
   assert.equal(result.success, false);
-  assert.match(result.error, /アクセス権がありません/);
+  assert.match(result.error, /開けませんでした/);
 });
 
 test('getColumnAnalysis: returns sheet-not-found when getSheet returns null', () => {
@@ -1333,21 +1324,6 @@ test('getNotificationUpdate: 児童の「新着あり」は対象クラスの回
   const res = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-01-01T00:00:00Z' });
   assert.equal(res.success, true);
   assert.equal(res.hasNewContent, false, '他の学級の投稿では新着にしない');
-});
-
-test('getNotificationUpdate: 許可不足で読めなかったときは「混雑」で黙らず直し方を返す (busy より先に見る)', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'child@example.com',
-    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    getConfigOrDefault: () => ({ isPublished: true }),
-    getUserSheetData: () => ({ success: false, busy: true }),
-    authorizationScopeFailureSeen_: () => true,
-    AUTH_SCOPE_GUIDANCE: '許可がそろっていません',
-    getBoardDataVersion_: () => '1'
-  });
-  const res = ctx.getNotificationUpdate('u1', {});
-  assert.equal(res.success, false);
-  assert.equal(res.error, 'AUTH_REQUIRED');
 });
 
 test('getNotificationUpdate: 許可不足でない混雑は従来どおり「新着なし」(boardBusy) で返す', () => {

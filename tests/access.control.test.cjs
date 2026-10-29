@@ -4,7 +4,7 @@
 //
 // AccessControl.js の表面:
 //   - isBoardCollaborator(targetUser, viewerEmail)  … 公開エントリ (guard + config 取得 + Drive 委譲)
-//   - __hasEditorPermissionViaDrive_(fileId, emailNorm) … Drive permissions.list + cache (security 中核)
+//   - __hasEditorPermissionViaDrive_(fileId, emailNorm) … DriveApp の編集者・持ち主 + cache (security 中核)
 //   - __emailHash_(email) … SHA-256 cache key (衝突で他人の editor 判定を継承しないため)
 //
 // 修正済みバグ (v2855 collaborator 認可): isBoardCollaborator は getUserConfig() の
@@ -37,26 +37,30 @@ function computeDigestSha256(str) {
   return Array.from(buf).map((b) => (b > 127 ? b - 256 : b)); // GAS の signed byte を模す
 }
 
-// UrlFetchApp.fetch の HTTPResponse stub。
-function mockResponse(code, body) {
-  return { getResponseCode: () => code, getContentText: () => (typeof body === 'string' ? body : JSON.stringify(body)) };
-}
-
-function drivePermissionsBody(entries) {
-  return { permissions: entries.map((e) => ({ emailAddress: e.email, role: e.role })) };
+// Drive の共有の状態 (writer = 編集者 / owner = 持ち主 / reader = 閲覧だけ)。
+function drivePermissions(entries) {
+  return {
+    editors: entries.filter((e) => e.role === 'writer').map((e) => e.email),
+    owner: (entries.find((e) => e.role === 'owner') || {}).email || null
+  };
 }
 
 function loadCtx(overrides = {}) {
   const cache = overrides.cache || createMockCache();
-  const fetchCalls = [];
+  const driveCalls = [];
+  const drive = overrides.drive || { editors: [], owner: null };
+  const user = (e) => ({ getEmail: () => e });
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     CacheService: { getScriptCache: () => cache },
-    pickServiceAccount_: overrides.pickServiceAccount_ || (() => ({ client_email: 'sa@x.iam.gserviceaccount.com' })),
-    getServiceAccountAccessToken_: overrides.getServiceAccountAccessToken_ || (() => 'fake-token'),
     getUserConfig: overrides.getUserConfig || (() => ({ success: true, config: { spreadsheetId: 'SS_DEFAULT' } })),
-    UrlFetchApp: {
-      fetch: overrides.fetch || ((url, opts) => { fetchCalls.push({ url, opts }); return mockResponse(200, drivePermissionsBody([])); })
+    // 先生として実行するので、ボード SS の編集者・持ち主は DriveApp で読む。
+    DriveApp: {
+      getFileById: (id) => {
+        driveCalls.push(id);
+        if (drive.throws) throw new Error('Drive unavailable');
+        return { getEditors: () => (drive.editors || []).map(user), getOwner: () => (drive.owner ? user(drive.owner) : null) };
+      }
     },
     Utilities: {
       computeDigest: (_algo, str) => computeDigestSha256(str),
@@ -69,7 +73,7 @@ function loadCtx(overrides = {}) {
   const source = fs.readFileSync(path.resolve(__dirname, '../src/AccessControl.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'AccessControl.js' });
   context._cache = cache;
-  context._fetchCalls = fetchCalls;
+  context._driveCalls = driveCalls;
   return context;
 }
 
@@ -91,62 +95,63 @@ test('__emailHash_: 異なるメールは異なる hash (衝突回避) かつ 64
 });
 
 // =====================================================================
-// __hasEditorPermissionViaDrive_ : Drive permissions.list + cache (security 中核)
+// __hasEditorPermissionViaDrive_ : DriveApp の編集者・持ち主 + cache (security 中核)
 // =====================================================================
 
 test('__hasEditorPermissionViaDrive_: writer ロールの editor は true', () => {
   const ctx = loadCtx({
-    fetch: () => mockResponse(200, drivePermissionsBody([
+    drive: drivePermissions([
       { email: 'editor@x.jp', role: 'writer' },
       { email: 'other@x.jp', role: 'reader' }
-    ]))
+    ])
   });
   assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), true);
 });
 
 test('__hasEditorPermissionViaDrive_: owner ロールも editor 扱いで true', () => {
   const ctx = loadCtx({
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'boss@x.jp', role: 'owner' }]))
+    drive: drivePermissions([{ email: 'boss@x.jp', role: 'owner' }])
   });
   assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'boss@x.jp'), true);
 });
 
 test('__hasEditorPermissionViaDrive_: reader のみ / 不在は false', () => {
   const ctx = loadCtx({
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'viewer@x.jp', role: 'reader' }]))
+    drive: drivePermissions([{ email: 'viewer@x.jp', role: 'reader' }])
   });
   assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'viewer@x.jp'), false);
   assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'nobody@x.jp'), false);
 });
 
-test('__hasEditorPermissionViaDrive_: Drive が非200 のときは fail-closed で false', () => {
-  const ctx = loadCtx({ fetch: () => mockResponse(403, 'Forbidden') });
-  assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), false);
+test('__hasEditorPermissionViaDrive_: 大文字小文字を区別せず、持ち主も編集者として扱う', () => {
+  const ctx = loadCtx({ drive: { editors: ['Coteacher@x.jp'], owner: 'teacher@x.jp' } });
+  assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'coteacher@x.jp'), true);
+  assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'teacher@x.jp'), true);
+  assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'student@x.jp'), false);
 });
 
-test('__hasEditorPermissionViaDrive_: SA が引けない / token 無しは fail-closed で false', () => {
-  const noSa = loadCtx({ pickServiceAccount_: () => null });
-  assert.equal(noSa.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), false);
-  const noToken = loadCtx({ getServiceAccountAccessToken_: () => null });
-  assert.equal(noToken.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), false);
+test('__hasEditorPermissionViaDrive_: Drive が読めないときは false、拒否を cache しない', () => {
+  const ctx = loadCtx({ drive: { throws: true } });
+  assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'coteacher@x.jp'), false);
+  assert.equal(ctx._cache._puts.length, 0, '一時的な失敗で「編集者ではない」を固定しない');
 });
 
-test('__hasEditorPermissionViaDrive_: fetch が例外を投げても fail-closed で false (認可を開かない)', () => {
-  const ctx = loadCtx({ fetch: () => { throw new Error('network down'); } });
+test('__hasEditorPermissionViaDrive_: Drive が例外を投げても fail-closed で false (認可を開かない)', () => {
+  const ctx = loadCtx({ drive: { throws: true } });
   assert.equal(ctx.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), false);
 });
 
 test('__hasEditorPermissionViaDrive_: cache hit ("1"/"0") は Drive を叩かず即返す', () => {
   const okCache = loadCtx({
-    fetch: () => { throw new Error('should not fetch on cache hit'); }
+    drive: { throws: true }
   });
   // 該当 key を直接 seed する (key 生成は本物の __emailHash_ に合わせる)
   const key = 'collab:SS1:' + okCache.__emailHash_('editor@x.jp');
   okCache._cache._store.set(key, '1');
   assert.equal(okCache.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), true);
-  assert.equal(okCache._fetchCalls.length, 0);
+  assert.equal(okCache._driveCalls.length, 0);
 
-  const noCache = loadCtx({ fetch: () => { throw new Error('should not fetch'); } });
+  const noCache = loadCtx({ drive: { throws: true } });
   const key2 = 'collab:SS1:' + noCache.__emailHash_('editor@x.jp');
   noCache._cache._store.set(key2, '0');
   assert.equal(noCache.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp'), false);
@@ -154,14 +159,14 @@ test('__hasEditorPermissionViaDrive_: cache hit ("1"/"0") は Drive を叩かず
 
 test('__hasEditorPermissionViaDrive_: 許可は 120s / 拒否は 600s で cache 書込み', () => {
   const okCtx = loadCtx({
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+    drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
   okCtx.__hasEditorPermissionViaDrive_('SS1', 'editor@x.jp');
   const okPut = okCtx._cache._puts.at(-1);
   assert.equal(okPut.v, '1');
   assert.equal(okPut.ttl, 120); // 付与は短命 (revoke 後の stale grant 窓を短く)
 
-  const noCtx = loadCtx({ fetch: () => mockResponse(200, drivePermissionsBody([])) });
+  const noCtx = loadCtx({ drive: drivePermissions([]) });
   noCtx.__hasEditorPermissionViaDrive_('SS1', 'nobody@x.jp');
   const noPut = noCtx._cache._puts.at(-1);
   assert.equal(noPut.v, '0');
@@ -212,7 +217,7 @@ test('isBoardCollaborator: envelope を unwrap し Drive editor を collaborator
     // 本物の getUserConfig と同じ envelope 形状
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'SS1' } }),
     // editor として Drive 上は writer 権限を持つ
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+    drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
   assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), true);
 });
@@ -221,7 +226,7 @@ test('isBoardCollaborator: SS に editor 権限が無い viewer は false (unwra
   const ctx = loadCtx({
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'SS1' } }),
     // editor@x.jp のみ writer。viewer@x.jp は permission list に不在
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+    drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
   assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'viewer@x.jp'), false);
 });
@@ -229,7 +234,7 @@ test('isBoardCollaborator: SS に editor 権限が無い viewer は false (unwra
 test('isBoardCollaborator: getUserConfig が success:false なら false (config 取得失敗)', () => {
   const ctx = loadCtx({
     getUserConfig: () => ({ success: false, config: { spreadsheetId: 'SS1' }, message: 'User not found' }),
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+    drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
   assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
 });
@@ -240,7 +245,7 @@ test('isBoardCollaborator: getUserConfig が success:false なら false (config 
 test('isBoardCollaborator: corrupted config は spreadsheetId が残っていても fail-closed で false', () => {
   const ctx = loadCtx({
     getUserConfig: () => ({ success: true, corrupted: true, config: { spreadsheetId: 'SS1' } }),
-    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+    drive: drivePermissions([{ email: 'editor@x.jp', role: 'writer' }])
   });
   assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
 });

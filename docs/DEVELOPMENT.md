@@ -5,150 +5,62 @@
 
 ---
 
-## 1. 観測：本番状態とログの取得
+## 1. 観測：配置の状態とログ
 
-### 1-1. Cloud Logging（GAS 実行ログ + フロントエンドエラー）
+### 1-1. 実行ログ
 
-```bash
-npm run logs:cloud                              # 直近 6h, WARNING 以上 (自分の prodDeployId のみ)
-npm run logs:cloud -- --severity ERROR --hours 24
-npm run logs:cloud -- --user naha-okinawa      # メアド断片でフィルタ
-npm run logs:cloud -- --function doPost        # 関数名でフィルタ
-npm run logs:cloud -- --all-deployments        # 共有 GCP project の全アプリログ
-npm run logs:cloud -- --deployment <id>        # 特定 deployment にフィルタ
-npm run logs:cloud -- --json                   # JSON 形式で出力
-npm run logs:cloud -- --brief                  # 1 行/エントリ簡潔モード
-npm run logs:summary                           # シグネチャ別集計
-npm run logs:errors                            # 直近 24h ERROR 集計
-npm run logs:tail                              # 直近 10 分 ERROR
-npm run logs:open                              # open 環境用
-```
+先生ごとの配置は既定の GCP project で動くので、Cloud Logging を CLI から読めない。
+Apps Script エディタ (スプレッドシート → 拡張機能 → Apps Script) の「実行数」で見る。
+フロントエンドのエラー (`window.error` / `unhandledrejection` / `ErrorHandler.logError`) も
+`reportClientError` doPost アクション経由で同じ場所に出る (`[client/error]` プレフィックス)。
 
-**デフォルトで自分の deployment に絞る**：那覇市版の GCP project には別 GAS アプリ
-（students/events_202604）が同居しており、その ERROR が紛れ込んでデバッグを阻害する。
-`config.prodDeployId` フィルタが既定でかかるので、自分のアプリのログだけが返る。
-共有プロジェクト全体を見たいときは `--all-deployments` を付与。
+### 1-2. Admin API（配置の状態確認・操作）
 
-**フロントエンドエラーも含む**：`window.error` / `unhandledrejection` / `ErrorHandler.logError`
-は `reportClientError` doPost アクション経由で Cloud Logging に流れる。
-`[client/error]` / `[client/warn]` プレフィックスで識別。
-
-#### Sheets API の利用量と上限に対する余裕（Cloud Monitoring）
-
-```bash
-npm run quota:report                    # 直近 7 日: 日ごとの合計 / 429 / 1 分最大 (対上限 %)
-npm run quota:report -- --days 30
-npm run quota:report -- --day 2026-10-22   # その日 (JST) の 1 分ごとの上位 10
-```
-
-上限は読み取り・書き込みとも **300 回/分/プロジェクト・60 回/分/ユーザー**（サービスアカウントは
-1 つ = 1 ユーザー）。SA を同じ GCP project に足しても 300/分 で頭打ち。Google は上限超過を
-2026 年後半から課金対象にする予定と明記している（[Sheets API の使用量上限](https://developers.google.com/workspace/sheets/api/limits)）。
-授業の後に 1 分最大が上限の何 % だったかを見て、余裕が減っていないかを確かめる。
-同じ project に同居する別アプリの分も合計に入る（credential ごとの値で見分ける）。
-
-#### `?debug=1` でフロントの console.log/warn も収集
-
-児童・教師が問題を再現するとき、URL に `?debug=1` を付けて開いてもらうと、
-ブラウザの console.log/warn も Cloud Logging に流れる（最大 20 件 / セッション）。
-
-### 1-2. Admin API（本番状態確認・操作）
+送り先は `scripts/single-tenants.json` の配置。`--tenant <名前>` で選ぶ (省略時は検証用を除く最初の配置)。
+API キーは配置ごとに `single-tenants.json` の `apiKey` (初回に `setupApiKey` で決める。
+`scripts/migrate-to-single.js` / `scripts/verify/e2e-single.js` が初回に自動で決める)。
 
 #### 基本（システム状態）
 
 ```bash
 npm run api -- systemDiagnosis        # Core props / DB / Deploy の健康診断
-npm run api -- getUsers               # 全ユーザー一覧
+npm run api -- getUsers               # 登録 (先生 1 人)
 npm run api -- getAppStatus           # アプリ有効/無効状態
 npm run api -- enableApp              # アプリを有効化
 npm run api -- disableApp             # 緊急停止（アプリ無効化）
 npm run api -- getLogs --limit 20     # セキュリティログ
 npm run api -- perfMetrics            # パフォーマンス指標
-npm run api -- perfDiagnosis          # パフォーマンス診断 + 推奨事項
 npm run api -- listProperties         # Script Properties（認証情報マスク済み）
-npm run api -- getProperty --k NAME           # 個別 property 取得
-npm run api -- setProperty --k NAME --v VALUE # property 更新
 npm run api -- cacheReset             # 全キャッシュクリア
-npm run api -- autoRepair             # 自動修復
 ```
 
-#### ユーザー config 操作（CLI から本番設定を読み書き）
+#### ボードの設定・授業
 
 ```bash
-# 読み取り
-npm run api -- findUser --email t260781p@naha-okinawa.ed.jp
-npm run api -- getUserConfig --userId adb24b94-...
-npm run api -- exportConfigs --output backup.json          # 全ユーザー dump（ファイル）
-
-# 書き込み（部分 patch、deep merge、保護フィールド自動除外）
+npm run api -- getUserConfig --userId <uuid>
+npm run api -- exportConfigs --output backup.json          # 設定の dump（ファイル）
 npm run api -- setUserConfig --userId <uuid> \
-  --patch '{"displaySettings":{"boardMode":"numberline"}}'
-
-npm run api -- setUserConfig --userId <uuid> \
-  --patch '{"xAxisLabels":{"min":"そのまま使う","max":"自分で直す"},"allowResubmit":true}'
-
-# bulk: 条件に合うユーザー全員に同じ patch を適用
-npm run api -- bulkSetUserConfig \
-  --filter '{"isPublished":false}' \
-  --patch '{"displaySettings":{"showReactions":true}}' \
-  --dryRun                              # 影響範囲を先に確認
-
-npm run api -- bulkSetUserConfig --filter '{"emailContains":"naha"}' --patch '...'
-# 100 人超は 6 分制限に当たるので --offset/--limit で区切る。時間切れが近いと途中で返り、
-#   応答の nextOffset (complete:false) を次の --offset に渡して続きを実行する
-npm run api -- bulkSetUserConfig --patch '...' --offset 0 --limit 50
-
-# アクティブ / 公開状態の切替
-npm run api -- toggleUserActive --userId <uuid>            # アクティブ状態切替
-npm run api -- toggleUserBoard --userId <uuid>             # ボード公開状態切替
-
-# 分析・プレビュー
-npm run api -- runColumnAnalysis --userId <uuid>           # 列マッピング自動検出
+  --patch '{"displaySettings":{"boardMode":"numberline"}}' # 部分 patch、deep merge、保護フィールド自動除外
 npm run api -- previewBoard --userId <uuid>                # viewer 視点のサンプル
+npm run api -- unpublishBoard / republishMyBoard           # 公開を終了する / 再び公開する
 
-# Form 操作 (v3)
 npm run api -- listMyForms                                  # 自分の Drive 内 Form を最大 30 件
-npm run api -- validateFormUrl --formUrl <URL>              # URL 形式 + 到達性チェック
-npm run api -- connectForm --userId <uuid> --formUrl <URL>  # 既存 Form を user に紐付け
-npm run api -- createForm --userId <uuid> --templateType board|numberline|matrix
-# templateType=numberline/matrix のときは boardMode も自動セット
+npm run api -- connectForm --userId <uuid> --formUrl <URL>  # 既存 Form をボードにつなぐ
+npm run api -- createForm --userId <uuid> --templateType board|numberline|matrix|pie
 
-# JSON 引数の渡し方
-#   --patch '<json>'   : JSON-aware（自動パース）
-#   --filter '<json>'  : 同上
-#   --json '<json>'    : 任意 JSON を json param に格納
-#   --file path.json   : ファイルからまるごと params 読み込み
-#   --output path      : 結果を JSON ファイルに保存
+npm run api -- lesson.list --userId <uuid>
+npm run api -- lesson.liveAnswers --userId <uuid> --lessonId <id>
+npm run api -- lesson.advance --userId <uuid> --lessonId <id> --direction next
 ```
 
-**API キーは `scripts/config.json` に保存**（git ignore 済み、template から作成）。
-初回設定は `setupApiKey` アクションで手動投入が必要。
+JSON 引数: `--patch` / `--filter` / `--json` は自動パース、`--file path.json` で params を読み込み、
+`--output path` で結果を保存。保護フィールド (patch から自動除外): `userId`, `userEmail`, `googleId`, `createdAt`, `etag`
 
-**保護されているフィールド**（patch から自動除外）：
-`userId`, `userEmail`, `googleId`, `createdAt`, `etag`
+#### 引っ越し (共有の本体 → 先生ごとの配置)
 
-### 1-3. SA pool 管理
-
-700 人スケールの同時アクセスを service account pool で捌く。設計詳細は [ARCHITECTURE.md](ARCHITECTURE.md)。
-
-```bash
-npm run api -- listServiceAccountPool         # pool 一覧 (slot/email/projectId)
-npm run api -- getServiceAccountUsage         # SA 別 5分窓使用回数 + cooling 状態
-npm run api -- addServiceAccountToPool --json '<SA JSON>'     # 1 個追加 (DB editor + verify 自動)
-npm run api -- addServiceAccountsToPoolBatch --inputs '<...>' # 複数一括 (改行 or `}\n{` 区切り)
-npm run api -- reverifyServiceAccountInPool --slot SERVICE_ACCOUNT_CREDS_2  # 共有反映後の再検証
-npm run api -- removeServiceAccountFromPool --slot SERVICE_ACCOUNT_CREDS_2  # secondary 削除
-npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>  # 1 SS に SA pool 全員 editor 追加
-npm run api -- migrateBoardSharing --dryRun true   # 既存ボード一括 cleanup の dry run
-npm run api -- migrateBoardSharing                 # 全ボードに SA pool editor 追加 + domain 共有 revoke
-npm run api -- migrateBoardSharing --offset 50 --limit 50  # 多数のボードは区切る (nextOffset で続き)
-```
-
-**負荷検証**（CI 対象外、手動）:
-
-```bash
-node scripts/load-test-concurrent.js --n 30 --op previewBoard  # N 並列 API call で SA pool / 429 を検証
-```
+`scripts/migrate-to-single.js --name <配置> --userId <元の userId> [--dry-run]`。元の本体の admin API
+(`scripts/config.json`) から授業とボードの設定を読み、`migrate.importLesson` / `migrate.importConfig` で取り込む。
+別のスプレッドシートにある授業モードの回答は `migrate.importLessonAnswers` (学級の付け替え・時刻のずらし可)。
 
 ---
 
@@ -195,70 +107,34 @@ node scripts/lint.js src/main.js      # 特定ファイル
 ### 2-4. 統合チェック
 
 ```bash
-npm run check                         # test + systemDiagnosis（本番疎通含む）
+npm run check                         # test + systemDiagnosis（配置への疎通含む）
 ```
 
-### 2-5. 本番スモークテスト（read-only 統合テスト）
+### 2-5. 画面の機能を端から端まで (検証用の配置)
 
 ```bash
-npm run smoke                         # 那覇 (default)
-npm run smoke:open                    # 沖縄 (open)
-npm run smoke:all                     # 両テナント
-node scripts/smoke-prod.js --verbose  # previewBoard の中身も表示
+npm run verify:e2e -- t260781p-verify  # 掲示板モード・授業モード・児童の操作の 54 項目
 ```
 
-**なぜ必要か**: `tests/*.test.cjs` は `vm.createContext` で GAS API を stub したユニットテストなので、
-**「stub と実 GAS の挙動が違う」バグを一切検出できない**。スモークテストは実 GAS / 実 Sheets /
-実 SA pool を通して、デプロイ後の本番が本当に生きているかを検証する。
-
-検証項目（7 つ・すべて read-only。本番状態を変えない）:
-
-1. アプリが有効（緊急停止されていない）
-2. `systemDiagnosis` 全項目 PASS
-3. users DB が実 Sheets から読め、レコード形状が正しい
-4. 全 `configJson` が JSON として parse 可能（破損 config は viewer 事故の原因）
-5. 必須 Script Properties が揃っている
-6. **`previewBoard` が実データを返す** — SA pool → 実 Spreadsheet → 列マッピングを丸ごと通す中核チェック
-7. Cache / 外部サービスが available
-
-**いつ使うか**: `npm run deploy:all` の直後（デプロイゲート）。失敗すると exit 1。
-CI には入れない（認証情報と本番疎通が必要、GAS quota を消費するため）。
-
-### 2-6. 負荷検証（同時接続シミュレーション）
-
-```bash
-npm run loadtest                      # 那覇 / N=30 / previewBoard
-npm run loadtest:open                 # 沖縄
-npm run loadtest -- --n 50 --max-p90 15000   # 並列数としきい値を指定
-node scripts/load-test-concurrent.js --no-warmup   # コールドスタート自体を測る
-```
-
-700 人規模を想定した設計（SA pool round-robin + 30s cooldown / board data cache 10s /
-per-row CAS lock）が実際に効いているかを本番で実測する。**並列時に崩れる挙動は
-ユニットテストでも smoke テストでも検出できない**ため、これが唯一の検証手段。
-
-- `--userId` 省略時は `getUsers` から接続済みユーザーを自動選択（テナント非依存）
-- **ウォームアップ 1 回を計測から除外**する。GAS はアイドル後の初回に spin-up が入り
-  （実測 22s、ウォーム時 4.6s）、そのまま測ると初回が必ず false FAIL になるため
-- 判定: 全件成功 **かつ** p90 ≤ `--max-p90`（既定 20000ms）で exit 0。
-  成功率だけ見ると「全部返ったが 1 件 60 秒」を見逃す
-
-> ⚠️ **本番に実負荷をかける**。read-only だが N に比例して GAS / Sheets API quota を消費する。
-> **授業中には実行しない**。実測の目安（N=3, ウォーム時）: 那覇 p90 6.7s / 沖縄 p90 4.8s。
+検証用の配置 (`single-tenants.json` に `extraFiles: ["scripts/verify/DevInvoke.js"]`) でだけ流せる。
+admin API の `dev.invoke` で画面が `google.script.run` で呼ぶ処理を名前で呼び、児童の操作は `as` で
+架空の児童として呼ぶ。フォームや授業を作るので本番の先生には流さない (作ったフォームは Drive に残る)。
 
 ---
 
-## 3. デプロイと環境
+## 3. 配置
 
 ```bash
-npm run push                          # ローカル → GAS（デプロイは別）
-npm run pull                          # GAS → ローカル
-npm run deploy:prod                   # URL 維持で本番再デプロイ（push 込み）
-npm run deploy                        # 新 URL でテスト用デプロイ
-npm run deploy:list                   # 既存デプロイ一覧
+npm run deploy                                    # 全員の配置を更新 (URL はそのまま)
+npm run deploy:single -- deploy --name <名前>     # 1 人分だけ更新
+npm run deploy:single -- create --name <名前> --adminEmail <先生のメール> [--user organization] [--title <SS 名>]
+npm run deploy:single -- list
 ```
 
-`open` ドメイン用：`npm run push:open` / `npm run deploy:open` / `npm run api:open` / `npm run logs:open`
+- `create` は先生の Drive にスプレッドシート + 紐づけスクリプトを作り、配置する。先生がその URL を 1 度
+  開いて許可すると、初回の準備 (`ensureDeploymentBootstrap_`) が済み、管理パネルが出る
+- 組み立ては `.single-stage/<名前>/` (git に入らない)。src/ を写し、`Deployment.js` だけを差し替える
+- 配置の前に生成物の鮮度を確かめる (`gen-pagehead.js --check` / `gen-utilities.js --check`)
 
 ---
 
@@ -286,27 +162,20 @@ git config core.hooksPath .githooks
 ### 5-1. バグ調査（ユーザー報告）
 
 ```bash
-npm run logs:cloud -- --severity ERROR --hours 24 --user <メアド断片>
-npm run api -- getUsers                        # 設定が壊れていないか確認
-npm run api -- perfMetrics                     # クォータ枯渇していないか
-# 必要なら: ユーザーに ?debug=1 を付けたURLでアクセスを依頼 → ログ再取得
+npm run api -- getLogs --limit 50              # セキュリティログ
+npm run api -- getUserConfig --userId <uuid>   # 設定が壊れていないか確認
+# 実行ログは Apps Script エディタの「実行数」で見る (1-1)
 ```
 
-### 5-2. コード変更後の本番デプロイ
+### 5-2. コード変更後の配置
 
 ```bash
-# 1. ローカル変更
-# 2. pre-commit が走るのでテスト通過を確認
-git commit -m "feat: ..."
-
-# 3. デプロイ
-npm run deploy:prod
-
-# 4. 本番疎通確認
+npm test
+npm run deploy:single -- deploy --name t260781p-verify
+npm run verify:e2e -- t260781p-verify          # 54 項目
+npm run deploy                                 # 全員の配置へ
 npm run api -- systemDiagnosis
-
-# 5. 30 分後にエラーが増えていないか
-npm run logs:cloud -- --severity ERROR --hours 0.5
+git commit -m "feat: ..." && git push
 ```
 
 ### 5-3. 大規模リファクタ前
@@ -332,11 +201,10 @@ npm run test:coverage                 # 既存カバレッジを記録
 - `npm test`
 - `npm run theme:perfect`
 
-デプロイは CI からは**行わない**（ローカル `deploy:prod` のみ）。
+配置は CI からは**行わない**（ローカルの `npm run deploy` のみ）。
 
-**注意: CI は本番のゲートではない。** 手順が `deploy:prod` → commit → push である以上、CI が回るのは
-デプロイの後になる。本番を守るのは pre-commit と `deploy:prod` の preflight（git クリーン + 生成物の
-鮮度）の 2 つだけ。CI にしかないチェックを増やしても本番事故は止められない。
+**注意: CI は本番のゲートではない。** 配置 → commit → push の順である以上、CI が回るのは配置の後になる。
+本番を守るのは pre-commit と、検証用の配置での `verify:e2e`、`deploy-single.js` の preflight (生成物の鮮度)。
 
 ---
 

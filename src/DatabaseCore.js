@@ -1,256 +1,13 @@
 /**
- * @fileoverview DatabaseCore - users シートの CRUD、Sheets API リトライ/サーキット
- *   ブレーカー、Service Account JWT による安全なアクセス基盤。
+ * @fileoverview DatabaseCore - users シートの CRUD と、スプレッドシートを開くときのアクセス判定。
+ *
+ * 先生専用の配置 (先生として実行) なので、読み書きはすべて SpreadsheetApp.openById で行う
+ *   (実行者 = 先生 = すべてのシートの持ち主)。サービスアカウントも Sheets API の直叩きも使わない。
+ *   誰が何を見てよいかだけを checkSpreadsheetAccess_ が決める。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_, noteAuthorizationScopeFailure_, sheetsApiBackoffMs_, isSingleTenant_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_, withStampedeGuard_, acquireCacheLock_, releaseCacheLock_, packJsonForCache_, unpackJsonFromCache_ */
 
-/**
- * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
- *
- * `saEmail` と `authResolver` を渡すと、 retry 時に元 SA が cooling 中なら別 SA の token に
- * 詰め替えて非 cooling SA で retry を続ける (auto failover)。 これがないと closure 固定
- * された accessToken が同じ quota 焼け SA に再突入して失敗する。
- *
- * @param {string} url
- * @param {Object} options - UrlFetchApp.fetch オプション (Authorization header 含む)
- * @param {string} [operationName] - ログ識別
- * @param {string} [saEmail] - 初回 SA の client_email (cooldown 登録 + failover trigger)
- * @param {Function} [authResolver] - retry 時に新 SA を解決する closure
- */
-// 1 API call あたりの試行回数 (executeWithRetry の maxRetries と 429 sleep の判定で共有)。
-const SHEETS_API_MAX_ATTEMPTS_ = 3;
-
-// circuit breaker の共有 state を読む。壊れた値 (部分書込み / 旧 schema / null) は既定値に倒す。
-//   Why: JSON.parse が想定外の値を返すと undefined > 0 が silently false になり、
-//   breaker が機能しない silent bug になる。Number() || 0 で必ず数値にする。
-/**
- * Sheets 呼び出しの breaker が開いている残り時間 (ms)。閉じていれば 0。
- * 混雑を返すときに「何 ms 後に来てほしいか」(Retry-After 相当) を添えるために使う。
- */
-// Sheets 呼び出しの breaker の状態を置く ScriptCache の key (書く側と読む側で共有する唯一の定義)。
-const SHEETS_CIRCUIT_BREAKER_KEY_ = 'circuit_breaker_state';
-
-function sheetsCircuitRetryAfterMs_() {
-  try {
-    if (typeof CacheService === 'undefined') return 0;
-    const st = readCircuitBreakerState_(CacheService.getScriptCache(), SHEETS_CIRCUIT_BREAKER_KEY_);
-    return Math.max(0, st.circuitOpenUntil - Date.now());
-  } catch (_) { return 0; /* 分からなければ「閉じている」(画面はいつもの間隔で来る) */ }
-}
-
-function readCircuitBreakerState_(cache, key) {
-  const state = { consecutiveErrors: 0, circuitOpenUntil: 0 };
-  let raw = null;
-  try { raw = cache.get(key); } catch (_) { return state; /* cache 不通は「閉じている」扱いで読む */ }
-  if (!raw) return state;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') {
-      state.consecutiveErrors = Number(parsed.consecutiveErrors) || 0;
-      state.circuitOpenUntil = Number(parsed.circuitOpenUntil) || 0;
-    }
-  } catch (parseError) {
-    console.warn('Circuit breaker state parse failed, resetting:', parseError.message);
-  }
-  return state;
-}
-
-// 直近の SA proxy 読み取り失敗 (429 で retry を使い切った / breaker open) を実行単位で覚える。
-//   Why: proxy の getValues() は失敗時に例外ではなく [] を返す (多数の呼び出し側がそれを前提に
-//   「空」として扱う)。しかし「空の範囲」と「読めなかった」を区別しないと、DataService の
-//   ボード読みが「回答 0 件」を成功として cache し、児童 30 人全員のボードが最大 60 秒
-//   空になる (2026-10 監査)。GAS は 1 実行 = 1 スレッドなので、グローバル 1 個の slot で
-//   「直前の getValues が失敗したか」を呼び出し側へ安全に伝えられる。
-//   使い方: 読む前に takeProxyReadFailure_() で捨て、読んだ後にもう 1 回呼んで非 null なら失敗。
-let __lastProxyReadFailure_ = null;
-function noteProxyReadFailure_(label, error) {
-  __lastProxyReadFailure_ = {
-    label: String(label || 'read'),
-    message: (error && error.message) ? String(error.message) : String(error || 'read failed'),
-    at: Date.now()
-  };
-}
-function takeProxyReadFailure_() {
-  const f = __lastProxyReadFailure_;
-  __lastProxyReadFailure_ = null;
-  return f;
-}
-
-function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver, fetchOpts) {
-  let retryCount = 0;
-  let currentOptions = options;
-  let currentSaEmail = saEmail || null;
-  // Why (v2865 / H3): :append のような非冪等 POST は、 5xx / network 断が「サーバー commit 後に
-  //   応答が失われた」のか「未実行」なのか判定不能。 retry すると重複行を生む。 429 だけは
-  //   quota で確実に reject (=未実行) なので retry 安全。 idempotent=false のとき非 429 エラーを
-  //   non-retryable にして executeWithRetry の再実行を止める。 PUT (setValues) は範囲上書きで
-  //   冪等なので default (idempotent=true) のまま。
-  const idempotent = !(fetchOpts && fetchOpts.idempotent === false);
-
-  const cache = CacheService.getScriptCache();
-  const CIRCUIT_BREAKER_KEY = SHEETS_CIRCUIT_BREAKER_KEY_;
-  const circuitState = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
-
-  const now = Date.now();
-  if (circuitState.circuitOpenUntil > now) {
-    const waitTime = Math.round((circuitState.circuitOpenUntil - now) / 1000);
-    throw new Error(`Circuit breaker open: API calls paused for ${waitTime}s to allow quota recovery`);
-  }
-
-  return executeWithRetry(
-    () => {
-      // retry 時、 元 SA が cooling なら resolver で別 SA の token に詰め替える。 これがないと
-      // closure 固定された accessToken が同じ quota 焼け SA に再突入して「failed after 2 attempts」
-      // で user-facing fail になる。
-      if (authResolver && retryCount > 0 && currentSaEmail && isServiceAccountCoolingDown_(currentSaEmail)) {
-        try {
-          const fresh = authResolver();
-          if (fresh && fresh.token && fresh.saEmail && fresh.saEmail !== currentSaEmail) {
-            const newHeaders = Object.assign({}, currentOptions.headers || {}, { Authorization: 'Bearer ' + fresh.token });
-            currentOptions = Object.assign({}, currentOptions, { headers: newHeaders });
-            console.warn(`↪ ${operationName || 'SheetsAPI'}: switching SA ${currentSaEmail} → ${fresh.saEmail} (retry ${retryCount})`);
-            currentSaEmail = fresh.saEmail;
-          }
-        } catch (_) { /* resolver 失敗は飲んで元 SA で retry */ }
-      }
-
-      let response;
-      try {
-        response = UrlFetchApp.fetch(url, currentOptions);
-      } catch (fetchError) {
-        // 利用者の許可不足なら印を残す (呼び出し元が「混み合っています」ではなく直し方を返せるように)。
-        if (typeof noteAuthorizationScopeFailure_ === 'function') noteAuthorizationScopeFailure_(fetchError);
-        // 非冪等 write が network/socket で落ちた場合、 commit 済か判定不能 → retry 禁止。
-        if (!idempotent) {
-          throw new Error(`non-idempotent write aborted (no retry): ${fetchError && fetchError.message ? fetchError.message : fetchError}`);
-        }
-        throw fetchError;
-      }
-      const code = response.getResponseCode();
-
-      if (code === 429) {
-        // 当該 SA を 30s cooldown に入れて後続 request は別 SA に逃がす (auto failover)。
-        // inner sleep は 5/10/15s。retry は cooling でない別 SA に切り替わるので、同じ SA の
-        //   分単位 quota 回復を待つ必要はない。旧値 (15/30/45s) は 1 request を 90 秒以上
-        //   吊るし、児童の画面では「送信中」のまま固まる + 同時実行 3 本の枠を塞いで polling
-        //   まで止めていた (2026-09-08)。全 SA が焼けた場合は circuit breaker が短く止める。
-        //   最終試行 (この後 retry しない) では sleep しない: 待っても投げ直さないので無駄。
-        if (currentSaEmail) markServiceAccountCoolingDown_(currentSaEmail);
-        const willRetry = retryCount + 1 < SHEETS_API_MAX_ATTEMPTS_;
-        // 別の (cooling でない) SA に切り替えられるなら待たない。待つのは「切替先が無い」ときだけ。
-        //   Why: 429 は SA 単位の分単位 quota なので、別 SA で投げ直せば即座に通る。ここで 5〜15 秒
-        //   眠ると、その間 GAS の同時実行枠 (30) を 1 本塞ぐ。30 人の polling が同時に 429 を踏むと
-        //   全員が眠って枠が尽き、新しいリクエストが「Service invoked too many times」で落ちていた。
-        // 「この SA 以外に cooling でない SA が居るか」。無ければ pool 全体が焼けている。
-        //   SA を渡さない呼び出し (切替先を持たない) は常に「無い」扱い。
-        const otherSaAvailable = Boolean(currentSaEmail) && hasNonCoolingServiceAccount_(currentSaEmail);
-        const canSwitchSa = Boolean(authResolver) && otherSaAvailable;
-        // 待つのは切替先が無いときだけ。長さは Google が Sheets API に推奨する式
-        //   (2^n 秒 + 1 秒以内の乱数、上限 15 秒)。30 人が同じ瞬間に踏んでも投げ直しが散る。
-        //   長く眠らない: 眠っている間、その児童の画面の google.script.run の枠 (10 本) を 1 本塞ぐ。
-        const backoffTime = (willRetry && !canSwitchSa)
-          ? (typeof sheetsApiBackoffMs_ === 'function'
-            ? sheetsApiBackoffMs_(retryCount, 15000)
-            : Math.min(5000 + (retryCount * 5000), 15000))
-          : 0;
-        console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount}${canSwitchSa ? ', switching SA' : ''})`);
-
-        // 並行 request の増分を取りこぼさないよう、書く直前に読み直してから +1 する
-        //   (関数冒頭の値は古い。30 本が同時に 429 を踏んでも 1 しか増えないと閾値 7 に届かない)。
-        const cur = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
-        cur.consecutiveErrors++;
-        // breaker は「pool 全体が焼けた」ときだけ開く (2026-10 監査)。
-        //   Why: counter は SA 共通なので、1 つの SA が分単位 quota を使い切ると、その SA を掴んで
-        //   いた同時 request が一斉に 429 を踏んで 7 を超え、他の 4 本が健在でも全 Sheets 呼び出しが
-        //   30〜120 秒止まっていた。cooling でない SA が残っている間は failover (上の switching) に
-        //   任せ、圧力 (counter) だけ積む。全 SA が cooling になった最初の 429 で、積んだ圧力に
-        //   応じた長さで開く。
-        if (!otherSaAvailable && cur.consecutiveErrors >= 7 && cur.circuitOpenUntil <= Date.now()) {
-          const lockoutMs = cur.consecutiveErrors >= 15 ? 120000
-            : cur.consecutiveErrors >= 10 ? 60000 : 30000;
-          // Date.now() を再取得する。 関数冒頭の `now` は executeWithRetry 突入前の値で、
-          // ここに到達する頃には 429 backoff の Utilities.sleep (最大 ~60s×複数 retry) が
-          // 経過済。 stale な `now` で計算するとロックアウトが実質ほぼ即時失効し、 quota
-          // 回復のための circuit pause が機能しない。
-          cur.circuitOpenUntil = Date.now() + lockoutMs;
-          console.error(`Circuit breaker activated: ${cur.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
-        }
-        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(cur), 120);
-
-        if (backoffTime > 0) Utilities.sleep(backoffTime);
-        retryCount++;
-        throw new Error('Quota exceeded (429), retry with adaptive backoff');
-      }
-
-      if (code !== 200) {
-        const errorText = response.getContentText();
-        // 非冪等 write の 5xx 等は commit 済の可能性があるため retry させない。
-        if (!idempotent) {
-          throw new Error(`non-idempotent write failed (no retry): API returned ${code}: ${errorText}`);
-        }
-        throw new Error(`API returned ${code}: ${errorText}`);
-      }
-
-      // 成功時は hard-reset せず 1 だけ減衰させる (v2865 / M3)。 700 viewer の部分 storm では
-      //   429 と 200 が interleave するため、 hard-reset (=0) だと「並行する任意の 1 成功が
-      //   global counter を 0 に戻す」 race で閾値 7 に到達できず breaker が機能しなかった。
-      //   decay 方式なら net error pressure が蓄積し、 真の quota 枯渇でのみ開く。 単発の
-      //   transient は数回の成功で自然解消する。 (counter は「連続」 ではなく net pressure の意味)
-      // 書く前に state を読み直す。関数冒頭で読んだ値は、この request が走っている間に別の
-      //   request が breaker を開いていても古いまま。古い値から circuitOpenUntil:0 を書くと、
-      //   開いた直後に「たまたま成功した 1 本」が breaker を閉じ、storm の最中に一度も止まれない。
-      //   開いている breaker はここでは触らない (期限は TTL と時刻で自然に切れる)。
-      const latest = readCircuitBreakerState_(cache, CIRCUIT_BREAKER_KEY);
-      if (latest.circuitOpenUntil <= Date.now() && latest.consecutiveErrors > 0) {
-        latest.consecutiveErrors = Math.max(0, latest.consecutiveErrors - 1);
-        latest.circuitOpenUntil = 0;
-        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(latest), 60);
-      }
-
-      return response;
-    },
-    {
-      maxRetries: SHEETS_API_MAX_ATTEMPTS_,
-      initialDelay: 2000,
-      maxDelay: 20000,
-      operationName: operationName || 'Sheets API call'
-    }
-  );
-}
-
-/*
- * Service Account pool (round-robin, with cooldown).
- *
- * Sheets API quota は SA 1 個あたり 300 read/min。 200-700 人同時アクセスでは単一 SA で焼ける
- * ため、 SERVICE_ACCOUNT_CREDS (primary) に加え SERVICE_ACCOUNT_CREDS_2..10 を Script Properties
- * に並べて N 倍化する。 200 人で 2-3 個、 500-700 人で 4-5 個推奨。 10 個以上は admin 監視が
- * 煩雑になるだけで実効効果は頭打ち。
- *
- * 設計の核:
- *  - **round-robin** (`pickServiceAccount_`): ScriptCache の共有 counter `sa_rr_counter` を
- *    pool.length で割って次 SA を pick。 heavy user (admin/教師の連投) も pool 全体に分散される。
- *    user-affinity hash 方式だと heavy user が固定 SA を焼く事故が起きる。
- *    注意: ScriptCache の get→put は非アトミックなので、 同時刻の burst では複数 invocation が
- *    同じ counter を読んで同 SA を選ぶ衝突が起こりうる (= 完全均等は保証しない)。 ただし
- *    cooldown が焼けた SA を 30s 除外するため、 偏りは自己修正される。
- *  - **cooldown** (`markServiceAccountCoolingDown_`): 429 を喰った SA を 30s 除外。 同 user が
- *    同 SA で 429 を再現する無駄を防ぐ。 全 SA cooling 時は full pool で round-robin (止める
- *    より retry のほうがマシ)。
- *  - **2 段 token cache** (`getServiceAccountAccessToken_`): in-memory + ScriptCache 50min。
- *    SA 切替時の JWT 交換 overhead を実質ゼロに。
- *  - **per-SA verify cache** (`verifyServiceAccountAccess_`): 1 SA だけ DB 共有漏れがあっても
- *    pool 全体は機能継続。
- */
-const SERVICE_ACCOUNT_POOL_MAX_ = 10;
-const SA_COOLDOWN_TTL_SEC = 30;
-const SA_TOKEN_TTL_SEC_ = 50 * 60;
-const SA_VERIFY_TTL_OK_SEC_ = 600;
-const SA_VERIFY_TTL_NO_SEC_ = 120;
-// SA access token の scope。Sheets (読み書き) + Drive 読み取り (共同編集者判定の permissions.list)。
-const SA_TOKEN_SCOPES_ = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly';
-
-// Cache key prefixes (集約。 scattered string literal を排除)。
 // users シート書き込みの key 単位 lock (acquireCacheLock_ / helpers.js)。
 const USERS_LOCK_KEYS_ = Object.freeze({
   ROW: 'users_row_lock:',        // + userId : 1 ユーザー行の read-modify-write
@@ -258,819 +15,106 @@ const USERS_LOCK_KEYS_ = Object.freeze({
   STRUCT: 'users_struct_lock'    //          : 行削除 (行番号がずれる) 中は誰も書かない
 });
 
-const SA_CACHE_KEYS_ = {
-  TOKEN: 'sa_token:',          // SA access token (per client_email, 50min TTL)
-  ACCESS: 'sa_access:',         // SS x SA verify result (per ssId+saEmail, 10min ok / 2min no)
-  COOLDOWN: 'sa_cooldown:',     // 429 後の cooldown フラグ (per client_email, 30s TTL)
-  PICK_COUNTER: 'sa_pick:',     // admin 可視化用 pick 回数 (per client_email, 5min TTL)
-  RR_COUNTER: 'sa_rr_counter',  // round-robin 共有 counter
-  VALIDATION_VER: 'sa_validation_ver:', // SS publish 状態変更時の cache invalidator
-  VALIDATION: 'sa_validation_'  // validation 結果 cache (key includes ver + ssId + email)
-};
-
-function serviceAccountPoolSlotKey_(n) {
-  return n === 1 ? 'SERVICE_ACCOUNT_CREDS' : ('SERVICE_ACCOUNT_CREDS_' + n);
-}
+// アクセス判定の短期 cache。key に「版」を含め、公開状態が変わったら版を上げて全 viewer 分を古くする。
+const ACCESS_CACHE_KEYS_ = Object.freeze({
+  VERSION: 'access_ver:',   // + spreadsheetId
+  DECISION: 'access_'       // + 版 + spreadsheetId + email
+});
 
 /**
- * SA JSON を soft parse する (壊れていたら null。 throw しない)。
- * pool loader 側は「壊れてる SA は無視して次へ」が正しい挙動。
- * @param {string} raw - JSON 文字列
- * @returns {Object|null} parsed SA or null
+ * 公開状態が変わったら呼ぶ。そのスプレッドシートのアクセス判定の cache (60 秒) を全 viewer 分古くする。
+ *   Why: これがないと、公開を終了した直後の最大 60 秒、児童がまだ読めてしまう。
+ *   ScriptCache は wildcard で消せないので、版の番号を上げる (cache key に版を含めている)。
  */
-function parseServiceAccountCredsSoft_(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  try {
-    const sa = JSON.parse(raw);
-    if (!sa || typeof sa !== 'object') return null;
-    if (!sa.client_email || !sa.private_key || !sa.type) return null;
-    if (!validateEmail(sa.client_email).isValid) return null;
-    if (typeof sa.private_key !== 'string' ||
-        (sa.private_key.indexOf('BEGIN PRIVATE KEY') === -1 &&
-         sa.private_key.indexOf('BEGIN RSA PRIVATE KEY') === -1)) {
-      return null;
-    }
-    return sa;
-  } catch (_) {
-    return null;
-  }
-}
-
-/**
- * 設定されている SA を全て返す (primary + secondaries, validate 済)。
- * @returns {Object[]} array of SA objects (empty if none configured)
- */
-// parse 済 pool の実行インスタンス内 memo (getCachedProperty と同じ 30 秒)。
-//   Why: openSpreadsheet 1 回で getAllServiceAccounts_ は 3 回呼ばれ (getServiceAccount /
-//   pickServiceAccount_ / openSpreadsheetViaServiceAccount)、毎回 10 slot × JSON.parse (~2.5KB)
-//   を繰り返していた。slot を書く側 (add/remove) は invalidateServiceAccountPoolMemo_ で捨てる。
-let __saPoolMemo_ = null;
-const SA_POOL_MEMO_TTL_MS_ = 30000;
-function invalidateServiceAccountPoolMemo_() { __saPoolMemo_ = null; }
-
-function getAllServiceAccounts_() {
-  const now = Date.now();
-  if (__saPoolMemo_ && (now - __saPoolMemo_.at) < SA_POOL_MEMO_TTL_MS_) return __saPoolMemo_.pool.slice();
-  const out = [];
-  for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
-    const sa = parseServiceAccountCredsSoft_(getCachedProperty(serviceAccountPoolSlotKey_(n)));
-    if (sa) out.push(sa);
-  }
-  __saPoolMemo_ = { at: now, pool: out };
-  return out.slice();
-}
-
-// 指定 SA 以外に cooling でない SA が pool に居るか (429 時に「待たずに切り替える」判断用)。
-function hasNonCoolingServiceAccount_(excludeEmail) {
-  const pool = getAllServiceAccounts_();
-  for (let i = 0; i < pool.length; i++) {
-    const email = pool[i].client_email;
-    if (email === excludeEmail) continue;
-    if (!isServiceAccountCoolingDown_(email)) return true;
-  }
-  return false;
-}
-
-/** SA pick 回数を 5 分窓カウンタに記録 (admin 可視化用)。 */
-function recordSaPick_(saEmail) {
-  if (!saEmail || typeof CacheService === 'undefined') return;
-  try {
-    const cache = CacheService.getScriptCache();
-    const key = SA_CACHE_KEYS_.PICK_COUNTER + saEmail;
-    const cur = Number(cache.get(key) || 0);
-    cache.put(key, String(cur + 1), 300);
-  } catch (_) { /* ignore */ }
-}
-
-/** 429 を喰った SA を short-term cooldown (30s) に入れる。 */
-function markServiceAccountCoolingDown_(saEmail) {
-  if (!saEmail || typeof CacheService === 'undefined') return;
-  try { CacheService.getScriptCache().put(SA_CACHE_KEYS_.COOLDOWN + saEmail, '1', SA_COOLDOWN_TTL_SEC); }
-  catch (_) { /* ignore */ }
-}
-
-function isServiceAccountCoolingDown_(saEmail) {
-  if (!saEmail || typeof CacheService === 'undefined') return false;
-  try { return Boolean(CacheService.getScriptCache().get(SA_CACHE_KEYS_.COOLDOWN + saEmail)); }
-  catch (_) { return false; }
-}
-
-/**
- * リクエストごとに SA を 1 個 round-robin で pick する。 cooldown 中の SA は候補から除外。
- * 全 SA cooling 時は full pool で round-robin (degrade して止まらないことを優先)。
- * pool.length === 0 のとき null を返す (caller は openById fallback)。
- *
- * Why round-robin: heavy user (admin/教師) が同 SA に張り付いて quota 焼け、 という現象を
- * 防ぐ。 user-hash affinity だと bucket 偏りで pool 利用率が 21/44/35% など歪み、 1 SA が
- * 集中砲火を受ける。 共有 counter を pool.length で mod すれば完全均等分散。 SA token cache
- * (50 分) は per-SA で warm 維持されるので、 SA 切替コストは ~0 (cache hit のみ)。
- *
- * @returns {Object|null} picked SA or null
- */
-function pickServiceAccount_() {
-  const fullPool = getAllServiceAccounts_();
-  if (fullPool.length === 0) return null;
-  if (fullPool.length === 1) {
-    recordSaPick_(fullPool[0].client_email);
-    return fullPool[0];
-  }
-  let pool = fullPool.filter(sa => !isServiceAccountCoolingDown_(sa.client_email));
-  if (pool.length === 0) pool = fullPool;
-  let idx;
-  try {
-    if (typeof CacheService !== 'undefined') {
-      const cache = CacheService.getScriptCache();
-      const RR_KEY = SA_CACHE_KEYS_.RR_COUNTER;
-      const cur = Number(cache.get(RR_KEY) || 0);
-      idx = cur % pool.length;
-      cache.put(RR_KEY, String((cur + 1) % 1000000), 600);
-    } else {
-      idx = Math.floor(Math.random() * pool.length);
-    }
-  } catch (_) {
-    idx = Math.floor(Math.random() * pool.length);
-  }
-  const picked = pool[idx];
-  recordSaPick_(picked.client_email);
-  return picked;
-}
-
-/**
- * SA pool の直近 5 分使用回数を返す。 admin が「全 SA に分散しているか」を可視化する用。
- * @returns {Object} { success, windowSec, total, coolingCount, pool: [{ clientEmail, picks, cooling }] }
- */
-function getServiceAccountUsage() {
-  const pool = getAllServiceAccounts_();
-  if (typeof CacheService === 'undefined') {
-    return { success: true, windowSec: 300, cooldownTtlSec: SA_COOLDOWN_TTL_SEC, total: 0, coolingCount: 0, pool: [] };
-  }
-  const cache = CacheService.getScriptCache();
-  const usage = pool.map((sa) => {
-    let count = 0; let cooling = false;
-    try { count = Number(cache.get('sa_pick:' + sa.client_email) || 0); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-    try { cooling = Boolean(cache.get('sa_cooldown:' + sa.client_email)); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-    return { clientEmail: sa.client_email, picks: count, cooling };
-  });
-  return {
-    success: true,
-    windowSec: 300,
-    cooldownTtlSec: SA_COOLDOWN_TTL_SEC,
-    total: usage.reduce((acc, u) => acc + u.picks, 0),
-    coolingCount: usage.filter(u => u.cooling).length,
-    pool: usage
-  };
-}
-
-/**
- * サービスアカウント認証情報を取得 (primary slot のメタ + pool 全体のサマリ)。
- * @returns {Object} { isValid, email?, type?, poolSize?, pool?: email[] }
- */
-function getServiceAccount() {
-  try {
-    const pool = getAllServiceAccounts_();
-    if (pool.length === 0) {
-      return { isValid: false, error: 'No credentials found' };
-    }
-    const primary = pool[0];
-    return {
-      isValid: true,
-      email: primary.client_email,
-      type: primary.type,
-      poolSize: pool.length,
-      pool: pool.map((s) => s.client_email)
-    };
-  } catch (error) {
-    console.warn('getServiceAccount: Invalid credentials format');
-    return { isValid: false, error: 'Invalid format' };
-  }
-}
-
-/**
- * SA access token を 2 段 cache (in-memory + ScriptCache) で 50 分保持。
- *
- * 段構成:
- *   1. in-memory (`saTokenCache_`): 同一 V8 instance の warm reuse 内で fastest hit
- *   2. ScriptCache: 全 invocation 共有。 cold start (新 instance) でも JWT 交換 1 回で済む。
- *      200 人朝の会の最初の数十人で N 重複 JWT 交換が発生する事故を防ぐ。
- */
-const saTokenCache_ = Object.create(null);
-
-function getServiceAccountAccessToken_(sa) {
-  if (!sa || !sa.client_email || !sa.private_key) return null;
-  const cacheKey = sa.client_email;
-  const now = Date.now();
-
-  // Tier 1: in-memory
-  const memo = saTokenCache_[cacheKey];
-  if (memo && memo.expiresAt > now) return memo.token;
-
-  // Tier 2: ScriptCache
-  const scriptCache = (typeof CacheService !== 'undefined' && CacheService.getScriptCache)
-    ? CacheService.getScriptCache() : null;
-  const scriptCacheKey = SA_CACHE_KEYS_.TOKEN + cacheKey;
-  if (scriptCache) {
-    try {
-      const cached = scriptCache.get(scriptCacheKey);
-      if (cached) {
-        // ScriptCache 値は {t: token, e: 絶対期限epochMs}。 in-memory expiresAt は **保存済の
-        //   絶対期限** で cap する。 旧実装は read 時刻 + 50min を入れていたため、 ScriptCache に
-        //   49 分前から載っていた token を read すると in-memory が「あと 50 分有効」と誤認し、
-        //   OAuth token の実寿命 60 分を超えて期限切れ token を配り 401 を招いていた
-        //   (401 は 429 でないため SA failover も走らない)。
-        let token = cached;
-        let absExpiry = now + SA_TOKEN_TTL_SEC_ * 1000; // legacy plain-string fallback
-        try {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.t) {
-            token = parsed.t;
-            absExpiry = Number(parsed.e) || absExpiry;
-          } else {
-            // 旧形式 (plain token 文字列): 真の発行時刻が不明なため短命に倒して安全側へ。
-            absExpiry = now + 60 * 1000;
-          }
-        } catch (_) {
-          absExpiry = now + 60 * 1000;
-        }
-        if (absExpiry > now) {
-          saTokenCache_[cacheKey] = { token, expiresAt: absExpiry };
-          return token;
-        }
-      }
-    } catch (_) { /* ignore */ }
-  }
-
-  // JWT exchange
-  const nowSec = Math.floor(now / 1000);
-  try {
-    // JWT 署名も try の中に置く。private_key が "BEGIN PRIVATE KEY" を含むだけの壊れた鍵だと
-    //   computeRsaSha256Signature が throw し、ここで止まると openSpreadsheetViaServiceAccount
-    //   が pool の次の SA に進めず全滅していた。null を返せば呼び出し側は次の SA を試す。
-    // scope: Sheets に加えて Drive 読み取りも要求する。isBoardCollaborator (AccessControl.js) が
-    //   この token で Drive permissions.list を叩く。spreadsheets scope だけだと 403 になり、
-    //   共同編集者のハイライト権限が常に拒否されていた。
-    const jwt = createServiceAccountJWT(
-      { alg: 'RS256', typ: 'JWT' },
-      {
-        iss: sa.client_email,
-        scope: SA_TOKEN_SCOPES_,
-        aud: 'https://oauth2.googleapis.com/token',
-        exp: nowSec + 3600,
-        iat: nowSec
-      },
-      sa.private_key
-    );
-    const tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-      muteHttpExceptions: true
-    });
-    const tokenData = JSON.parse(tokenResp.getContentText());
-    if (!tokenData.access_token) {
-      console.warn('SA token exchange failed:', tokenData.error_description || tokenData.error);
-      return null;
-    }
-    // OAuth token の実寿命 (expires_in, 通常 3599s)。 安全マージン 5 分を引いた絶対期限を
-    //   両 tier で共有し、 read 時に in-memory が実寿命を超えて延命しないようにする。
-    const lifetimeSec = Number(tokenData.expires_in) > 0 ? Number(tokenData.expires_in) : 3600;
-    const absExpiry = now + Math.max(0, (lifetimeSec - 300)) * 1000;
-    // ScriptCache TTL は in-memory cap (=token 実寿命) と従来の 50min の小さい方。
-    const scriptTtlSec = Math.min(SA_TOKEN_TTL_SEC_, Math.max(60, lifetimeSec - 300));
-    saTokenCache_[cacheKey] = { token: tokenData.access_token, expiresAt: absExpiry };
-    if (scriptCache) {
-      try {
-        scriptCache.put(scriptCacheKey, JSON.stringify({ t: tokenData.access_token, e: absExpiry }), scriptTtlSec);
-      } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-    }
-    return tokenData.access_token;
-  } catch (err) {
-    console.warn('SA token exchange exception:', err && err.message);
-    return null;
-  }
-}
-
-/**
- * SA が実際にスプレッドシートにアクセスできるか per-SA で 1 回検証 (10 分 ok cache, 2 分 no cache)。
- * 未共有 (403) の SA は次の候補に skip → 1 個だけ共有漏れがあっても pool 全体が機能継続。
- * 429/5xx は transient なので cache しない (焼くと全 SA path が一斉に封鎖される)。
- */
-function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
-  if (!sheetId || !accessToken) return false;
-  const cacheKey = SA_CACHE_KEYS_.ACCESS + sheetId + ':' + (saEmail || 'unknown');
-  let cache = null;
-  try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-  if (cache) {
-    try {
-      const cached = cache.get(cacheKey);
-      if (cached === 'ok') return true;
-      if (cached === 'no') return false;
-    } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-  }
-  try {
-    const resp = UrlFetchApp.fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?includeGridData=false&fields=properties.title`,
-      { headers: { Authorization: `Bearer ${accessToken}` }, muteHttpExceptions: true }
-    );
-    const code = resp.getResponseCode();
-    const ok = code === 200;
-    const isTransient = code === 429 || (code >= 500 && code < 600);
-    // 429 を踏んだ SA は cooldown に入れる (proxy 経路と同じ扱い)。入れないと、焼けている SA を
-    //   次の openSpreadsheet がまた選んで verify から 429 を踏み直す。
-    if (code === 429 && saEmail) markServiceAccountCoolingDown_(saEmail);
-    if (cache) {
-      try {
-        if (ok) cache.put(cacheKey, 'ok', SA_VERIFY_TTL_OK_SEC_);
-        else if (!isTransient) cache.put(cacheKey, 'no', SA_VERIFY_TTL_NO_SEC_);
-      } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-    }
-    if (!ok) {
-      console.warn('SA access verify failed for', sheetId.substring(0, 8) + '...',
-        'code=' + code, isTransient ? '(transient, no cache)' : '');
-    }
-    return ok;
-  } catch (err) {
-    console.warn('SA access verify exception:', err && err.message);
-    return false;
-  }
-}
-
-/**
- * proxy が保持する SA を「動的解決」する closure を作る。
- *  - 通常: 初回 pick した SA をそのまま使う (token cache 再利用)
- *  - 初回 SA が cooldown 中: pool から非 cooling SA を 1 個再 pick + token を取得し直す
- *  - 非 cooling SA 無し (全 pool cooling): 初回 SA に戻す (完全停止より retry のほうがマシ)
- *
- * これにより同 session 内で 429 を踏んだ瞬間に別 SA に逃げられる。 旧実装は proxy が初回 token
- * を closure 固定していたため、 同 session が同 SA に張り付いて quota 焼け retry を繰り返す
- * 事故が起きていた。
- */
-function makeProxyAuthResolver_(sheetId, initialToken, initialSaEmail) {
-  return function currentAuth() {
-    if (!initialSaEmail || !isServiceAccountCoolingDown_(initialSaEmail)) {
-      return { token: initialToken, saEmail: initialSaEmail };
-    }
-    const fresh = pickServiceAccount_();
-    if (!fresh || fresh.client_email === initialSaEmail) {
-      return { token: initialToken, saEmail: initialSaEmail };
-    }
-    if (isServiceAccountCoolingDown_(fresh.client_email)) {
-      return { token: initialToken, saEmail: initialSaEmail };
-    }
-    const freshToken = getServiceAccountAccessToken_(fresh);
-    if (!freshToken) return { token: initialToken, saEmail: initialSaEmail };
-    // 切替先の SA がこの SS を開けるか (10 分 cache 済の verify) を確かめる。確かめずに渡すと、
-    //   共有漏れの SA に切り替わった request が 403 (= non-retryable) で児童に失敗を返す。
-    //   開けない SA なら、焼けている初回 SA で投げ直すほうがまだ通る可能性がある。
-    if (!verifyServiceAccountAccess_(sheetId, freshToken, fresh.client_email)) {
-      return { token: initialToken, saEmail: initialSaEmail };
-    }
-    return { token: freshToken, saEmail: fresh.client_email };
-  };
-}
-
-/**
- * 全 users.config から board の spreadsheetId を抽出 (重複除去)。
- * 旧 countBoardSpreadsheets_ (DatabaseCore) / collectAllBoardSpreadsheetIds_ (AdminApis) の統合。
- * @returns {string[]}
- */
-function getAllBoardSpreadsheetIds() {
-  try {
-    if (typeof getAllUsers !== 'function') return [];
-    const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
-    if (!Array.isArray(users)) return [];
-    const ids = new Set();
-    for (const u of users) {
-      if (!u || !u.configJson) continue;
-      const cfg = safeJsonParse_(u.configJson, null);
-      if (!cfg) continue;
-      if (cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
-      if (Array.isArray(cfg.profiles)) {
-        for (const p of cfg.profiles) {
-          if (p && p.spreadsheetId && typeof p.spreadsheetId === 'string') ids.add(p.spreadsheetId);
-        }
-      }
-    }
-    return Array.from(ids);
-  } catch (err) {
-    if (typeof logError_ === 'function') logError_('getAllBoardSpreadsheetIds', err);
-    return [];
-  }
-}
-
-/**
- * 公開状態変更時に呼ぶ。 sa_validation cache (`validateServiceAccountUsage` の 60s 短期 cache)
- * を該当 SS について全 viewer 分まとめて invalidate。 これがないと unpublish 直後 60 秒間
- * viewer がアクセスできる security leak が残る。
- *
- * ScriptCache には wildcard delete がないため、 version counter を bump する方式で実装する。
- * `sa_validation_*` cache key 側にこの version を含めれば、 bump 後は旧 key が全 stale になる。
- */
-function invalidateSaValidationCache_(spreadsheetId) {
+function invalidateAccessDecisionCache_(spreadsheetId) {
   if (!spreadsheetId || typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    // `validateServiceAccountUsage` 内で email キーを含む全 viewer entry を一括 stale 化したい。
-    // wildcard 不可なので、 ssId 単位の version counter を持って cache key に組み込む方式に変更。
-    const key = SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId;
+    const key = ACCESS_CACHE_KEYS_.VERSION + spreadsheetId;
     const cur = Number(cache.get(key) || 0);
     cache.put(key, String(cur + 1), 3600);
-  } catch (_) { /* ignore */ }
-}
-
-/** SA 1 個の token + access キャッシュをまとめて invalidate (新規登録 / 再 verify 時に呼ぶ)。 */
-function invalidateSaCache_(spreadsheetId, clientEmail) {
-  if (typeof CacheService === 'undefined') return;
-  try {
-    const cache = CacheService.getScriptCache();
-    if (spreadsheetId && clientEmail) cache.remove(SA_CACHE_KEYS_.ACCESS + spreadsheetId + ':' + clientEmail);
-    if (clientEmail) {
-      cache.remove(SA_CACHE_KEYS_.TOKEN + clientEmail);
-      delete saTokenCache_[clientEmail];
-    }
-  } catch (_) { /* ignore */ }
-}
-
-// ---------------------------------------------------------------------
-// SA pool 管理 (admin UI 用)
-// ---------------------------------------------------------------------
-
-/** SA pool 全スロットをメタ情報のみで返す (private_key は含めない)。 */
-function listServiceAccountPool() {
-  const slots = [];
-  for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
-    const key = serviceAccountPoolSlotKey_(n);
-    const raw = getCachedProperty(key);
-    if (!raw) continue;
-    const sa = parseServiceAccountCredsSoft_(raw);
-    if (sa) {
-      slots.push({
-        slot: key,
-        index: n,
-        role: n === 1 ? 'primary' : 'secondary',
-        clientEmail: sa.client_email,
-        projectId: sa.project_id || null,
-        privateKeyId: sa.private_key_id ? (sa.private_key_id.slice(0, 8) + '…') : null,
-        valid: true
-      });
-    } else {
-      slots.push({
-        slot: key,
-        index: n,
-        role: n === 1 ? 'primary' : 'secondary',
-        clientEmail: null,
-        valid: false,
-        error: 'parse-failed'
-      });
-    }
-  }
-  return {
-    success: true,
-    poolSize: slots.filter((s) => s.valid).length,
-    maxSize: SERVICE_ACCOUNT_POOL_MAX_,
-    slots
-  };
+  } catch (_) { /* cache 不通なら判定 cache も使えないので、古い判定が残る心配もない */ }
 }
 
 /**
- * SA JSON を pool に追加。 空きスロットを自動選択。 同 client_email の重複は拒否。
- * DB editor 共有 → token 取得 → access verify を一括実行 (UI は verified を見る)。
- */
-function addServiceAccountToPool(saJsonString) {
-  try {
-    const sa = parseServiceAccountCredsSoft_(saJsonString);
-    if (!sa) return createErrorResponse('SA JSON の形式が不正です', null, { error: 'INVALID_SA_JSON' });
-
-    const existing = getAllServiceAccounts_();
-    for (let i = 0; i < existing.length; i++) {
-      if (existing[i].client_email === sa.client_email) {
-        return createErrorResponse(`${sa.client_email} は既に pool に登録されています`, null, { error: 'ALREADY_REGISTERED' });
-      }
-    }
-
-    let targetSlot = null;
-    let targetIndex = null;
-    for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
-      const key = serviceAccountPoolSlotKey_(n);
-      if (!getCachedProperty(key)) { targetSlot = key; targetIndex = n; break; }
-    }
-    if (!targetSlot) {
-      return createErrorResponse(`pool は上限 (${SERVICE_ACCOUNT_POOL_MAX_} 個) に達しています`, null, { error: 'POOL_FULL' });
-    }
-
-    PropertiesService.getScriptProperties().setProperty(targetSlot, String(saJsonString));
-    clearPropertyCache(targetSlot);
-    invalidateServiceAccountPoolMemo_();
-
-    // DB 共有 + verify (fail-soft)
-    let shared = false;
-    let shareError = null;
-    let shareHint = null;
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    try {
-      if (dbId && typeof DriveApp !== 'undefined') {
-        DriveApp.getFileById(dbId).addEditor(sa.client_email);
-        shared = true;
-      }
-    } catch (err) {
-      shareError = (err && err.message) || String(err);
-      const msg = String(shareError).toLowerCase();
-      if (msg.indexOf('does not have permission') !== -1 || msg.indexOf('権限がありません') !== -1) {
-        shareHint = 'GAS 実行ユーザが DB のオーナー/編集者ではありません。 手動で DB を ' + sa.client_email + ' に編集者共有してください。';
-      } else if (msg.indexOf('rate') !== -1 || msg.indexOf('429') !== -1 || msg.indexOf('quota') !== -1) {
-        shareHint = 'Drive API quota 一時上限。 30 秒後に「再 verify」 を押してください。';
-      } else {
-        shareHint = '自動共有失敗。 必要なら DB を ' + sa.client_email + ' に編集者共有してください。';
-      }
-    }
-
-    let verified = false;
-    let verifyError = null;
-    try {
-      if (dbId) {
-        invalidateSaCache_(dbId, sa.client_email);
-        const accessToken = getServiceAccountAccessToken_(sa);
-        if (!accessToken) {
-          verifyError = 'token 取得失敗 (private_key 不正 / IAM API 未有効化)';
-        } else {
-          verified = verifyServiceAccountAccess_(dbId, accessToken, sa.client_email);
-          if (!verified) verifyError = '共有反映待ち or DB アクセス不可';
-        }
-      }
-    } catch (err) {
-      verifyError = (err && err.message) || String(err);
-    }
-
-    // 新 SA を board SS にも展開しないと、 pool 拡張効果が出ない (新 SA は全 board で verify
-    // 失敗 → primary SA に round-robin が偏る)。 admin に migrateBoardSharing 実行を促す。
-    const boardsToMigrate = getAllBoardSpreadsheetIds().length;
-
-    return {
-      success: true,
-      slot: targetSlot,
-      index: targetIndex,
-      clientEmail: sa.client_email,
-      shared,
-      shareError,
-      shareHint,
-      verified,
-      verifyError,
-      boardsToMigrate,
-      migrationHint: boardsToMigrate > 0
-        ? `${boardsToMigrate} 個の既存 board に新 SA を editor 追加するため "migrateBoardSharing" を実行してください`
-        : null
-    };
-  } catch (err) {
-    logError_('addServiceAccountToPool', err);
-    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
-  }
-}
-
-/** 複数 SA JSON を一括登録 (改行区切り or `}\n{` 連結 or array)。 */
-function addServiceAccountsToPoolBatch(jsonInputs) {
-  let arr;
-  if (Array.isArray(jsonInputs)) {
-    arr = jsonInputs.map(String);
-  } else {
-    const s = String(jsonInputs || '');
-    arr = s.split(/}\s*{/).map((chunk, i, all) => {
-      let c = chunk;
-      if (i > 0) c = '{' + c;
-      if (i < all.length - 1) c += '}';
-      return c.trim();
-    }).filter(Boolean);
-  }
-  const results = [];
-  for (let i = 0; i < arr.length; i++) {
-    results.push(addServiceAccountToPool(arr[i]));
-  }
-  const verifiedCount = results.filter((r) => r && r.success && r.verified).length;
-  const registeredCount = results.filter((r) => r && r.success).length;
-  return {
-    success: registeredCount > 0,
-    total: results.length,
-    registered: registeredCount,
-    verified: verifiedCount,
-    results
-  };
-}
-
-/** admin の「再 verify」 ボタン用。 共有反映待ちで verified=false だった SA を再確認。 */
-function reverifyServiceAccountInPool(slotKey) {
-  try {
-    const key = String(slotKey || '');
-    if (!/^SERVICE_ACCOUNT_CREDS(_\d+)?$/.test(key)) {
-      return createErrorResponse('不正なスロット: ' + key, null, { error: 'INVALID_SLOT' });
-    }
-    const raw = getCachedProperty(key);
-    if (!raw) return createErrorResponse(key + ' は登録されていません', null, { error: 'NOT_FOUND' });
-    const sa = parseServiceAccountCredsSoft_(raw);
-    if (!sa) return createErrorResponse('SA JSON が壊れています', null, { error: 'INVALID_SA_JSON' });
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    // createErrorResponse に寄せない唯一の例外: message が無く error は機械コードだけ。
-    //   ビルダーは message にも同じ文字列を入れるため、コードが人間向け文言に昇格する。
-    if (!dbId) return { success: false, error: 'DB_NOT_CONFIGURED' };
-    invalidateSaCache_(dbId, sa.client_email);
-    const accessToken = getServiceAccountAccessToken_(sa);
-    // success:true は「検証処理を実行できた」の意味で、結果は verified が持つ。
-    //   診断コードを error に入れると `if (res.error)` で失敗と誤判定されるため reason を使う。
-    //   error は「このレスポンスは失敗」の意味だけに固定する。
-    if (!accessToken) return { success: true, verified: false, reason: 'TOKEN_FAILED' };
-    const verified = verifyServiceAccountAccess_(dbId, accessToken, sa.client_email);
-    return { success: true, verified, clientEmail: sa.client_email };
-  } catch (err) {
-    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
-  }
-}
-
-/**
- * Secondary slot の SA を削除。 primary は削除不可 (差替は Script Property SERVICE_ACCOUNT_CREDS を直接書き換える)。
- * GCP 側の key revoke は別途 (誤削除からの復旧の余地を残す)。
- */
-function removeServiceAccountFromPool(slotKey) {
-  try {
-    const key = String(slotKey || '');
-    if (key === 'SERVICE_ACCOUNT_CREDS') {
-      return createErrorResponse('primary (SERVICE_ACCOUNT_CREDS) は UI から削除できません。 セットアップ画面から差替えてください', null, { error: 'PRIMARY_LOCKED' });
-    }
-    if (!/^SERVICE_ACCOUNT_CREDS_(\d+)$/.test(key)) {
-      return createErrorResponse(`不正なスロット: ${key}`, null, { error: 'INVALID_SLOT' });
-    }
-    const n = Number(key.split('_').pop());
-    if (!(n >= 2 && n <= SERVICE_ACCOUNT_POOL_MAX_)) {
-      return createErrorResponse(`範囲外スロット: ${key}`, null, { error: 'INVALID_SLOT' });
-    }
-    const existing = getCachedProperty(key);
-    if (!existing) {
-      return createErrorResponse(`${key} は登録されていません`, null, { error: 'NOT_FOUND' });
-    }
-    const sa = parseServiceAccountCredsSoft_(existing);
-    PropertiesService.getScriptProperties().deleteProperty(key);
-    clearPropertyCache(key);
-    invalidateServiceAccountPoolMemo_();
-    if (sa && sa.client_email) {
-      const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-      invalidateSaCache_(dbId, sa.client_email);
-    }
-    return { success: true, slot: key, removed: true };
-  } catch (err) {
-    logError_('removeServiceAccountFromPool', err);
-    return createErrorResponse((err && err.message) || String(err), null, { error: 'EXCEPTION' });
-  }
-}
-
-/**
- * SS アクセスの妥当性と最適経路を判定する Security Gate + Router。
+ * このスプレッドシートを、いまの呼び出し元に開かせてよいか。
  *
- * 新セキュリティモデル (通常 Google Form 同等):
- *  - viewer は board SS への直接権限を持たない → SA pool 経由
- *  - owner は自分の SS のオーナー権限を持つ → openById 直接 (SA pool quota を節約)
- *  - admin は cross-user 操作 → SA pool
+ *   | 呼び出し元           | DB | 先生のシート (公開中) | 先生のシート (非公開) | ボードに無いシート |
+ *   |----------------------|----|------------------------|------------------------|--------------------|
+ *   | 先生 (管理者)        | 可 | 可                     | 可                     | 可 (作ったばかりのフォームの回答先など) |
+ *   | 児童・ほかの先生      | 可 | 可                     | 不可                   | 不可               |
  *
- * 戻り値の `accessMode`:
- *   - `'own'` : caller が SS の owner、 SpreadsheetApp.openById で直接アクセス推奨
- *   - `'sa'`  : SA pool 経由でアクセス (admin / viewer)
- *   - `'denied'` (allowed=false のときのみ): アクセス不可
- *
- * 許可マトリクス:
- *   | caller         | DB sheet | own board | 他人の公開 board | 他人の非公開 board |
- *   |----------------|----------|-----------|------------------|--------------------|
- *   | admin          | sa       | own       | sa               | sa                 |
- *   | owner          | sa       | own       | sa               | denied             |
- *   | viewer (生徒)  | sa       | —         | sa               | denied             |
+ *   DB は画面から直接は読まれず、サーバの処理が users / lessons を読むためだけに開く。
+ *   児童の読める範囲は「公開中のボードの設定に入っているシート」だけ (findUserBySpreadsheetId)。
  *
  * @param {string} spreadsheetId
- * @param {boolean} useServiceAccount - false で強制 own モード (互換用)
- * @param {string} context - ログ識別用
- * @returns {{allowed:boolean, reason:string, accessMode:('own'|'sa'|'denied')}}
+ * @param {string} [context] - ログ識別用
+ * @returns {{allowed:boolean, reason:string}}
  */
-function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context = 'unknown') {
+function checkSpreadsheetAccess_(spreadsheetId, context = 'unknown') {
   try {
-    if (!useServiceAccount) {
-      return { allowed: true, reason: 'Direct access (legacy flag)', accessMode: 'own' };
+    if (spreadsheetId === getCachedProperty('DATABASE_SPREADSHEET_ID')) {
+      return { allowed: true, reason: 'database' };
     }
-
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    if (spreadsheetId === dbId) {
-      return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID (shared resource)', accessMode: 'sa' };
-    }
-
     const currentEmail = getCurrentEmail();
-
-    // 短期 cache (60s) で重複 DB lookup を抑制。 cache key に caller email を含めることで
-    // 同じ SS でも owner / viewer で別キャッシュ。 version counter (`sa_validation_ver:{ssId}`)
-    // を組み込むことで、 publish 状態変更時に invalidateSaValidationCache_ から bump → 旧 key
-    // が全 viewer 分一括 stale 化される。
-    let cache = null;
-    try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
-    let validationVer = '0';
-    if (cache) {
-      try { validationVer = String(cache.get(SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId) || '0'); } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
+    if (currentEmail && isAdministrator(currentEmail)) {
+      return { allowed: true, reason: 'teacher' };
     }
-    const cacheKey = `sa_validation_v${validationVer}_${spreadsheetId}_${currentEmail || 'anon'}`;
+
+    let cache = null;
+    try { cache = CacheService.getScriptCache(); } catch (_) { /* cache 不通は機能的に無害 (毎回判定する) */ }
+    let version = '0';
+    if (cache) {
+      try { version = String(cache.get(ACCESS_CACHE_KEYS_.VERSION + spreadsheetId) || '0'); } catch (_) { /* 版が読めなければ 0 */ }
+    }
+    const cacheKey = `${ACCESS_CACHE_KEYS_.DECISION}v${version}_${spreadsheetId}_${currentEmail || 'anon'}`;
     if (cache) {
       try {
-        const cached = cache.get(cacheKey);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          return {
-            allowed: Boolean(parsed.allowed),
-            reason: parsed.reason,
-            accessMode: parsed.accessMode || (parsed.allowed ? 'sa' : 'denied')
-          };
-        }
-      } catch (_) { /* fall through */ }
+        const hit = cache.get(cacheKey);
+        if (hit) return JSON.parse(hit);
+      } catch (_) { /* 読めなければ判定し直す */ }
     }
-
-    // 結果保存 helper — 4 分岐の cache.put 重複を集約。
-    // Why (deny は短い TTL): allow 結果は publish 状態変化時に invalidateSaValidationCache_
-    //   で proactive bump されるが、 deny 結果 (「Target user not found」「Board not
-    //   published」) は SS 自体が user config に追加されただけでは bump が走らない。
-    //   deny を 60s cache すると profile 追加 / 設定修正後も「アクセス不可」 が 1 分続く
-    //   ため、 deny は 5s に短縮 (allow は従来通り 60s)。
-    const cacheAndReturn = (result) => {
+    // 許可は 60 秒、不許可は 5 秒だけ覚える。不許可を長く覚えると、ボードを公開した直後も
+    //   児童の画面が「読めない」のまま 1 分続く (公開の bump は許可側の古さだけを消す)。
+    const remember = (result) => {
       if (cache) {
-        try {
-          const ttl = result.allowed ? 60 : 5;
-          cache.put(cacheKey, JSON.stringify(result), ttl);
-        } catch (_) { /* cache 不通は機能的に無害 (次回再計算) */ }
+        try { cache.put(cacheKey, JSON.stringify(result), result.allowed ? 60 : 5); } catch (_) { /* 覚えられなくても判定は正しい */ }
       }
       return result;
     };
 
-    const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
-    if (!targetUser) {
-      console.warn('SA_VALIDATION: Target user not found for spreadsheet:', spreadsheetId.substring(0, 8));
-      return cacheAndReturn({ allowed: false, reason: 'Target user not found', accessMode: 'denied' });
+    const owner = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
+    if (!owner) {
+      console.warn('checkSpreadsheetAccess_: どのボードにも入っていないシート:', spreadsheetId.substring(0, 8), context);
+      return remember({ allowed: false, reason: 'not on any board' });
     }
-
-    // email は大文字小文字を区別しないので正規化して比較する。 isBoardCollaborator と揃え、
-    // 保存値と session 値の case 差で owner を viewer と誤判定 (非公開ボードで誤 deny) するのを防ぐ。
-    const normEmail = (e) => String(e || '').toLowerCase().trim();
-    const isOwner = Boolean(targetUser.userEmail && currentEmail && normEmail(targetUser.userEmail) === normEmail(currentEmail));
-    if (isOwner) {
-      // 編集者は自分の SS のオーナー権限を持つ → openById で直接アクセス。
-      // SA pool quota を viewer の閲覧トラフィックに温存できる。
-      return cacheAndReturn({ allowed: true, reason: 'Own board (direct access)', accessMode: 'own' });
-    }
-
-    // admin は他人のボードに cross-user アクセスする必要があるので SA pool 経由。
-    if (isAdministrator(currentEmail)) {
-      return cacheAndReturn({ allowed: true, reason: 'Admin privileges (cross-user)', accessMode: 'sa' });
-    }
-
-    // 公開状態の判定。 `getUserConfig` 経由だと findUserById が viewer のアクセス制御で deny
-    // するチキン&エッグ問題があるため、 既に取得済の `targetUser.configJson` を直接 parse する。
-    // (`findUserBySpreadsheetId` は admin 経路で取得しており、 configJson は信頼できる)
-    const isPublished = isUserBoardPublished(targetUser);
-    if (!isPublished) {
-      console.warn('SA_VALIDATION: Non-owner access to unpublished board:', {
+    if (!isUserBoardPublished(owner)) {
+      console.warn('checkSpreadsheetAccess_: 非公開のボード:', {
         currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : 'unknown',
         spreadsheetId: spreadsheetId.substring(0, 8),
         context
       });
-      return cacheAndReturn({ allowed: false, reason: 'Board not published', accessMode: 'denied' });
+      return remember({ allowed: false, reason: 'board not published' });
     }
-    return cacheAndReturn({ allowed: true, reason: 'Public board access', accessMode: 'sa' });
+    return remember({ allowed: true, reason: 'published board' });
   } catch (error) {
-    logError_('SA_VALIDATION', error);
-    return { allowed: false, reason: 'Validation error', accessMode: 'denied' };
+    logError_('checkSpreadsheetAccess_', error);
+    return { allowed: false, reason: 'access check failed' };
   }
 }
 
 /**
- * データベーススプレッドシートを開く（CLAUDE.md準拠 - Editor→Admin共有DB）
- * DATABASE_SPREADSHEET_IDは常にサービスアカウントでアクセス（セキュリティ要件）
- * @param {Object} options - オプション設定
- * @returns {Object|null} Database spreadsheet object
+ * データベース (先生のスプレッドシート) を開く。
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null}
  */
-function openDatabase(options = {}) {
+function openDatabase() {
+  const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+  if (!dbId) {
+    console.warn('openDatabase: DATABASE_SPREADSHEET_ID not configured');
+    return null;
+  }
   try {
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    if (!dbId) {
-      console.warn('openDatabase: DATABASE_SPREADSHEET_ID not configured');
-      return null;
-    }
-
-    const forceServiceAccount = true;
-
-    const dataAccess = openSpreadsheet(dbId, {
-      useServiceAccount: forceServiceAccount,
-      context: 'database_access'
-    });
-
-    if (!dataAccess) {
-      console.warn('openDatabase: Failed to access database via Sheets API, attempting SpreadsheetApp.openById fallback');
-
-      try {
-        const fallbackSpreadsheet = SpreadsheetApp.openById(dbId);
-        return fallbackSpreadsheet;
-      } catch (fallbackError) {
-        logError_('openDatabase', fallbackError, { sheetsApiError: 'Failed via openSpreadsheet' });
-        return null;
-      }
-    }
-
-    return dataAccess?.spreadsheet || null;
+    return SpreadsheetApp.openById(dbId);
   } catch (error) {
     logError_('openDatabase', error);
     return null;
@@ -1078,480 +122,45 @@ function openDatabase(options = {}) {
 }
 
 /**
- * 任意のスプレッドシートを開く。 アクセス経路は caller の役割で自動判定。
- *
- * 経路の自動振り分け (`validateServiceAccountUsage` の `accessMode` で決まる):
- *  - **owner (editor)** が自分の SS を読む → `SpreadsheetApp.openById` (own OAuth, SA quota 不要)
- *  - **viewer (生徒)** / **admin** が cross-user アクセス → SA pool 経由
- *  - **DB sheet** はどの caller でも SA pool 経由 (共有資源)
- *
- * v2782+ で旧 domain-wide sharing 経路は廃止し、 通常 Google Form 相当のセキュリティ
- * (viewer の Drive 非表示 + 直接編集不可) に統一。
- *
+ * スプレッドシートを開く。開かせてよいかは checkSpreadsheetAccess_ が決める。
  * @param {string} spreadsheetId
  * @param {Object} [options]
  * @param {string} [options.context] - ログ識別用
- * @returns {{spreadsheet, auth, accessMode, getSheet}|null}
+ * @returns {{spreadsheet, getSheet}|null}
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
-  try {
-    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
-      console.warn('openSpreadsheet: Invalid spreadsheet ID');
-      return null;
-    }
-
-    const useServiceAccount = options.useServiceAccount !== false;
-
-    const validation = validateServiceAccountUsage(
-      spreadsheetId, useServiceAccount, options.context || 'openSpreadsheet'
-    );
-    if (!validation.allowed) {
-      console.warn('openSpreadsheet: access denied:', validation.reason);
-      return null;
-    }
-
-    // accessMode: 'own' → openById (owner's OAuth), 'sa' → SA pool
-    // 先生専用の配置 (isSingleTenant_) では実行者 = 先生 = 持ち主なので、許可された読み書きは
-    //   すべて openById で直接開く。誰が何を見てよいかは上の validation がそのまま決める。
-    const useSaPath = validation.accessMode === 'sa' && !(typeof isSingleTenant_ === 'function' && isSingleTenant_());
-    let spreadsheet = null;
-    let auth = null;
-
-    try {
-      if (useSaPath) {
-        auth = getServiceAccount();
-        if (auth.isValid) {
-          spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
-        }
-        if (!spreadsheet) {
-          // SA pool 全滅時の openById fallback は DB スプレッドシートに限定する。
-          // user board に deploy 主を editor 追加していない (SA pool のみ) ので、
-          // user board への openById は元々失敗するだけ。 ここで明示的に絞ることで
-          // 「viewer は board SS に直接権限を持たない」セキュリティモデルを保証する。
-          const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-          if (dbId && spreadsheetId === dbId) {
-            console.warn('openSpreadsheet: SA pool failed, falling back to openById (DB sheet only)', {
-              spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
-            });
-            spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-          } else {
-            console.warn('openSpreadsheet: SA pool failed for user board, refusing owner fallback', {
-              spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
-            });
-            return null;
-          }
-        }
-      } else {
-        spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      }
-    } catch (openError) {
-      // 呼出元 (getUserSheetData 等) が 1 行 ERROR に集約する前提で WARN に降格。
-      console.warn('openSpreadsheet: スプレッドシート接続失敗', {
-        spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
-        error: openError.message,
-        accessMode: validation.accessMode,
-        hasAuth: !!auth
-      });
-      return null;
-    }
-
-    return {
-      spreadsheet,
-      auth: auth || { isValid: false },
-      accessMode: validation.accessMode,
-      getSheet(sheetName) {
-        if (!sheetName) {
-          console.warn('openSpreadsheet.getSheet: Sheet name required');
-          return null;
-        }
-        try {
-          return spreadsheet.getSheetByName(sheetName);
-        } catch (error) {
-          console.warn(`openSpreadsheet.getSheet: Failed to get sheet "${sheetName}":`, error.message);
-          return null;
-        }
-      }
-    };
-  } catch (error) {
-    logError_('openSpreadsheet', error);
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+    console.warn('openSpreadsheet: Invalid spreadsheet ID');
     return null;
   }
-}
-
-// ---------------------------------------------------------------------
-// サービスアカウント経路のヘルパー群
-// openSpreadsheet内部からmodule-levelへ抽出（クロージャ未使用のため純粋な字句移動）。
-// デバッグ時のスタックトレース可読性とテスト可能性の向上が目的。
-// ---------------------------------------------------------------------
-
-/**
- * SA pool から 1 個 pick → token 取得 → access verify → proxy 化。
- * verify で落ちた SA は次の候補に順次 fallback (1 個だけ DB に未共有でも継続)。
- * @param {string} sheetId
- * @returns {Object|null} SS proxy or null
- */
-function openSpreadsheetViaServiceAccount(sheetId) {
-  try {
-    const pool = getAllServiceAccounts_();
-    if (pool.length === 0) return null;
-
-    const preferred = pickServiceAccount_();
-    // client_email で探す。getAllServiceAccounts_ は呼ぶたびに parse し直した別オブジェクトを返す
-    //   ので、参照比較 (indexOf) は常に -1 = 常に SA #1 から始まり、round-robin が一度も効いて
-    //   いなかった (30 人が全員 primary SA に乗り、primary だけが 429 を踏む)。
-    const startIdx = preferred ? pool.findIndex((s) => s.client_email === preferred.client_email) : -1;
-    const baseIdx = startIdx >= 0 ? startIdx : 0;
-    const anyNotCooling = pool.length > 1 && pool.some((s) => !isServiceAccountCoolingDown_(s.client_email));
-
-    for (let step = 0; step < pool.length; step++) {
-      const sa = pool[(baseIdx + step) % pool.length];
-      // cooling 中の SA は、他に冷えていない SA が居る限り飛ばす (全滅なら順に試す)。
-      if (anyNotCooling && isServiceAccountCoolingDown_(sa.client_email)) continue;
-      const accessToken = getServiceAccountAccessToken_(sa);
-      if (!accessToken) continue;
-      if (!verifyServiceAccountAccess_(sheetId, accessToken, sa.client_email)) continue;
-      return createServiceAccountSpreadsheetProxy(sheetId, accessToken, sa.client_email);
-    }
-    return null;
-  } catch (error) {
-    logError_('openSpreadsheetViaServiceAccount', error);
+  const access = checkSpreadsheetAccess_(spreadsheetId, options.context || 'openSpreadsheet');
+  if (!access.allowed) {
+    console.warn('openSpreadsheet: access denied:', access.reason);
     return null;
   }
-}
-
-function createServiceAccountJWT(header, payload, privateKey) {
-  const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=/g, '');
-  const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=/g, '');
-  const signatureInput = `${headerB64}.${payloadB64}`;
-
-  const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-  const signatureB64 = Utilities.base64EncodeWebSafe(signature).replace(/=/g, '');
-
-  return `${signatureInput}.${signatureB64}`;
-}
-
-function createServiceAccountSpreadsheetProxy(sheetId, accessToken, saEmail) {
-  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-  // resolveAuth: proxy が hot path で「現 SA が cooling なら別 SA に逃げる」を解決する closure。
-  // SS / Sheet proxy 群はこれを共有することで session 中の 429 burst を回避する。
-  const resolveAuth = makeProxyAuthResolver_(sheetId, accessToken, saEmail);
-
+  let spreadsheet;
+  try {
+    spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  } catch (openError) {
+    // 呼出元 (getUserSheetData 等) が 1 行 ERROR に集約する前提で WARN に降格。
+    console.warn('openSpreadsheet: スプレッドシート接続失敗', {
+      spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
+      error: openError.message
+    });
+    return null;
+  }
   return {
-    getId: () => sheetId,
-    getName: () => {
-      try {
-        const auth = resolveAuth();
-        const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}?includeGridData=false&fields=properties.title`,
-          { headers: { 'Authorization': `Bearer ${auth.token}` } },
-          `getName(${sheetId.substring(0, 8)}...)`,
-          auth.saEmail, resolveAuth
-        );
-        const data = JSON.parse(response.getContentText());
-        return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
-      } catch (error) {
-        console.warn('getName via API failed after retries:', error.message);
-        return `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
+    spreadsheet,
+    getSheet(sheetName) {
+      if (!sheetName) {
+        console.warn('openSpreadsheet.getSheet: Sheet name required');
+        return null;
       }
-    },
-    getSheetByName: (sheetName) => {
-      const auth = resolveAuth();
-      return createServiceAccountSheetProxy(sheetId, sheetName, auth.token, {}, auth.saEmail, resolveAuth);
-    },
-    // シート作成 (batchUpdate addSheet)。SA は DB の editor なので API 経由で作れる。
-    //   Why: lazy bootstrap (lesson_responses 等) を SpreadsheetApp.openById に頼ると、
-    //   「呼び出し元が DB の編集権を持つとき」しか動かない (CLI の API キー経路や教師の
-    //   セッションでは失敗する)。SA 経由なら誰が呼んでも同じに動く。
-    insertSheet: (sheetName) => {
-      const auth = resolveAuth();
-      fetchSheetsAPIWithRetry(
-        `${baseUrl}:batchUpdate`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-          payload: JSON.stringify({ requests: [{ addSheet: { properties: { title: sheetName } } }] })
-        },
-        `insertSheet(${sheetName})`,
-        auth.saEmail, resolveAuth,
-        { idempotent: false }  // 同名シートが既に在ると 400 (成功済みの再実行を弾けるので安全)
-      );
-      return createServiceAccountSheetProxy(sheetId, sheetName, auth.token, {}, auth.saEmail, resolveAuth);
-    },
-    getSheets: () => {
       try {
-        const auth = resolveAuth();
-        const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}?includeGridData=false`,
-          { headers: { 'Authorization': `Bearer ${auth.token}` } },
-          `getSheets(${sheetId.substring(0, 8)}...)`,
-          auth.saEmail, resolveAuth
-        );
-        const data = JSON.parse(response.getContentText());
-        const sheets = data.sheets || [];
-        return sheets.map((sheetData) => {
-          const properties = sheetData.properties || {};
-          return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', auth.token, {
-            sheetId: properties.sheetId,
-            rowCount: properties.gridProperties?.rowCount || 1000,
-            columnCount: properties.gridProperties?.columnCount || 26
-          }, auth.saEmail, resolveAuth);
-        });
+        return spreadsheet.getSheetByName(sheetName);
       } catch (error) {
-        console.warn('getSheets via API failed after retries:', error.message);
-        return [];
-      }
-    }
-  };
-}
-
-// :append の応答 (updates.updatedRange) が A 列から始まっていることを確かめる。
-//   例: "'phase4'!A45:H45" は OK、"'phase4'!J68:Q68" は表検出がずれた書き込みなので失敗にする。
-//   応答に updatedRange が無い場合は判定できないので通す (古い応答形式との互換)。
-function assertAppendedAtColumnA_(response, label) {
-  let range = '';
-  try {
-    const body = safeJsonParse_(response && response.getContentText ? response.getContentText() : '', {});
-    range = (body && body.updates && body.updates.updatedRange) || '';
-  } catch (_) { return; /* 応答が読めないときは判定しない */ }
-  if (!range) return;
-  const m = /!\$?([A-Z]+)\$?(\d+)/.exec(range);
-  if (m && m[1] !== 'A') {
-    throw new Error(`${label}: 追記位置が A 列ではありません (${range})。シートの表の外に孤立したセルがあります`);
-  }
-}
-
-function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}, saEmail, parentResolveAuth) {
-  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-  // parent から渡された resolver を使い回せば、 cooldown 解決が連鎖して同 session 内で
-  // 429 burst を回避できる。 旧 API 互換のため parent 未指定時は自前 resolver を作る。
-  const resolveAuth = parentResolveAuth || makeProxyAuthResolver_(sheetId, accessToken, saEmail);
-  let cachedDimensions = null;
-
-  function fetchDimensionsOnce() {
-    if (cachedDimensions) return cachedDimensions;
-    try {
-      const auth = resolveAuth();
-      const response = fetchSheetsAPIWithRetry(
-        `${baseUrl}?includeGridData=false&fields=sheets(properties(sheetId,title,gridProperties))`,
-        { headers: { 'Authorization': `Bearer ${auth.token}` } },
-        `fetchDimensions(${sheetName})`,
-        auth.saEmail, resolveAuth
-      );
-      const data = JSON.parse(response.getContentText());
-      const sheets = data.sheets || [];
-      const targetSheet = sheets.find((s) => s.properties && s.properties.title === sheetName);
-      cachedDimensions = {
-        rowCount: targetSheet?.properties?.gridProperties?.rowCount || 1000,
-        columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26,
-        sheetId: (targetSheet && targetSheet.properties && typeof targetSheet.properties.sheetId === 'number')
-          ? targetSheet.properties.sheetId : null
-      };
-      return cachedDimensions;
-    } catch (error) {
-      console.warn(`fetchDimensions failed for ${sheetName}:`, error.message);
-      noteProxyReadFailure_(`fetchDimensions(${sheetName})`, error);
-      return { rowCount: 1000, columnCount: 26, sheetId: null };
-    }
-  }
-
-  // setValue(s) 共通の RAW PUT。 resource (range or sheetName) / values / label のみ可変。
-  //   getRange().setValue/setValues と getDataRange().setValues の 3 箇所で共有。
-  const putValuesViaApi = (resource, values, label) => {
-    const auth = resolveAuth();
-    return fetchSheetsAPIWithRetry(
-      `${baseUrl}/values/${resource}?valueInputOption=RAW`,
-      {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-        payload: JSON.stringify({ values })
-      },
-      label,
-      auth.saEmail, resolveAuth
-    );
-  };
-
-  return {
-    getName: () => sheetName,
-    getSheetId: () => additionalInfo.sheetId || 0,
-    // SpreadsheetApp の Sheet と同じく親 SS の ID を返す。
-    //   Why 必須か: 見出し / 行数の cache key は getParent().getId() で SS を区別する。
-    //   無いと key が 'unknown_<シート名>' になり、授業モードの phase1 のように同名のシートを
-    //   テナント中で取り違えていた (別の授業の見出し・行数が児童のボードに出る)。
-    getParent: () => ({ getId: () => sheetId }),
-    // 行削除 (batchUpdate deleteDimension)。SpreadsheetApp の Sheet#deleteRows(rowPosition, howMany) 互換。
-    //   Why: 授業の削除は DB シートの行を消す。DB は常に SA 経由で開くので、
-    //   proxy にこれが無いと TypeError (deleteRows is not a function) になり、教師 (DB の
-    //   編集権を持たない) は授業を削除できなかった。sheetId は寸法と同じ metadata 読みで得る。
-    deleteRows: (rowPosition, howMany) => {
-      const start = Number(rowPosition);
-      const count = Number(howMany) || 1;
-      if (!(start >= 1) || !(count >= 1)) throw new Error(`deleteRows: invalid range (${rowPosition}, ${howMany})`);
-      const dims = fetchDimensionsOnce();
-      const gridSheetId = (typeof additionalInfo.sheetId === 'number') ? additionalInfo.sheetId : dims.sheetId;
-      if (gridSheetId === null || gridSheetId === undefined) {
-        throw new Error(`deleteRows: sheetId of "${sheetName}" could not be resolved`);
-      }
-      const auth = resolveAuth();
-      return fetchSheetsAPIWithRetry(
-        `${baseUrl}:batchUpdate`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-          payload: JSON.stringify({
-            requests: [{
-              deleteDimension: {
-                range: { sheetId: gridSheetId, dimension: 'ROWS', startIndex: start - 1, endIndex: start - 1 + count }
-              }
-            }]
-          })
-        },
-        `deleteRows(${sheetName}!${start}+${count})`,
-        auth.saEmail, resolveAuth,
-        { idempotent: false }  // 行削除は非冪等 (再実行すると次の行まで消える)
-      );
-    },
-    getLastRow: () => {
-      if (additionalInfo.rowCount) return additionalInfo.rowCount;
-      return fetchDimensionsOnce().rowCount;
-    },
-    getLastColumn: () => {
-      if (additionalInfo.columnCount) return additionalInfo.columnCount;
-      return fetchDimensionsOnce().columnCount;
-    },
-    getRange: (row, col, numRows, numCols) => {
-      const range = numRows && numCols
-        ? `${sheetName}!R${row}C${col}:R${row + numRows - 1}C${col + numCols - 1}`
-        : `${sheetName}!R${row}C${col}`;
-
-      return {
-        getValues: () => {
-          try {
-            const auth = resolveAuth();
-            const response = fetchSheetsAPIWithRetry(
-              `${baseUrl}/values/${range}`,
-              { headers: { 'Authorization': `Bearer ${auth.token}` } },
-              `getRange.getValues(${range})`,
-              auth.saEmail, resolveAuth
-            );
-            const data = JSON.parse(response.getContentText());
-            return data.values || [];
-          } catch (error) {
-            // [] を返す契約は維持する (多数の呼び出し側が「空」として扱う) が、「読めなかった」事実は
-            //   実行単位の slot に残す。DataService の板読みはこれを見て「空の板」と「失敗」を分ける。
-            console.warn('getValues via API failed after retries:', error.message);
-            noteProxyReadFailure_(`getRange.getValues(${range})`, error);
-            return [];
-          }
-        },
-        setValue: (value) => {
-          try {
-            return putValuesViaApi(range, [[value]], `setValue(${range})`);
-          } catch (error) {
-            console.warn('setValue via API failed after retries:', error.message);
-            throw error;
-          }
-        },
-        setValues: (values) => {
-          try {
-            return putValuesViaApi(range, values, `setValues(${range})`);
-          } catch (error) {
-            console.warn('setValues via API failed after retries:', error.message);
-            throw error;
-          }
-        }
-      };
-    },
-    getDataRange: () => {
-      return {
-        getValues: () => {
-          try {
-            const auth = resolveAuth();
-            const response = fetchSheetsAPIWithRetry(
-              `${baseUrl}/values/${sheetName}`,
-              { headers: { 'Authorization': `Bearer ${auth.token}` } },
-              `getDataRange(${sheetName})`,
-              auth.saEmail, resolveAuth
-            );
-            const data = JSON.parse(response.getContentText());
-            return data.values || [];
-          } catch (error) {
-            console.warn('getDataRange via API failed after retries:', error.message);
-            noteProxyReadFailure_(`getDataRange(${sheetName})`, error);
-            return [];
-          }
-        },
-        setValues: (values) => {
-          try {
-            return putValuesViaApi(sheetName, values, `getDataRange.setValues(${sheetName})`);
-          } catch (error) {
-            console.warn('getDataRange setValues via API failed after retries:', error.message);
-            throw error;
-          }
-        }
-      };
-    },
-    // :append の範囲は「シート名だけ」にしない。
-    //   Why: Sheets API はその範囲内で「最後のテーブル」を探し、その直下・その先頭列から書く
-    //   (公式仕様)。シート名だけを渡すと、表の外に孤立セルが 1 つあるだけで (例: 切替直後の
-    //   ボードで押した 👍 が phase4 の J65 に書かれる) 以後の追記がすべて J 列から積まれ、
-    //   B 列にメールが無いためアプリのどの読み取りにも出ない。2026-09-29 の 4組 25 人分がこれ。
-    //   A1 を範囲にすると「A1 を含むテーブル」の直下・A 列に固定される。書いた位置は応答の
-    //   updatedRange で必ず確かめ、A 列でなければ失敗として投げる (「送りました」を出さない)。
-    appendRow: (rowData) => {
-      try {
-        const auth = resolveAuth();
-        const payload = { values: [rowData] };
-        const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}/values/${sheetName}!A1:append?valueInputOption=RAW`,
-          {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-            payload: JSON.stringify(payload)
-          },
-          `appendRow(${sheetName})`,
-          auth.saEmail, resolveAuth,
-          { idempotent: false }  // :append は非冪等 — 5xx/network での盲目 retry は重複行を生む
-        );
-        assertAppendedAtColumnA_(response, `appendRow(${sheetName})`);
-        return response;
-      } catch (error) {
-        console.warn('appendRow via API failed after retries:', error.message);
-        throw error;
-      }
-    },
-    // 複数行を 1 回の :append で「連続した範囲」として原子的に追記し、開始行を返す。
-    //   Why: lesson アーカイブは行範囲ポインタ (startRow, rowCount) で参照する。
-    //   1 行ずつ appendRow すると、別授業の同時 capture と行が交錯して範囲が壊れる。
-    //   :append は 1 呼び出し分の values を必ず連続で書き、書いた範囲を応答で返すので、
-    //   getLastRow → 書込 の 2 手に分けたときの race が存在しない (lock 不要)。
-    appendRows: (values) => {
-      try {
-        const auth = resolveAuth();
-        const payload = { values };
-        const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}/values/${sheetName}!A1:append?valueInputOption=RAW`,
-          {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-            payload: JSON.stringify(payload)
-          },
-          `appendRows(${sheetName})`,
-          auth.saEmail, resolveAuth,
-          { idempotent: false }  // appendRow と同じ理由で盲目 retry 禁止
-        );
-        assertAppendedAtColumnA_(response, `appendRows(${sheetName})`);
-        // updates.updatedRange 例: "'lesson_responses'!A5:I100" → 開始行 5
-        const body = safeJsonParse_(response.getContentText(), {});
-        const range = (body && body.updates && body.updates.updatedRange) || '';
-        const m = /![A-Z]+([0-9]+)/.exec(range);
-        return {
-          startRow: m ? Number(m[1]) : -1,
-          rowCount: values.length,
-          updatedRange: range
-        };
-      } catch (error) {
-        console.warn('appendRows via API failed after retries:', error.message);
-        throw error;
+        console.warn(`openSpreadsheet.getSheet: Failed to get sheet "${sheetName}":`, error.message);
+        return null;
       }
     }
   };
@@ -1696,7 +305,7 @@ function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
  * メールアドレスでユーザーを検索（CLAUDE.md準拠 - Editor→Admin共有DB）
  * @param {string} email - ユーザーのメールアドレス
  * @param {Object} context - アクセスコンテキスト
- * @param {boolean} context.forceServiceAccount - サービスアカウント強制使用
+ * @param {boolean} context.systemLookup - サーバ内部の検索 (閲覧者の権限確認をしない)
  * @param {string} context.requestingUser - リクエストユーザー（デバッグ用）
  * @returns {Object|null} User object
  */
@@ -1717,7 +326,7 @@ function findUserByEmail(email, context = {}) {
  * @param {Object} context - アクセスコンテキスト
  * @param {string} context.requestingUser - リクエストユーザー（debug/権限判定用）
  * @param {boolean} [context.allowPublishedRead] - 公開ボードなら非オーナーも許可
- * @param {boolean} [context.forceServiceAccount] - サービスアカウント強制使用
+ * @param {boolean} [context.systemLookup] - サーバ内部の検索 (閲覧者の権限確認をしない)
  * @returns {Object|null} User object
  */
 function findUserById(userId, context = {}) {
@@ -1767,7 +376,7 @@ function findUserByGoogleId(googleId, context = {}) {
  * 探索は (1) individual cache → (2) getAllUsers キャッシュ → (3) 直接DB の順。
  * @param {string} fieldName - 検索するユーザーフィールド ('userEmail' | 'userId' | 'googleId')
  * @param {*} fieldValue - 一致させる値
- * @param {Object} context - requestingUser / preloadedAuth / forceServiceAccount 等に加え、
+ * @param {Object} context - requestingUser / preloadedAuth / systemLookup 等に加え、
  *                          内部用の cacheKeyPrefix (null で個別キャッシュ無効) と label を受け取る
  * @returns {Object|null} アクセス制御適用済みのユーザー、または null
  */
@@ -1793,7 +402,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
     try {
       const allUsers = getAllUsers(
         { activeOnly: false },
-        { ...context, forceServiceAccount: true, skipCache: false }
+        { ...context, systemLookup: true, skipCache: false }
       );
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find((u) => u[fieldName] === fieldValue);
@@ -1974,8 +583,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     };
 
     const data = sheet.getDataRange().getValues();
-    // Why: SA proxy の getValues は 429 で retry を使い切ると [] を返す。ここで
-    //   headers が undefined のまま進むと TypeError になり、症状 (quota) が消える。
+    // Why: 読めなかったとき headers が undefined のまま進むと TypeError になり、原因が消える。
     //   戻り値の契約は user | null なので、ここで error envelope を返してはいけない
     //   (呼び出し側の `if (!user)` を通り抜けて「Invalid user data」になっていた)。
     if (!Array.isArray(data) || data.length === 0 || !Array.isArray(data[0])) {
@@ -2000,8 +608,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     if (hasCreatedAtColumn) setCol('createdAt', now);
     setCol('lastModified', now);
 
-    // 容量判定は読んだ実データ行数で行う。SA proxy の getLastRow はグリッドの行数 (既定 1000、
-    //   追記で拡張される) を返すので、データ行数の代わりにはならない。
+    // 容量判定は読んだ実データ行数で行う。
     if (data.length >= 10000) {
       logError_('createUser', new Error('Users sheet at capacity'));
       return null;
@@ -2049,13 +656,13 @@ function getAllUsers(options = {}, context = {}) {
       isAdmin = isAdministrator(currentEmail);
     }
 
-    if (!isAdmin && !context.forceServiceAccount) {
+    if (!isAdmin && !context.systemLookup) {
       console.warn('getAllUsers: Non-admin user attempting cross-user data access');
       return [];
     }
 
     const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
-    const cacheSuffix = `${simpleHash(options)}_${context.forceServiceAccount ? 'sa' : 'norm'}`;
+    const cacheSuffix = `${simpleHash(options)}_${context.systemLookup ? 'sys' : 'norm'}`;
     const cacheKey = `all_users_v${cacheVersion}_${cacheSuffix}`;
     const skipCache = context.skipCache || false;
 
@@ -2419,11 +1026,11 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
     // skipCache は「SS → user の対応 (user_by_sheet, 10 分)」だけを飛ばす。users 一覧そのものは
     //   USER_CACHE_VERSION 付き cache (config 保存で bump) を使う。
-    //   Why: 以前は skipCache が getAllUsers にも伝わり、validateServiceAccountUsage の
+    //   Why: 以前は skipCache が getAllUsers にも伝わり、checkSpreadsheetAccess_ の
     //   cache miss (児童 × SS ごとに 60 秒) のたびに users シートを読んでいた。30 人の授業で
     //   毎分 30 read、しかもフェーズ切替で同時に切れるので burst になっていた (2026-09-08)。
     const allUsers = getAllUsers({ activeOnly: false }, {
-      ...context, skipCache: false, forceServiceAccount: true, preloadedAuth: context.preloadedAuth
+      ...context, skipCache: false, systemLookup: true, preloadedAuth: context.preloadedAuth
     });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');

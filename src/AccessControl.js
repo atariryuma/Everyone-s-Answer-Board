@@ -20,10 +20,10 @@
  *   - 再公開 (republishMyBoard / publish from unpublished)
  *   - プロファイル管理 (loadProfile / deleteProfile / 別名保存)
  *   - lesson の作成 / 編集 / 削除 / archive
- *   - 管理 API (SA pool, admin diagnostics, all-user 操作)
+ *   - 管理 API (admin diagnostics)
  *
  * 効率:
- *   - SA pool 経由で Drive REST API permissions.list を 1 回 fetch
+ *   - 実行者 = 先生 = 持ち主の権限で、DriveApp から編集者と持ち主を 1 回読む
  *   - 結果は ScriptCache に cache (per file × per email hash)
  *   - 付与 ('1') は短命 (2 min): editor 共有を revoke しても権限残存が最大 2 分で消える
  *     (collaborator は unpublish 等の権限を持つため、 revoke 後の stale grant 窓を短く保つ)
@@ -31,7 +31,7 @@
  *   - owner / admin 判定は呼び出し側で先に行うこと (Drive API 呼び出し回避)
  */
 
-/* global pickServiceAccount_, getServiceAccountAccessToken_, getUserConfig, logError_ */
+/* global getUserConfig, logError_ */
 
 const COLLABORATOR_CACHE_TTL_OK_SEC = 120;
 const COLLABORATOR_CACHE_TTL_NO_SEC = 600;
@@ -84,35 +84,11 @@ function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
   if (hit !== null) return hit === '1';
 
   let ok = false;
-  // 429 / 5xx は一時的な失敗なので「編集者ではない」を 10 分固定しない (transient は cache しない)。
+  // Drive が読めなかったとき (一時的な失敗) は「編集者ではない」を 10 分固定しない (cache しない)。
   let transient = false;
   try {
-    const sa = pickServiceAccount_();
-    if (!sa) return false;
-    const token = getServiceAccountAccessToken_(sa);
-    if (!token) return false;
-    const url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) +
-                '/permissions?fields=permissions(emailAddress,role)&supportsAllDrives=true';
-    const response = UrlFetchApp.fetch(url, {
-      method: 'get',
-      headers: { Authorization: 'Bearer ' + token },
-      muteHttpExceptions: true
-    });
-    const code = response.getResponseCode();
-    if (code === 200) {
-      const json = JSON.parse(response.getContentText());
-      const editors = (json.permissions || [])
-        .filter(function (p) { return p.role === 'writer' || p.role === 'owner'; })
-        .map(function (p) { return String(p.emailAddress || '').toLowerCase(); });
-      ok = editors.indexOf(emailNorm) !== -1;
-    } else {
-      // 黙って false にしない: 403 なら SA token の scope 不足 (drive.readonly が要る) か
-      //   SA がそのファイルの閲覧権を持たない。症状は「共同編集者がハイライトできない」だけで、
-      //   痕跡が無いと原因が追えない。
-      transient = code === 429 || (code >= 500 && code < 600);
-      console.warn('isBoardCollaborator: Drive permissions.list returned', code,
-        transient ? '(transient, not cached)' : '', String(response.getContentText() || '').slice(0, 200));
-    }
+    // 先生として実行するので、先生のボード SS の編集者を DriveApp でそのまま読める。
+    ok = __editorEmailsViaDriveApp_(fileId).indexOf(emailNorm) !== -1;
   } catch (e) {
     transient = true;
     if (typeof logError_ === 'function') logError_('isBoardCollaborator/drive', e);
@@ -122,6 +98,15 @@ function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
     catch (_) { /* cache 不通は機能的に無害 (次回 Drive を読み直す) */ }
   }
   return ok;
+}
+
+// ファイルの編集者と持ち主のメール (小文字)。実行者 (先生) がそのファイルを読める前提。
+function __editorEmailsViaDriveApp_(fileId) {
+  const file = DriveApp.getFileById(fileId);
+  const emails = file.getEditors().map(function (u) { return String(u.getEmail() || '').toLowerCase(); });
+  const owner = file.getOwner();
+  if (owner) emails.push(String(owner.getEmail() || '').toLowerCase());
+  return emails;
 }
 
 function __emailHash_(email) {

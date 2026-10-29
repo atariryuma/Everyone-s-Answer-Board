@@ -171,7 +171,7 @@ test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (1
   vm.runInContext(SRC('DatabaseCore.js'), helpersCtx, { filename: 'DatabaseCore.js' });
   helpersCtx.openDatabase = () => ({ getSheetByName: () => sheet });
 
-  const first = helpersCtx.getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
+  const first = helpersCtx.getAllUsers({ activeOnly: false }, { systemLookup: true });
   assert.equal(first.length, 50);
   assert.equal(reads, 1);
   const stored = [...cache._store.entries()].find(([k]) => k.startsWith('all_users_v'));
@@ -179,7 +179,7 @@ test('getAllUsers: 一覧は圧縮して cache し、読み返すと同じ形 (1
   assert.ok(stored[1].length < 100000, `cache 値は 100KB 未満 (${stored[1].length} 文字)`);
   assert.ok(JSON.parse(stored[1]).__gz, '圧縮表現で書かれている');
 
-  const second = helpersCtx.getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
+  const second = helpersCtx.getAllUsers({ activeOnly: false }, { systemLookup: true });
   assert.equal(reads, 1, '2 回目は cache から (シートを読まない)');
   assert.equal(JSON.stringify(second), JSON.stringify(first), '読み返した形は同じ');
 });

@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global takeProxyReadFailure_, createErrorResponse, formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, isAuthorizationScopeError_, sheetsApiBackoffMs_ */
+/* global createErrorResponse, formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, sheetsApiBackoffMs_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -101,7 +101,6 @@ function resolveTimestampIndex(headers) {
  * @returns {{sheet:Sheet, spreadsheet:Spreadsheet}}
  */
 function connectToSpreadsheetSheet(config) {
-  // accessMode は openSpreadsheet が自動判定 (owner なら openById、 viewer なら SA pool)。
   const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'connectToSpreadsheetSheet' });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
@@ -313,7 +312,6 @@ function processBatchData(ctx) {
   //   空のまま止まる (2026-10 監査)。
   ctx.readFailures = 0;
   ctx.truncated = false;
-  const takeProxyFailure = (typeof takeProxyReadFailure_ === 'function') ? takeProxyReadFailure_ : () => null;
 
   for (let startRow = 2; startRow <= lastRow; ) {
     const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors, totalDataRows);
@@ -321,14 +319,7 @@ function processBatchData(ctx) {
     const batchSize = endRow - startRow + 1;
 
     try {
-      takeProxyFailure();   // 以前の失敗を捨て、この読みの結果だけを見る
       const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
-      // SA proxy は失敗時に例外ではなく [] を返す (空のグリッドと区別できない)。実行単位の
-      //   失敗 slot を見て、失敗なら例外に戻して下の catch (429 backoff / skip) に載せる。
-      const proxyFailure = takeProxyFailure();
-      if (proxyFailure) {
-        throw new Error(`sheet read failed (${proxyFailure.label}): ${proxyFailure.message}`);
-      }
       const batchProcessed = processRawDataBatch({
         batchRows, headers, options,
         startOffset: startRow - 2,
@@ -347,16 +338,8 @@ function processBatchData(ctx) {
       // batchError から message 文字列を取り出す。これを忘れると catch 自身が
       // ReferenceError を投げ、429 backoff / 永続エラースキップが一切動かなくなる。
       const errorMessage = batchError && batchError.message ? batchError.message : String(batchError);
-      // 利用者の許可不足は、残りのバッチを読んでも全部同じ理由で落ちる (待っても直らない)。
-      //   以前は 1 バッチごとに 3 回投げ直し、「実行時間制限のため中断」まで数十秒かけていた
-      //   (2026-10-21/22 の児童 1〜2 人)。読みをやめて、呼び出し側に直し方を返させる。
-      if (typeof isAuthorizationScopeError_ === 'function' && isAuthorizationScopeError_(errorMessage)) {
-        console.warn('DataService.processBatchData: authorization incomplete, stop reading', { startRow, endRow });
-        ctx.readFailures++;
-        break;
-      }
       const isQuota = errorMessage.includes('429') || errorMessage.includes('Quota exceeded')
-        || errorMessage.includes('quota') || errorMessage.includes('Circuit breaker');
+        || errorMessage.includes('quota') || errorMessage.includes('too many times');
       if (isQuota) {
         // quota は一時的な混雑で原因は明らか。ERROR で積まない (WARN に落として痕跡は残す)。
         console.warn('DataService.processBatchData: read throttled', { startRow, endRow, consecutiveErrors, errorMessage });
@@ -370,7 +353,7 @@ function processBatchData(ctx) {
       }
 
       if (isQuota) {
-        // Sheets API の quota なので、Google が推奨する式 (2^n 秒 + 1 秒以内の乱数) で待つ。
+        // 一時的な上限なので、Google が推奨する式 (2^n 秒 + 1 秒以内の乱数) で待つ。
         const backoffMs = (typeof sheetsApiBackoffMs_ === 'function')
           ? sheetsApiBackoffMs_(consecutiveErrors - 1, 8000)
           : Math.min(1000 * Math.pow(2, consecutiveErrors), 8000);
@@ -728,7 +711,6 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     const {spreadsheetId} = config.config;
     const sheetName = config.config.sheetName || 'フォームの回答 1';
 
-    // accessMode は openSpreadsheet が自動判定 (owner = openById, viewer/admin = SA pool)。
     const dataAccess = openSpreadsheet(spreadsheetId, {
       targetUserEmail: user.userEmail,
       context: 'deleteAnswerRow'

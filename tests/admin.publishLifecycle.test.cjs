@@ -97,21 +97,6 @@ test('republishMyBoard: sets isPublished=true and publishedAt=now', () => {
   assert.match(result.publishedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
 });
 
-test('toggleUserBoardStatus: false → true → false alternates state correctly', () => {
-  const ctx = loadAdminContext();
-  ctx.__savedConfigs['other1'] = { isPublished: false, publishedAt: null };
-
-  const r1 = ctx.toggleUserBoardStatus('other1');
-  assert.equal(r1.success, true);
-  assert.equal(r1.isPublished, true);
-  assert.ok(r1.publishedAt);
-
-  const r2 = ctx.toggleUserBoardStatus('other1');
-  assert.equal(r2.success, true);
-  assert.equal(r2.isPublished, false);
-  assert.equal(r2.publishedAt, null);
-});
-
 // =====================================================================
 // etag conflict detection は 3 関数すべてで一貫
 // =====================================================================
@@ -141,19 +126,6 @@ test('republishMyBoard: rejects with etag_mismatch when sourceEtag differs', () 
   };
 
   const result = ctx.republishMyBoard({ sourceEtag: 'old_etag_v1' });
-  assert.equal(result.success, false);
-  assert.equal(result.error, 'etag_mismatch');
-});
-
-test('toggleUserBoardStatus: rejects with etag_mismatch when sourceEtag differs', () => {
-  const ctx = loadAdminContext();
-  ctx.__savedConfigs['other1'] = {
-    isPublished: false,
-    publishedAt: null,
-    etag: 'current_etag_v2'
-  };
-
-  const result = ctx.toggleUserBoardStatus('other1', { sourceEtag: 'old_etag_v1' });
   assert.equal(result.success, false);
   assert.equal(result.error, 'etag_mismatch');
 });
@@ -253,30 +225,11 @@ test('republishMyBoard: collaborator CANNOT publish other user board (write op b
   assert.equal(result.success, false);
 });
 
-test('toggleUserBoardStatus: rejects non-admin caller', () => {
-  const ctx = loadAdminContext({
-    isAdministrator: () => false,
-    getCurrentEmail: () => 'other@example.com'
-  });
-  ctx.__savedConfigs['other1'] = { isPublished: false, publishedAt: null };
-
-  const result = ctx.toggleUserBoardStatus('other1');
-  assert.equal(result.success, false);
-  assert.match(result.message, /管理者/);
-});
-
-test('toggleUserBoardStatus: requires targetUserId', () => {
-  const ctx = loadAdminContext();
-  const result = ctx.toggleUserBoardStatus(null);
-  assert.equal(result.success, false);
-  assert.match(result.message, /targetUserId/);
-});
-
 // =====================================================================
 // レスポンス形の統一
 // =====================================================================
 
-test('all 3 lifecycle helpers return unified shape with publishedAt + isPublished + redirectUrl + etag', () => {
+test('both lifecycle helpers return unified shape with publishedAt + isPublished + redirectUrl + etag', () => {
   const ctx = loadAdminContext();
   ctx.__savedConfigs['owner1'] = { isPublished: false, publishedAt: null };
 
@@ -293,7 +246,6 @@ test('all 3 lifecycle helpers return unified shape with publishedAt + isPublishe
 
   checkShape(ctx.republishMyBoard());
   checkShape(ctx.unpublishBoard('owner1'));
-  checkShape(ctx.toggleUserBoardStatus('other1'));
 });
 
 // =====================================================================
@@ -316,20 +268,6 @@ test('dispatch: republishMyBoard via dispatcher works', () => {
   const result = ctx.dispatchAdminOperation('republishMyBoard', {});
   assert.equal(result.success, true);
   assert.equal(result.isPublished, true);
-});
-
-test('dispatch: toggleUserBoard with etag forwards to lifecycle helper', () => {
-  const ctx = loadAdminContext();
-  ctx.__savedConfigs['other1'] = { isPublished: false, publishedAt: null, etag: 'cur' };
-
-  // wrong etag rejected
-  const r1 = ctx.dispatchAdminOperation('toggleUserBoard', { targetUserId: 'other1', etag: 'wrong' });
-  assert.equal(r1.success, false);
-  assert.equal(r1.error, 'etag_mismatch');
-
-  // correct etag passes
-  const r2 = ctx.dispatchAdminOperation('toggleUserBoard', { targetUserId: 'other1', etag: 'cur' });
-  assert.equal(r2.success, true);
 });
 
 // =====================================================================

@@ -5,13 +5,13 @@
  *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
  *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
  *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection, searchFormsByDrive
- *   - DB: testDatabaseConnection, __ensureSheetWithHeaders_ (先生専用の配置の初回にシートをそろえる)
+ *   - DB: testDatabaseConnection, __ensureSheetWithHeaders_ (配置の初回にシートをそろえる)
  *
- * 公開状態の書き換えはここの publishApp と AdminApis.js の 3 関数 (republishMyBoard /
- * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
+ * 公開状態の書き換えはここの publishApp と AdminApis.js の 2 関数 (republishMyBoard /
+ * unpublishBoard) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache, isSingleTenant_ */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, openDatabase, getCachedProperty, getSheetInfo, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, logError_, clearDatabaseUserCache, clearPropertyCache */
 
 /**
  * キャッシュ期間 (秒)
@@ -264,10 +264,6 @@ function testSystemDiagnosis() {
         adminEmail: !!props.getProperty('ADMIN_EMAIL'),
         databaseId: !!props.getProperty('DATABASE_SPREADSHEET_ID')
       };
-      // 先生専用の配置は SA pool を使わない (hasCoreSystemProps と同じ判定)。
-      if (!(typeof isSingleTenant_ === 'function' && isSingleTenant_())) {
-        coreProps.serviceAccount = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
-      }
 
       const allCorePresent = Object.values(coreProps).every(Boolean);
       diagnostics.push({
@@ -394,8 +390,7 @@ function performAutoRepair() {
       const props = PropertiesService.getScriptProperties();
       const coreProps = {
         ADMIN_EMAIL: props.getProperty('ADMIN_EMAIL'),
-        DATABASE_SPREADSHEET_ID: props.getProperty('DATABASE_SPREADSHEET_ID'),
-        SERVICE_ACCOUNT_CREDS: props.getProperty('SERVICE_ACCOUNT_CREDS')
+        DATABASE_SPREADSHEET_ID: props.getProperty('DATABASE_SPREADSHEET_ID')
       };
 
       const missingProps = Object.keys(coreProps).filter(key => !coreProps[key]);
@@ -616,7 +611,7 @@ function publishApp(publishConfig) {
       updatedConfig.currentLessonStartedAt = publishedAt;
     }
 
-    // __allowPublishStateWrite: publishApp は publish 状態を書き換える正規経路 (4 関数の 1 つ)。
+    // __allowPublishStateWrite: publishApp は publish 状態を書き換える正規経路 (3 関数の 1 つ)。
     //   saveUserConfig の publish-state ガードを通過させる。
     const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true, __allowPublishStateWrite: true });
 
@@ -631,7 +626,7 @@ function publishApp(publishConfig) {
     }
 
     // publish 遷移時の cache 即時 stale 化 (__applyPublishStateChange と共有の mechanism)。
-    //   saveUserConfig が primary の sa_validation は消すが、 profile 分 + board data version は
+    //   saveUserConfig が primary のアクセス判定 cache は消すが、 profile 分 + board data version は
     //   ここで明示。 再公開 (unpublish→republish) 時に viewer が stale/空データを見るのを防ぐ。
     if (typeof invalidateBoardCaches_ === 'function') {
       invalidateBoardCaches_(updatedConfig, user.userId);
@@ -1556,7 +1551,7 @@ function testDatabaseConnection() {
 }
 
 // DB のシートを idempotent にそろえる (無ければ作る / 空ならヘッダーを書く)。
-//   先生専用の配置の初回 (helpers.js の ensureSingleTenantBootstrap_) が使う。
+//   先生専用の配置の初回 (helpers.js の ensureDeploymentBootstrap_) が使う。
 function __ensureSheetWithHeaders_(ss, sheetName, headers) {
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
