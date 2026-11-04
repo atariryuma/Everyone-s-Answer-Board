@@ -207,7 +207,13 @@ check('授業', '授業のナビ (getActiveLessonNav)', () => { const r = inv('g
 const submit = (who, phaseIndex, x, y) => inv('submitLessonAnswer', [userId, { lessonId, phaseIndex, numericX: x, numericY: y, reason: `検証 ${phaseIndex}`, class: CLS, name: 'けんしょう' }], who);
 check('児童(授業)', '「考える」で送る (submitLessonAnswer × 2 人)', () => { const a = submit(STUDENT[0], 0, 2, 4); const b = submit(STUDENT[1], 0, 4, 2); return { pass: ok(a) && ok(b), note: ok(a) && ok(b) ? '' : text(ok(a) ? b : a) }; });
 check('児童(授業)', '「考える」の間は他の子の回答が見えない', () => { const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]); return { pass: ok(r) && rowsOf(r).length === 1, note: ok(r) ? `見えた行 ${rowsOf(r).length}` : text(r) }; });
-check('児童(授業)', '同じフェーズで送り直すと行が増えない', () => { submit(STUDENT[0], 0, 3, 3); const r = op('lesson.liveAnswers', { userId, lessonId }); return { pass: ok(r) && (r.data.rows || []).length === 2, note: ok(r) ? `先生の一覧 ${(r.data.rows || []).length} 行` : text(r) }; });
+const spotOf = (row) => `${row.numericX},${row.numericY}`;
+check('児童(授業)', '同じフェーズで送り直すと行が増えず、新しい位置になる', () => {
+  submit(STUDENT[0], 0, 3, 3);
+  const r = op('lesson.liveAnswers', { userId, lessonId });
+  const spots = ((r.data && r.data.rows) || []).map(spotOf);
+  return { pass: ok(r) && spots.length === 2 && spots.includes('3,3') && !spots.includes('2,4'), note: ok(r) ? `先生の一覧 ${spots.length} 行` : text(r) };
+});
 check('先生(授業)', 'ハイライト (lesson.toggleHighlight)', () => {
   const live = op('lesson.liveAnswers', { userId, lessonId }).data;
   const row = (live.rows || [])[0];
@@ -219,6 +225,29 @@ check('児童(授業)', '「出会う」で全員の回答が見え、名前は�
   const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]);
   const named = rowsOf(r).filter((x) => x.name).length;
   return { pass: ok(r) && rowsOf(r).length === 2 && named === 0, note: ok(r) ? `見えた行 ${rowsOf(r).length}・名前つき ${named}` : text(r) };
+});
+check('児童(授業)', '「出会う」の間は送れない (サーバが断る)', () => { const r = submit(STUDENT[0], 1, 1, 1); return { pass: !ok(r), note: text(r) }; });
+// 投稿フェーズへ戻して置き直す流れ: 他の子はまた見えなくなり、行も記録も増えず、最新の位置だけが残る
+check('先生(授業)', '「考える」へ戻すと、他の子の回答はまた見えない', () => {
+  const a = inv('advanceLessonPhase', [userId, lessonId, 'previous', null]);
+  const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]);
+  return { pass: ok(a) && ok(r) && rowsOf(r).length === 1, note: ok(a) ? `見えた行 ${rowsOf(r).length}` : text(a) };
+});
+check('児童(授業)', '戻したあとに置き直しても行が増えず、新しい位置になる', () => {
+  const a = submit(STUDENT[0], 0, 5, 1);
+  const r = op('lesson.liveAnswers', { userId, lessonId });
+  const spots = ((r.data && r.data.rows) || []).map(spotOf);
+  return { pass: ok(a) && ok(r) && spots.length === 2 && spots.includes('5,1') && !spots.includes('3,3'), note: ok(a) ? `先生の一覧 ${spots.length} 行` : text(a) };
+});
+check('先生(授業)', 'もう一度「出会う」へ進むと、記録は倍にならない', () => {
+  const a = inv('advanceLessonPhase', [userId, lessonId, 'next', null]);
+  const snaps = (op('lesson.review', { userId, lessonId }).data.lesson.lessonJson.snapshots || []).filter((s) => s.phaseIndex === 0);
+  return { pass: ok(a) && snaps.length === 1 && snaps[0].rowCount === 2, note: ok(a) ? `記録 ${snaps.length} 件・${snaps[0] ? snaps[0].rowCount : 0} 行` : text(a) };
+});
+check('児童(授業)', '置き直した位置が「出会う」で見える', () => {
+  const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[1]);
+  const spots = rowsOf(r).map(spotOf);
+  return { pass: ok(r) && spots.length === 2 && spots.includes('5,1') && !spots.includes('3,3'), note: ok(r) ? `見えた行 ${spots.length}` : text(r) };
 });
 check('先生(授業)', 'フェーズを進める: 議論する', () => { const r = inv('advanceLessonPhase', [userId, lessonId, 'next', null]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 check('児童(授業)', '「議論する」では送れない (サーバが断る)', () => { const r = submit(STUDENT[0], 2, 1, 1); return { pass: !ok(r), note: text(r) }; });
