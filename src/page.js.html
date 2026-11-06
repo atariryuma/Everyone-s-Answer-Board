@@ -1672,6 +1672,7 @@
       //   Why トーストでないか: 直後の「〜に進みました」が同じ表示場所を上書きし、
       //   誰にも見えていなかった (2026-10-28 の理科で、送る前に進んだ児童が気づけなかった)。
       this.state.lessonUnsentNote = this.__nextLessonUnsentNote(prev, phase);
+      this.__confirmLessonUnsentNote(this.state.lessonUnsentNote);
       this.state.lessonDraft = null;
       this.state.lessonPrevPoint = null;
       this.state.lessonSent = null;
@@ -2580,17 +2581,19 @@
     }
 
     // フェーズが変わる直前の判定: 送っていない書きかけ (位置かことば) が端末にあるか。
+    //   一度送ったフェーズは数えない (置き直しの途中でも、前に送った考えは届いている)。
     __hasUnsentLessonDraft(prevPhase) {
       if (!prevPhase || ['input', 'reinput'].indexOf(prevPhase.screenRole) < 0) return false;
       const sent = this.state.lessonSent;
-      if (sent && sent.lessonId === prevPhase.lessonId && sent.phaseIndex === prevPhase.phaseIndex && !this.state.lessonEditing) return false;
+      if (sent && sent.lessonId === prevPhase.lessonId && sent.phaseIndex === prevPhase.phaseIndex) return false;
       const d = this.__restoreLessonDraft(prevPhase);
       return Boolean(d && (d.numericX || String(d.reason || '').trim()));
     }
 
     /**
      * フェーズが変わったときの「まだ送れていません」案内の状態を決める (児童だけ)。
-     *   - 前のフェーズに送っていない書きかけがあれば、そのフェーズの案内にする
+     *   - 前のフェーズに送っていない書きかけがあれば、そのフェーズの案内の候補にする。
+     *     出すのはサーバで送れていないと確かめてから (__confirmLessonUnsentNote)
      *   - 書く画面 (input / reinput) に入ったら外す。新しく書く時間であり、
      *     案内したフェーズに戻ったのなら書きかけは画面に復元されている
      *   - それ以外 (出会う → 議論する 等) は持ち越す。まだ送れていないことは変わらない
@@ -2598,19 +2601,51 @@
     __nextLessonUnsentNote(prev, phase) {
       if (this.state.isEditor === true || !phase) return null;
       if (prev && this.__hasUnsentLessonDraft(prev)) {
-        const s = this.state.lessonSent;
         return {
           lessonId: prev.lessonId,
           phaseIndex: prev.phaseIndex,
           phaseName: prev.phaseName || '',
-          // 送ったあとの置き直しだけが送れていない (前に送った考えは届いている)
-          replaced: Boolean(s && s.lessonId === prev.lessonId && s.phaseIndex === prev.phaseIndex)
+          confirmed: false
         };
       }
       const note = this.state.lessonUnsentNote;
       if (!note || note.lessonId !== phase.lessonId) return null;
       if (['input', 'reinput'].indexOf(phase.screenRole) >= 0) return null;
       return note;
+    }
+
+    /**
+     * 案内の候補を、サーバの記録で確かめてから出す。
+     *   Why: 端末の判定だけで出すと、送れているのに「まだ送れていません」が出た (2026-11-06 3組)。
+     *   送った直後に進んだ (返事がフェーズの切替より遅れた)、通信が切れて返事だけ届かなかった、
+     *   などで端末とサーバがずれる。記録はサーバにあるので、サーバに無いときだけ出す。
+     *   30 人が同じ瞬間に読まないよう __loadMyLessonRecord と同じく 0〜2.5 秒ばらけさせる
+     *   (読むのは書きかけを残した児童だけ)。
+     */
+    __confirmLessonUnsentNote(note) {
+      if (!note || note.confirmed) return;
+      setTimeout(() => {
+        if (this.state.lessonUnsentNote !== note) return;
+        this.runGas('getMyLessonTrajectory', this.state.userId)
+          .then((res) => {
+            if (this.state.lessonUnsentNote !== note) return;
+            if (!res || !res.success) throw new Error((res && res.message) || 'record unavailable');
+            const phases = (res.data && res.data.phases) || [];
+            if (phases.some((p) => p.phaseIndex === note.phaseIndex)) {
+              // 届いている。案内は出さず、端末の書きかけも要らない。
+              this.__clearLessonDraft({ lessonId: note.lessonId, phaseIndex: note.phaseIndex });
+              this.state.lessonUnsentNote = null;
+              return;
+            }
+            note.confirmed = true;
+            this.__renderLessonUnsentNote();
+          })
+          .catch(() => {
+            // 確かめられないときは出さない。届いているのに「送れていません」と言うほうが、
+            //   児童を混乱させる (送り直そうとしても前のフェーズには送れない)。
+            if (this.state.lessonUnsentNote === note) this.state.lessonUnsentNote = null;
+          });
+      }, Math.random() * 2500);
     }
 
     /**
@@ -2622,7 +2657,7 @@
     __renderLessonUnsentNote() {
       const note = this.state.lessonUnsentNote;
       let el = document.getElementById('lessonUnsentNote');
-      if (!note) {
+      if (!note || !note.confirmed) {
         if (el && el.parentNode) el.parentNode.removeChild(el);
         document.body.classList.remove('lesson-has-note');
         return;
@@ -2637,13 +2672,10 @@
       const where = note.phaseName ? '「' + note.phaseName + '」' : '前の時間';
       const title = document.createElement('p');
       title.className = 'lesson-unsent-title';
-      title.textContent = where + (note.replaced ? 'の置き直しは、まだ送れていません' : 'の考えは、まだ送れていません');
+      title.textContent = where + 'の考えは、まだ送れていません';
       const body = document.createElement('p');
       body.className = 'lesson-unsent-body';
-      // 置き直しは端末に残しても復元されない (戻ると「送りました」画面になる) ので、残っているとは言わない。
-      body.textContent = note.replaced
-        ? '送る前に次へ進みました。前に送った考えは届いています。'
-        : '送る前に次へ進みました。書いたことは、この端末に残っています。';
+      body.textContent = '送る前に次へ進みました。書いたことは、この端末に残っています。';
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'lesson-unsent-close';

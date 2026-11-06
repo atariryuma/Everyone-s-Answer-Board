@@ -139,7 +139,7 @@ test('児童: フェーズが変わると state の下書きは外れるが端�
   assert.equal(app.state.lessonDraft, null);
   assert.ok(store.has('lessonDraft:u1:L1:0'), '端末には残る');
   const note = app.state.lessonUnsentNote;
-  assert.equal(JSON.stringify(note), JSON.stringify({ lessonId: 'L1', phaseIndex: 0, phaseName: '考える', replaced: false }));
+  assert.equal(JSON.stringify(note), JSON.stringify({ lessonId: 'L1', phaseIndex: 0, phaseName: '考える', confirmed: false }));
   // トーストは「進みました」の 1 回だけ。以前は「残しています」がこれに上書きされて見えなかった (2026-10-28)。
   assert.deepEqual(Array.from(app.toasts), ['「出会う」に進みました']);
 });
@@ -207,7 +207,7 @@ test('もう一度考えるで送らずに進んだら、ふりかえるでそ�
   assert.equal(app.state.lessonUnsentNote && app.state.lessonUnsentNote.phaseName, 'もう一度考える');
 });
 
-test('送ったあとの置き直しだけが送れていないときは、replaced として区別する', () => {
+test('送ったあとの置き直しの途中で進んだときは、案内を出さない (前に送った考えは届いている)', () => {
   const { app } = loadApp();
   app.state.lessonPhase = think;
   app.state.lessonSent = { lessonId: 'L1', phaseIndex: 0 };
@@ -216,7 +216,49 @@ test('送ったあとの置き直しだけが送れていないときは、repla
   app.__persistLessonDraft();
   app.__renderLessonScreen = () => {};
   app.__applyLessonPhase(meet);
-  assert.equal(app.state.lessonUnsentNote && app.state.lessonUnsentNote.replaced, true);
+  assert.equal(app.state.lessonUnsentNote, null);
+});
+
+// 案内はサーバの記録で確かめてから出す (2026-11-06 3組: 送れているのに「まだ送れていません」が出た)
+async function moveWithServer(record) {
+  const doc = miniDocument();
+  const { app, store } = loadApp({ document: doc, setTimeout: (fn) => { fn(); return 1; } });
+  const calls = [];
+  app.runGas = async (name) => { calls.push(name); if (record instanceof Error) throw record; return record; };
+  withUnsentThink(app);
+  app.__applyLessonPhase(meet);
+  await new Promise((r) => setImmediate(r));
+  return { app, store, doc, calls };
+}
+
+test('サーバに考えが届いていたら、案内を出さず、端末の書きかけも消す', async () => {
+  const { app, store, doc, calls } = await moveWithServer({ success: true, data: { phases: [{ phaseIndex: 0 }] } });
+  assert.deepEqual(calls, ['getMyLessonTrajectory']);
+  assert.equal(app.state.lessonUnsentNote, null);
+  assert.equal(doc.getElementById('lessonUnsentNote'), null);
+  assert.equal(store.has('lessonDraft:u1:L1:0'), false);
+});
+
+test('サーバにも無いときだけ案内を出す', async () => {
+  const { app, doc } = await moveWithServer({ success: true, data: { phases: [] } });
+  assert.equal(app.state.lessonUnsentNote && app.state.lessonUnsentNote.confirmed, true);
+  assert.ok(doc.getElementById('lessonUnsentNote'), '画面に出る');
+});
+
+test('サーバに確かめられないときは出さない (届いているのに「送れていません」と言わない)', async () => {
+  const failed = await moveWithServer({ success: false, message: 'busy' });
+  assert.equal(failed.app.state.lessonUnsentNote, null);
+  const thrown = await moveWithServer(new Error('network'));
+  assert.equal(thrown.app.state.lessonUnsentNote, null);
+  assert.equal(thrown.doc.getElementById('lessonUnsentNote'), null);
+});
+
+test('確かめる前の候補は画面に出さない', () => {
+  const doc = miniDocument();
+  const { app } = loadApp({ document: doc });
+  app.state.lessonUnsentNote = { lessonId: 'L1', phaseIndex: 0, phaseName: '考える', confirmed: false };
+  app.__renderLessonUnsentNote();
+  assert.equal(doc.getElementById('lessonUnsentNote'), null);
 });
 
 test('送ってから進んだとき・教師の画面・授業の終わりには案内を出さない', () => {
@@ -275,7 +317,7 @@ function miniDocument() {
 test('案内の文言: 送れていないこと・端末に残っていることだけを書き、教師の操作は予告しない', () => {
   const doc = miniDocument();
   const { app } = loadApp({ document: doc });
-  app.state.lessonUnsentNote = { lessonId: 'L1', phaseIndex: 0, phaseName: '考える', replaced: false };
+  app.state.lessonUnsentNote = { lessonId: 'L1', phaseIndex: 0, phaseName: '考える', confirmed: true };
   app.__renderLessonUnsentNote();
   const el = doc.getElementById('lessonUnsentNote');
   assert.ok(el, '画面に出る');
@@ -284,13 +326,6 @@ test('案内の文言: 送れていないこと・端末に残っていること
   assert.match(el.textContent, /書いたことは、この端末に残っています/);
   assert.doesNotMatch(el.textContent, /先生/);
   assert.ok(doc.bodyClasses.has('lesson-has-note'), '下に余白を足す');
-
-  // 置き直しは戻っても復元されないので「残っています」とは言わない
-  app.state.lessonUnsentNote = { lessonId: 'L1', phaseIndex: 0, phaseName: '考える', replaced: true };
-  app.__renderLessonUnsentNote();
-  assert.match(el.textContent, /置き直しは、まだ送れていません/);
-  assert.match(el.textContent, /前に送った考えは届いています/);
-  assert.doesNotMatch(el.textContent, /端末に残っています/);
 
   // 「とじる」で消える
   const close = el.children.find((c) => c.tagName === 'button');
