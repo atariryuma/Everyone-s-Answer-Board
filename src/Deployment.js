@@ -8,3 +8,6 @@
  */
 const DEPLOY_ADMIN_EMAIL = '';
 const DEPLOY_DATABASE_SPREADSHEET_ID = '';
+// ops-monitor への報告の送り先と鍵（OpsReport.js）。空なら送らない。
+const DEPLOY_OPS_REPORT_URL = '';
+const DEPLOY_OPS_REPORT_TOKEN = '';

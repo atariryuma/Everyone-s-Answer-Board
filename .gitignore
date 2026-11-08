@@ -52,4 +52,6 @@ scripts/config.*.json
 
 # 先生専用の配置 (scripts/deploy-single.js)
 scripts/single-tenants.json
+# ops-monitor への報告の鍵 (scripts/deploy-single.js が Deployment.js に焼き込む)
+scripts/ops-report.local.json
 .single-stage/

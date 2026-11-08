@@ -54,7 +54,11 @@ function saveConfig(cfg) {
 function clasp(stageDir, user, args) {
   // -P / -I で作業フォルダの .clasp.json / .claspignore を明示する。付けないと clasp は
   //   親フォルダ (リポジトリ直下) の本体の .clasp.json を拾い、本体に push してしまう。
-  return execFileSync('npx', ['clasp', '--user', user, '-P', '.', '-I', '.', ...args], {
+  // Windows の npx は .cmd なので shell なしでは起動できない (ENOENT)。node に同梱の npx-cli.js を node で直接呼ぶ。
+  const [cmd, pre] = process.platform === 'win32'
+    ? [process.execPath, [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]]
+    : ['npx', []];
+  return execFileSync(cmd, [...pre, 'clasp', '--user', user, '-P', '.', '-I', '.', ...args], {
     cwd: stageDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
   });
 }
@@ -65,8 +69,18 @@ function checkGeneratedFresh() {
   }
 }
 
+// ops-monitor への報告の送り先と鍵 (全配置で共通。git に入れない)。無ければ空=報告しない。
+//   形: { "url": "https://…/report", "token": "ops_…" }。値は画面に出さない。
+const OPS_REPORT_CONFIG = path.join(__dirname, 'ops-report.local.json');
+function loadOpsReport() {
+  if (!fs.existsSync(OPS_REPORT_CONFIG)) return { url: '', token: '' };
+  const j = JSON.parse(fs.readFileSync(OPS_REPORT_CONFIG, 'utf8'));
+  return { url: String(j.url || ''), token: String(j.token || '') };
+}
+
 // src/ を写し、Deployment.js だけ差し替える。
 function stage(tenant) {
+  const ops = loadOpsReport();
   const dir = path.join(STAGE_ROOT, tenant.name);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -79,7 +93,9 @@ function stage(tenant) {
   fs.writeFileSync(path.join(dir, 'Deployment.js'),
     '// scripts/deploy-single.js が書いたファイル。src/Deployment.js の説明を参照。\n' +
     `const DEPLOY_ADMIN_EMAIL = ${str(tenant.adminEmail)};\n` +
-    `const DEPLOY_DATABASE_SPREADSHEET_ID = ${str(tenant.spreadsheetId)};\n`);
+    `const DEPLOY_DATABASE_SPREADSHEET_ID = ${str(tenant.spreadsheetId)};\n` +
+    `const DEPLOY_OPS_REPORT_URL = ${str(ops.url)};\n` +
+    `const DEPLOY_OPS_REPORT_TOKEN = ${str(ops.token)};\n`);
   // 検証用の配置にだけ足すファイル (single-tenants.json の extraFiles、リポジトリからの相対パス)。
   //   例: scripts/verify/DevInvoke.js (画面の処理を admin API から直接呼ぶ入口)。本番の先生には付けない。
   for (const rel of tenant.extraFiles || []) {

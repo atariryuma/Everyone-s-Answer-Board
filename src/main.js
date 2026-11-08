@@ -858,6 +858,14 @@ function handleClientErrorReport_(email, payload) {
       userAgent
     };
 
+    if (level === 'error') {
+      // ops-monitor へは場所だけ (処理の区分・Error の name・行)。文面・スタック・URL・報告者は送らない。
+      if (typeof opsReport_ === 'function') {
+        const ctxPlace = /^[\w/.-]{1,40}$/.test(context) ? ':' + context.replace(/\//g, '.').replace(/\.$/, '') : '';
+        const kindMatch = /^([A-Za-z_$][\w$]{0,63})(?::|$)/.exec(stack || message);
+        opsReport_('client' + ctxPlace, { name: kindMatch ? kindMatch[1] : 'Error' }, { file: 'client', line: lineNo || 0 });
+      }
+    }
     if (level === 'error') console.error(summary, detail);
     else if (level === 'warn') console.warn(summary, detail);
     else console.log(summary, detail);

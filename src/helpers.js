@@ -561,6 +561,8 @@ function logError_(funcName, error, context) {
   } else {
     console.error(funcName + ' error:', msg);
   }
+  // ops-monitor へは場所だけを送る（文面と context は送らない。OpsReport.js）
+  if (typeof opsReport_ === 'function') opsReport_(funcName, error);
 }
 
 /**
