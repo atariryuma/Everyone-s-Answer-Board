@@ -11,7 +11,7 @@
  *   npm run api -- getAppStatus
  *   npm run api -- systemDiagnosis
  *   npm run api -- getUsers
- *   npm run api -- getLogs --limit 20
+ *   npm run api -- getLogs                 # 記録は無い (ops-monitor の毎朝の報告と「実行数」を案内する)
  *   npm run api -- perfMetrics --category api
  *   npm run api -- listProperties
  *

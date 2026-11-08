@@ -275,45 +275,18 @@ function unpublishBoard(targetUserId, options = {}) {
 
 
 
+// security_log_* を書き込む処理は無い (読むだけだった) ので、空の一覧を「異常なし」に見せず、見る場所を返す。
+//   エラーの場所は ops-monitor の毎朝の報告 (src/OpsReport.js)、中身は Apps Script エディタの「実行数」で見る。
+//   options は CLI (scripts/admin-api.js の --limit) との互換のために受けるだけ。
 function getLogs(options = {}) {
   try {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
-
-    const limit = Math.max(1, Math.min(Number(options.limit || 50), 200));
-    const props = PropertiesService.getScriptProperties().getProperties();
-    const logKeys = Object.keys(props)
-      .filter(key => key.startsWith('security_log_'))
-      .sort((a, b) => {
-        const tsA = Number(a.split('_')[2] || 0);
-        const tsB = Number(b.split('_')[2] || 0);
-        return tsB - tsA;
-      })
-      .slice(0, limit);
-
-    const logs = logKeys.map(key => {
-      try {
-        const parsed = JSON.parse(props[key]);
-        return {
-          key,
-          ...parsed
-        };
-      } catch (parseError) {
-        return {
-          key,
-          timestamp: null,
-          severity: 'unknown',
-          description: 'ログ解析に失敗しました',
-          parseError: parseError.message
-        };
-      }
-    });
-
     return {
       success: true,
-      logs,
-      count: logs.length,
-      message: logs.length > 0 ? 'セキュリティログを取得しました' : 'セキュリティログはありません'
+      logs: [],
+      count: 0,
+      message: 'このアプリはセキュリティログを記録していません。エラーは ops-monitor の毎朝の報告と、Apps Script エディタの「実行数」で確認してください。'
     };
   } catch (error) {
     logError_('getLogs', error);

@@ -53,7 +53,7 @@ doPost の `adminApi` アクションに API キー認証でアクセス。デ�
 
 ```bash
 npm run api -- systemDiagnosis                # DB接続・設定・デプロイ状態の健康診断
-npm run api -- getLogs --limit 20             # セキュリティログ
+npm run api -- getLogs                        # 記録は無い (ops-monitor と「実行数」を案内する)
 npm run api -- getUserConfig --userId X       # ボードの設定
 npm run api -- setUserConfig --userId X --patch '{...}'  # config パッチ適用
 npm run api -- previewBoard --userId X        # viewer 視点の公開ボードプレビュー
@@ -62,7 +62,7 @@ npm run api -- previewBoard --userId X        # viewer 視点の公開ボード�
 **いつ使うか:**
 
 - 配置の後 → `systemDiagnosis` で壊れていないか確認
-- エラー調査時 → `getLogs` でセキュリティログ、`perfMetrics` でボトルネック特定
+- エラー調査時 → ops-monitor の毎朝の報告 (エラーの場所) と Apps Script の「実行数」、`perfMetrics` でボトルネック特定 (`getLogs` は記録が無いので案内だけを返す)
 - 設定変更後 → `listProperties` で反映を確認
 
 **実行ログ**: 先生ごとの配置は既定の GCP project で動くので、Cloud Logging を CLI から読めない。

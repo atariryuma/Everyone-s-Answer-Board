@@ -1327,10 +1327,6 @@ function collectBatchMetrics_() {
  */
 function collectErrorMetrics_(options = {}) {
   try {
-    const recentWindowHours = Number(options.recentWindowHours || 24);
-    const now = Date.now();
-    const windowMs = recentWindowHours * 60 * 60 * 1000;
-
     const errorStats = {
       errorHandlingImplemented: true,
       source: 'runtime_observation',
@@ -1341,7 +1337,8 @@ function collectErrorMetrics_(options = {}) {
         permission: { status: 'implemented' }
       },
       recommendations: [],
-      recentSecurityEvents: 0
+      // エラーの件数はここでは数えない (security_log_* は書き込まれていなかった)。ops-monitor の毎朝の報告で見る。
+      errorReports: 'ops-monitor'
     };
 
     try {
@@ -1352,25 +1349,9 @@ function collectErrorMetrics_(options = {}) {
       errorStats.lastError = probeError.message;
     }
 
-    try {
-      const props = PropertiesService.getScriptProperties().getProperties();
-      const securityLogKeys = Object.keys(props).filter(key => key.startsWith('security_log_'));
-      const recentKeys = securityLogKeys.filter(key => {
-        const ts = Number(key.split('_')[2] || 0);
-        return ts > 0 && (now - ts) <= windowMs;
-      });
-      errorStats.recentSecurityEvents = recentKeys.length;
-    } catch (logError) {
-      errorStats.recentSecurityEvents = -1;
-      errorStats.logReadWarning = logError.message;
-    }
 
     if (errorStats.basicFunctionality !== 'working') {
       errorStats.recommendations.push('認証状態の検証を実施し、Webアプリの公開設定を確認してください。');
-    }
-
-    if (errorStats.recentSecurityEvents > 20) {
-      errorStats.recommendations.push('高重要度イベントが増加しています。アクセスログと運用設定を確認してください。');
     }
 
     if (errorStats.recommendations.length === 0) {

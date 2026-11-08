@@ -28,7 +28,7 @@ npm run api -- getUsers               # 登録 (先生 1 人)
 npm run api -- getAppStatus           # アプリ有効/無効状態
 npm run api -- enableApp              # アプリを有効化
 npm run api -- disableApp             # 緊急停止（アプリ無効化）
-npm run api -- getLogs --limit 20     # セキュリティログ
+npm run api -- getLogs               # 記録は無い (ops-monitor と「実行数」を案内する)
 npm run api -- perfMetrics            # パフォーマンス指標
 npm run api -- listProperties         # Script Properties（認証情報マスク済み）
 npm run api -- cacheReset             # 全キャッシュクリア
@@ -164,7 +164,7 @@ git config core.hooksPath .githooks
 ### 5-1. バグ調査（ユーザー報告）
 
 ```bash
-npm run api -- getLogs --limit 50              # セキュリティログ
+# エラーの場所は ops-monitor の毎朝の報告で見る (getLogs は記録が無い)
 npm run api -- getUserConfig --userId <uuid>   # 設定が壊れていないか確認
 # 実行ログは Apps Script エディタの「実行数」で見る (1-1)
 ```
