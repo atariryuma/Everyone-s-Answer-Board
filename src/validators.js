@@ -2,7 +2,7 @@
  * @fileoverview 入力検証・サニタイズ（email / URL / spreadsheet ID / config 等）。
  */
 
-/* global SYSTEM_LIMITS */
+/* global SYSTEM_LIMITS, __strictBool */
 
 /**
  * 表示モードの単一定義 (v2899)。
@@ -357,6 +357,20 @@ function validateMapping(columnMapping) {
     return result;
 }
 
+// 表示設定の真偽値は ConfigService.js の __strictBool と同じ規則で読む (true / 1 / "true" / "1" だけが真)。
+//   Boolean("false") は true なので、ここで Boolean() を使うと後段の __strictBool が効かず、
+//   文字列 "false" の showNames が「名前を出す」に化けていた。validators.js を単独で読むテストのために
+//   __strictBool が無いときの同じ規則も持つ。
+function validatorStrictBool_(v) {
+    if (typeof __strictBool === 'function') return __strictBool(v);
+    if (v === true || v === 1) return true;
+    if (typeof v === 'string') {
+        const lower = v.trim().toLowerCase();
+        return lower === 'true' || lower === '1';
+    }
+    return false;
+}
+
 /**
  * 設定オブジェクト総合検証
  * @param {Object} config - 設定オブジェクト
@@ -421,8 +435,8 @@ function validateConfig(config) {
 
     if (config.displaySettings && typeof config.displaySettings === 'object') {
       const sanitizedDS = {
-        showNames: Boolean(config.displaySettings.showNames),
-        showReactions: Boolean(config.displaySettings.showReactions),
+        showNames: validatorStrictBool_(config.displaySettings.showNames),
+        showReactions: validatorStrictBool_(config.displaySettings.showReactions),
         theme: String(config.displaySettings.theme || 'default').substring(0, 50),
         pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || SYSTEM_LIMITS.DEFAULT_PAGE_SIZE, 1), SYSTEM_LIMITS.MAX_PAGE_SIZE)
       };

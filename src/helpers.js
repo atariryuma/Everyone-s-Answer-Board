@@ -554,6 +554,17 @@ function createExceptionResponse(error, context) {
  *   構造化ログを書いていたが、 prefix 形式がバラバラ。 全 catch を logError_ に
  *   移すために context を第 3 引数で受ける形に拡張 (2026-05-18 v2797)。
  */
+/**
+ * 実行ログに書くメールを伏せる (先頭 3 文字だけ残す。誰か分かれば足りる)。児童のメールを伏せずに書かない。
+ * @param {string} email
+ * @returns {string}
+ */
+function maskEmailForLog_(email) {
+  const s = String(email || '').trim();
+  if (!s) return '-';
+  return s.indexOf('@') >= 0 ? s.replace(/^(.{0,3}).*@.*$/, '$1…@') : s.slice(0, 3) + '…';
+}
+
 function logError_(funcName, error, context) {
   const msg = (error && error.message) ? error.message : error;
   if (context !== undefined) {

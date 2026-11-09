@@ -598,9 +598,9 @@ function doPost(e) {
     try {
       request = JSON.parse(postData);
     } catch (parseError) {
+      // 本文の中身は記録しない (管理 API の apiKey が平文で実行ログに残りうる)。長さだけ。
       logError_('doPost.JSON.parse', parseError, {
-        dataLength: postData ? postData.length : 0,
-        dataPreview: postData ? postData.substring(0, 100) : 'N/A'
+        dataLength: postData ? postData.length : 0
       });
       return jsonResponse({
         success: false,
@@ -784,6 +784,31 @@ function reportClientError(payload) {
   }
 }
 
+// 画面から ops-monitor へ送ってよい kind (ブラウザの標準のエラーの名前)。それ以外は 'Error'。
+const CLIENT_ERROR_KINDS_ = ['Error', 'TypeError', 'ReferenceError', 'RangeError', 'SyntaxError', 'URIError',
+  'EvalError', 'AggregateError', 'DOMException', 'SecurityError', 'NetworkError', 'AbortError', 'TimeoutError',
+  'QuotaExceededError', 'NotFoundError', 'NotAllowedError', 'InvalidStateError'];
+// 配置全体で、画面からの報告を ops-monitor へ送るのは 1 時間に この件数まで。
+const CLIENT_OPS_REPORT_CAP_PER_HOUR_ = 20;
+
+function clientErrorKind_(text) {
+  const m = /^([A-Za-z_$][\w$]{0,63})(?::|$)/.exec(String(text || ''));
+  return m && CLIENT_ERROR_KINDS_.indexOf(m[1]) >= 0 ? m[1] : 'Error';
+}
+
+function clientOpsReportAllowed_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const key = 'ops_client_cap_' + Math.floor(Date.now() / 3600000);
+    const n = parseInt(cache.get(key) || '0', 10) || 0;
+    if (n >= CLIENT_OPS_REPORT_CAP_PER_HOUR_) return false;
+    cache.put(key, String(n + 1), 3600);
+    return true;
+  } catch (_) {
+    return false;   // 数えられないときは送らない (画面からの報告は外へ出さなくても実行ログに残る)
+  }
+}
+
 function handleClientErrorReport_(email, payload) {
   try {
     if (!isPlainObject(payload)) {
@@ -858,13 +883,13 @@ function handleClientErrorReport_(email, payload) {
       userAgent
     };
 
-    if (level === 'error') {
-      // ops-monitor へは場所だけ (処理の区分・Error の name・行)。文面・スタック・URL・報告者は送らない。
-      if (typeof opsReport_ === 'function') {
-        const ctxPlace = /^[\w/.-]{1,40}$/.test(context) ? ':' + context.replace(/\//g, '.').replace(/\.$/, '') : '';
-        const kindMatch = /^([A-Za-z_$][\w$]{0,63})(?::|$)/.exec(stack || message);
-        opsReport_('client' + ctxPlace, { name: kindMatch ? kindMatch[1] : 'Error' }, { file: 'client', line: lineNo || 0 });
-      }
+    // 誰か分からない報告 (メールが取れない) は実行ログにだけ残し、ops-monitor へは送らない。
+    if (level === 'error' && email && typeof opsReport_ === 'function' && clientOpsReportAllowed_()) {
+      // ops-monitor へは固定の場所 (client) と、決まった名前の一覧から選んだ kind だけを送る。
+      //   Why: context・line・stack は児童の画面が自由に決められる。そのまま「場所」にすると、値を毎回変えて
+      //   間引きをすり抜け、偽の報告で ops-monitor と先生の UrlFetch の上限を埋められる。スタックが無いときは
+      //   message の先頭の単語が kind になり、文面の一部が外へ出うる。
+      opsReport_('client', { name: clientErrorKind_(stack || message) }, { file: 'client', line: 0 });
     }
     if (level === 'error') console.error(summary, detail);
     else if (level === 'warn') console.warn(summary, detail);

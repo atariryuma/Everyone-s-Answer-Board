@@ -133,7 +133,7 @@ function processLoginAction() {
     if (!user) {
       user = createUser_(email, {}, { googleId });
       if (!user) {
-        logError_('processLoginAction.createUser', new Error('createUser returned null'), { email });
+        logError_('processLoginAction.createUser', new Error('createUser returned null'), { viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(email) : '-') });
         return {
           success: false,
           message: 'ユーザー登録に失敗しました。しばらくしてから再度お試しください。'

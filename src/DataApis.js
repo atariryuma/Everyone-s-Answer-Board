@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, boardHashScope_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
+/* global __lessonPhaseUnknown_, applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, boardHashScope_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -933,7 +933,10 @@ function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnB
     if (isOwnBoard || isAdmin) return result;
     if (typeof __getViewerLessonPhase_ !== 'function') return result;
     const phase = (phaseArg !== undefined) ? phaseArg : __getViewerLessonPhase_(targetUserId);
-    if (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput')) return result;
+    // フェーズを判定できなかった (読み込み失敗) ときは「授業中でない」と同じにせず、自分の行だけを返す。
+    //   Why: 「考える」の最中に読みが失敗すると、他の児童の回答がそのまま見えていた。
+    const unknown = !phase && typeof __lessonPhaseUnknown_ === 'function' && __lessonPhaseUnknown_(targetUserId);
+    if (!unknown && (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput'))) return result;
 
     const rows = Array.isArray(result.data) ? result.data : [];
     const me = String(viewerEmail || '').trim().toLowerCase();
@@ -1223,6 +1226,27 @@ function invalidateBoardCaches_(config, userId) {
   }
 }
 
+// 直前の結果 (LATEST) の key に入れる「接続先と設定の世代」。LATEST は version に依らないので、これが無いと
+//   接続先のシートを切り替えた直後に、前のシートのデータを新しい設定 (たとえば showNames:true) のまま
+//   児童に返しうる。config が無い呼び出しは空 (= 従来どおり)。
+function boardSourceTag_(config) {
+  const c = config || {};
+  const src = String(c.spreadsheetId || '') + '|' + String(c.sheetName || '') + '|' + String(c.etag || '');
+  if (src === '||') return '';
+  try {
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, src, Utilities.Charset.UTF_8);
+    let hex = '';
+    for (let i = 0; i < 8; i++) {
+      const b = bytes[i] & 0xff;
+      hex += (b < 16 ? '0' : '') + b.toString(16);
+    }
+    return hex;
+  } catch (_) {
+    // digest が使えない (テスト単独 load 等) ときは素の値。cache key の長さ上限 (250) を超えないよう切る
+    return src.slice(0, 120);
+  }
+}
+
 function boardDataCacheKey_(userId, options) {
   const ver = getBoardDataVersion_(userId);
   const filter = options.classFilter || '_';
@@ -1235,6 +1259,7 @@ function boardDataCacheKey_(userId, options) {
  * @param {Object} options - classFilter / sortBy (cache key の一部)
  * @param {Function} loader
  * @param {Object} [guardOpts]
+ * @param {Object} [guardOpts.config] - ボードの設定。直前の結果 (LATEST) を接続先と設定の世代で分ける
  * @param {boolean} [guardOpts.allowStale=true] - 他が読んでいる間に直前の結果を返してよいか。
  *   教師 (owner / admin) は false: 授業のフェーズ切替はこの応答を snapshot として凍結するので、
  *   投稿の直後に古い分布を掴んではいけない。児童の polling は true でよい。
@@ -1277,7 +1302,7 @@ function withBoardDataCache_(userId, options, loader, guardOpts) {
     isCacheable,
     flightKey: `${BOARD_CACHE_KEYS_.FLIGHT}${userId}:${filter}:${sort}`,
     flightTtl: BOARD_DATA_FLIGHT_TTL_SEC,
-    latestKey: `${BOARD_CACHE_KEYS_.LATEST}${userId}:${filter}:${sort}`,
+    latestKey: `${BOARD_CACHE_KEYS_.LATEST}${userId}:${boardSourceTag_(guardOpts && guardOpts.config)}:${filter}:${sort}`,
     latestTtl: BOARD_DATA_LATEST_TTL_SEC,
     allowStale,
     waitMs: 500,
@@ -1319,7 +1344,7 @@ function prewarmBoardDataCache_(userId, teacherEmail, classes) {
   for (const classFilter of filters) {
     const options = { classFilter, sortBy: 'newest', includeTimestamp: true, adminMode: true, requestingUser: teacherEmail };
     const res = withBoardDataCache_(userId, options, () =>
-      getUserSheetData_(userId, options, targetUser, config), { allowStale: false });
+      getUserSheetData_(userId, options, targetUser, config), { allowStale: false, config });
     if (res && res.success) out.warmed++; else out.failed++;
   }
   return out;
@@ -1392,7 +1417,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       const access = resolveViewerBoardAccess_(targetUserId, viewerEmail, isSystemAdmin);
       if (!access.ok) {
         if (access.reason === 'not_found') {
-          logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewerEmail });
+          logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(viewerEmail) : '-') });
           return createErrorResponse('Target user not found', [], { sheetName: '', header: 'ユーザーエラー' });
         }
         return createErrorResponse('このボードは未公開です', [], { sheetName: '', header: '未公開' });
@@ -1425,7 +1450,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       const cacheableResult = useCache
         ? withBoardDataCache_(targetUser.userId, options, () =>
             getUserSheetData_(targetUser.userId, options, targetUser, targetUserConfig),
-            { allowStale: isViewerOnly })
+            { allowStale: isViewerOnly, config: targetUserConfig })
         : getUserSheetData_(targetUser.userId, options, targetUser, targetUserConfig);
 
       const result = cacheableResult;
@@ -1453,7 +1478,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     });
 
     if (!user) {
-      logError_('getPublishedSheetData', new Error('User not found (self-access)'), { viewerEmail });
+      logError_('getPublishedSheetData', new Error('User not found (self-access)'), { viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(viewerEmail) : '-') });
       return {
         success: false,
         error: 'User not found',
@@ -1738,7 +1763,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const userData = useCache
       ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
           getUserSheetData_(targetUser.userId, dataOptions, targetUser, targetConfig),
-          { allowStale: isViewerOnly })
+          { allowStale: isViewerOnly, config: targetConfig })
       : getUserSheetData_(targetUser.userId, dataOptions, targetUser, targetConfig);
 
     // 混んでいる間は「新着なし」で返す (lessonPhase / boardVersion は届ける)。失敗にすると
@@ -2121,7 +2146,7 @@ function getActiveFormInfo(userId) {
     if (!targetUserId) {
       const currentUser = findUserByEmail_(currentEmail, { requestingUser: currentEmail });
       if (!currentUser) {
-        logError_('getActiveFormInfo', new Error('Current user not found'), { currentEmail });
+        logError_('getActiveFormInfo', new Error('Current user not found'), { viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(currentEmail) : '-') });
         return {
           success: false,
           message: 'User not found',

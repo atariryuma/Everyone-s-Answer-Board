@@ -699,7 +699,7 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     const isAdmin = isAdministrator(currentEmail);
 
     if (!isOwner && !isAdmin) {
-      console.warn('deleteAnswerRow: Insufficient permissions:', { userId, currentEmail });
+      console.warn('deleteAnswerRow: Insufficient permissions:', { userId, viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(currentEmail) : '-') });
       return createDataServiceErrorResponse('削除権限がありません');
     }
 

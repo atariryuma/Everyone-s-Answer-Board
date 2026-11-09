@@ -2407,9 +2407,18 @@ function __invalidateViewerLessonPhase_(targetUserId) {
  * @param {boolean} [opts.fresh] - true なら cache を読まない (submitLessonAnswer の権能検証用。
  *   フェーズ切替直後の投稿を、古い cache で受理しないため)
  */
+// この実行の中で「授業のフェーズを判定できなかった」ボード (targetUserId → true)。
+//   判定できないときの null は「授業中でない」と区別がつかないので、他の児童の行を隠す側
+//   (__maskOthersDuringInputPhase_) がこれを見て、自分の行だけを返す。
+const LESSON_PHASE_UNKNOWN_ = {};
+function __lessonPhaseUnknown_(targetUserId) {
+  return Boolean(targetUserId && LESSON_PHASE_UNKNOWN_[targetUserId]);
+}
+
 function __getViewerLessonPhase_(targetUserId, opts) {
   try {
     if (!targetUserId) return null;
+    delete LESSON_PHASE_UNKNOWN_[targetUserId];
     const fresh = Boolean(opts && opts.fresh);
     const cacheKey = __viewerLessonPhaseCacheKey_(targetUserId);
     if (!fresh && typeof CacheService !== 'undefined') {
@@ -2429,9 +2438,15 @@ function __getViewerLessonPhase_(targetUserId, opts) {
       if (fresh) return null;
       try {
         const last = CacheService.getScriptCache().get(cacheKey + ':last');
-        const parsed = last ? JSON.parse(last) : null;
-        return parsed && parsed.phase ? parsed.phase : null;
-      } catch (_) { return null; /* 直前の値も無ければ従来どおり「授業なし」 */ }
+        if (last) {
+          const parsed = JSON.parse(last);
+          return parsed && parsed.phase ? parsed.phase : null;
+        }
+      } catch (_) { /* 直前の値も読めない: 下で「判定できない」として返す */ }
+      // 直前の値も無い: 授業を指しているのにフェーズが分からない。「授業なし」(null) を返すが、
+      //   他の児童の行を隠す判定には「分からない」と伝える (考えるの最中に他人の回答を出さない)。
+      LESSON_PHASE_UNKNOWN_[targetUserId] = true;
+      return null;
     }
     if (typeof saveToCacheWithSizeCheck_ === 'function') {
       // null (授業中でない) も cache する。掲示板モードの polling で毎回 config を読まないため。
@@ -2442,6 +2457,7 @@ function __getViewerLessonPhase_(targetUserId, opts) {
     return phase;
   } catch (error) {
     logError_('__getViewerLessonPhase_', error);
+    if (targetUserId) LESSON_PHASE_UNKNOWN_[targetUserId] = true;   // 判定できない (他の児童の行は隠す)
     return null;
   }
 }
