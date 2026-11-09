@@ -156,3 +156,14 @@ test('emailToShortHash: null/empty input returns null sentinel', () => {
   assert.equal(ctx.emailToShortHash_(undefined), null);
   assert.equal(ctx.emailToShortHash_('   '), null);
 });
+test('emailToShortHash_: ボード・名前表示の有無ごとに別のハッシュになる（他のボードの匿名回答を特定させない）', () => {
+  const ctx = loadHelpersCtx();
+  const named = ctx.boardHashScope_({ spreadsheetId: 'S1', sheetName: 'A', displaySettings: { showNames: true } });
+  const anon = ctx.boardHashScope_({ spreadsheetId: 'S1', sheetName: 'A', displaySettings: { showNames: false } });
+  const other = ctx.boardHashScope_({ spreadsheetId: 'S2', sheetName: 'A', displaySettings: { showNames: false } });
+  const e = 'student@school.jp';
+  assert.notEqual(ctx.emailToShortHash_(e, named), ctx.emailToShortHash_(e, anon));
+  assert.notEqual(ctx.emailToShortHash_(e, anon), ctx.emailToShortHash_(e, other));
+  assert.equal(ctx.emailToShortHash_(e, anon), ctx.emailToShortHash_(e, anon));
+});
+

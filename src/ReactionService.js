@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard_）。
  */
 
-/* global resolveColumnIndex, emailToShortHash_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
+/* global resolveColumnIndex, emailToShortHash_, boardHashScope_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -83,7 +83,7 @@ function resolveRowIdentity_(rowIdentity, headers, config) {
     return {
       column: idx + 1, kind: 'emailHash',
       matches: (actual) => {
-        const h = emailToShortHash_(String(actual || ''));
+        const h = emailToShortHash_(String(actual || ''), boardHashScope_(config));
         // 行に email が無い (匿名回答) ときは判定できないので通す
         return !h || h === rowIdentity.hash;
       }

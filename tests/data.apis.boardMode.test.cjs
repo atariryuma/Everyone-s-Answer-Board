@@ -31,6 +31,7 @@ function loadDataApisContext(overrides = {}) {
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: 'viewer@example.com', isAdmin: false }),
     getCachedProperty_: () => null,
     saveToCacheWithSizeCheck_: () => true,
+    boardHashScope_: () => 'scope',
     emailToShortHash_: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
     validateUrl: () => ({ isValid: true }),

@@ -65,6 +65,7 @@ function loadReaction(overrides = {}) {
       const idx = headers.findIndex((h) => String(h).toLowerCase().includes(field === 'email' ? 'mail' : field));
       return { index: idx };
     },
+    boardHashScope_: () => 'scope',
     emailToShortHash_: (email) => (email ? 'h_' + String(email).trim().toLowerCase() : null),
     ...overrides
   };

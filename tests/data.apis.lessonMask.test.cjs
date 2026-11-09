@@ -16,6 +16,7 @@ const SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/DataApis.js'), 'u
 
 function loadContext(lessonPhase) {
   const context = {
+    boardHashScope_: () => 'scope',
     console: { log: () => {}, warn: () => {}, error: () => {} },
     URL,
     ...gasResponseStubs(),

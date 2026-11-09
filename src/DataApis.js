@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
+/* global applyViewerReactions_, formatTimestamp, gzipTextToBase64_, gunzipBase64ToText_, getCurrentEmail, isAdministrator, findUserById_, findUserByEmail_, findPublishedBoardOwner_, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig_, openSpreadsheet, getSheetInfo, getUserSheetData_, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache_, performIntegratedColumnDiagnostics, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash_, boardHashScope_, sanitizeProfileHistory, safeJsonParse_, __getViewerLessonPhase_, withStampedeGuard_, __rowsInClasses_, teacherOnlyError_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -1001,6 +1001,7 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
   // Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡するために
   //      仮名化された emailHash を全モードで wire に乗せる。生メアドは showNames=false なら除去。
   //      includeIdentity=true のときも emailHash は重複して載せるが、ペイロード増は <10B/row なので無視できる。
+  const hashScope = boardHashScope_(config);
   const safeData = rows.map(item => {
     if (typeof item !== 'object' || item === null) return item;
     const cleaned = {};
@@ -1012,7 +1013,7 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
     }
     // emailHash は両モードで載せる（揺らぎ追跡のため）
     if (typeof rawEmail === 'string' && rawEmail) {
-      cleaned.emailHash = emailToShortHash_(rawEmail);
+      cleaned.emailHash = emailToShortHash_(rawEmail, hashScope);
     }
     return cleaned;
   });
@@ -1073,7 +1074,7 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
     // 閲覧者自身の仮名 (行の emailHash と同じ salt)。児童が分布の中で自分の点を見つけるため。
     //   自分のハッシュだけなので他者の同定には使えない。行の hash と同じ関数を 1 回呼ぶだけ。
     viewerEmailHash: (viewerContext.email && typeof emailToShortHash_ === 'function')
-      ? (emailToShortHash_(viewerContext.email) || null) : null,
+      ? (emailToShortHash_(viewerContext.email, boardHashScope_(config)) || null) : null,
     // 授業中の現在フェーズ (null = 授業中でない)。undefined は「判定していない」(review 等)。
     ...(result.lessonPhase !== undefined ? { lessonPhase: result.lessonPhase } : {}),
     // stampede guard が「直前の結果」を返した (1 つ前の版)。受け手は読み直し保留を保つ。

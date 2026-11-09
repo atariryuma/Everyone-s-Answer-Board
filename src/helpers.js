@@ -660,10 +660,21 @@ const DEFAULT_DISPLAY_SETTINGS = { showNames: false, showReactions: false, theme
  *      DB に元メアドは残るため、教師端末では同一児童の追跡が可能。
  *      児童端末側に送る wire ペイロードは showNames=false なら名前/メアド除去 + emailHash のみ。
  *
+ * scope（ボードと名前表示の有無）を混ぜる。混ぜないと、名前を出すボードで「メール→ハッシュ」の
+ * 表を作った児童が、別のボードや名前を隠したボードの回答も誰のものか分かってしまう。
+ * 同じ画面の中（行・閲覧者自身・リアクションの照合）では同じ scope を使うこと（boardHashScope_）。
+ *
  * @param {string} email - メールアドレス
+ * @param {string=} scope - boardHashScope_(config) の値
  * @returns {string|null} 8文字hex、入力空ならnull
  */
-function emailToShortHash_(email) {
+function boardHashScope_(config) {
+  const c = config || {};
+  const showNames = Boolean(c.displaySettings && c.displaySettings.showNames);
+  return String(c.spreadsheetId || '') + '/' + String(c.sheetName || '') + '/' + (showNames ? 'named' : 'anon');
+}
+
+function emailToShortHash_(email, scope) {
   if (!email || typeof email !== 'string') return null;
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) return null;
@@ -700,7 +711,7 @@ function emailToShortHash_(email) {
   try {
     const bytes = Utilities.computeDigest(
       Utilities.DigestAlgorithm.SHA_1,
-      salt + ':' + trimmed,
+      salt + ':' + (scope ? String(scope) + ':' : '') + trimmed,
       Utilities.Charset.UTF_8
     );
     // 4 bytes → 8 hex chars

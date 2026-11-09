@@ -229,6 +229,7 @@ function loadCtx(overrides = {}) {
     getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: myEmail, isAdmin: false }),
     getCachedProperty_: () => null,
     saveToCacheWithSizeCheck_: () => true,
+    boardHashScope_: () => 'scope',
     emailToShortHash_: () => 'h_xxxx',
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
     validateUrl: () => ({ isValid: true }),

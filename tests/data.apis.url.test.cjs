@@ -38,6 +38,7 @@ function loadDataApisContext(overrides = {}) {
     getCachedProperty_: () => null,
     saveToCacheWithSizeCheck_: () => true,
     // emailHash は helpers.js 由来（M1/M2 可視化モードで揺らぎ追跡に使う仮名化ID）。
+    boardHashScope_: () => 'scope',
     emailToShortHash_: (email) => (email && typeof email === 'string') ? `h_${email.slice(0, 4)}` : null,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
     validateUrl: () => ({ isValid: true }),
