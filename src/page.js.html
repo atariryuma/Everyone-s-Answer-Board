@@ -2481,6 +2481,8 @@
             : String((res && res.message) || '送信に失敗しました').replace(/^[A-Z_]+:\s*/, '');
           const refused = new Error(message);
           refused.reported = true;   // onFail で二重に報告しない
+          // ほかの人がもう使っている名前だった。onFail で名前の欄を出し直す。
+          refused.nameTaken = Boolean(res && res.error === 'NAME_TAKEN');
           throw refused;
         }
         this.showToast('考えを送りました');
@@ -2503,6 +2505,12 @@
         // サーバーの拒否は send() 内で報告済み (err.reported)。ここに来る未報告の失敗は通信そのもの。
         if (!(err && err.reported)) {
           this.__reportLessonSubmit('TRANSPORT:' + String((err && err.message) || '').slice(0, 60), phase);
+        }
+        // 断られた名前を端末に覚えたままだと、名前の欄が出ず、同じ名前を送り続けて先へ進めない。
+        //   忘れて描き直す (位置と書いたことばは書きかけとして残っているので消えない)。
+        if (err && err.nameTaken) {
+          this.__saveLessonName('');
+          this.__renderLessonScreen();
         }
       };
       if (window.sharedUtilities && window.sharedUtilities.buttons && btn) {
@@ -2710,6 +2718,9 @@
      * Why localStorage か: 毎フェーズ名前を打たせるのは 45 分の授業では邪魔。
      *   ボードごとに 1 度だけ聞いて端末に覚える。端末が変われば聞き直すが、
      *   記録の同定は email なので、名前が空でもデータは壊れない。
+     *
+     * ここで覚えた名前は「初めて名乗るときの希望」。記録する名前はサーバが決める
+     *   (自分のメールにすでに名前があればそれを使い、ほかの人の名前は NAME_TAKEN で断る)。
      */
     __lessonStoredName() {
       try {

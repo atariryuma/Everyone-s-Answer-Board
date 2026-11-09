@@ -362,3 +362,37 @@ test('送る前に進んでいた (PHASE_MISMATCH): 読み込み直しではな�
   await app.__submitLessonAnswer();
   assert.deepEqual(Array.from(app.toasts), ['授業が切り替わりました。画面を読み込み直してください']);
 });
+
+test('ほかの人が使っている名前で断られた (NAME_TAKEN): 覚えた名前を忘れて、名前の欄を出し直す', async () => {
+  const doc = miniDocument();
+  const reasonEl = doc.createElement('textarea');
+  reasonEl.id = 'lessonReason';
+  reasonEl.value = '理由';
+  const { app, store } = loadApp({ document: doc, setTimeout: (fn) => { fn(); return 1; } });
+  app.state.lessonPhase = think;
+  app.state.lessonDraft = { numericX: 2, numericY: 3, reason: '理由' };
+  app.__lessonClass = () => '';
+  app.__reportLessonSubmit = () => {};
+  let rendered = 0;
+  app.__renderLessonScreen = () => { rendered++; };
+  store.set('lessonName:u1', 'あおい');
+
+  // ほかの理由で断られたときは、名前を忘れない
+  app.runGas = async () => ({ success: false, error: 'SUBMIT_BUSY', message: 'いま混み合っています。少し待ってからもう一度送ってください' });
+  await app.__submitLessonAnswer();
+  assert.equal(store.get('lessonName:u1'), 'あおい');
+  assert.equal(rendered, 0);
+
+  app.toasts.length = 0;
+  let sentName = null;
+  app.runGas = async (_fn, _uid, payload) => {
+    sentName = payload.name;
+    return { success: false, error: 'NAME_TAKEN', message: 'その名前は、ほかの人がもう使っています。名字もつけて入れ直してください（こまったら先生に知らせてください）' };
+  };
+  await app.__submitLessonAnswer();
+  assert.equal(sentName, 'あおい');
+  assert.deepEqual(Array.from(app.toasts), ['その名前は、ほかの人がもう使っています。名字もつけて入れ直してください（こまったら先生に知らせてください）']);
+  assert.equal(app.__lessonStoredName(), '', '覚えたままだと名前の欄が出ず、同じ名前を送り続ける');
+  assert.equal(rendered, 1, '名前の欄を出すために描き直す');
+  assert.equal(app.state.lessonDraft.reason, '理由', '書いたことは消さない');
+});

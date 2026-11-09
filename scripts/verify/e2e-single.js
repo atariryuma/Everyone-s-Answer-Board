@@ -204,7 +204,8 @@ check('授業', '授業を始める → ボードが授業に (lesson.start)', (
 });
 check('授業', 'ボードを公開した状態にする (republishMyBoard)', () => { const cfg = op('getUserConfig', { userId }).data.config; const r = cfg.isPublished ? { success: true } : inv('republishMyBoard', [{}]); return { pass: ok(r), note: cfg.isPublished ? 'もともと公開中' : (ok(r) ? '' : text(r)) }; });
 check('授業', '授業のナビ (getActiveLessonNav)', () => { const r = inv('getActiveLessonNav', [userId]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
-const submit = (who, phaseIndex, x, y) => inv('submitLessonAnswer', [userId, { lessonId, phaseIndex, numericX: x, numericY: y, reason: `検証 ${phaseIndex}`, class: CLS, name: 'けんしょう' }], who);
+// 名前は児童ごとに変える (ほかのメールにひも付いた名前では送れない: NAME_TAKEN)。
+const submit = (who, phaseIndex, x, y) => inv('submitLessonAnswer', [userId, { lessonId, phaseIndex, numericX: x, numericY: y, reason: `検証 ${phaseIndex}`, class: CLS, name: `けんしょう${STUDENT.indexOf(who) + 1}` }], who);
 check('児童(授業)', '「考える」で送る (submitLessonAnswer × 2 人)', () => { const a = submit(STUDENT[0], 0, 2, 4); const b = submit(STUDENT[1], 0, 4, 2); return { pass: ok(a) && ok(b), note: ok(a) && ok(b) ? '' : text(ok(a) ? b : a) }; });
 check('児童(授業)', '「考える」の間は他の子の回答が見えない', () => { const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]); return { pass: ok(r) && rowsOf(r).length === 1, note: ok(r) ? `見えた行 ${rowsOf(r).length}` : text(r) }; });
 const spotOf = (row) => `${row.numericX},${row.numericY}`;

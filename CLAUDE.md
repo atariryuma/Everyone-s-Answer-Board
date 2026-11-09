@@ -251,6 +251,9 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 - **「考える」では他者の行を返さない**（`__maskOthersDuringInputPhase_`）。viewer cache は
   全件を保持し、mask は cache 取得後に viewer ごとに適用する（順序を逆にすると他人の分が cache される）。
 - **児童同士に名前を見せない**（native phase は `showNames:false` が既定）。教師は `isOwnBoard` で見える。
+- **記録する名前はサーバが決める**（`__resolveLessonSubmitName_`）。名簿は無いので、その授業の回答シートにある
+  「メール → 名前」を使う。自分のメールに名前があればそれ（端末の値は使わない）、無ければ端末の名前。ただし
+  ほかのメールの名前と同じなら `NAME_TAKEN` で断る。端末が送る `name` をそのままシートに書かない。
 - **`answer` と `reason` を同じ列にしない**。`validateMapping` は `numericX/Y` だけ重複を免除する。
   違反すると config 保存が落ち、教師が「開始」を押した瞬間に失敗する（`__nativeColumnMapping_`）。
 - 投稿を受け付けないフェーズは**直前の入力フェーズのシート**を見る（自分のシートは空）。

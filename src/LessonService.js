@@ -53,6 +53,7 @@ function __nativeColumnMapping_(formTemplate) {
 }
 
 const LESSON_NATIVE_COL_EMAIL = 2;   // 1-based (getRange 用)
+const LESSON_NATIVE_COL_NAME = 4;    // 1-based
 
 // 画面の権能。教師のフェーズ送りが、全児童の画面で「何ができるか」を決める。
 //   Why 権能を phase に持たせるか: 「アプリが議論を代替しない」「先入観より先に自分の考えを持つ」
@@ -2543,9 +2544,11 @@ function __sanitizeLessonText_(value, maxLen) {
 
 // 同一フェーズ内の自分の行番号 (1-based) を返す。無ければ -1。
 //   全行を 1 回で読む (行は 1 児童 1 行 = 数十行なので、寸法と email 列を別々に読むより安い)。
-function __findOwnLessonRow_(sheet, actorEmail) {
+//   capture を渡すと、読んだ全行を capture.data に入れる (名前の照合が同じシートをもう 1 回読まないため)。
+function __findOwnLessonRow_(sheet, actorEmail, capture) {
   try {
     const data = (sheet.getDataRange ? sheet.getDataRange().getValues() : []) || [];
+    if (capture) capture.data = data;
     const target = String(actorEmail || '').trim().toLowerCase();
     // 同じ児童の行が複数あれば最後の行 (最新の送信) を採用する。読む側 (__readOwnLessonAnswer_) と
     //   揃える。復旧で行を移した直後など、重複行が残っていても置き直しが最新に当たるように。
@@ -2588,6 +2591,130 @@ function __resolveSubmitClass_(clientClass, lessonJson) {
   const targets = __lessonTargetClasses_(lessonJson);
   if (targets.length === 1) return targets[0];
   return __sanitizeLessonText_(clientClass, 50);
+}
+
+/**
+ * 名前を比べるための形にそろえる (シートに書く値ではない)。
+ *
+ * Why: 空白を足す・全角半角を変える・ひらがなをカタカナにする・記号を足す、だけで「別の名前」と
+ *   扱うと、ほかの児童の名前をそのまま名乗れてしまう。漢字とかなの違いまでは名簿が無いと分からない。
+ */
+function __lessonNameKey_(name) {
+  let s = String(name == null ? '' : name);
+  try { s = s.normalize('NFKC'); } catch (_) { /* normalize が無い実行環境では、そろえずに比べる */ }
+  // シートに ' 付きで書いた名前 (= + - @ で始まる) は、読むと ' が付かない。どちらで来ても同じにする。
+  s = s.replace(/^'(?=[=+\-@])/, '').toLowerCase();
+  // カタカナ → ひらがな
+  s = s.replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+  const stripped = s.replace(/[\s\p{P}\p{S}]/gu, '');
+  // 記号だけの名前は、空白だけ除いた形で比べる (全部が同じ名前にならないように)
+  return stripped || s.replace(/\s/g, '');
+}
+
+// 回答シートの生の全行 (見出しつき) から [メール, 名前] の組を取り出す。
+function __lessonNamePairsFromSheetData_(data) {
+  const out = [];
+  for (let i = 1; i < (data || []).length; i++) {
+    const r = data[i] || [];
+    const email = String(r[LESSON_NATIVE_COL_EMAIL - 1] || '').trim().toLowerCase();
+    const name = String(r[LESSON_NATIVE_COL_NAME - 1] == null ? '' : r[LESSON_NATIVE_COL_NAME - 1]).trim();
+    if (email && name) out.push([email, name]);
+  }
+  return out;
+}
+
+// 別フェーズの名前の覚え。回答シートの行 cache (投稿のたびに版が変わる) とは別に持つ。
+const LESSON_NAME_PAIRS_CACHE_TTL_S = 300;
+
+/**
+ * この授業の、いまのフェーズ以外の入力フェーズに書かれている [メール, 名前] の組を返す。
+ *
+ * Why 別の cache か: 回答シートの行 cache は投稿のたびに版が上がる。それに乗ると、置き直しの
+ *   フェーズで児童が送るたびに前のフェーズのシートを読み直し、30 人ぶんの読みが足されて
+ *   Sheets の読み取り上限 (2026-09-30 の 429) に当たる。前のフェーズのシートは、いまのフェーズの
+ *   間は書かれないので、フェーズが進むまで覚えてよい (key に進んだ回数を入れる)。
+ *   最初の入力フェーズでは、ほかに見るシートが無いので何も読まない。
+ *
+ * @returns {Array|null} [メール, 名前] の配列。どれかのシートが読めなければ null (覚えない)。
+ */
+function __loadOtherPhaseLessonNames_(lessonId, lessonJson, phaseIndex, boardUserId) {
+  const phases = (lessonJson && lessonJson.phases) || [];
+  const current = phases[phaseIndex] || {};
+  const trans = (lessonJson && Array.isArray(lessonJson.profileTransitions)) ? lessonJson.profileTransitions : [];
+  const targets = [];
+  for (let i = 0; i < phases.length; i++) {
+    const def = phases[i];
+    if (i === phaseIndex || !def || !def.spreadsheetId || !def.sheetName) continue;
+    if (LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(def)) < 0) continue;
+    if (def.spreadsheetId === current.spreadsheetId && def.sheetName === current.sheetName) continue;
+    // 後ろのフェーズは、一度開いたもの (先生が戻ってきた) だけ。開いていないシートは空なので読まない。
+    if (i > phaseIndex && !trans.some((t) => t && Number(t.to) === i)) continue;
+    targets.push(def);
+  }
+  if (targets.length === 0) return [];
+
+  const cacheKey = 'lesson_names_' + String(lessonId) + '_p' + phaseIndex + '_t' + trans.length;
+  let cache = null;
+  try {
+    cache = (typeof CacheService !== 'undefined') ? CacheService.getScriptCache() : null;
+    const hit = cache ? cache.get(cacheKey) : null;
+    if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
+  } catch (_) { /* cache が使えない・壊れた値は、下でシートから読み直して回復する */ }
+
+  const pairs = [];
+  for (let k = 0; k < targets.length; k++) {
+    const rows = __readAllLessonRows_(targets[k], { boardUserId, nullOnFail: true });
+    if (!Array.isArray(rows)) return null;
+    rows.forEach((r) => { if (r && r.email && r.name) pairs.push([r.email, String(r.name).trim()]); });
+  }
+  if (cache && typeof saveToCacheWithSizeCheck_ === 'function') {
+    saveToCacheWithSizeCheck_(cacheKey, pairs, LESSON_NAME_PAIRS_CACHE_TTL_S);
+  }
+  return pairs;
+}
+
+/**
+ * 投稿に記録する名前を、サーバが決める。端末が送ってきた名前は「初めて名乗るときの希望」としてだけ使う。
+ *
+ * Why: 名前は児童が打った文字をそのまま書いていたので、ほかの児童の名前で投稿できた
+ *   (名前を出す設定のボードや先生の一覧で、その子の考えとして見える)。名簿は無いので、
+ *   この授業の回答シートにすでにある「メール → 名前」の対応を使う。
+ *     1. 自分のメールにすでに名前がある → その名前 (端末の値は使わない。あとから変えられない)
+ *     2. まだ無い → 端末の名前。ただし、ほかのメールの名前と同じなら断る
+ *     3. 別フェーズのシートが読めず確かめられない → 名前は空で受け付ける (考えは失わせない。
+ *        先生の一覧にはメールが出る。次に送ったときに名前が入る)
+ *
+ * @param {string} actorEmail - サーバが得たメール
+ * @param {string} requestedName - 端末が送ってきた名前
+ * @param {Array} currentPairs - いまのフェーズのシートの [メール, 名前]
+ * @param {function(): (Array|null)} loadOtherPairs - 別フェーズの [メール, 名前] (読めなければ null)
+ * @returns {{name: string, source: string}|{taken: boolean}}
+ */
+function __resolveLessonSubmitName_(actorEmail, requestedName, currentPairs, loadOtherPairs) {
+  const me = String(actorEmail || '').trim().toLowerCase();
+  // 同じ児童の行が複数あれば、後ろ (新しい方) の名前
+  const ownIn = (pairs) => {
+    let name = '';
+    for (let i = 0; i < pairs.length; i++) if (pairs[i][0] === me && pairs[i][1]) name = pairs[i][1];
+    return name;
+  };
+  const boundHere = ownIn(currentPairs);
+  if (boundHere) return { name: boundHere, source: 'bound' };
+
+  const otherPairs = loadOtherPairs();
+  if (Array.isArray(otherPairs)) {
+    const boundBefore = ownIn(otherPairs);
+    if (boundBefore) return { name: boundBefore, source: 'bound' };
+  }
+  const requested = __sanitizeLessonText_(requestedName, 50);
+  if (!requested) return { name: '', source: 'empty' };
+  if (!Array.isArray(otherPairs)) return { name: '', source: 'unverified' };
+
+  const key = __lessonNameKey_(requested);
+  const taken = currentPairs.concat(otherPairs)
+    .some((pair) => pair[0] !== me && __lessonNameKey_(pair[1]) === key);
+  if (taken) return { taken: true };
+  return { name: requested, source: 'claimed' };
 }
 
 function submitLessonAnswer(targetUserId, payload) {
@@ -2650,7 +2777,7 @@ function submitLessonAnswer(targetUserId, payload) {
       new Date().toISOString(),
       actorEmail,
       __plainTextCell_(__resolveSubmitClass_(p.class, lessonJson)),
-      __plainTextCell_(__sanitizeLessonText_(p.name, 50)),
+      '',   // 名前。下の lock の中で、サーバが決めた値を入れる (端末の値をそのまま書かない)
       x,
       (y === null) ? '' : y,
       __plainTextCell_(reason),
@@ -2671,21 +2798,56 @@ function submitLessonAnswer(targetUserId, payload) {
     if (!submitLock) {
       return refuse('SUBMIT_BUSY', 'いま混み合っています。少し待ってからもう一度送ってください');
     }
+    // 名前ごとの lock。Why: 2 人が同じ名前を同時に初めて名乗ると、どちらも「まだ誰も使っていない」と
+    //   見て両方に書かれる。同じ名前の照合 → 書き込みを 1 人ずつにする。名前を送ってこない投稿では取らない。
+    const requestedNameKey = __lessonNameKey_(__sanitizeLessonText_(p.name, 50));
+    const nameLockKey = requestedNameKey
+      ? 'lesson_name:' + String(phase.lessonId) + ':' + requestedNameKey.slice(0, 80)
+      : '';
+    let nameLock = null;
     let existingRow;
     let writtenRow;
     try {
-      existingRow = __findOwnLessonRow_(sheet, actorEmail);
+      if (nameLockKey && typeof acquireCacheLock_ === 'function') {
+        nameLock = acquireCacheLock_(nameLockKey, { ttlSec: 30, waitMs: 4000 });
+        if (!nameLock) {
+          return refuse('SUBMIT_BUSY', 'いま混み合っています。少し待ってからもう一度送ってください');
+        }
+      }
+      const sheetRead = {};
+      existingRow = __findOwnLessonRow_(sheet, actorEmail, sheetRead);
       if (existingRow === LESSON_ROW_READ_FAILED) {
         return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
       }
+      const resolvedName = __resolveLessonSubmitName_(
+        actorEmail, p.name, __lessonNamePairsFromSheetData_(sheetRead.data),
+        () => __loadOtherPhaseLessonNames_(phase.lessonId, lessonJson, phase.phaseIndex, targetUserId)
+      );
+      if (resolvedName.taken) {
+        return refuse('NAME_TAKEN', 'その名前は、ほかの人がもう使っています。名字もつけて入れ直してください（こまったら先生に知らせてください）');
+      }
+      if (resolvedName.source === 'unverified') {
+        // 黙って落とさない: 名前が空の行ができる (先生の一覧にはメールが出る)。原因が追えるように残す。
+        console.warn('[lesson/submit] name unverified (前のフェーズのシートが読めず、名前を空で受け付けた)',
+          __lessonSubmitLogFields_(ctx));
+      }
+      row[LESSON_NATIVE_COL_NAME - 1] = __plainTextCell_(__sanitizeLessonText_(resolvedName.name, 50));
       writtenRow = existingRow;
       if (existingRow > 0) {
         sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+        // 空だった名前を書き換えで初めて入れたときは、名前の lock を放す前に確定させる
+        //   (appendRow は下の行番号の読みで確定する)。待っている同じ名前の投稿に、この行が見えるように。
+        if (resolvedName.source === 'claimed' && typeof SpreadsheetApp !== 'undefined' && typeof SpreadsheetApp.flush === 'function') {
+          SpreadsheetApp.flush();
+        }
       } else {
         writtenRow = __lessonAppendedRow_(sheet.appendRow(row));
       }
     } finally {
-      if (typeof releaseCacheLock_ === 'function') releaseCacheLock_(submitLockKey, submitLock);
+      if (typeof releaseCacheLock_ === 'function') {
+        if (nameLock) releaseCacheLock_(nameLockKey, nameLock);
+        releaseCacheLock_(submitLockKey, submitLock);
+      }
     }
     // 受理した送信も 1 行残す (どのシートの何行目に書いたか)。行がずれて見えなくなる事故を、
     //   次は「送信完了なのに一覧に無い」の時点でログから突き止められるようにする。
@@ -3110,10 +3272,12 @@ function __cellToNumOrNull_(cell) {
 /**
  * @param {Object} phaseDef - { spreadsheetId, sheetName }
  * @param {Object} opts - { boardUserId: 授業の所有者 (cache の version 用), fresh,
- *   ownerReview: 授業後の振り返り。通常の検証で開けなければ __openEndedLessonSheet_ で開く }
+ *   ownerReview: 授業後の振り返り。通常の検証で開けなければ __openEndedLessonSheet_ で開く,
+ *   nullOnFail: 読めなかったときに [] ではなく null を返す (「回答なし」と「読めない」を分けたい呼び出し用) }
  *   boardUserId が無ければ cache を使わない (version で捨てられない cache を作らない)。
  */
 function __readAllLessonRows_(phaseDef, opts) {
+  const failed = (opts && opts.nullOnFail) ? null : [];
   try {
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) return [];
     const boardUserId = opts && opts.boardUserId;
@@ -3121,7 +3285,7 @@ function __readAllLessonRows_(phaseDef, opts) {
       && typeof CacheService !== 'undefined' && typeof getBoardDataVersion_ === 'function';
     if (!useCache) {
       const direct = __loadLessonRowsFromSheet_(phaseDef, opts);
-      return direct ? direct : [];
+      return direct ? direct : failed;
     }
     // 「ふりかえる」に入った瞬間、学級全員 (30〜100 人) が同時に自分の航跡を読みに来る。
     //   cache は最初の 1 件が埋めるが、シート読みには 1〜3 秒かかるので、その間に来た全員が
@@ -3141,7 +3305,7 @@ function __readAllLessonRows_(phaseDef, opts) {
       if (Array.isArray(loaded) && typeof saveToCacheWithSizeCheck_ === 'function') {
         saveToCacheWithSizeCheck_(cacheKey, loaded, LESSON_ROWS_CACHE_TTL_S);
       }
-      return Array.isArray(loaded) ? loaded : [];
+      return Array.isArray(loaded) ? loaded : failed;
     }
     const guarded = withStampedeGuard_({
       key: cacheKey,
@@ -3158,10 +3322,10 @@ function __readAllLessonRows_(phaseDef, opts) {
       waitMs: 500,
       waitTries: 4
     });
-    return Array.isArray(guarded) ? guarded : [];
+    return Array.isArray(guarded) ? guarded : failed;
   } catch (error) {
     logError_('__readAllLessonRows_', error);
-    return [];
+    return failed;
   }
 }
 

@@ -2182,3 +2182,260 @@ test('submitLessonAnswer: lock が取れなければ書かずに断る (二重�
   assert.equal(res.error, 'SUBMIT_BUSY');
   assert.equal(h.nativeSheets.get('phase1')._data.length, before, '行を足さない');
 });
+
+// =====================================================================
+// 名前はサーバが決める (2026-11-09 レビュー #18: ほかの児童の名前で投稿できた)
+//   名簿は無いので、この授業の回答シートにある「メール → 名前」の対応を使う。
+// =====================================================================
+
+// 名前の列 (0-based 3) を、メールごとに取り出す。
+function namesByEmail(sheet) {
+  const out = {};
+  sheet._data.slice(1).forEach((r) => { out[r[1]] = r[3]; });
+  return out;
+}
+const think = (lessonId, extra) => Object.assign({ lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '理由' }, extra);
+const rethink = (lessonId, extra) => Object.assign({ lessonId, phaseIndex: 3, numericX: 2, numericY: 4, reason: '理由' }, extra);
+
+test('名前: ほかのメールにひも付いた名前では投稿できない (NAME_TAKEN)。書き方を変えても同じ', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  assert.equal(submitAs(h, 'a@example.com', think(lessonId, { name: 'あおい' })).success, true);
+
+  const sheet = h.nativeSheets.get('phase1');
+  ['あおい', ' あ お い ', 'アオイ', 'ｱｵｲ', 'あおい！', '「あおい」'].forEach((name) => {
+    const res = submitAs(h, 'b@example.com', think(lessonId, { name }));
+    assert.equal(res.success, false, `「${name}」が通った`);
+    assert.equal(res.error, 'NAME_TAKEN');
+    assert.match(res.message, /ほかの人がもう使っています/);
+  });
+  assert.equal(sheet._data.length, 2, '断った投稿の行は足さない');
+
+  // 名字を付ければ送れる
+  const ok = submitAs(h, 'b@example.com', think(lessonId, { name: 'たなか あおい' }));
+  assert.equal(ok.success, true, ok.message);
+  assert.deepEqual(namesByEmail(sheet), { 'a@example.com': 'あおい', 'b@example.com': 'たなか あおい' });
+});
+
+test('名前: 自分の名前は今まで通り使える。一度決まった名前は、端末が何を送っても変わらない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const sheet = h.nativeSheets.get('phase1');
+  submitAs(h, 'a@example.com', think(lessonId, { name: 'あおい' }));
+  submitAs(h, 'b@example.com', think(lessonId, { name: 'ぼたん' }));
+
+  // 置き直し (同じ名前)
+  const again = submitAs(h, 'a@example.com', think(lessonId, { name: 'あおい', numericX: 5, reason: 'やっぱり' }));
+  assert.equal(again.success, true, again.message);
+  assert.equal(again.data.updated, true);
+  assert.equal(sheet._data.length, 3, '行は増えない');
+  assert.equal(sheet._data[1][4], 5, '位置は新しくなる');
+
+  // 端末がほかの子の名前・別の名前・空を送ってきても、記録する名前は自分のメールの名前のまま
+  ['ぼたん', 'べつのなまえ', ''].forEach((name) => {
+    const res = submitAs(h, 'a@example.com', think(lessonId, { name }));
+    assert.equal(res.success, true, `名前「${name}」で断られた: ${res.message}`);
+    assert.deepEqual(namesByEmail(sheet), { 'a@example.com': 'あおい', 'b@example.com': 'ぼたん' });
+  });
+});
+
+test('名前: 対応が無い児童の初回は、入れた名前がそのメールの名前になる', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const sheet = h.nativeSheets.get('phase1');
+
+  const first = submitAs(h, 'new@example.com', think(lessonId, { name: '  はるき\u0007 ' }));
+  assert.equal(first.success, true, first.message);
+  assert.equal(sheet._data[1][3], 'はるき', '制御文字と前後の空白を落として書く (従来どおり)');
+
+  // 名前を送らない投稿は、空のまま受け付ける (従来どおり)。あとで名前を送れば、そこで決まる
+  assert.equal(submitAs(h, 'noname@example.com', think(lessonId)).success, true);
+  assert.equal(sheet._data[2][3], '');
+  assert.equal(submitAs(h, 'noname@example.com', think(lessonId, { name: 'はるき' })).error, 'NAME_TAKEN', '空だった子も、ほかの子の名前は使えない');
+  assert.equal(sheet._data[2][3], '', '断られたら名前は空のまま');
+  assert.equal(submitAs(h, 'noname@example.com', think(lessonId, { name: 'なつみ' })).success, true);
+  assert.equal(sheet._data[2][3], 'なつみ');
+  assert.equal(sheet._data.length, 3);
+});
+
+test('名前: 前のフェーズで決まった名前を、あとのフェーズでも使う (ほかの子は名乗れない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);          // a=あおい, b=ぼたん, c=ちひろ
+  advanceAsTeacher(h, lessonId, 3);     // もう一度考える
+  const sheet = h.nativeSheets.get('phase4');
+
+  // 端末を替えて名前を聞き直された子が、ほかの子の名前を入れても、自分の名前で記録される
+  assert.equal(submitAs(h, 'b@example.com', rethink(lessonId, { name: 'あおい' })).success, true);
+  // 端末に名前が残っていない (空で送る) 子も、前のフェーズの名前で記録される
+  assert.equal(submitAs(h, 'c@example.com', rethink(lessonId)).success, true);
+  // 「考える」で送っていない子は、すでにいる子の名前を名乗れない (その子がまだ送っていなくても)
+  const late = submitAs(h, 'late@example.com', rethink(lessonId, { name: 'あおい' }));
+  assert.equal(late.error, 'NAME_TAKEN');
+  assert.equal(submitAs(h, 'late@example.com', rethink(lessonId, { name: 'おそい' })).success, true);
+  assert.equal(submitAs(h, 'a@example.com', rethink(lessonId, { name: 'あおい' })).success, true);
+
+  assert.deepEqual(namesByEmail(sheet), {
+    'b@example.com': 'ぼたん', 'c@example.com': 'ちひろ', 'late@example.com': 'おそい', 'a@example.com': 'あおい'
+  });
+
+  // 先生の一覧と授業後の見取りにも、サーバが決めた名前が出る
+  h.setEmail('teacher@example.com');
+  const live = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.deepEqual(Array.from(live.data.rows).map(r => r.name).sort(), ['あおい', 'おそい', 'ちひろ', 'ぼたん']);
+});
+
+test('名前: 先生が戻ったフェーズでは、先のフェーズで決まった名前も見る', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  assert.equal(submitAs(h, 'late@example.com', rethink(lessonId, { name: 'おそい' })).success, true);
+  advanceAsTeacher(h, lessonId, 0);     // 「考える」に戻る
+  assert.equal(submitAs(h, 'x@example.com', think(lessonId, { name: 'おそい' })).error, 'NAME_TAKEN');
+  assert.equal(submitAs(h, 'late@example.com', think(lessonId, { name: 'ちがうなまえ' })).success, true);
+  assert.equal(h.nativeSheets.get('phase1')._data[1][3], 'おそい', '先のフェーズで決まった名前で記録する');
+});
+
+test('名前: 匿名 (名前を出さない既定) は今まで通り。名前を送らなくても投稿でき、児童同士には名前を出さない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  // 名前なしの投稿は何人でも通る (空の名前どうしは「同じ名前」と扱わない)
+  ['p@example.com', 'q@example.com', 'r@example.com'].forEach((email) => {
+    const res = submitAs(h, email, think(lessonId));
+    assert.equal(res.success, true, res.message);
+  });
+  const sheet = h.nativeSheets.get('phase1');
+  assert.deepEqual(sheet._data.slice(1).map(r => r[3]), ['', '', '']);
+
+  // 名前を出すかどうかの既定 (出さない) は変えていない
+  const lessonJson = JSON.parse(h.lessonsSheet._data[1][10]);
+  lessonJson.phases.forEach((p, i) => {
+    const patch = h.context.__buildPhaseConfigPatch_(p, lessonJson, lessonId);
+    assert.equal(patch.displaySettings.showNames, false, `phase ${i} で名前が見える設定になっている`);
+  });
+  // 名前が無い児童は、先生の一覧ではメールで見分ける (行にメールが付いている)
+  h.setEmail('teacher@example.com');
+  const live = h.context.getLessonLiveAnswers('u1', lessonId);
+  assert.deepEqual(Array.from(live.data.rows).map(r => [r.name, r.email]),
+    [['', 'p@example.com'], ['', 'q@example.com'], ['', 'r@example.com']]);
+});
+
+test('名前: 前のフェーズのシートが読めないときは、名前を空にして考えだけ受け付ける (ログに名前は出さない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  const phase1 = h.nativeSheets.get('phase1');
+  const origRange = phase1.getDataRange;
+  phase1.getDataRange = () => ({ getValues: () => [] });   // 429 などで読めない
+  const { warns } = captureLogs(h);
+
+  const res = submitAs(h, 'late@example.com', rethink(lessonId, { name: 'あおい' }));
+  assert.equal(res.success, true, '確かめられないからといって、考えを失わせない');
+  const sheet = h.nativeSheets.get('phase4');
+  assert.equal(sheet._data[1][3], '', '確かめられない名前は書かない');
+  const warned = warns.filter(w => /name unverified/.test(w));
+  assert.equal(warned.length, 1, '黙って落とさない');
+  assert.equal(/あおい/.test(warned[0]), false, 'ログに名前を出さない');
+  assert.equal(/late@example\.com/.test(warned[0]), false, 'ログにメールをそのまま出さない');
+
+  // 読めるようになってから送り直すと、そこで照合される
+  phase1.getDataRange = origRange;
+  assert.equal(submitAs(h, 'late@example.com', rethink(lessonId, { name: 'あおい' })).error, 'NAME_TAKEN');
+  assert.equal(submitAs(h, 'late@example.com', rethink(lessonId, { name: 'おそい' })).success, true);
+  assert.equal(sheet._data[1][3], 'おそい');
+  assert.equal(sheet._data.length, 2, '行は増えない');
+});
+
+test('名前: 最初の入力フェーズではほかのシートを読まない。あとのフェーズでも前のシートを読むのは 1 回', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  withMemCache(h);
+  const reads = {};
+  h.nativeSheets.forEach((sh, name) => {
+    const orig = sh.getDataRange;
+    reads[name] = 0;
+    sh.getDataRange = function () { reads[name]++; return orig.apply(this, arguments); };
+  });
+
+  ['a', 'b', 'c'].forEach((id, i) => {
+    assert.equal(submitAs(h, `${id}@example.com`, think(lessonId, { name: 'なまえ' + i })).success, true);
+  });
+  assert.equal(reads.phase1, 3, '自分の行を探す 1 回ずつだけ (名前の照合で読み足さない)');
+  assert.equal(reads.phase4, 0, 'まだ開いていないフェーズのシートは読まない');
+
+  advanceAsTeacher(h, lessonId, 3);
+  reads.phase1 = 0;
+  ['a', 'b', 'c'].forEach((id, i) => {
+    assert.equal(submitAs(h, `${id}@example.com`, rethink(lessonId, { name: 'なまえ' + i })).success, true);
+  });
+  assert.equal(reads.phase1, 1, '前のフェーズの名前は覚えておき、投稿のたびに読み直さない (読み取り上限を焼かない)');
+  // 一度名前が入った子の置き直しは、前のフェーズを見にも行かない
+  reads.phase1 = 0;
+  h.context.CacheService = undefined;
+  assert.equal(submitAs(h, 'a@example.com', rethink(lessonId, { name: 'なまえ0' })).success, true);
+  assert.equal(reads.phase1, 0);
+});
+
+test('名前: 同じ名前を同時に初めて名乗っても 1 人にしか付かないよう、名前ごとの lock を取る', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const calls = [];
+  const released = [];
+  h.context.answerSheetStructLockKey_ = () => 'struct';
+  h.context.acquireCacheLock_ = (key, opts) => { calls.push({ key, opts }); return 'tok' + calls.length; };
+  h.context.releaseCacheLock_ = (key, tok) => released.push([key, tok]);
+
+  assert.equal(submitAs(h, 'a@example.com', think(lessonId, { name: ' アオイ ' })).success, true);
+  assert.deepEqual(calls.map(c => c.key), [
+    `lesson_submit:${lessonId}:0:a@example.com`,
+    `lesson_name:${lessonId}:あおい`
+  ], '書き方が違っても同じ名前は同じ lock');
+  assert.deepEqual(released, [[calls[1].key, 'tok2'], [calls[0].key, 'tok1']], '両方外す');
+
+  // 同じ名前の別の投稿が書いている最中 (名前の lock が取れない) は、書かずに断る。投稿の lock は外す
+  calls.length = 0;
+  released.length = 0;
+  h.context.acquireCacheLock_ = (key) => { calls.push({ key }); return key.startsWith('lesson_name:') ? null : 'tok'; };
+  const before = h.nativeSheets.get('phase1')._data.length;
+  const busy = submitAs(h, 'b@example.com', think(lessonId, { name: 'あおい' }));
+  assert.equal(busy.error, 'SUBMIT_BUSY');
+  assert.equal(h.nativeSheets.get('phase1')._data.length, before, '行を足さない');
+  assert.deepEqual(released, [[`lesson_submit:${lessonId}:0:b@example.com`, 'tok']]);
+});
+
+test('__lessonNameKey_: 空白・全角半角・かなの種類・記号の違いをそろえる (別の名前は別のまま)', () => {
+  const h = loadContext();
+  const key = h.context.__lessonNameKey_;
+  assert.equal(key('たなか　あおい'), key('たなかあおい'));
+  assert.equal(key('タナカ アオイ'), key('たなかあおい'));
+  assert.equal(key('ＴＡＲＯ'), key('taro'));
+  assert.equal(key("'+太郎"), key('+太郎'), "シートに ' 付きで書いた名前と、読んだ名前が同じになる");
+  assert.equal(key('+太郎'), key('太郎'));
+  assert.notEqual(key('あおい'), key('あおい2'));
+  assert.notEqual(key('たなかあおい'), key('あおい'));
+  assert.notEqual(key('!!'), key('??'), '記号だけの名前どうしを同じにしない');
+  assert.equal(key(''), '');
+  assert.equal(key(null), '');
+});
+
+test('__findOwnLessonRow_: capture を渡すと読んだ全行を返す (名前の照合で同じシートを読み直さない)', () => {
+  const h = loadContext();
+  const sheet = createSheet(['ts', 'email', 'class', 'name', 'x', 'y', 'reason', 'insight'], 'phase1');
+  sheet.appendRow(['t1', 'a@example.com', '', 'あおい', 1, 1, 'r', '']);
+  let reads = 0;
+  const orig = sheet.getDataRange;
+  sheet.getDataRange = () => { reads++; return orig(); };
+  const capture = {};
+  assert.equal(h.context.__findOwnLessonRow_(sheet, 'a@example.com', capture), 2);
+  assert.equal(reads, 1);
+  assert.deepEqual(Array.from(h.context.__lessonNamePairsFromSheetData_(capture.data)).map(p => Array.from(p)),
+    [['a@example.com', 'あおい']]);
+});
