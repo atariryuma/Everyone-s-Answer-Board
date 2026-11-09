@@ -440,6 +440,10 @@ function markWelcomeSeen() {
     if (!cfgResult || !cfgResult.success) {
       return createErrorResponse(`設定の取得に失敗しました: ${(cfgResult && cfgResult.message) || '詳細不明'}`);
     }
+    // 破損 config (parse 失敗で既定の値が返る) を保存すると、復旧できたはずの原本を既定の値で上書きする。
+    if (cfgResult.corrupted) {
+      return createErrorResponse('設定データが破損しているため保存を中止しました。設定の復旧が必要です。');
+    }
     const config = cfgResult.config;
     config.hasSeenWelcome = true;
 

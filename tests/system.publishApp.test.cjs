@@ -14,6 +14,7 @@ function loadSystemControllerContext(overrides = {}) {
     },
     ...gasResponseStubs(),
     logError_: () => {},
+    teacherOnlyError_: () => null,
     getCurrentEmail: () => 'teacher@example.com',
     findUserByEmail_: () => ({ userId: 'user-1', userEmail: 'teacher@example.com' }),
     getUserConfig: () => ({
@@ -354,4 +355,29 @@ test('isValidWebAppUrl_: rejects null, undefined, empty, non-string', () => {
   assert.equal(ctx.isValidWebAppUrl_(undefined), false);
   assert.equal(ctx.isValidWebAppUrl_(''), false);
   assert.equal(ctx.isValidWebAppUrl_(42), false);
+});
+
+test('publishApp: この配置の先生でなければ公開できない (古い users の行が残っていても)', () => {
+  let saveCalled = false;
+  const context = loadSystemControllerContext({
+    teacherOnlyError_: () => ({ success: false, message: '管理者権限が必要です' }),
+    getCurrentEmail: () => 'student@example.com',
+    findUserByEmail_: () => ({ userId: 'old-row', userEmail: 'student@example.com' }),
+    saveUserConfig_: () => { saveCalled = true; return { success: true }; }
+  });
+  const result = context.publishApp({ spreadsheetId: 'any-sheet', sheetName: 'Sheet1', etag: 'etag-1' });
+  assert.equal(result.success, false);
+  assert.equal(saveCalled, false);
+});
+
+test('publishApp: 設定が壊れている (corrupted) ときは保存しない (原本を既定の値で上書きしない)', () => {
+  let saveCalled = false;
+  const context = loadSystemControllerContext({
+    getUserConfig: () => ({ success: true, corrupted: true, config: { etag: 'etag-1', displaySettings: {} } }),
+    saveUserConfig_: () => { saveCalled = true; return { success: true }; }
+  });
+  const result = context.publishApp({ spreadsheetId: 'ss', sheetName: 'Sheet1', etag: 'etag-1' });
+  assert.equal(result.success, false);
+  assert.match(result.message, /破損/);
+  assert.equal(saveCalled, false);
 });

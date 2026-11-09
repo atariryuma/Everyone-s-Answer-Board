@@ -523,13 +523,18 @@ function publishApp(publishConfig) {
       return createAuthError();
     }
 
+    // 公開できるのはこの配置の先生だけ。Why: 以前は「users に行があるか」だけで判断し、指定したシートに
+    //   本人の権限があるかは見ていなかった。登録を先生だけに絞る (2026-10-29) より前の行が残っていると、
+    //   先生でない人が、先生 (実行者) の読める任意のシートを公開できた。
+    { const denied = teacherOnlyError_(); if (denied) return denied; }
+
     if (!publishConfig || typeof publishConfig !== 'object' || Array.isArray(publishConfig)) {
       return createErrorResponse('公開設定が必要です');
     }
 
     const user = findUserByEmail_(email, { requestingUser: email });
     if (!user) {
-      logError_('publishApp', new Error('User not found'), { email });
+      logError_('publishApp', new Error('User not found'), { viewer: (typeof maskEmailForLog_ === 'function' ? maskEmailForLog_(email) : '-') });
       return createErrorResponse('ユーザーが見つかりません');
     }
 
@@ -541,6 +546,10 @@ function publishApp(publishConfig) {
     const cfgRes = getUserConfig(user.userId, user);
     if (!cfgRes || !cfgRes.success) {
       return createErrorResponse(`設定の取得に失敗しました: ${(cfgRes && cfgRes.message) || '詳細不明'}`);
+    }
+    // 破損 config (parse 失敗で既定の値が返る) を土台に保存すると、復旧できたはずの原本を上書きする。
+    if (cfgRes.corrupted) {
+      return createErrorResponse('設定データが破損しているため公開できません。設定の復旧が必要です。');
     }
     const currentConfig = cfgRes.config;
     const { config: safePublishConfig, ignoredKeys } = sanitizePublishPayload_(publishConfig, currentConfig);

@@ -259,7 +259,11 @@ function createTemplateForm(templateType, templateOptions) {
 
     // Why VERIFIED via REST: Apps Script の setCollectEmail(true) では「回答者入力」モード
     // になりなりすまし可能。Forms REST API で emailCollectionType=VERIFIED を強制する。
-    setFormEmailCollectionVerified_(form.getId());
+    //   確認済みにできなかったら (自己申告のメールに落ちたら) 黙って成功にしない: 記録して画面にも伝える。
+    const emailVerified = setFormEmailCollectionVerified_(form.getId());
+    if (!emailVerified) {
+      logError_('createTemplateForm:emailNotVerified', new Error('Forms API で確認済みメールの収集を設定できませんでした'));
+    }
 
     // 1 回答制限: opts.allowResubmit=true なら OFF (揺らぎ追跡が有効)、それ以外は ON (既定)。
     //   UI の「再投稿を許可（揺らぎを追跡）」チェックボックスを反映。
@@ -416,7 +420,10 @@ function createTemplateForm(templateType, templateOptions) {
       sheetName: 'フォームの回答 1',
       folderUrl: folderUrl,
       wasCreated: true,
-      message: `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました`
+      emailVerified: emailVerified,
+      message: emailVerified
+        ? `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました`
+        : `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました。ただし回答者のメールを「確認済み」にできず、自己申告になっています。フォームの設定で「メールアドレスを収集する: 確認済み」にしてください`
     };
 
   } catch (error) {
@@ -533,6 +540,18 @@ function customizeForm_(formIdOrUrl, schema) {
       return createErrorResponse('too many questions (max 40)');
     }
 
+    // 設問を全部確かめてから既存の設問を消す。Why: 先に消すと、未対応の型だけのスキーマでも
+    //   「0 問で作り直しました」の成功になり、フォームが空になる。
+    const SUPPORTED_QUESTION_TYPES = ['list', 'multipleChoice', 'text', 'paragraph', 'scale'];
+    const invalidAt = schema.questions.findIndex((q) => !q || typeof q !== 'object' || !q.title
+      || SUPPORTED_QUESTION_TYPES.indexOf(q.type) < 0);
+    if (invalidAt >= 0) {
+      return createErrorResponse(`unsupported or invalid question at index ${invalidAt}`);
+    }
+    if (schema.questions.length === 0) {
+      return createErrorResponse('schema.questions must not be empty');
+    }
+
     let form;
     try {
       form = __openFormByIdOrUrl_(formIdOrUrl);
@@ -634,7 +653,10 @@ function customizeForm_(formIdOrUrl, schema) {
       try {
         const oldDestId = form.getDestinationId();
         // 旧 SS が空でない場合（既に回答あり）はリセットを諦めて警告
+        //   読めない (権限・一時的な失敗) ときも「回答あり」と同じに扱う: 確かめられないまま作り直すと、
+        //   回答の入った旧 SS をゴミ箱へ移してしまう (以前は例外を握りつぶして「回答なし」とみなしていた)。
         let hasResponses = false;
+        let unverified = false;
         if (oldDestId) {
           try {
             const oldSs = SpreadsheetApp.openById(oldDestId);
@@ -642,10 +664,13 @@ function customizeForm_(formIdOrUrl, schema) {
             for (const s of sheets) {
               if (s.getLastRow() > 1) { hasResponses = true; break; }
             }
-          } catch (_) { /* skip */ }
+          } catch (readErr) {
+            unverified = true;
+            console.warn('customizeForm: could not verify old destination; skip reset:', readErr && readErr.message);
+          }
         }
-        if (hasResponses) {
-          console.warn('customizeForm: skipped destination reset (responses exist in old spreadsheet)');
+        if (hasResponses || unverified) {
+          if (hasResponses) console.warn('customizeForm: skipped destination reset (responses exist in old spreadsheet)');
         } else {
           // 新 SS を作って再リンク。リンク前後でファイル所有者は CLI ユーザー（Form と同じ）。
           const ssTitle = form.getTitle() + ' (回答)';
@@ -2245,11 +2270,13 @@ function setFormEmailCollectionVerified_(formId) {
 
     const responseCode = response.getResponseCode();
     if (responseCode !== 200) {
-      console.warn('Forms API emailCollectionType設定に失敗:', responseCode, response.getContentText());
-      // フォールバック: Apps Script の setCollectEmail を使用
+      console.warn('Forms API emailCollectionType設定に失敗:', responseCode);
+      // フォールバック: Apps Script の setCollectEmail を使用 (自己申告。確認済みではない)
       const form = FormApp.openById(formId);
       form.setCollectEmail(true);
+      return false;
     }
+    return true;
   } catch (error) {
     console.warn('Forms REST API呼び出しエラー（フォールバック実行）:', error.message);
     // フォールバック: Apps Script の setCollectEmail を使用
@@ -2259,6 +2286,7 @@ function setFormEmailCollectionVerified_(formId) {
     } catch (fallbackError) {
       logError_('setEmailCollection.fallback', fallbackError);
     }
+    return false;
   }
 }
 
