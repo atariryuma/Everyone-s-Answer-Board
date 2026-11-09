@@ -4899,8 +4899,12 @@
           maxRetries: 2,
           baseDelay: 500,
           context: `デバウンスリアクション処理 (${reactionKey})`,
+          // リアクションは押すたびに反転する (冪等でない)。再送してよいのは、サーバが「書かずに断った」と
+          //   はっきり返したときだけ (同じ行の処理中・混雑)。応答だけが失われた・応答の形が変だった等で
+          //   再送すると、届いていた 1 回目が打ち消されて押した結果が反転する。
           retryCondition: (error) => {
-            return error.message && !error.message.includes('権限') && !error.message.includes('無効');
+            const msg = (error && error.message) || '';
+            return msg.includes('同時リアクション処理中') || msg.includes('混み合って');
           }
         });
 

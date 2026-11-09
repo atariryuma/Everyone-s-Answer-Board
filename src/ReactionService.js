@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard_）。
  */
 
-/* global resolveColumnIndex, emailToShortHash_, boardHashScope_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
+/* global answerSheetStructLockKey_, resolveColumnIndex, emailToShortHash_, boardHashScope_, __getViewerLessonPhase_, getCurrentEmail, findPublishedBoardOwner_, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache_, bumpBoardDataVersion_, isBoardCollaborator_, logError_, sameEmail_, resolveReactionMode */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -20,6 +20,29 @@ const ROW_LOCK_RETRY_SLEEP_MS = 200;
 //   (sameEmail_ と同じ規約 / M1)。 別 case の綴りが混入しても二重カウントしない。
 function normalizeReactionEmail_(email) {
   return String(email == null ? '' : email).trim().toLowerCase();
+}
+
+/**
+ * 見出しの右端に列を足す (リアクション 3 種・HIGHLIGHT の初回の用意) ところを、スクリプト全体の lock で包む。
+ *   Why: リアクションとハイライトは別々の行 lock のまま、どちらも「1 行目を読み直す → 右端に足す」をする。
+ *   同時に起きると同じ列に書いて見出しが 1 つ消えた。列を足すのはボードごとに最初の 1 回だけなので、
+ *   ScriptLock を数百 ms 握っても他の処理はほぼ待たない。
+ */
+function withColumnProvisionLock_(fn) {
+  let lock = null;
+  let held = false;
+  try {
+    if (typeof LockService !== 'undefined' && LockService && LockService.getScriptLock) {
+      lock = LockService.getScriptLock();
+      held = lock.tryLock(5000);
+    }
+  } catch (_) { lock = null; /* LockService が使えなければ lock なしで進む (読み直しの確認は残る) */ }
+  if (lock && !held) throw new Error('いま混み合っています。少し待ってからもう一度押してください');
+  try {
+    return fn();
+  } finally {
+    if (lock && held) { try { lock.releaseLock(); } catch (_) { /* ScriptLock は実行終了で必ず解放される */ } }
+  }
 }
 
 /**
@@ -234,55 +257,57 @@ function processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, prel
   const missingForProvision = missingTypes.slice();
 
   if (missingForProvision.length > 0) {
-    // Why fresh header re-read: 呼び出し側 (executeBoardRowOperation_) は preloadedHeaders
-    // を 10 分 cache から取得していて、別スレッドが直前に provisioning 済みでも
-    // cache が stale だと「missing」と誤判定し、重複列を append してしまう。
-    // LockService 取得後にここを通るが、cache 上の headers は別途古いままなので
-    // sheet から fresh に読み直して「本当に missing か」を再確認する。
-    const freshHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
-    const reallyMissing = [];
-    missingForProvision.forEach(type => {
-      const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === type);
-      if (freshIdx === -1) {
-        reallyMissing.push(type);
-      } else {
-        // 直前の thread が既に provision 済 → 既存列を使う
-        reactionColumns[type] = freshIdx + 1;
-        // local headers にも反映 (以降のロジックのため)
-        while (headers.length <= freshIdx) headers.push('');
-        headers[freshIdx] = type;
+    withColumnProvisionLock_(() => {
+      // Why fresh header re-read: 呼び出し側 (executeBoardRowOperation_) は preloadedHeaders
+      // を 10 分 cache から取得していて、別スレッドが直前に provisioning 済みでも
+      // cache が stale だと「missing」と誤判定し、重複列を append してしまう。
+      // LockService 取得後にここを通るが、cache 上の headers は別途古いままなので
+      // sheet から fresh に読み直して「本当に missing か」を再確認する。
+      const freshHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+      const reallyMissing = [];
+      missingForProvision.forEach(type => {
+        const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === type);
+        if (freshIdx === -1) {
+          reallyMissing.push(type);
+        } else {
+          // 直前の thread が既に provision 済 → 既存列を使う
+          reactionColumns[type] = freshIdx + 1;
+          // local headers にも反映 (以降のロジックのため)
+          while (headers.length <= freshIdx) headers.push('');
+          headers[freshIdx] = type;
+        }
+      });
+
+      if (reallyMissing.length > 0) {
+        console.warn('processReactionDirect: lazy-provisioning reaction columns', {
+          reallyMissing,
+          currentHeaderCount: freshHeaders.length,
+          rowNumber
+        });
+        try {
+          // 既存最終列の右側に append。setValues 1 回で済むよう一括書き込み。
+          const startCol = freshHeaders.length + 1;
+          sheet.getRange(1, startCol, 1, reallyMissing.length)
+               .setValues([reallyMissing]);
+          // headers 配列も同期更新（同じ関数内の以降のロジックが反映を見られるように）
+          reallyMissing.forEach((name, i) => {
+            while (headers.length < startCol + i) headers.push('');
+            headers.push(name);
+            if (reactionTypes.includes(name)) {
+              reactionColumns[name] = startCol + i;
+            }
+          });
+          // ヘッダー cache を invalidate (他の concurrent callers が stale を見ないように)
+          if (typeof invalidateSheetHeadersCache_ === 'function') {
+            try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
+            catch (_) { /* best effort */ }
+          }
+        } catch (provError) {
+          logError_('processReactionDirect.provisioning', provError, { reallyMissing });
+          throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
+        }
       }
     });
-
-    if (reallyMissing.length > 0) {
-      console.warn('processReactionDirect: lazy-provisioning reaction columns', {
-        reallyMissing,
-        currentHeaderCount: freshHeaders.length,
-        rowNumber
-      });
-      try {
-        // 既存最終列の右側に append。setValues 1 回で済むよう一括書き込み。
-        const startCol = freshHeaders.length + 1;
-        sheet.getRange(1, startCol, 1, reallyMissing.length)
-             .setValues([reallyMissing]);
-        // headers 配列も同期更新（同じ関数内の以降のロジックが反映を見られるように）
-        reallyMissing.forEach((name, i) => {
-          while (headers.length < startCol + i) headers.push('');
-          headers.push(name);
-          if (reactionTypes.includes(name)) {
-            reactionColumns[name] = startCol + i;
-          }
-        });
-        // ヘッダー cache を invalidate (他の concurrent callers が stale を見ないように)
-        if (typeof invalidateSheetHeadersCache_ === 'function') {
-          try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
-          catch (_) { /* best effort */ }
-        }
-      } catch (provError) {
-        logError_('processReactionDirect.provisioning', provError, { reallyMissing });
-        throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
-      }
-    }
     // 不足解消したので missingTypes をクリア
     missingTypes = missingTypes.filter(t => reactionColumns[t] === undefined);
   }
@@ -411,39 +436,43 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
   //   新規ボードで初回 HIGHLIGHT 押下時に必ず失敗する UX 破壊フロー。
   //   processReactionDirect_ と同じ方針で missing column を sheet 末尾に append → 続行。
   if (highlightColIndex === -1) {
-    // 10 分 cache の見出しは古いことがある。同時に走ったリアクションが右端に UNDERSTAND/LIKE/CURIOUS
-    //   を足した直後だと、同じ列に HIGHLIGHT を書いて見出しを潰す。書く前に 1 行目を読み直す。
-    const freshHeaders = readHeaderRowOnly_(sheet);
-    if (freshHeaders.length > 0) {
-      const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
-      if (freshIdx !== -1) {
-        highlightColIndex = freshIdx;
-      } else {
-        headers.length = 0;
-        freshHeaders.forEach(h => headers.push(h));
+    withColumnProvisionLock_(() => {
+      if (highlightColIndex === -1) {
+        // 10 分 cache の見出しは古いことがある。同時に走ったリアクションが右端に UNDERSTAND/LIKE/CURIOUS
+        //   を足した直後だと、同じ列に HIGHLIGHT を書いて見出しを潰す。書く前に 1 行目を読み直す。
+        const freshHeaders = readHeaderRowOnly_(sheet);
+        if (freshHeaders.length > 0) {
+          const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
+          if (freshIdx !== -1) {
+            highlightColIndex = freshIdx;
+          } else {
+            headers.length = 0;
+            freshHeaders.forEach(h => headers.push(h));
+          }
+        }
       }
-    }
-  }
-  if (highlightColIndex === -1) {
-    // 新しいボードで初めて ★ を押したときの正常な動き (WARN にしない)。
-    console.log('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
-      currentHeaderCount: headers.length,
-      rowNumber
+      if (highlightColIndex === -1) {
+        // 新しいボードで初めて ★ を押したときの正常な動き (WARN にしない)。
+        console.log('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
+          currentHeaderCount: headers.length,
+          rowNumber
+        });
+        try {
+          const newCol = headers.length + 1;
+          sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
+          headers.push('HIGHLIGHT');
+          highlightColIndex = newCol - 1;
+          provisioned = true;
+          if (typeof invalidateSheetHeadersCache_ === 'function') {
+            try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
+            catch (_) { /* cache 不通は機能的に無害 (10 分で切れる) */ }
+          }
+        } catch (provError) {
+          logError_('processHighlightDirect.provisioning', provError);
+          throw new Error(`ハイライト列の追加に失敗しました: ${provError.message}`);
+        }
+      }
     });
-    try {
-      const newCol = headers.length + 1;
-      sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
-      headers.push('HIGHLIGHT');
-      highlightColIndex = newCol - 1;
-      provisioned = true;
-      if (typeof invalidateSheetHeadersCache_ === 'function') {
-        try { invalidateSheetHeadersCache_(sheet.getParent().getId(), sheet.getName()); }
-        catch (_) { /* cache 不通は機能的に無害 (10 分で切れる) */ }
-      }
-    } catch (provError) {
-      logError_('processHighlightDirect.provisioning', provError);
-      throw new Error(`ハイライト列の追加に失敗しました: ${provError.message}`);
-    }
   }
 
   const highlightCol = highlightColIndex + 1;
@@ -789,6 +818,14 @@ function executeBoardRowOperation_(options) {
     if (!acquired) return createErrorResponse(concurrentMessage);
 
     try {
+      // 回答の削除 (行が繰り上がる) の最中は書かない。行番号が別の児童の行を指しうる。
+      if (typeof answerSheetStructLockKey_ === 'function') {
+        let structBusy = false;
+        try { structBusy = Boolean(cache.get(answerSheetStructLockKey_(config.spreadsheetId, config.sheetName))); } catch (_) { structBusy = false; /* cache 不通なら確かめずに進む (行の正体の照合は下で行う) */ }
+        if (structBusy) {
+          return createErrorResponse('いま混み合っています。少し待ってからもう一度押してください', null, { error: 'BUSY', busy: true });
+        }
+      }
       // Race protection: lock acquire 中に教師が unpublish した可能性がある。 lock 取得後
       // に publish 状態を再確認し、 viewer (= non-admin non-owner) からの write を再度 gate。
       // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard_ と同じ判定基準)。

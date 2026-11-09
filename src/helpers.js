@@ -117,17 +117,40 @@ function setCachedProperty_(key, value) {
 }
 
 /**
+ * 文字列の UTF-8 でのバイト数。CacheService の上限 (100KB / value) はバイトで数える。
+ *   Why: 文字数 (length) で比べていたので、日本語 (1 文字 3 バイト) が約 3.4 万字を超えると
+ *   上限の判定を通ったまま put が失敗し、cache に入らなかった。
+ * @param {string} s
+ * @returns {number}
+ */
+function utf8ByteLength_(s) {
+  const str = String(s);
+  let bytes = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    const c = str.charCodeAt(i);
+    if (c < 0x80) bytes += 1;
+    else if (c < 0x800) bytes += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const d = str.charCodeAt(i + 1);
+      if (d >= 0xdc00 && d <= 0xdfff) { bytes += 4; i += 1; } else bytes += 3;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/**
  * CacheService に JSON を保存（CacheService の 100KB 制限を超える場合は false）。
  * @param {string} cacheKey
  * @param {Object} data
  * @param {number} ttl - 秒
- * @param {number} [maxSize=100000]
+ * @param {number} [maxSize=100000] - バイト数 (UTF-8)
  */
 function saveToCacheWithSizeCheck_(cacheKey, data, ttl, maxSize = 100000) {
   try {
     const dataJson = JSON.stringify(data);
-    if (dataJson.length > maxSize) {
-      console.warn(`saveToCacheWithSizeCheck_: Data too large for cache (${dataJson.length} bytes, max ${maxSize})`);
+    const size = utf8ByteLength_(dataJson);
+    if (size > maxSize) {
+      console.warn(`saveToCacheWithSizeCheck_: Data too large for cache (${size} bytes, max ${maxSize})`);
       return false;
     }
     CacheService.getScriptCache().put(cacheKey, dataJson, ttl);
@@ -432,6 +455,15 @@ function acquireCacheLock_(key, opts) {
   }
 }
 
+/**
+ * 回答シートの「行の並びを変える操作 (行の削除)」の lock の key。削除で下の行が 1 つ繰り上がるので、
+ *   その間に行番号で書く処理 (授業の投稿の書き換え・リアクション・ハイライト) が別の児童の行を上書きしうる。
+ *   削除はこの key を取り、行番号で書く処理はこの key が立っている間は書かない (blockedBy / 確認)。
+ */
+function answerSheetStructLockKey_(spreadsheetId, sheetName) {
+  return 'answer_sheet_struct:' + String(spreadsheetId || '') + ':' + String(sheetName || '').slice(0, 100);
+}
+
 /** acquireCacheLock_ の対。自分の token のときだけ外す (他人が取り直した lock を消さない)。 */
 function releaseCacheLock_(key, token) {
   if (!token || token === 'nolock' || typeof CacheService === 'undefined') return;
@@ -705,7 +737,11 @@ function emailToShortHash_(email, scope) {
       lock = null; // lock 取れなくても下で生成は試みる (劣化動作)
     }
     try {
-      salt = getCachedProperty_('EMAIL_HASH_SALT'); // lock 取得中に他 request が確定済みかも
+      // lock の中では PropertiesService から直接読む。getCachedProperty_ は lock の前に読んだ null を
+      //   この実行の中で覚えているので、他の request が確定させた salt が見えず、上書きしてしまう
+      //   (同じ児童のハッシュが変わる)。
+      salt = PropertiesService.getScriptProperties().getProperty('EMAIL_HASH_SALT');
+      delete RUNTIME_PROPERTIES_CACHE.EMAIL_HASH_SALT;   // 覚えた null を捨てる (次の呼び出しは確定した値を読む)
       if (!salt) {
         salt = Utilities.getUuid().replace(/-/g, '');
         try {

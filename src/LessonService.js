@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_, formatTimestamp */
+/* global acquireCacheLock_, releaseCacheLock_, answerSheetStructLockKey_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, packJsonForCache_, unpackJsonFromCache_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_, formatTimestamp */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -2657,15 +2657,35 @@ function submitLessonAnswer(targetUserId, payload) {
       __plainTextCell_(addedInsight)
     ];
 
-    const existingRow = __findOwnLessonRow_(sheet, actorEmail);
-    if (existingRow === LESSON_ROW_READ_FAILED) {
-      return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
+    // 「自分の行を探す → 足すか書き換える」を、この授業・フェーズ・児童ごとの lock で包む。
+    //   Why: 二重にタップすると、2 つの実行がどちらも「行が無い」と見て appendRow し、同じ児童の行が 2 つできた。
+    //   回答の削除 (行が繰り上がる) の最中は書かない (blockedBy): 探した行番号が別の児童の行を指しうる。
+    const submitLockKey = 'lesson_submit:' + String(phase.lessonId) + ':' + String(phase.phaseIndex) + ':' + String(actorEmail).trim().toLowerCase();
+    const submitLock = (typeof acquireCacheLock_ === 'function')
+      ? acquireCacheLock_(submitLockKey, {
+        ttlSec: 30, waitMs: 8000,
+        blockedBy: typeof answerSheetStructLockKey_ === 'function'
+          ? [answerSheetStructLockKey_(phaseDef.spreadsheetId, phaseDef.sheetName)] : []
+      })
+      : 'nolock';   // helpers.js を読まない単体テストの経路
+    if (!submitLock) {
+      return refuse('SUBMIT_BUSY', 'いま混み合っています。少し待ってからもう一度送ってください');
     }
-    let writtenRow = existingRow;
-    if (existingRow > 0) {
-      sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
-    } else {
-      writtenRow = __lessonAppendedRow_(sheet.appendRow(row));
+    let existingRow;
+    let writtenRow;
+    try {
+      existingRow = __findOwnLessonRow_(sheet, actorEmail);
+      if (existingRow === LESSON_ROW_READ_FAILED) {
+        return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
+      }
+      writtenRow = existingRow;
+      if (existingRow > 0) {
+        sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+      } else {
+        writtenRow = __lessonAppendedRow_(sheet.appendRow(row));
+      }
+    } finally {
+      if (typeof releaseCacheLock_ === 'function') releaseCacheLock_(submitLockKey, submitLock);
     }
     // 受理した送信も 1 行残す (どのシートの何行目に書いたか)。行がずれて見えなくなる事故を、
     //   次は「送信完了なのに一覧に無い」の時点でログから突き止められるようにする。
@@ -3130,6 +3150,10 @@ function __readAllLessonRows_(phaseDef, opts) {
       // 見出し行すら読めていない (429 等) は null で返し cache しない。
       //   空を cache すると 60 秒間「回答なし」に見える。
       isCacheable: (v) => Array.isArray(v),
+      // gzip して入れる: 学級の人数ぶんの回答 (日本語) は 100KB を超えうる。超えると cache に入らず、
+      //   「ふりかえる」に入った瞬間に全員がシートを読みに行く。
+      pack: (typeof packJsonForCache_ === 'function') ? packJsonForCache_ : undefined,
+      unpack: (typeof unpackJsonFromCache_ === 'function') ? unpackJsonFromCache_ : undefined,
       allowStale: false,
       waitMs: 500,
       waitTries: 4

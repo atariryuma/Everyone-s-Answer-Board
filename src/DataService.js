@@ -3,7 +3,11 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global createErrorResponse, formatTimestamp, getQuestionText_, findUserById_, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, sheetsApiBackoffMs_ */
+/* global acquireCacheLock_, releaseCacheLock_, answerSheetStructLockKey_, createErrorResponse, formatTimestamp, getQuestionText_, findUserById_, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_, bumpBoardDataVersion_, sheetsApiBackoffMs_ */
+
+// 回答の削除で「行の並び」lock を取ったあと、lock を確かめる直前に書き始めていた処理
+//   (授業の投稿の書き換え・リアクション) が書き終わるのを待つ時間。
+const STRUCT_LOCK_SETTLE_MS = 1500;
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -725,29 +729,47 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
       return createDataServiceErrorResponse(`シート「${sheetName}」が見つかりません`);
     }
 
-    // bounds は **fresh** な getLastRow() で取る。 getSheetInfo の lastRow は
-    //   getSheetRowCount の 30s cache 由来で、 新規投稿直後は stale になりうるため。
-    const { lastCol } = getSheetInfo(sheet);
-    const lastRow = sheet.getLastRow();
-    if (rowIndex < 2 || rowIndex > lastRow) {
-      return createDataServiceErrorResponse('無効な行番号です');
+    // 行の並びを変える間は、行番号で書く処理 (授業の投稿・リアクション・ハイライト) を止める。
+    //   Why: 削除で下の行が繰り上がる間に書かれると、別の児童の行を上書きする。
+    const structKey = typeof answerSheetStructLockKey_ === 'function' ? answerSheetStructLockKey_(spreadsheetId, sheetName) : '';
+    const structLock = (structKey && typeof acquireCacheLock_ === 'function')
+      ? acquireCacheLock_(structKey, { ttlSec: 30, waitMs: 5000 })
+      : 'nolock';   // helpers.js を読まない単体テストの経路
+    if (!structLock) {
+      return createDataServiceErrorResponse('いま混み合っています。少し待ってからもう一度お試しください。');
     }
-
-    const [rowData] = sheet.getRange(rowIndex, 1, 1, lastCol).getValues();
-
-    // identity verification: client が想定した行と実シートの行が一致するか timestamp (列A) で確認。
-    //   不一致 = snapshot 以降に行が削除/挿入され index がずれた = 別の回答を指している。
-    //   誤削除を防ぐため abort し、 画面更新を促す。
-    if (expectedTimestamp !== undefined && expectedTimestamp !== null && expectedTimestamp !== '') {
-      const actual = toComparableTimestamp_(rowData[0]);
-      const expected = toComparableTimestamp_(expectedTimestamp);
-      if (actual && expected && actual !== expected) {
-        console.warn('deleteAnswerRow: timestamp mismatch (row shifted?)', { userId, rowIndex });
-        return createDataServiceErrorResponse('対象の回答が変更されています。画面を更新してからもう一度お試しください。');
+    let rowData;
+    try {
+      // 行番号で書く処理が lock を確かめた直後に書き始めていた分を待つ (書き込み 1 回ぶん)。
+      if (structLock !== 'nolock' && typeof Utilities !== 'undefined' && Utilities && typeof Utilities.sleep === 'function') {
+        Utilities.sleep(STRUCT_LOCK_SETTLE_MS);
       }
-    }
+      // bounds は **fresh** な getLastRow() で取る。 getSheetInfo の lastRow は
+      //   getSheetRowCount の 30s cache 由来で、 新規投稿直後は stale になりうるため。
+      const { lastCol } = getSheetInfo(sheet);
+      const lastRow = sheet.getLastRow();
+      if (rowIndex < 2 || rowIndex > lastRow) {
+        return createDataServiceErrorResponse('無効な行番号です');
+      }
 
-    sheet.deleteRows(rowIndex, 1);
+      [rowData] = sheet.getRange(rowIndex, 1, 1, lastCol).getValues();
+
+      // identity verification: client が想定した行と実シートの行が一致するか timestamp (列A) で確認。
+      //   不一致 = snapshot 以降に行が削除/挿入され index がずれた = 別の回答を指している。
+      //   誤削除を防ぐため abort し、 画面更新を促す。
+      if (expectedTimestamp !== undefined && expectedTimestamp !== null && expectedTimestamp !== '') {
+        const actual = toComparableTimestamp_(rowData[0]);
+        const expected = toComparableTimestamp_(expectedTimestamp);
+        if (actual && expected && actual !== expected) {
+          console.warn('deleteAnswerRow: timestamp mismatch (row shifted?)', { userId, rowIndex });
+          return createDataServiceErrorResponse('対象の回答が変更されています。画面を更新してからもう一度お試しください。');
+        }
+      }
+
+      sheet.deleteRows(rowIndex, 1);
+    } finally {
+      if (typeof releaseCacheLock_ === 'function') releaseCacheLock_(structKey, structLock);
+    }
 
     // 削除で下の行が 1 つ繰り上がる。cache に古い行が残ると、次の読込が消えた行の番号で
     //   回答を持ち続け、2 個目の削除が「対象の回答が変更されています」で止まる (2026-09-08)。
@@ -765,7 +787,7 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
     // Why: sheet.deleteRows だけでは Google Forms のレスポンスストアには残り、
     //      フォームの集計・再送信防止・回答編集 URL が実在する回答として扱われる。
     //      未リンク・権限不足は致命的ではないので best-effort でシート削除は成功扱い。
-    deleteLinkedFormResponseByTimestamp_(sheet, rowData[0]);
+    deleteLinkedFormResponseByTimestamp_(sheet, rowData[0], rowEmailOf_(sheet, rowData));
 
     return {
       success: true,
@@ -778,6 +800,21 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
   }
 }
 
+// 削除した行のメール (見出しが「メールアドレス」/ Email の列)。見つからなければ ''。
+//   フォームの回答を時刻だけで探すと、同じ秒に送った別の児童の回答を消しうるので、照らし合わせに使う。
+function rowEmailOf_(sheet, rowData) {
+  try {
+    const headers = (sheet.getRange(1, 1, 1, (rowData || []).length).getValues() || [])[0] || [];
+    for (let i = 0; i < headers.length; i += 1) {
+      const h = String(headers[i] || '').trim().toLowerCase();
+      if (h === 'メールアドレス' || h === 'email address' || h === 'email' || h === 'メール') {
+        return String(rowData[i] || '').trim().toLowerCase();
+      }
+    }
+  } catch (_) { /* 見出しが読めなければメールなしで照らし合わせる (候補が 1 つのときだけ消す) */ }
+  return '';
+}
+
 /**
  * シートにリンクされたフォームから、指定タイムスタンプのレスポンスを削除する（best-effort）。
  *
@@ -786,9 +823,10 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
  *
  * @param {Sheet} sheet
  * @param {Date} rowTimestamp - sheet.getRange(...).getValues() 由来なので常に Date
+ * @param {string} [rowEmail] - 削除した行のメール。あれば回答者のメールとも照らし合わせる
  * @returns {{success:boolean, message?:string}}
  */
-function deleteLinkedFormResponseByTimestamp_(sheet, rowTimestamp) {
+function deleteLinkedFormResponseByTimestamp_(sheet, rowTimestamp, rowEmail) {
   const TOLERANCE_MS = 1000;
   try {
     const formUrl = sheet.getFormUrl();
@@ -809,15 +847,27 @@ function deleteLinkedFormResponseByTimestamp_(sheet, rowTimestamp) {
     // Why: 全件取得でなく target 以降に限定することで、長期運用フォーム（数千件）でも
     //      1 件取れば済む。FormApp.getResponses(timestamp) は「timestamp 以降」を返す。
     const responses = form.getResponses(new Date(targetTime - TOLERANCE_MS));
+    const email = String(rowEmail || '').trim().toLowerCase();
+    const candidates = [];
     for (let i = 0; i < responses.length; i += 1) {
       // Why: Sheet 側は秒精度、FormResponse 側はミリ秒精度のため完全一致しない。
       const respTime = responses[i].getTimestamp().getTime();
-      if (Math.abs(respTime - targetTime) <= TOLERANCE_MS) {
-        form.deleteResponse(responses[i].getId());
-        return { success: true };
+      if (Math.abs(respTime - targetTime) > TOLERANCE_MS) continue;
+      if (email) {
+        let respEmail = '';
+        try { respEmail = String(responses[i].getRespondentEmail() || '').trim().toLowerCase(); } catch (_) { respEmail = ''; /* 集めていないフォーム */ }
+        if (respEmail && respEmail !== email) continue;   // 同じ秒の別の児童の回答
       }
+      candidates.push(responses[i]);
     }
-    return createErrorResponse('no matching form response');
+    if (candidates.length === 0) return createErrorResponse('no matching form response');
+    // 候補が複数 = どれが消した行の回答か決められない。別の児童の回答を消さないよう、消さずに止める。
+    if (candidates.length > 1) {
+      console.warn('deleteLinkedFormResponseByTimestamp: ambiguous', { count: candidates.length });
+      return createErrorResponse('ambiguous form response');
+    }
+    form.deleteResponse(candidates[0].getId());
+    return { success: true };
   } catch (error) {
     console.warn('deleteLinkedFormResponseByTimestamp: failed', {
       error: error.message

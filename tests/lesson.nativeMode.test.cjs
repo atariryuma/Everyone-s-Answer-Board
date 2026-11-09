@@ -2148,3 +2148,37 @@ test('submitLessonAnswer: 行を足したら行数の覚えを捨てる (送っ�
   submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 2, reason: 'b' });
   assert.deepEqual(dropped, ['phase1'], '送り直し (行の更新) では行数は変わらないので捨てない');
 });
+
+// 2026-11-09 レビュー #4: 「自分の行を探す → 足すか書き換える」を授業・フェーズ・児童ごとの lock で包む。
+test('submitLessonAnswer: 授業・フェーズ・児童ごとの lock を取り、回答の削除中 (行の並びの lock) は書かない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const calls = [];
+  h.context.answerSheetStructLockKey_ = (ss, name) => `struct:${ss}:${name}`;
+  h.context.acquireCacheLock_ = (key, opts) => { calls.push({ key, opts }); return 'tok'; };
+  const released = [];
+  h.context.releaseCacheLock_ = (key, tok) => released.push([key, tok]);
+
+  const res = submitAs(h, 'Child1@Example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'A' });
+  assert.equal(res.success, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].key, `lesson_submit:${lessonId}:0:child1@example.com`, '児童ごと (大小文字をそろえる)');
+  assert.equal(calls[0].opts.blockedBy.length, 1);
+  assert.match(calls[0].opts.blockedBy[0], /^struct:/, '削除中は待つ');
+  assert.deepEqual(released, [[calls[0].key, 'tok']], '書いたら外す');
+});
+
+test('submitLessonAnswer: lock が取れなければ書かずに断る (二重タップで同じ児童の行が 2 つできない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  h.context.answerSheetStructLockKey_ = () => 'struct';
+  h.context.acquireCacheLock_ = () => null;   // 同じ児童の別の送信が書いている最中
+  h.context.releaseCacheLock_ = () => {};
+  const before = h.nativeSheets.get('phase1')._data.length;
+  const res = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'A' });
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'SUBMIT_BUSY');
+  assert.equal(h.nativeSheets.get('phase1')._data.length, before, '行を足さない');
+});
