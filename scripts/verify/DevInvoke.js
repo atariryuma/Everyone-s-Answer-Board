@@ -14,7 +14,8 @@
  *   (e2e-single.js の最後の項目)。先生として実行するので、検証のたびに先生の Drive に溜まるため。
  */
 
-/* global _apiKeyAdminEmail:writable, createErrorResponse, getCachedProperty_, DriveApp, Utilities */
+/* global _apiKeyAdminEmail:writable, createErrorResponse, getCachedProperty_, DriveApp, Utilities,
+   getAllUsers_, safeJsonParse_, SpreadsheetApp, FormApp */
 
 // 画面 (src/*.html) が呼ぶ処理だけ。ここに無い名前は呼ばない。
 const DEV_INVOKE_ALLOWED_ = [
@@ -63,8 +64,44 @@ function __devTrashTestFiles_(p) {
   }
 }
 
+// 検証用の配置のいまのボードのフォームについて、メールの集め方と回答シートの見出しを返す。
+//   selfReported: true を渡すと、先に「回答者の入力 (自己申告)」へ戻す (repairFormEmailCollection を
+//   本物の FormApp で試すため)。検証用の配置 (DB の名前が【検証】で始まる) でしか書かない。
+function __devFormEmailProbe_(p) {
+  try {
+    const users = getAllUsers_({ activeOnly: false }, { systemLookup: true }) || [];
+    let ssId = '';
+    users.forEach((u) => {
+      const c = safeJsonParse_(u && u.configJson, null);
+      if (!ssId && c && c.spreadsheetId) ssId = c.spreadsheetId;
+    });
+    if (!ssId) return createErrorResponse('dev.formEmailProbe: ボードにつながったシートがありません');
+    const ss = SpreadsheetApp.openById(ssId);
+    const editUrl = ss.getFormUrl();
+    if (!editUrl) return createErrorResponse('dev.formEmailProbe: シートにフォームがつながっていません');
+    const form = FormApp.openByUrl(editUrl);
+    if (p.selfReported === true) {
+      // 書くのは検証用の配置のときだけ (検証用の DB は名前が【検証】で始まる。e2e が作るボードのフォームは
+      //   題名が【検証】で始まらないものもあるので、フォームの題名ではなく DB の名前で見分ける)
+      const dbName = SpreadsheetApp.openById(getCachedProperty_('DATABASE_SPREADSHEET_ID')).getName();
+      if (!DEV_TEST_FILE_NAME_.test(dbName)) {
+        return createErrorResponse('dev.formEmailProbe: 検証用の配置ではないので書きません');
+      }
+      form.setEmailCollectionType(FormApp.EmailCollectionType.RESPONDER_INPUT);
+    }
+    const sheet = ss.getSheets()[0];
+    const headers = sheet.getLastColumn() > 0
+      ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String)
+      : [];
+    return { success: true, emailType: String(form.getEmailCollectionType()), headers };
+  } catch (e) {
+    return createErrorResponse('dev.formEmailProbe: ' + (e && e.message));
+  }
+}
+
 function __devAdminOperation_(op, params) {
   if (op === 'dev.trashTestFiles') return __devTrashTestFiles_(params || {});
+  if (op === 'dev.formEmailProbe') return __devFormEmailProbe_(params || {});
   if (op !== 'dev.invoke') return null;
   const p = params || {};
   const fn = String(p.fn || '');

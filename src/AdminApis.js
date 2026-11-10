@@ -814,6 +814,12 @@ function dispatchAdminOperation(operation, params) {
       return setFormAllowResubmit(params.formId || params.formUrl, Boolean(params.allowResubmit));
     }
 
+    case 'repairFormEmailCollection': {
+      // アプリにつながっているフォームのうち、メールが自己申告のものを確認済みに直す (一度きりの手当て)。
+      //   apply: true を渡したときだけ変える。渡さなければ数えるだけ。
+      return repairFormEmailCollection_({ apply: params.apply === true });
+    }
+
     case 'uploadLessonImage': {
       { const e = reqStr('imageData'); if (e) return e; }
       return uploadLessonImage(params.imageData, params.filename || '');

@@ -2240,6 +2240,108 @@ function isValidFormUrl(url) {
 }
 
 /**
+ * アプリにつながっているフォームのうち、メールが「回答者の入力 (自己申告)」のものを「確認済み」に直す。
+ *
+ * Why: 2026-10-29 〜 2026-11-11 にアプリが作ったフォームは、確認済みにする設定が毎回断られ、
+ *   自己申告のメールに落ちていた (setFormEmailCollectionVerified_ の Why)。回答者がほかの人の
+ *   メールを名乗れるので、すでに作ったフォームも直す。admin API の repairFormEmailCollection から呼ぶ。
+ *
+ * 触るのは、利用者の設定 (いまのボード・保存してある profile) と授業のフェーズが指しているフォームだけ。
+ *   先生の Drive にあるほかのフォームは見ない。「メールを集めない」にしてあるフォームは変えない
+ *   (先生がそう決めたもの)。apply を渡さなければ数えるだけ (何も変えない)。
+ *
+ * 返すのは件数と、フォームごとの「どこから指されているか・ID の先頭 6 文字・状態」だけ。
+ *   題名は返さない (学級名や児童の名前が入りうる)。
+ *
+ * @param {{apply?: boolean}} [options]
+ */
+function repairFormEmailCollection_(options) {
+  const apply = Boolean(options && options.apply === true);
+  const types = (typeof FormApp !== 'undefined') ? FormApp.EmailCollectionType : null;
+  if (!types || !types.VERIFIED) {
+    return createErrorResponse('この実行環境では、フォームのメールの集め方を読めません', null, { error: 'EMAIL_TYPE_UNSUPPORTED' });
+  }
+
+  // 1) フォームを指している場所を集める
+  const sources = [];
+  const addSource = (where, src) => {
+    if (!src || typeof src !== 'object') return;
+    const formId = typeof src.formId === 'string' ? src.formId : '';
+    const formUrl = typeof src.formUrl === 'string' ? src.formUrl : '';
+    const spreadsheetId = typeof src.spreadsheetId === 'string' ? src.spreadsheetId : '';
+    if (formId || formUrl || spreadsheetId) sources.push({ where, formId, formUrl, spreadsheetId });
+  };
+  const users = getAllUsers_({ activeOnly: false }, { systemLookup: true }) || [];
+  users.forEach((user) => {
+    const config = safeJsonParse_(user && user.configJson, null);
+    if (!config) return;
+    addSource('config', config);
+    if (Array.isArray(config.profiles)) config.profiles.forEach((p) => addSource('profile', p));
+  });
+  const lessons = (typeof __listLessonsForUser_ === 'function') ? __listLessonsForUser_(null, { allUsers: true }) : [];
+  lessons.forEach((lesson) => {
+    const phases = (lesson && lesson.lessonJson && Array.isArray(lesson.lessonJson.phases)) ? lesson.lessonJson.phases : [];
+    phases.forEach((phase) => addSource('lesson', phase));
+  });
+
+  // 2) フォームを開く (同じフォームは 1 回だけ)
+  const openForm = (src) => {
+    // 授業のフェーズと同じ開き方 (編集用の ID → だめなら回答のスプレッドシートから)。写しを渡す (元を書き換えない)
+    let form = (typeof __openLessonForm_ === 'function')
+      ? __openLessonForm_({ formId: src.formId, spreadsheetId: src.spreadsheetId })
+      : null;
+    if (!form && src.formUrl && /\/edit(\?|#|$)/.test(src.formUrl)) {
+      try { form = FormApp.openByUrl(src.formUrl); } catch (_) { form = null; }
+    }
+    return form;
+  };
+  const seen = {};
+  const forms = [];
+  let unopened = 0;
+  sources.forEach((src) => {
+    let form = null;
+    try { form = openForm(src); } catch (_) { form = null; }
+    if (!form) { unopened++; return; }
+    const id = String(form.getId());
+    if (seen[id]) return;
+    seen[id] = true;
+    forms.push({ where: src.where, id, form });
+  });
+
+  // 3) 自己申告のものだけ直す
+  const counts = { verified: 0, selfReported: 0, notCollecting: 0, fixed: 0, failed: 0, unreadable: 0 };
+  const list = forms.map((entry) => {
+    const item = { where: entry.where, id: entry.id.slice(0, 6), state: '' };
+    let before;
+    try { before = entry.form.getEmailCollectionType(); } catch (_) { counts.unreadable++; item.state = 'unreadable'; return item; }
+    if (before === types.VERIFIED) { counts.verified++; item.state = 'verified'; return item; }
+    if (before !== types.RESPONDER_INPUT) { counts.notCollecting++; item.state = 'notCollecting'; return item; }
+    counts.selfReported++;
+    if (!apply) { item.state = 'selfReported'; return item; }
+    try {
+      entry.form.setEmailCollectionType(types.VERIFIED);
+      // 読み戻して確かめる (設定したつもりで自己申告のまま、を直したと言わない)
+      if (entry.form.getEmailCollectionType() === types.VERIFIED) { counts.fixed++; item.state = 'fixed'; }
+      else { counts.failed++; item.state = 'failed'; }
+    } catch (e) {
+      counts.failed++;
+      item.state = 'failed';
+      logError_('repairFormEmailCollection', e);
+    }
+    return item;
+  });
+
+  return createSuccessResponse(apply ? '自己申告のフォームを確認済みに直しました' : '数えただけです (何も変えていません)', {
+    applied: apply,
+    sources: sources.length,
+    forms: forms.length,
+    unopened,
+    counts,
+    list
+  });
+}
+
+/**
  * Forms REST API を使用してメール収集設定を「確認済み（VERIFIED）」に設定
  * Apps Script の setCollectEmail(true) では「回答者入力」モードになるため、REST APIを使用
  * 参考: https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
