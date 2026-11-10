@@ -2426,6 +2426,73 @@ test('__lessonNameKey_: 空白・全角半角・かなの種類・記号の違�
   assert.equal(key(null), '');
 });
 
+test('__lessonNameKey_: 画面に出ない文字を足しても同じ名前になる (見た目が同じ別の名前を作れない)', () => {
+  const h = loadContext();
+  const key = h.context.__lessonNameKey_;
+  const invisible = [
+    '️',         // 異体字セレクタ
+    '︀',
+    '\u{E0100}',      // 異体字セレクタ (漢字の字形)
+    '​',         // ゼロ幅スペース
+    '‍',         // ゼロ幅接合子
+    '⁠',         // 語の接合子
+    '­',         // ソフトハイフン
+    '‮',         // 右から左への上書き
+    '؜',         // アラビア文字の向きの印
+    'ㅤ',         // ハングルの埋め草 (空白に見える)
+    '﻿'
+  ];
+  invisible.forEach((ch) => {
+    const code = 'U+' + ch.codePointAt(0).toString(16).toUpperCase();
+    assert.equal(key('あおい' + ch), key('あおい'), code + ' を後ろに足す');
+    assert.equal(key('あ' + ch + 'おい'), key('あおい'), code + ' を間に挟む');
+    assert.equal(key(ch + 'あおい'), key('あおい'), code + ' を前に足す');
+    assert.equal(key('!' + ch + '!'), key('!!'), code + ' を記号だけの名前に挟む');
+    assert.equal(key("'" + ch + '+太郎'), key('+太郎'), code + " を先頭の ' の後ろに挟む");
+  });
+  // 見える違いは別の名前のまま
+  assert.notEqual(key('あおい'), key('あおき'));
+  assert.notEqual(key('はな'), key('ばな'), '濁点は見える違い');
+});
+
+test('__lessonNamePairsTtl_: フェーズが進んだ直後は短く、落ち着いたら長く覚える', () => {
+  const h = loadContext();
+  const ttl = h.context.__lessonNamePairsTtl_;
+  const at = Date.parse('2026-01-15T01:00:00.000Z');
+  const trans = [{ ts: '2026-01-15T00:00:00.000Z', from: null, to: 0 }, { ts: '2026-01-15T01:00:00.000Z', from: 0, to: 3 }];
+  assert.equal(ttl(trans, at), 15, '進んだ瞬間');
+  assert.equal(ttl(trans, at + 119999), 15, '進んで 120 秒たつまで');
+  assert.equal(ttl(trans, at + 120000), 300, '落ち着いた後');
+  assert.equal(ttl(trans, at - 5000), 15, '遷移の時刻が先 (時計のずれ) なら短い側');
+  assert.equal(ttl([{ from: 0, to: 3 }], at), 15, '時刻が無ければ短い側');
+  assert.equal(ttl([{ ts: 'こわれた値', from: 0, to: 3 }], at), 15, '時刻が読めなければ短い側');
+  assert.equal(ttl([], at), 15, '遷移が無ければ短い側');
+});
+
+test('名前: フェーズが進んだ直後に読んだ前のフェーズの名前は、短くしか覚えない (遅れて書かれた名前を拾い直せる)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  const store = withMemCache(h);
+  const saved = [];
+  h.context.saveToCacheWithSizeCheck_ = (k, v, ttl) => {
+    if (k.startsWith('lesson_names_')) saved.push({ key: k, ttl });
+    store.set(k, JSON.stringify(v));
+    return true;
+  };
+  assert.equal(submitAs(h, 'a@example.com', think(lessonId, { name: 'あおい' })).success, true);
+  advanceAsTeacher(h, lessonId, 3);
+  assert.equal(submitAs(h, 'b@example.com', rethink(lessonId, { name: 'みどり' })).success, true);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].ttl, 15, '進んだ直後は 15 秒');
+
+  // 進む前に始まっていた送信が、いま前のフェーズのシートに書かれた
+  h.nativeSheets.get('phase1').appendRow(['t', 'late@example.com', '', 'おくれ', 1, 1, 'r', '']);
+  // 覚えたままの間は見えない (ここが 300 秒だったのが元の穴)。切れた後は読み直すので、もう名乗れない
+  store.delete(saved[0].key);
+  assert.equal(submitAs(h, 'c@example.com', rethink(lessonId, { name: 'おくれ' })).error, 'NAME_TAKEN');
+});
+
 test('__findOwnLessonRow_: capture を渡すと読んだ全行を返す (名前の照合で同じシートを読み直さない)', () => {
   const h = loadContext();
   const sheet = createSheet(['ts', 'email', 'class', 'name', 'x', 'y', 'reason', 'insight'], 'phase1');

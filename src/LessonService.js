@@ -2598,10 +2598,14 @@ function __resolveSubmitClass_(clientClass, lessonJson) {
  *
  * Why: 空白を足す・全角半角を変える・ひらがなをカタカナにする・記号を足す、だけで「別の名前」と
  *   扱うと、ほかの児童の名前をそのまま名乗れてしまう。漢字とかなの違いまでは名簿が無いと分からない。
+ *   画面に出ない文字 (異体字セレクタ・ゼロ幅の文字・向きを変える制御文字など) も同じ:
+ *   足しても見た目は変わらないので、必ず除いてから比べる。
  */
 function __lessonNameKey_(name) {
   let s = String(name == null ? '' : name);
   try { s = s.normalize('NFKC'); } catch (_) { /* normalize が無い実行環境では、そろえずに比べる */ }
+  // 画面に出ない文字を先に除く (先頭の ' の後ろや、記号だけの名前の中に挟まれても効くように)
+  s = s.replace(LESSON_NAME_INVISIBLE_RE, '');
   // シートに ' 付きで書いた名前 (= + - @ で始まる) は、読むと ' が付かない。どちらで来ても同じにする。
   s = s.replace(/^'(?=[=+\-@])/, '').toLowerCase();
   // カタカナ → ひらがな
@@ -2610,6 +2614,10 @@ function __lessonNameKey_(name) {
   // 記号だけの名前は、空白だけ除いた形で比べる (全部が同じ名前にならないように)
   return stripped || s.replace(/\s/g, '');
 }
+
+// 画面に出ない文字: 制御文字 (Cc)・書式文字 (Cf: ゼロ幅・向きの制御など)・
+//   「無いものとして表示する」と決められた文字 (異体字セレクタ U+FE00–FE0F / U+E0100–E01EF、ハングルの埋め草など)。
+const LESSON_NAME_INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/gu;
 
 // 回答シートの生の全行 (見出しつき) から [メール, 名前] の組を取り出す。
 function __lessonNamePairsFromSheetData_(data) {
@@ -2625,6 +2633,29 @@ function __lessonNamePairsFromSheetData_(data) {
 
 // 別フェーズの名前の覚え。回答シートの行 cache (投稿のたびに版が変わる) とは別に持つ。
 const LESSON_NAME_PAIRS_CACHE_TTL_S = 300;
+// フェーズが進んだ直後は、短くしか覚えない (下の __lessonNamePairsTtl_ の Why)。
+const LESSON_NAME_PAIRS_SETTLE_MS = 120 * 1000;
+const LESSON_NAME_PAIRS_SETTLING_TTL_S = 15;
+
+/**
+ * 別フェーズの名前を、いま読んだら何秒覚えてよいか。
+ *
+ * Why: フェーズが進む前に始まった送信は、進んだ後に前のフェーズのシートへ書かれることがある
+ *   (送信はフェーズを最初に 1 回確かめるだけ)。進んだ直後に読んだ名前を 300 秒覚えると、その後に
+ *   書かれた名前が覚えから漏れ、その間ほかのメールが同じ名前を名乗れた。進んでから 120 秒
+ *   (送信の lock の寿命 30 秒より十分長い) は 15 秒しか覚えず、遅れて書かれた名前をすぐ拾い直す。
+ *   読みは 1 シートあたり 15 秒に 1 回までなので、読み取り上限には当たらない。
+ *   遷移の時刻が読めないときは、進んだ直後とみなす (短く覚える側に倒す)。
+ */
+function __lessonNamePairsTtl_(trans, nowMs) {
+  const last = trans.length ? trans[trans.length - 1] : null;
+  const switchedAt = last && last.ts ? Date.parse(last.ts) : NaN;
+  const sinceSwitch = nowMs - switchedAt;
+  // 未来の時刻 (時計のずれ) も「直後」に入れる
+  return (isFinite(sinceSwitch) && sinceSwitch >= LESSON_NAME_PAIRS_SETTLE_MS)
+    ? LESSON_NAME_PAIRS_CACHE_TTL_S
+    : LESSON_NAME_PAIRS_SETTLING_TTL_S;
+}
 
 /**
  * この授業の、いまのフェーズ以外の入力フェーズに書かれている [メール, 名前] の組を返す。
@@ -2632,7 +2663,8 @@ const LESSON_NAME_PAIRS_CACHE_TTL_S = 300;
  * Why 別の cache か: 回答シートの行 cache は投稿のたびに版が上がる。それに乗ると、置き直しの
  *   フェーズで児童が送るたびに前のフェーズのシートを読み直し、30 人ぶんの読みが足されて
  *   Sheets の読み取り上限 (2026-09-30 の 429) に当たる。前のフェーズのシートは、いまのフェーズの
- *   間は書かれないので、フェーズが進むまで覚えてよい (key に進んだ回数を入れる)。
+ *   間は (進む前に始まっていた送信を除いて) 書かれないので、フェーズが進むまで覚えてよい
+ *   (key に進んだ回数を入れる。覚える長さは __lessonNamePairsTtl_)。
  *   最初の入力フェーズでは、ほかに見るシートが無いので何も読まない。
  *
  * @returns {Array|null} [メール, 名前] の配列。どれかのシートが読めなければ null (覚えない)。
@@ -2661,6 +2693,8 @@ function __loadOtherPhaseLessonNames_(lessonId, lessonJson, phaseIndex, boardUse
     if (hit) { const parsed = JSON.parse(hit); if (Array.isArray(parsed)) return parsed; }
   } catch (_) { /* cache が使えない・壊れた値は、下でシートから読み直して回復する */ }
 
+  // 覚える長さは、読む前の時刻で決める (読んだ後に書かれた行は、この覚えに入らないため)
+  const ttl = __lessonNamePairsTtl_(trans, Date.now());
   const pairs = [];
   for (let k = 0; k < targets.length; k++) {
     const rows = __readAllLessonRows_(targets[k], { boardUserId, nullOnFail: true });
@@ -2668,7 +2702,7 @@ function __loadOtherPhaseLessonNames_(lessonId, lessonJson, phaseIndex, boardUse
     rows.forEach((r) => { if (r && r.email && r.name) pairs.push([r.email, String(r.name).trim()]); });
   }
   if (cache && typeof saveToCacheWithSizeCheck_ === 'function') {
-    saveToCacheWithSizeCheck_(cacheKey, pairs, LESSON_NAME_PAIRS_CACHE_TTL_S);
+    saveToCacheWithSizeCheck_(cacheKey, pairs, ttl);
   }
   return pairs;
 }
