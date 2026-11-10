@@ -421,6 +421,8 @@ function createTemplateForm(templateType, templateOptions) {
       folderUrl: folderUrl,
       wasCreated: true,
       emailVerified: emailVerified,
+      // 確認済みにできなかった理由 (原因を追うため。画面には出さない)
+      emailVerifyFailure: emailVerified ? null : __lastEmailVerifyFailure_,
       message: emailVerified
         ? `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました`
         : `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました。ただし回答者のメールを「確認済み」にできず、自己申告になっています。フォームの設定で「メールアドレスを収集する: 確認済み」にしてください`
@@ -2244,7 +2246,48 @@ function isValidFormUrl(url) {
  * @param {string} formId - フォームID
  * @private
  */
+// 直前の setFormEmailCollectionVerified_ が失敗した理由 ({httpStatus, status, message})。成功なら null。
+let __lastEmailVerifyFailure_ = null;
+
+// Forms API の失敗の返事から、理由だけを取り出す (Google のエラーの種類と文面。長さは切る)。
+function __formsApiFailureReason_(httpStatus, bodyText) {
+  let status = '';
+  let message = '';
+  try {
+    const err = (JSON.parse(String(bodyText || '')) || {}).error || {};
+    status = String(err.status || '');
+    message = String(err.message || '');
+  } catch (_) { /* JSON でない返事 (HTML のエラーページなど) は番号だけ残す */ }
+  return { httpStatus: Number(httpStatus) || 0, status: status.slice(0, 60), message: message.slice(0, 300) };
+}
+
+/**
+ * Apps Script の FormApp だけで「確認済み」にする。できて、読み戻しても確認済みなら true。
+ *
+ * Why: 先生ごとの配置 (2026-10-29〜) は、スクリプトごとに既定の Google Cloud プロジェクトを持ち、
+ *   そこでは Forms API が有効になっていない。REST は毎回 403 (PERMISSION_DENIED) で断られ、
+ *   作ったフォームがすべて自己申告のメールに落ちていた (2026-11-11 に検証用の配置で確認)。
+ *   FormApp.setEmailCollectionType は Cloud プロジェクトの設定に関係なく使える。
+ *   使えない実行環境 (メソッドが無い・投げる) では false を返し、呼ぶ側が REST を試す。
+ */
+function __setEmailVerifiedViaFormApp_(formId) {
+  try {
+    const types = FormApp.EmailCollectionType;
+    const form = FormApp.openById(formId);
+    if (!types || !types.VERIFIED || typeof form.setEmailCollectionType !== 'function') return false;
+    form.setEmailCollectionType(types.VERIFIED);
+    // 読み戻して確かめる (設定したつもりで自己申告のまま、を成功と言わない)
+    if (typeof form.getEmailCollectionType !== 'function') return false;
+    return form.getEmailCollectionType() === types.VERIFIED;
+  } catch (e) {
+    console.warn('FormApp での確認済みメールの設定に失敗:', e && e.message);
+    return false;
+  }
+}
+
 function setFormEmailCollectionVerified_(formId) {
+  __lastEmailVerifyFailure_ = null;
+  if (__setEmailVerifiedViaFormApp_(formId)) return true;
   try {
     const url = `https://forms.googleapis.com/v1/forms/${formId}:batchUpdate`;
     const payload = {
@@ -2270,7 +2313,11 @@ function setFormEmailCollectionVerified_(formId) {
 
     const responseCode = response.getResponseCode();
     if (responseCode !== 200) {
-      console.warn('Forms API emailCollectionType設定に失敗:', responseCode);
+      // 失敗の理由を残す (2026-11-11)。Why: 番号だけ console に出していたので、ops-monitor の報告には
+      //   「設定できなかった」としか載らず、原因 (API が無効・権限・設定の形) を追えなかった。
+      //   Google の返すエラーの種類と文面だけ。フォームの中身や回答者の情報は入らない。
+      __lastEmailVerifyFailure_ = __formsApiFailureReason_(responseCode, response.getContentText());
+      console.warn('Forms API emailCollectionType設定に失敗:', responseCode, __lastEmailVerifyFailure_.status);
       // フォールバック: Apps Script の setCollectEmail を使用 (自己申告。確認済みではない)
       const form = FormApp.openById(formId);
       form.setCollectEmail(true);
@@ -2278,6 +2325,7 @@ function setFormEmailCollectionVerified_(formId) {
     }
     return true;
   } catch (error) {
+    __lastEmailVerifyFailure_ = { httpStatus: 0, status: 'FETCH_FAILED', message: '' };
     console.warn('Forms REST API呼び出しエラー（フォールバック実行）:', error.message);
     // フォールバック: Apps Script の setCollectEmail を使用
     try {

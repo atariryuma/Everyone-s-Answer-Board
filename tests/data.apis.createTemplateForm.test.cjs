@@ -887,6 +887,75 @@ test('createTemplateForm: setFormEmailCollectionVerified_ の REST 失敗は war
   assert.equal(res.success, true, 'REST failure must not break template creation');
   assert.deepEqual(Array.from(collectEmailCalls), [true],
     'fallback setCollectEmail(true) should be called once');
+  // 確認済みにできなかった理由を返事に載せる (原因を追うため)。JSON でない返事は番号だけ
+  assert.equal(res.emailVerified, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(res.emailVerifyFailure)), { httpStatus: 403, status: '', message: '' });
+});
+
+// 先生ごとの配置では Forms API (REST) が 403 で断られる (既定の Cloud プロジェクトで無効)。
+//   FormApp.setEmailCollectionType で確認済みにし、読み戻して確かめる (2026-11-11)。
+function formAppWithEmailType(opts) {
+  const state = { type: 'RESPONDER_INPUT', fetched: 0, collectEmailCalls: 0 };
+  const ctxHolder = {};
+  const mocks = {
+    UrlFetchApp: {
+      fetch: () => {
+        state.fetched++;
+        return {
+          getResponseCode: () => 403,
+          getContentText: () => JSON.stringify({ error: { status: 'PERMISSION_DENIED', message: 'Google Forms API has not been used in project 1 before or it is disabled.' } })
+        };
+      }
+    },
+    FormApp: {
+      create: (title) => {
+        const f = makeFakeForm();
+        f.getTitle = () => title;
+        f.setCollectEmail = () => { state.collectEmailCalls++; return f; };
+        if (opts.hasMethod) {
+          f.setEmailCollectionType = (t) => { if (opts.throws) throw new Error('no'); if (!opts.ignored) state.type = t; return f; };
+          f.getEmailCollectionType = () => state.type;
+        }
+        ctxHolder.form = f;
+        return f;
+      },
+      DestinationType: { SPREADSHEET: 'SPREADSHEET' },
+      EmailCollectionType: opts.hasEnum === false ? undefined : { DO_NOT_COLLECT: 'DO_NOT_COLLECT', VERIFIED: 'VERIFIED', RESPONDER_INPUT: 'RESPONDER_INPUT' },
+      openById: () => ctxHolder.form
+    }
+  };
+  return { state, ctx: loadCtx(mocks) };
+}
+
+test('createTemplateForm: FormApp で確認済みにできれば REST を呼ばず、確認済みと返す', () => {
+  const { state, ctx } = formAppWithEmailType({ hasMethod: true });
+  const res = ctx.createTemplateForm('board');
+  assert.equal(res.success, true);
+  assert.equal(res.emailVerified, true);
+  assert.equal(res.emailVerifyFailure, null);
+  assert.equal(state.type, 'VERIFIED');
+  assert.equal(state.fetched, 0, 'REST は呼ばない (呼んでも 403 で断られる)');
+  assert.equal(state.collectEmailCalls, 0, '自己申告のメールには落とさない');
+});
+
+test('createTemplateForm: FormApp の設定が効かない・投げる・無いときは REST を試し、だめなら理由つきで自己申告に落とす', () => {
+  const cases = [
+    ['設定しても読み戻すと確認済みでない', { hasMethod: true, ignored: true }],
+    ['設定が投げる', { hasMethod: true, throws: true }],
+    ['メソッドが無い', { hasMethod: false }],
+    ['列挙が無い', { hasMethod: true, hasEnum: false }]
+  ];
+  cases.forEach(([label, opts]) => {
+    const { state, ctx } = formAppWithEmailType(opts);
+    const res = ctx.createTemplateForm('board');
+    assert.equal(res.success, true, label);
+    assert.equal(res.emailVerified, false, `${label}: 確認済みと言わない`);
+    assert.equal(state.fetched, 1, `${label}: REST を試す`);
+    assert.equal(state.collectEmailCalls, 1, `${label}: 自己申告のメールへ落とす`);
+    assert.equal(res.emailVerifyFailure.httpStatus, 403, label);
+    assert.equal(res.emailVerifyFailure.status, 'PERMISSION_DENIED', label);
+    assert.match(res.emailVerifyFailure.message, /Forms API has not been used/, label);
+  });
 });
 
 test('createTemplateForm: UrlFetchApp.fetch が throw した場合もフォールバックして成功', () => {
