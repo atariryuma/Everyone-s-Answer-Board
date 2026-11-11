@@ -34,6 +34,8 @@ npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の�
 (`src/appsscript.json` の `webapp.executeAs = USER_DEPLOYING`)。データ (users / lessons / 授業の回答シート) は
 そのスプレッドシート 1 つに入る。配置ごとに違うのは `src/Deployment.js` (先生のメールと DB の SS ID) だけで、
 `scripts/deploy-single.js` が焼き込む。先生ごとの値は `scripts/single-tenants.json` (git に入れない)。
+エラーの報告先は `scripts/ops-report.local.json` (git に入れない)。無い PC では配置が止まる
+(空で焼き込むと本番の報告が黙って止まるため。報告なしで配置するなら `--no-ops-report`)。別の PC から配置するときは、この 2 つを写す。
 Why: 2026-10-29 から児童アカウントは「開いた人として実行」の Apps Script を一切開けない (管理側の設定)。
 
 **Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name <検証用の名前>` →
@@ -355,7 +357,7 @@ Tests run in Node.js using `node:test` (no frameworks). GAS globals are stubbed 
 
 ## clasp + Git
 
-- **Never commit**: `.clasp.json`, `.clasprc.json`, `scripts/single-tenants.json` (scriptId / API キー / 先生ごとの値)
+- **Never commit**: `.clasp.json`, `.clasprc.json`, `scripts/single-tenants.json` (scriptId / API キー / 先生ごとの値)、`scripts/ops-report.local.json` (報告先と鍵)
 - **Do commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`
 - 配置は `.single-stage/<名前>/` で組み立てて clasp に渡す (`-P . -I .` 必須。付けないと親の `.clasp.json` を拾う)
 - File extension: `.js` locally (clasp convention), shows as `.gs` in GAS editor

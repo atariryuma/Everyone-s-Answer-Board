@@ -12,6 +12,7 @@
  *   node scripts/deploy-single.js deploy --name <名前>      # 1 人分を更新 (URL はそのまま)
  *   node scripts/deploy-single.js deploy --all              # 全員分を更新
  *   node scripts/deploy-single.js list
+ *   scripts/ops-report.local.json (エラーの報告先) が無いと配置しない。報告なしで配置するなら --no-ops-report。
  *
  * 先生ごとの値は scripts/single-tenants.json (git に入れない)。
  */
@@ -25,6 +26,8 @@ const CONFIG = path.join(__dirname, 'single-tenants.json');
 // clasp は作業フォルダがリポジトリの外 (/private/tmp 等) だと「escapes project root」で止まるので、
 //   リポジトリの中の git に入らないフォルダで組み立てる。
 const STAGE_ROOT = path.join(ROOT, '.single-stage');
+// 配置の名前はフォルダ名に使う (.single-stage/<名前>/)
+const TENANT_NAME_RE = /^[\w-]+$/;
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -69,18 +72,46 @@ function checkGeneratedFresh() {
   }
 }
 
-// ops-monitor への報告の送り先と鍵 (全配置で共通。git に入れない)。無ければ空=報告しない。
+// ops-monitor への報告の送り先と鍵 (全配置で共通。git に入れない)。
 //   形: { "url": "https://…/report", "token": "ops_…" }。値は画面に出さない。
+//   Why 無ければ止める: このファイルは git に入らないので、別の PC に clone しただけでは無い。
+//   無いまま配置すると送り先が空で焼き込まれ、本番のエラーの報告が黙って止まる (2026-11-11 に気づいた)。
+//   報告なしで配置したいときだけ --no-ops-report を付ける。
 const OPS_REPORT_CONFIG = path.join(__dirname, 'ops-report.local.json');
-function loadOpsReport() {
-  if (!fs.existsSync(OPS_REPORT_CONFIG)) return { url: '', token: '' };
-  const j = JSON.parse(fs.readFileSync(OPS_REPORT_CONFIG, 'utf8'));
-  return { url: String(j.url || ''), token: String(j.token || '') };
+function loadOpsReport(opts) {
+  const o = opts || {};
+  if (o.skip) return { url: '', token: '' };
+  const file = o.file || OPS_REPORT_CONFIG;
+  const hint = '配置すると本番のエラーの報告が止まるので、配置しません。' +
+    '配置している PC の scripts/ops-report.local.json をこの PC の scripts/ に写してください ' +
+    '(報告なしで配置するなら --no-ops-report)。';
+  if (!fs.existsSync(file)) throw new Error('scripts/ops-report.local.json がありません。' + hint);
+  let j = null;
+  try {
+    j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    // JSON.parse のエラー文は中身の一部を含むことがある (鍵が画面に出る) ので、文は出さない
+    throw new Error('scripts/ops-report.local.json を JSON として読めません。' + hint);
+  }
+  // 文字列でないもの ({} など) を String() にすると '[object Object]' になり、空でないので通ってしまう
+  const text = (v) => (typeof v === 'string' ? v.trim() : '');
+  const url = text(j && j.url);
+  const token = text(j && j.token);
+  if (!url || !token) throw new Error('scripts/ops-report.local.json に url か token がありません。' + hint);
+  // new URL のエラー文は入力を含むことがあるので、文は出さない
+  let parsed = null;
+  try { parsed = new URL(url); } catch (e) { parsed = null; }
+  if (!parsed || parsed.protocol !== 'https:' || !parsed.hostname || /\s/.test(url)) {
+    throw new Error('scripts/ops-report.local.json の url が https:// の URL ではありません。' + hint);
+  }
+  return { url, token };
 }
 
 // src/ を写し、Deployment.js だけ差し替える。
-function stage(tenant) {
-  const ops = loadOpsReport();
+function stage(tenant, ops) {
+  // この下でフォルダごと消すので、名前が STAGE_ROOT の外を指さないことを確かめる
+  //   (create は名前を検証するが、single-tenants.json を手で書き換えた値はここまで素通りする)
+  if (!TENANT_NAME_RE.test(String(tenant.name || ''))) throw new Error('single-tenants.json の name が英数字・-・_ だけではありません');
   const dir = path.join(STAGE_ROOT, tenant.name);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -108,12 +139,12 @@ function stage(tenant) {
   return dir;
 }
 
-function create(args) {
+function create(args, ops) {
   const name = args.name;
   const adminEmail = args.adminEmail;
   const user = args.user || 'organization';
   if (!name || !adminEmail) throw new Error('--name と --adminEmail が必要です');
-  if (!/^[\w-]+$/.test(name)) throw new Error('--name は英数字・-・_ だけにしてください (フォルダ名に使う)');
+  if (!TENANT_NAME_RE.test(name)) throw new Error('--name は英数字・-・_ だけにしてください (フォルダ名に使う)');
   const cfg = loadConfig();
   if (cfg.tenants.some((t) => t.name === name)) throw new Error(`「${name}」は既にあります (deploy を使ってください)`);
 
@@ -127,11 +158,11 @@ function create(args) {
   cfg.tenants.push(tenant);
   saveConfig(cfg);
   console.log(`✓ スプレッドシートとスクリプトを作りました: ${name}`);
-  deployOne(tenant, cfg);
+  deployOne(tenant, cfg, ops);
 }
 
-function deployOne(tenant, cfg) {
-  const dir = stage(tenant);
+function deployOne(tenant, cfg, ops) {
+  const dir = stage(tenant, ops);
   const user = tenant.user || 'organization';
   console.log(`▶ ${tenant.name}: push`);
   clasp(dir, user, ['push', '--force']);
@@ -155,21 +186,27 @@ function main() {
     for (const t of loadConfig().tenants) console.log(`${t.name}\t${t.adminEmail}\t${t.deploymentId || '(未デプロイ)'}`);
     return;
   }
+  if (cmd !== 'create' && cmd !== 'deploy') throw new Error('使い方: create / deploy / list (ファイル冒頭の説明を参照)');
+  // 何かを作る・push する前に確かめる (1 人目だけ配置して止まる、を避ける)
+  const ops = loadOpsReport({ skip: args['no-ops-report'] === true });
+  if (!ops.url) console.log('⚠ --no-ops-report: エラーの報告先を空にして配置します (この配置からは報告が届きません)');
   checkGeneratedFresh();
-  if (cmd === 'create') return create(args);
+  if (cmd === 'create') return create(args, ops);
   if (cmd === 'deploy') {
     const cfg = loadConfig();
     const targets = args.all ? cfg.tenants : cfg.tenants.filter((t) => t.name === args.name);
     if (!targets.length) throw new Error('対象がありません (--name <名前> か --all)');
-    for (const t of targets) deployOne(t, cfg);
-    return;
+    for (const t of targets) deployOne(t, cfg, ops);
   }
-  throw new Error('使い方: create / deploy / list (ファイル冒頭の説明を参照)');
 }
 
-try {
-  main();
-} catch (e) {
-  console.error('✗', e.message);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    main();
+  } catch (e) {
+    console.error('✗', e.message);
+    process.exit(1);
+  }
 }
+
+module.exports = { loadOpsReport, stage };
