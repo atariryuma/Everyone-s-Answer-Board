@@ -3575,6 +3575,14 @@
       }
 
       if (this.state.isLoading && config.showLoading) {
+        // 読み込み中に頼まれた読み直しは捨てず、いまの読み込みが終わったあとに 1 回だけ読む。
+        //   Why: 捨てると、新着の読み直しの最中に選んだクラスや並び順が反映されず、選択欄は新しい値なのに
+        //   表示は前の条件のまま残る (並び順は次の新着まで戻らない)。条件は読む時点の選択欄から取るので、
+        //   何度頼まれても最後の選択で読む。キャッシュを捨てる指示は 1 つでもあれば残す。
+        const prev = this.state.__pendingReload;
+        this.state.__pendingReload = Object.assign({}, prev || {}, options, {
+          bypassCache: Boolean((prev && prev.bypassCache) || options.bypassCache)
+        });
         return Promise.resolve(); // Return resolved Promise to prevent hanging .then() chains
       }
 
@@ -3602,6 +3610,12 @@
         if (config.preserveAdminMode) {
           this.state.showAdminFeatures = true;
           this.updateAdminButtonUI();
+        }
+
+        const pending = this.state.__pendingReload;
+        if (pending) {
+          this.state.__pendingReload = null;
+          this.loadSheetData(pending).catch((e) => console.warn('loadSheetData (queued) error:', e));
         }
       }
     }

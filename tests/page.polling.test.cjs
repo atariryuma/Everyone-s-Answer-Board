@@ -1366,3 +1366,80 @@ test('getPollingInterval: サーバの retryAfterMs (混雑中) に 1 回だけ�
   const second = instance.getPollingInterval();
   assert.ok(second <= 6000, `次からはいつもの間隔: ${second}`);
 });
+
+// =====================================================================
+// loadSheetData — 読み込み中に頼まれた読み直しを捨てない (2026-11-11)
+//   新着の読み直し (showLoading: false) の最中にクラスや並び順を変えると、その読み直しが
+//   捨てられ、選択欄は新しい値なのに表示は前の条件のまま残っていた。
+// =====================================================================
+
+function makeLoaderInstance() {
+  const { instance } = makeInstance();
+  instance.state = { userId: 'u1', currentAnswers: [], isLoading: false };
+  instance.suspendRenderOptimization = () => {};
+  instance.resumeRenderOptimization = () => {};
+  instance.clearCache = () => {};
+  instance.handleError = () => {};
+  const calls = [];
+  const gates = [];
+  // 実際の読み込みのかわりに、呼ばれた条件を記録し、終わるタイミングをテストが決める
+  instance.performDataLoad = (config) => {
+    calls.push(config);
+    return new Promise((resolve) => gates.push(resolve));
+  };
+  return { instance, calls, gates };
+}
+
+const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
+
+test('loadSheetData: 新着の読み直しの最中にクラスを変えると、終わったあとで 1 回読み直す', async () => {
+  const { instance, calls, gates } = makeLoaderInstance();
+  const background = instance.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+  assert.equal(calls.length, 1);
+
+  // クラス選択の変更 (onClassFilterChange と同じ頼み方)
+  await instance.loadSheetData({ bypassCache: true, isInitialLoad: false });
+  assert.equal(calls.length, 1, '読み込み中はすぐには読まない');
+
+  gates[0]();
+  await background;
+  await flushMicrotasks();
+  assert.equal(calls.length, 2, '終わったあとで、頼まれた読み直しを 1 回する');
+  assert.equal(calls[1].showLoading, true);
+  assert.equal(calls[1].bypassCache, true);
+
+  gates[1]();
+  await flushMicrotasks();
+  assert.equal(calls.length, 2, 'それ以上は読まない');
+  assert.equal(instance.state.__pendingReload, null);
+  assert.equal(instance.state.isLoading, false);
+});
+
+test('loadSheetData: 読み込み中に何度頼まれても 1 回にまとめ、キャッシュを捨てる指示は残す', async () => {
+  const { instance, calls, gates } = makeLoaderInstance();
+  const first = instance.loadSheetData({ showLoading: true });
+  await instance.loadSheetData({ showLoading: true, bypassCache: true });
+  await instance.loadSheetData({ showLoading: true });
+  assert.equal(calls.length, 1);
+
+  gates[0]();
+  await first;
+  await flushMicrotasks();
+  assert.equal(calls.length, 2, '何度頼まれても読み直しは 1 回');
+  assert.equal(calls[1].bypassCache, true, '1 つでも頼まれていればキャッシュを捨てる');
+
+  gates[1]();
+  await flushMicrotasks();
+  assert.equal(calls.length, 2);
+});
+
+test('loadSheetData: 読み込み中でなければ、すぐに 1 回だけ読む', async () => {
+  const { instance, calls, gates } = makeLoaderInstance();
+  const p = instance.loadSheetData({ bypassCache: true, isInitialLoad: false });
+  assert.equal(calls.length, 1);
+  gates[0]();
+  await p;
+  await flushMicrotasks();
+  assert.equal(calls.length, 1);
+  assert.equal(instance.state.__pendingReload, undefined);
+});
