@@ -2295,13 +2295,33 @@ function repairFormEmailCollection_(options) {
     }
     return form;
   };
+  // 開けなかった指し先を、理由で分ける (2026-11-11)。Why: 本番で 21 の指し先のうち 18 が「開けない」と
+  //   出たが、フォームがもともと無い (授業モードの回答シート) のか、開けなかっただけなのかを
+  //   見分けられず、「自己申告のフォームは残っていない」と言い切れなかった。
+  //     noForm          … 回答のスプレッドシートは開けて、フォームがつながっていない (直す物が無い)
+  //     sheetUnopenable … スプレッドシートを開けない (消した・ほかの人の物)
+  //     formUnopenable  … フォームの ID・URL はあるが開けず、スプレッドシートからもたどれない
+  const whyUnopened = (src) => {
+    if (src.spreadsheetId && typeof SpreadsheetApp !== 'undefined') {
+      let linked = null;
+      try { linked = SpreadsheetApp.openById(src.spreadsheetId).getFormUrl(); } catch (_) { return 'sheetUnopenable'; }
+      if (!linked) return 'noForm';
+    }
+    return 'formUnopenable';
+  };
   const seen = {};
   const forms = [];
   let unopened = 0;
+  const unopenedBy = {};
   sources.forEach((src) => {
     let form = null;
     try { form = openForm(src); } catch (_) { form = null; }
-    if (!form) { unopened++; return; }
+    if (!form) {
+      unopened++;
+      const key = src.where + '/' + whyUnopened(src);
+      unopenedBy[key] = (unopenedBy[key] || 0) + 1;
+      return;
+    }
     const id = String(form.getId());
     if (seen[id]) return;
     seen[id] = true;
@@ -2336,6 +2356,7 @@ function repairFormEmailCollection_(options) {
     sources: sources.length,
     forms: forms.length,
     unopened,
+    unopenedBy,
     counts,
     list
   });

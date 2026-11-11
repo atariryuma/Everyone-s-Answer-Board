@@ -70,6 +70,14 @@ function loadCtx(world, overrides = {}) {
         return world.forms[m[1]];
       }
     },
+    // world.sheets: { [スプレッドシートID]: つながっているフォームの編集用 URL ('' = フォームなし) }。無い ID は開けない
+    SpreadsheetApp: {
+      openById: (id) => {
+        const sheets = world.sheets || {};
+        if (!(id in sheets)) throw new Error('開けない');
+        return { getFormUrl: () => sheets[id] || null };
+      }
+    },
     __logged: logged
   };
   Object.assign(ctx, overrides);
@@ -124,6 +132,33 @@ test('repairFormEmailCollection_: apply なしは数えるだけで、何も変�
   assert.equal(ctx.repairFormEmailCollection_({ apply: 'true' }).data.applied, false);
   assert.equal(ctx.repairFormEmailCollection_().data.applied, false);
   Object.values(world.forms).forEach((f) => assert.equal(f._sets, 0));
+});
+
+test('repairFormEmailCollection_: 開けなかった指し先を理由で分ける (フォームが無い・シートを開けない・フォームを開けない)', () => {
+  const world = {
+    forms: { okA123456789: fakeForm('okA123456789', TYPES.VERIFIED) },
+    sheets: { 'ss-native': '', 'ss-native2': '', 'ss-linked-lost': 'https://docs.google.com/forms/d/goneZ/edit' },
+    users: [user({
+      spreadsheetId: 'ss-deleted',                                              // シートを開けない
+      profiles: [{ name: 'p', formUrl: 'https://forms.gle/xxxx' }]              // 公開側の URL だけ (たどれない)
+    })],
+    lessons: [lesson([
+      { formId: 'okA123456789', spreadsheetId: 'ss-x' },                        // 開ける
+      { formId: '', spreadsheetId: 'ss-native', sheetName: 'phase1' },          // 授業モード (フォームが無い)
+      { formId: '', spreadsheetId: 'ss-native2', sheetName: 'phase2' },
+      { formId: 'goneZ', spreadsheetId: 'ss-linked-lost' }                      // シートはフォームを指すが、開けない
+    ])]
+  };
+  const res = loadCtx(world).repairFormEmailCollection_({});
+  assert.equal(res.success, true);
+  assert.equal(res.data.forms, 1);
+  assert.equal(res.data.unopened, 5);
+  assert.deepEqual(plain(res.data.unopenedBy), {
+    'config/sheetUnopenable': 1,
+    'profile/formUnopenable': 1,
+    'lesson/noForm': 2,
+    'lesson/formUnopenable': 1
+  });
 });
 
 test('repairFormEmailCollection_: apply で、自己申告のフォームだけを確認済みにする', () => {
