@@ -61,7 +61,9 @@ function clasp(stageDir, user, args) {
   const [cmd, pre] = process.platform === 'win32'
     ? [process.execPath, [path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]]
     : ['npx', []];
-  return execFileSync(cmd, [...pre, 'clasp', '--user', user, '-P', '.', '-I', '.', ...args], {
+  // 絶対パスで渡す: clasp 3.4 は -P の場所を相対のまま持ち、絶対パスにした srcDir と比べるので、
+  //   '.' だと「srcDir "" escapes project root」で止まる (3.1 では通っていた)。
+  return execFileSync(cmd, [...pre, 'clasp', '--user', user, '-P', stageDir, '-I', stageDir, ...args], {
     cwd: stageDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
   });
 }
