@@ -496,6 +496,41 @@ test('duplicateLesson: options.copyClasses=true で classes を引き継ぐ', ()
   assert.deepEqual(Array.from(dup.data.lesson.lessonJson.classes), ['5-1', '5-2']);
 });
 
+test('duplicateLesson: 授業モード (native) は inputMode と各フェーズの screenRole を引き継ぎ、回答先は写さない', () => {
+  const { context, lessonsSheet } = loadLessonContext();
+  const src = context.createLessonDraft('u1', '会話のゆくえ', 'dialogue-reconsider-5phase');
+  const sourceId = src.data.lesson.lessonId;
+  // 一度動かした授業を再現: 回答先 (DB 内のシート) が lessonJson に残っている
+  const row = lessonsSheet._data.find(r => r[0] === sourceId);
+  const json = JSON.parse(row[10]);
+  json.nativeSpreadsheetId = 'ss_old_lesson';
+  json.nativeSheetPrefix = '会話のゆくえ';
+  row[10] = JSON.stringify(json);
+
+  const dup = context.duplicateLesson('u1', sourceId, {});
+  assert.equal(dup.success, true, JSON.stringify(dup));
+  const lj = dup.data.lesson.lessonJson;
+  assert.equal(lj.inputMode, 'native');
+  assert.deepEqual(Array.from(lj.phases, p => p.screenRole),
+    ['input', 'browse', 'discuss', 'reinput', 'reflect']);
+  // 新しい授業は別のシートに書く
+  assert.equal(lj.nativeSpreadsheetId, undefined);
+  assert.equal(lj.nativeSheetPrefix, undefined);
+  // 複製した lesson を行から読み直しても同じ (保存された形で確かめる)
+  const saved = JSON.parse(lessonsSheet._data.find(r => r[0] === dup.data.lesson.lessonId)[10]);
+  assert.equal(saved.inputMode, 'native');
+  assert.equal(saved.phases[0].screenRole, 'input');
+  assert.equal(saved.nativeSpreadsheetId, undefined);
+});
+
+test('duplicateLesson: Form の授業は inputMode=form のまま', () => {
+  const { context } = loadLessonContext();
+  const src = context.createLessonDraft('u1', 'もとの授業', 'doutoku-3phase');
+  const dup = context.duplicateLesson('u1', src.data.lesson.lessonId, {});
+  assert.equal(dup.success, true);
+  assert.equal(dup.data.lesson.lessonJson.inputMode, 'form');
+});
+
 test('duplicateLesson: 他ユーザーのレッスンは複製不可', () => {
   const { context, lessonsSheet } = loadLessonContext();
   lessonsSheet._data.push(['lesson_other', 'u2', 'other', 'completed', '2026-01-01', '2026-01-01', '2026-01-01', 1, 100, 'etag', '{}']);

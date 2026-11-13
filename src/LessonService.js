@@ -993,8 +993,9 @@ function __hydrateLessonSnapshots_(lesson) {
 
 /**
  * 過去レッスンを「テンプレ的に複製」して新規 draft を作る。
- *   - phases の構造 (name / formTemplate / question / templateOptions) は引き継ぐ
- *   - Form / SS / classes / snapshots / profileTransitions は strip (新規授業 = 別 Form)
+ *   - phases の構造 (name / formTemplate / question / screenRole / templateOptions) と
+ *     lessonJson.inputMode は引き継ぐ (授業モードの授業が Form の授業にならないように)
+ *   - Form / SS / native の回答先 / classes / snapshots / profileTransitions は strip (新規授業 = 別の回答先)
  *   - 旧版のクラス構成は明示的に引き継ぎたいケースもあるので options.copyClasses=true で復元
  *   - name は元 name + " (コピー)"。ユーザーは Step 1 で書き換えられる。
  */
@@ -1010,6 +1011,11 @@ function duplicateLesson(userId, sourceLessonId, options) {
       name: p.name,
       formTemplate: p.formTemplate,
       question: p.question,
+      // 画面の権能 (input/browse/discuss/reinput/reflect)。落とすと授業モードの児童画面が
+      //   何もできなくなり、submitLessonAnswer のサーバ検証も通らない。
+      screenRole: p.screenRole || '',
+      // phase 個別の入力方式 (__isNativePhase_ が lesson 全体より先に見る)。持つ時だけ写す。
+      ...(p.inputMode ? { inputMode: p.inputMode } : {}),
       // templateOptions (軸ラベル / 選択肢) は教師の意図そのものなので必ず引き継ぐ
       templateOptions: p.templateOptions ? deepClone(p.templateOptions) : {},
       // 以下は「新しい Form を作る」ために必ず空にする
@@ -1022,6 +1028,9 @@ function duplicateLesson(userId, sourceLessonId, options) {
     const lessonJson = {
       template: src.lessonJson && src.lessonJson.template || 'doutoku-3phase',
       classes: opts.copyClasses ? ((src.lessonJson && src.lessonJson.classes) || []).slice() : [],
+      // 'native' (授業モード) を落とすと Form の授業として扱われる。createLessonDraft と同じ形。
+      //   回答先 (nativeSpreadsheetId / nativeSheetPrefix) は写さない: 新しい授業は別のシートに書く。
+      inputMode: (src.lessonJson && src.lessonJson.inputMode) || 'form',
       phases: newPhases,
       profileTransitions: [],
       snapshots: [],
