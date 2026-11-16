@@ -34,8 +34,10 @@ npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の�
 (`src/appsscript.json` の `webapp.executeAs = USER_DEPLOYING`)。データ (users / lessons / 授業の回答シート) は
 そのスプレッドシート 1 つに入る。配置ごとに違うのは `src/Deployment.js` (先生のメールと DB の SS ID) だけで、
 `scripts/deploy-single.js` が焼き込む。先生ごとの値は `scripts/single-tenants.json` (git に入れない)。
-エラーの報告先は `scripts/ops-report.local.json` (git に入れない)。無い PC では配置が止まる
-(空で焼き込むと本番の報告が黙って止まるため。報告なしで配置するなら `--no-ops-report`)。別の PC から配置するときは、この 2 つを写す。
+**エラーの報告 (ops-monitor) は 2026-11-16 にやめた。配置はいつも `--no-ops-report` を付ける。**
+学校のアカウントの GAS を外のサービスにつながない、という判断 (市の決まりと、担当が替わっても回る形にするため)。
+受け口の登録も消してあるので、前の配置が送っても受け取られない。`scripts/ops-report.local.json` は置かない
+(フラグを付け忘れると、ファイルが無いので配置が止まる。それで気づける)。別の PC から配置するときは `single-tenants.json` だけを写す。
 Why: 2026-10-29 から児童アカウントは「開いた人として実行」の Apps Script を一切開けない (管理側の設定)。
 
 **Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name <検証用の名前>` →
@@ -55,7 +57,7 @@ doPost の `adminApi` アクションに API キー認証でアクセス。デ�
 
 ```bash
 npm run api -- systemDiagnosis                # DB接続・設定・デプロイ状態の健康診断
-npm run api -- getLogs                        # 記録は無い (ops-monitor と「実行数」を案内する)
+npm run api -- getLogs                        # 記録は無い (案内だけを返す。ops-monitor への報告は 2026-11-16 にやめた)
 npm run api -- getUserConfig --userId X       # ボードの設定
 npm run api -- setUserConfig --userId X --patch '{...}'  # config パッチ適用
 npm run api -- previewBoard --userId X        # viewer 視点の公開ボードプレビュー
@@ -64,7 +66,7 @@ npm run api -- previewBoard --userId X        # viewer 視点の公開ボード�
 **いつ使うか:**
 
 - 配置の後 → `systemDiagnosis` で壊れていないか確認
-- エラー調査時 → ops-monitor の毎朝の報告 (エラーの場所) と Apps Script の「実行数」、`perfMetrics` でボトルネック特定 (`getLogs` は記録が無いので案内だけを返す)
+- エラー調査時 → Apps Script の「実行数」(先生が見る。ops-monitor への報告は 2026-11-16 にやめた)、`perfMetrics` でボトルネック特定 (`getLogs` は記録が無いので案内だけを返す)
 - 設定変更後 → `listProperties` で反映を確認
 
 **実行ログ**: 先生ごとの配置は既定の GCP project で動くので、Cloud Logging を CLI から読めない。
