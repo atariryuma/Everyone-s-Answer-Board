@@ -3307,10 +3307,13 @@ function toggleLessonHidden_(userId, lessonId, rowIndex, sheetName, expectedEmai
     if (String(sheetName || '') !== String(patch.sheetName || '')) {
       return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。一覧を読み込み直します');
     }
+    if (!expectedEmail) {
+      return createErrorResponse('ROW_CHANGED: 対象の回答を確かめられませんでした。一覧を読み込み直します');
+    }
     return toggleAnswerHidden_(userId, rowIndex, {
       expectedSpreadsheetId: patch.spreadsheetId,
       expectedSheetName: patch.sheetName,
-      rowIdentity: expectedEmail ? { column: LESSON_NATIVE_COL_EMAIL, value: expectedEmail } : null
+      rowIdentity: { column: LESSON_NATIVE_COL_EMAIL, value: expectedEmail }
     });
   } catch (error) {
     logError_('toggleLessonHidden_', error);

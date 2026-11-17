@@ -1017,37 +1017,42 @@ function __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isAdmin, p
   }
 }
 
-// 「ほかの児童に見せない」を押したばかりの回答 (児童のメール) を、短い間だけ覚える。
+// 「ほかの児童に見せない」を押したばかりの回答 (シート + 児童のメール) を、短い間だけ覚える。
 //   Why: 児童の読み込みは、新しい版を読んでいる間・読みに失敗している間、直前の結果 (LATEST。
 //   key に版が入らず 60 秒残る) を返す。それは押す前の行なので印が無く、絞り込みを通ってしまう。
 //   直前の結果を返すときだけこの覚えを見て、印を付け直す (ふだんの読み込みでは cache を読まない)。
+//   Why 回答ごとに 1 つの key か: 1 つの一覧を読んで書き戻すと、2 つを同時に押したとき片方を
+//   取りこぼす。Why シートも key に入れるか: 次のフェーズ (別のシート) の回答まで隠さないため。
 const RECENTLY_HIDDEN_TTL_SEC = 120;   // LATEST (60 秒) より長く
-function recentlyHiddenKey_(userId) { return 'board_hidden_recent_' + userId; }
+function recentlyHiddenKey_(userId, sheetName, email) {
+  const text = String(sheetName || '') + '|' + String(email || '').trim().toLowerCase();
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return 'bhr_' + userId + '_' + (h >>> 0).toString(36) + '_' + text.length.toString(36);
+}
 
-function noteRecentlyHidden_(userId, email, hidden) {
-  const key = String(email || '').trim().toLowerCase();
-  if (!userId || !key || typeof CacheService === 'undefined') return;
+function noteRecentlyHidden_(userId, sheetName, email, hidden) {
+  if (!userId || !sheetName || !String(email || '').trim() || typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    const list = safeJsonParse_(cache.get(recentlyHiddenKey_(userId)), []);
-    const next = (Array.isArray(list) ? list : []).filter(e => e !== key);
-    if (hidden) next.push(key);
-    cache.put(recentlyHiddenKey_(userId), JSON.stringify(next.slice(-50)), RECENTLY_HIDDEN_TTL_SEC);
+    const key = recentlyHiddenKey_(userId, sheetName, email);
+    if (hidden) cache.put(key, '1', RECENTLY_HIDDEN_TTL_SEC); else cache.remove(key);
   } catch (error) {
     // 黙って落とさない: 覚え損ねると、隠した回答が直前の結果からほかの児童に最大 60 秒出うる。
     console.warn('noteRecentlyHidden_ failed (a just-hidden answer may show from a stale board read):', error && error.message);
   }
 }
 
-function markRecentlyHiddenRows_(result, userId) {
+function markRecentlyHiddenRows_(result, userId, sheetName) {
   try {
-    if (!result || !Array.isArray(result.data) || typeof CacheService === 'undefined') return result;
-    const list = safeJsonParse_(CacheService.getScriptCache().get(recentlyHiddenKey_(userId)), []);
-    if (!Array.isArray(list) || list.length === 0) return result;
-    const hiddenEmails = new Set(list);
+    if (!result || !Array.isArray(result.data) || !sheetName || typeof CacheService === 'undefined') return result;
+    const keyOf = (r) => (r && r.email) ? recentlyHiddenKey_(userId, sheetName, r.email) : '';
+    const keys = Array.from(new Set(result.data.map(keyOf).filter(Boolean)));
+    if (keys.length === 0) return result;
+    const found = CacheService.getScriptCache().getAll(keys) || {};
+    if (Object.keys(found).length === 0) return result;
     return Object.assign({}, result, {
-      data: result.data.map(r => (r && hiddenEmails.has(String(r.email || '').trim().toLowerCase()))
-        ? Object.assign({}, r, { hidden: true }) : r)
+      data: result.data.map(r => (keyOf(r) && found[keyOf(r)]) ? Object.assign({}, r, { hidden: true }) : r)
     });
   } catch (error) {
     console.warn('markRecentlyHiddenRows_ failed (a just-hidden answer may show from a stale board read):', error && error.message);
@@ -1534,7 +1539,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId, 
 
       // 直前の結果 (stale) は「見せない」を押す前の行かもしれない。押したばかりの回答には印を付け直す。
       const result = (cacheableResult && cacheableResult.stale)
-        ? markRecentlyHiddenRows_(cacheableResult, targetUser.userId)
+        ? markRecentlyHiddenRows_(cacheableResult, targetUser.userId, targetUserConfig && targetUserConfig.sheetName)
         : cacheableResult;
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);

@@ -1308,6 +1308,12 @@ test('toggleLessonHidden_: 一覧が見ていたシート・行を toggleAnswerH
   assert.match(stale.message, /^PHASE_CHANGED/);
   assert.equal(calls.length, 1);
 
+  // その行の児童が分からなければ書かない (☆ と違って省けない)
+  const noEmail = h.context.toggleLessonHidden_('u1', lessonId, 3, 'phase1', '');
+  assert.equal(noEmail.success, false);
+  assert.match(noEmail.message, /^ROW_CHANGED/);
+  assert.equal(calls.length, 1);
+
   h.setEmail('a@example.com');
   const student = h.context.toggleLessonHidden_('u1', lessonId, 3, 'phase1', 'b@example.com');
   assert.equal(student.success, false);

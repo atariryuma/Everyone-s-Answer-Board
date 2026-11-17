@@ -339,20 +339,23 @@ test('hidden: 押したばかりの回答は、直前の結果 (印の無い古�
   const store = new Map();
   const ctx = loadDataApisContext({
     CacheService: { getScriptCache: () => ({
-      get: (k) => (store.has(k) ? store.get(k) : null), put: (k, v) => { store.set(k, v); }, remove: (k) => { store.delete(k); }
-    }) },
-    safeJsonParse_: (text, fallback) => { try { return text ? JSON.parse(text) : fallback; } catch (_) { return fallback; } }
+      get: (k) => (store.has(k) ? store.get(k) : null), put: (k, v) => { store.set(k, v); }, remove: (k) => { store.delete(k); },
+      getAll: (keys) => { const o = {}; keys.forEach((k) => { if (store.has(k)) o[k] = store.get(k); }); return o; }
+    }) }
   });
   const staleRows = () => ({ success: true, stale: true, data: HIDDEN_ROWS().map(r => Object.assign({}, r, { hidden: false })) });
+  const marked = (uid, sheet) => Array.from(ctx.markRecentlyHiddenRows_(staleRows(), uid, sheet).data.filter(r => r.hidden), r => r.id);
 
-  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u1').data.filter(r => r.hidden).length, 0);
+  assert.deepEqual(marked('u1', 'phase1'), []);
 
-  ctx.noteRecentlyHidden_('u1', 'B@example.com', true);
-  const marked = ctx.markRecentlyHiddenRows_(staleRows(), 'u1');
-  assert.deepEqual(Array.from(marked.data.filter(r => r.hidden), r => r.id), ['row_3']);
-  // ほかのボードの覚えは見ない
-  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u2').data.filter(r => r.hidden).length, 0);
+  // 2 つを続けて押しても、どちらも覚えている (回答ごとに別の key なので、書き戻しで消し合わない)
+  ctx.noteRecentlyHidden_('u1', 'phase1', 'B@example.com', true);
+  ctx.noteRecentlyHidden_('u1', 'phase1', 'c@example.com', true);
+  assert.deepEqual(marked('u1', 'phase1'), ['row_3', 'row_4']);
+  // ほかのボード・次のフェーズのシートの回答には付けない
+  assert.deepEqual(marked('u2', 'phase1'), []);
+  assert.deepEqual(marked('u1', 'phase4'), []);
 
-  ctx.noteRecentlyHidden_('u1', 'b@example.com', false);
-  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u1').data.filter(r => r.hidden).length, 0);
+  ctx.noteRecentlyHidden_('u1', 'phase1', 'b@example.com', false);
+  assert.deepEqual(marked('u1', 'phase1'), ['row_4']);
 });

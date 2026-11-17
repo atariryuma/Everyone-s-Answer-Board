@@ -738,8 +738,9 @@ function toggleAnswerHidden_(targetUserId, rowIndex, expect) {
   });
   // 児童の読み込みが直前の結果 (押す前の行) を返す間も外せるよう、押した回答を短い間だけ覚える。
   const email = expect && expect.rowIdentity && expect.rowIdentity.value;
-  if (res && res.success && email && typeof noteRecentlyHidden_ === 'function') {
-    noteRecentlyHidden_(targetUserId, email, res.hidden === true);
+  const sheetName = expect && expect.expectedSheetName;
+  if (res && res.success && email && sheetName && typeof noteRecentlyHidden_ === 'function') {
+    noteRecentlyHidden_(targetUserId, sheetName, email, res.hidden === true);
   }
   return res;
 }

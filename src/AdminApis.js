@@ -1188,7 +1188,10 @@ function dispatchAdminOperation(operation, params) {
       if (!Number.isInteger(rowIndex) || rowIndex < 2) {
         return createErrorResponse('rowIndex が不正です', null, { error: 'INVALID_ROW_INDEX' });
       }
-      const expectedEmail = typeof params.expectedEmail === 'string' ? params.expectedEmail.slice(0, 254) : '';
+      // その行の児童の照合は必須 (☆ と違って省けない): 行がずれたまま別の児童を隠さないためと、
+      //   隠した直後の覚え (noteRecentlyHidden_) がメールを鍵にするため。
+      { const e = reqStr('expectedEmail'); if (e) return e; }
+      const expectedEmail = String(params.expectedEmail).slice(0, 254);
       return toggleLessonHidden_(params.userId, params.lessonId, rowIndex, params.sheetName, expectedEmail);
     }
     case 'lesson.deleteAnswer': {
