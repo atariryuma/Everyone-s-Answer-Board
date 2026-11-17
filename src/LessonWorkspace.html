@@ -161,6 +161,18 @@
       <button type="button" id="lesson-runner-classes-cancel" class="btn btn-secondary text-xs">やめる</button>
     </div>
   </div>
+  <!-- 注目する言葉: 「いまの回答」のおすすめに使う (先生の一覧だけ。児童の画面には出ない)。 -->
+  <div id="lesson-runner-words" class="lesson-runner-classes mb-3">
+    <span class="text-xs text-theme-muted">注目する言葉:</span>
+    <span id="lesson-runner-words-text" class="text-sm text-theme">-</span>
+    <button type="button" id="lesson-runner-words-edit" class="btn btn-secondary text-xs">編集</button>
+    <div id="lesson-runner-words-editor" class="lesson-runner-classes-editor" hidden>
+      <input type="text" id="lesson-runner-words-input" class="modern-input text-sm flex-1"
+        placeholder="例: 許せない, 思いやり, 立場" aria-label="注目する言葉 (カンマ区切り、10 個まで)" />
+      <button type="button" id="lesson-runner-words-save" class="btn btn-primary text-xs">保存</button>
+      <button type="button" id="lesson-runner-words-cancel" class="btn btn-secondary text-xs">やめる</button>
+    </div>
+  </div>
   <!-- 開始中の授業が 2 つあるとき、ボードにつながっていない方を開いたら出す。
        フェーズを送る・終了するのはボードにつながっている授業だけ (サーバも断る)。 -->
   <div id="lesson-runner-board-link" class="box box-warning mb-3 hidden" role="status">
@@ -203,6 +215,8 @@
     <!-- クラスで絞り込んでいる間だけ出す。「届いているのに一覧に無い」を絞り込みのせいと分かるように。 -->
     <p id="lesson-live-filter-note" class="lesson-live-note lesson-live-filter-note hidden" aria-live="polite"></p>
     <div id="lesson-live-pending" class="lesson-live-pending hidden"></div>
+    <!-- おすすめ: 言葉と位置から自動で選んだ「読む候補」。☆ を付けると外れて次の候補が上がる。 -->
+    <section id="lesson-live-recommend" class="live-recommend box hidden" aria-labelledby="lesson-live-recommend-title"></section>
     <!-- 位置ごと / 新しい順 / ● → ★ のどれもここに描く (同じ 10 秒 polling に乗る)。 -->
     <div id="lesson-live-body" class="lesson-live-body"></div>
   </section>

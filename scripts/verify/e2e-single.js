@@ -215,6 +215,13 @@ check('児童(授業)', '同じフェーズで送り直すと行が増えず、�
   const spots = ((r.data && r.data.rows) || []).map(spotOf);
   return { pass: ok(r) && spots.length === 2 && spots.includes('3,3') && !spots.includes('2,4'), note: ok(r) ? `先生の一覧 ${spots.length} 行` : text(r) };
 });
+check('先生(授業)', '注目する言葉を入れると、おすすめに理由つきで出る (lesson.updateDraft focusWords)', () => {
+  const u = op('lesson.updateDraft', { userId, lessonId, fieldPath: 'focusWords', value: ['検証'] });
+  const live = op('lesson.liveAnswers', { userId, lessonId }).data || {};
+  const rec = live.recommend || [];
+  const hit = rec.filter((x) => (x.reasons || []).some((w) => w.kind === 'word' && String(w.label).includes('検証')));
+  return { pass: ok(u) && (live.focusWords || []).join() === '検証' && hit.length >= 1, note: ok(u) ? `おすすめ ${rec.length} 件 (言葉 ${hit.length})` : text(u) };
+});
 check('先生(授業)', 'ハイライト (lesson.toggleHighlight)', () => {
   const live = op('lesson.liveAnswers', { userId, lessonId }).data;
   const row = (live.rows || [])[0];

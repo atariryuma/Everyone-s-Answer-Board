@@ -2599,3 +2599,117 @@ test('__findOwnLessonRow_: capture を渡すと読んだ全行を返す (名前�
   assert.deepEqual(Array.from(h.context.__lessonNamePairsFromSheetData_(capture.data)).map(p => Array.from(p)),
     [['a@example.com', 'あおい']]);
 });
+
+// =====================================================================
+// おすすめ (先生が読む候補) — __recommendLessonAnswers_ / 注目する言葉
+//
+// Why: 授業中の操作を ☆ だけにするため、読む候補を自動で選ぶ。選び方がずれると
+//   同じ立場の回答ばかり並ぶ・☆ 済みが居座る、になるので、基準と多様性を pin する。
+// =====================================================================
+
+function recRow(rowIndex, x, y, reason, extra) {
+  return Object.assign({
+    rowIndex, email: 'r' + rowIndex + '@example.com', timestamp: '2026-11-18T00:00:' + String(rowIndex).padStart(2, '0') + 'Z',
+    numericX: x, numericY: y, reason, addedInsight: '', highlight: false, hidden: false
+  }, extra || {});
+}
+
+test('__recommendLessonAnswers_: 注目する言葉を含む回答を、当たった言葉つきで先頭に出す', () => {
+  const h = loadContext();
+  const rows = [
+    recRow(2, 3, 3, 'どちらとも言えない'),
+    recRow(3, 3, 3, 'ピエロは許せないと思った'),
+    recRow(4, 3, 3, 'とくにない')
+  ];
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['許せない'], boardMode: 'matrix' }));
+  assert.equal(rec.length, 1, '言葉にも位置にも当たらない回答は出さない');
+  assert.equal(rec[0].rowIndex, 3);
+  assert.equal(rec[0].email, 'r3@example.com');
+  assert.equal(rec[0].reasons[0].kind, 'word');
+  assert.equal(rec[0].reasons[0].label, '言葉：許せない');
+});
+
+test('__recommendLessonAnswers_: 全角半角・空白の違いは同じ言葉として当てる', () => {
+  const h = loadContext();
+  const rows = [recRow(2, 3, 3, 'ＡＢＣ　だと思う')];
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['abc だ'], boardMode: 'matrix' }));
+  assert.equal(rec.length, 1);
+});
+
+test('__recommendLessonAnswers_: ☆ 済みと「見せない」の回答は候補にしない', () => {
+  const h = loadContext();
+  const rows = [
+    recRow(2, 3, 3, '許せない', { highlight: true }),
+    recRow(3, 3, 3, '許せない', { hidden: true }),
+    recRow(4, 3, 3, '許せない')
+  ];
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['許せない'], boardMode: 'matrix' }));
+  assert.deepEqual(rec.map(r => r.rowIndex), [4]);
+});
+
+test('__recommendLessonAnswers_: 言葉が無くても、端の立場と少数の立場を選ぶ', () => {
+  const h = loadContext();
+  const rows = [
+    recRow(2, 4, 3, 'a'), recRow(3, 4, 3, 'b'), recRow(4, 4, 3, 'c'), recRow(5, 4, 3, 'd'),
+    recRow(6, 4, 3, 'e'), recRow(7, 5, 5, '右上の端'),
+    recRow(8, 2, 3, 'ひとりだけ左')
+  ];
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { boardMode: 'matrix' }));
+  const kinds = {};
+  rec.forEach((r) => { kinds[r.rowIndex] = Array.from(r.reasons).map(x => x.kind); });
+  assert.deepEqual(kinds[8], ['few'], '左は 7 人中 1 人 = 少数の立場');
+  assert.deepEqual(kinds[7], ['edge'], '5·5 は端');
+  assert.equal(rec.length, 2, '多数派のまん中寄りは出さない');
+});
+
+test('__recommendLessonAnswers_: 同じ側ばかり並べない (まだ出ていない側を先に取る)', () => {
+  const h = loadContext();
+  const rows = [
+    recRow(2, 5, 3, '許せない 1'), recRow(3, 5, 3, '許せない 2'), recRow(4, 5, 3, '許せない 3'),
+    recRow(5, 1, 3, '許せない 4'), recRow(6, 5, 3, 'x'), recRow(7, 5, 3, 'y'), recRow(8, 1, 3, 'z')
+  ];
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['許せない'], boardMode: 'matrix' }));
+  const first3 = rec.slice(0, 3).map(r => r.rowIndex);
+  assert.ok(first3.indexOf(5) >= 0 || first3.indexOf(8) >= 0, '先頭 3 件に左側の回答が入る: ' + first3.join(','));
+  assert.equal(rec[0].rowIndex, 2, '同じ強さなら先に届いた回答');
+  assert.ok(rec.length <= 6, '候補は 6 件まで');
+});
+
+test('__recommendLessonAnswers_: 前の位置があれば、大きく動いた回答を先頭に出す (1 つ隣は拾わない)', () => {
+  const h = loadContext();
+  const rows = [recRow(2, 3, 3, 'a'), recRow(3, 3, 3, 'b'), recRow(4, 3, 3, 'c')];
+  const prevByEmail = {
+    'r2@example.com': { numericX: 3, numericY: 3 },
+    'r3@example.com': { numericX: 1, numericY: 3 },
+    'r4@example.com': { numericX: 2, numericY: 3 }
+  };
+  const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { boardMode: 'matrix', prevByEmail }));
+  assert.deepEqual(rec.map(r => r.rowIndex), [3]);
+  assert.equal(rec[0].reasons[0].kind, 'moved');
+});
+
+test('__normalizeFocusWords_: 文字列も配列も受け、重複・空を落として 10 個・20 字までにする', () => {
+  const h = loadContext();
+  assert.deepEqual(Array.from(h.context.__normalizeFocusWords_('許せない、 思いやり,許せない,,')), ['許せない', '思いやり']);
+  assert.equal(Array.from(h.context.__normalizeFocusWords_(Array.from({ length: 30 }, (_, i) => 'w' + i))).length, 10);
+  assert.equal(Array.from(h.context.__normalizeFocusWords_(['あ'.repeat(50)]))[0].length, 20);
+  assert.deepEqual(Array.from(h.context.__normalizeFocusWords_(null)), []);
+});
+
+test('updateLessonDraft: 注目する言葉は実行中でも直せて、一覧のおすすめに効く', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+
+  const before = h.context.getLessonLiveAnswers('u1', lessonId);
+  const res = h.context.updateLessonDraft('u1', lessonId, 'focusWords', '迷う、迷う, ');
+  assert.equal(res.success, true, res.message);
+  assert.deepEqual(Array.from(res.data.lesson.lessonJson.focusWords), ['迷う'], '形はサーバがそろえる');
+
+  const after = h.context.getLessonLiveAnswers('u1', lessonId, { sinceSig: before.data.sig });
+  assert.notEqual(after.data.unchanged, true, '言葉を変えたら一覧を取り直させる (sig が変わる)');
+  assert.deepEqual(Array.from(after.data.focusWords), ['迷う']);
+  const rec = Array.from(after.data.recommend);
+  assert.equal(rec[0].rowIndex, 3, '「迷う」と書いた児童が先頭');
+  assert.equal(rec[0].reasons[0].label, '言葉：迷う');
+});

@@ -397,6 +397,16 @@
     .live-hide-btn:disabled { opacity: 0.45; cursor: default; }
     .live-hide-btn.is-busy { cursor: progress; }
     .live-answer.is-hidden-answer { border-style: dashed; opacity: 0.75; }
+    /* おすすめ: 一覧の上に置く「読む候補」。理由の札は評価ではなく目安なので、控えめな色にする */
+    .live-recommend { margin-bottom: var(--space-3); }
+    .live-recommend-head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+    .live-recommend-title { margin: 0; font-size: var(--font-size-sm); font-weight: 700; color: var(--theme-text-primary); }
+    .live-recommend-note { font-size: var(--font-size-xs); color: var(--theme-text-muted); }
+    .live-why { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-1) 0 0; padding: 0; list-style: none; }
+    .live-why li {
+      font-size: var(--font-size-xs); font-weight: 700; color: var(--theme-accent-cyan);
+      border: 1px solid var(--theme-border-subtle); border-radius: var(--radius-sm); padding: 0 var(--space-2);
+    }
     .live-hidden-badge { font-size: var(--font-size-xs); font-weight: 700; color: var(--status-warning); }
     /* 削除: ☆ と同じ大きさ。色は hover のときだけ (ふだんは目立たせない) */
     .live-del-btn { flex: none; width: 2.25rem; height: 2.25rem; background: transparent; color: var(--theme-text-muted); }
