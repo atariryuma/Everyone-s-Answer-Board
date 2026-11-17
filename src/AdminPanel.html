@@ -387,6 +387,17 @@
     }
     .live-hl-btn:disabled { opacity: 0.45; cursor: default; }
     .live-hl-btn.is-busy { cursor: progress; }
+    /* ほかの児童に見せない: ☆ と同じ大きさ。押してある間 (= 見せていない) は警告色 */
+    .live-hide-btn { flex: none; width: 2.25rem; height: 2.25rem; background: transparent; color: var(--theme-text-muted); }
+    .live-hide-btn:hover:not(:disabled) { color: var(--status-warning); border-color: var(--status-warning); }
+    .live-hide-btn[aria-pressed="true"] {
+      color: var(--status-warning); border-color: var(--status-warning);
+      background: color-mix(in srgb, var(--status-warning) 18%, transparent);
+    }
+    .live-hide-btn:disabled { opacity: 0.45; cursor: default; }
+    .live-hide-btn.is-busy { cursor: progress; }
+    .live-answer.is-hidden-answer { border-style: dashed; opacity: 0.75; }
+    .live-hidden-badge { font-size: var(--font-size-xs); font-weight: 700; color: var(--status-warning); }
     /* 削除: ☆ と同じ大きさ。色は hover のときだけ (ふだんは目立たせない) */
     .live-del-btn { flex: none; width: 2.25rem; height: 2.25rem; background: transparent; color: var(--theme-text-muted); }
     .live-del-btn:hover:not(:disabled) { color: var(--status-error); border-color: var(--status-error); }

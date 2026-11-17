@@ -282,3 +282,44 @@ test('viewerIsTeacher: false for regular viewer (student)', () => {
   assert.equal(result.viewerIsTeacher, false);
 });
 
+
+// =====================================================================
+// 「ほかの児童に見せない」(hidden) の回答
+// Why: 行は閲覧者で共有する cache に全件入っている。ボードへ返す出口はここ 1 つなので、
+//   ここで外れなければ、隠した回答がほかの児童にも電子黒板にも出る。
+// =====================================================================
+
+const HIDDEN_ROWS = () => ([
+  { id: 'row_2', email: 'a@example.com', name: 'あ', answer: 'A', hidden: true },
+  { id: 'row_3', email: 'b@example.com', name: 'い', answer: 'B', hidden: false },
+  { id: 'row_4', email: 'c@example.com', name: 'う', answer: 'C' }
+]);
+const hiddenCfg = { displaySettings: { boardMode: 'board' }, columnMapping: { answer: 1 } };
+
+test('hidden: ほかの児童には返さない', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult_(
+    { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg,
+    { isAdmin: false, isOwnBoard: false, email: 'b@example.com' });
+  assert.deepEqual(Array.from(result.data, r => r.id), ['row_3', 'row_4']);
+});
+
+test('hidden: 本人には今までどおり返し、印は載せない (大文字小文字の違いは無視)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult_(
+    { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg,
+    { isAdmin: false, isOwnBoard: false, email: 'A@Example.com' });
+  assert.deepEqual(Array.from(result.data, r => r.id), ['row_2', 'row_3', 'row_4']);
+  assert.equal(result.data.some(r => 'hidden' in r), false);
+});
+
+test('hidden: 先生のボード (電子黒板に映る) にも返さない。メールが分からない閲覧者にも返さない', () => {
+  const ctx = loadDataApisContext();
+  const teacher = ctx.buildSafePublishedDataResult_(
+    { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg,
+    { isAdmin: true, isOwnBoard: true, email: 'teacher@example.com' });
+  assert.deepEqual(Array.from(teacher.data, r => r.id), ['row_3', 'row_4']);
+  const anon = ctx.buildSafePublishedDataResult_(
+    { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg, { isAdmin: false, isOwnBoard: true });
+  assert.deepEqual(Array.from(anon.data, r => r.id), ['row_3', 'row_4']);
+});

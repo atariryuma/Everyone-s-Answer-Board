@@ -3196,7 +3196,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
     //   (timestamp だけだと同じ時刻の置き直しを見落とす。30 行 × 500 字でも hash は一瞬)。
     const rowsSig = (source.sheetName + '|' + phaseIndex + '|' + scopeClasses.join(',') + '|' + rows
       .map(r => [r.rowIndex, r.timestamp, r.name, r.class, r.numericX, r.numericY,
-        r.reason, r.addedInsight, r.highlight ? 1 : 0].join('\u0001')).join('\u0002')
+        r.reason, r.addedInsight, r.highlight ? 1 : 0, r.hidden ? 1 : 0].join('\u0001')).join('\u0002')
       + '|' + (pending ? pending.map(p => p.email).join(',') : '-'));
     const phaseInfo = {
       index: phaseIndex,
@@ -3286,6 +3286,33 @@ function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName, expectedEm
     });
   } catch (error) {
     logError_('toggleLessonHighlight', error);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 授業中の回答一覧から、回答を「ほかの児童に見せない」にする / 戻す。
+ * toggleLessonHighlight と同じ照合 (一覧が見ていたシート・その行の児童) をして、
+ * ボードの toggleAnswerHidden_ に委ねる。
+ */
+function toggleLessonHidden_(userId, lessonId, rowIndex, sheetName, expectedEmail) {
+  try {
+    const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true, cachedLesson: true });
+    if (auth.error) return auth.error;
+    const lessonJson = auth.found.lesson.lessonJson || {};
+    const phase = (lessonJson.phases || [])[__activePhaseIndex_(lessonJson)];
+    if (!phase) return createErrorResponse('現在のフェーズが見つかりません');
+    const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
+    if (String(sheetName || '') !== String(patch.sheetName || '')) {
+      return createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。一覧を読み込み直します');
+    }
+    return toggleAnswerHidden_(userId, rowIndex, {
+      expectedSpreadsheetId: patch.spreadsheetId,
+      expectedSheetName: patch.sheetName,
+      rowIdentity: expectedEmail ? { column: LESSON_NATIVE_COL_EMAIL, value: expectedEmail } : null
+    });
+  } catch (error) {
+    logError_('toggleLessonHidden_', error);
     return createExceptionResponse(error);
   }
 }
@@ -3457,6 +3484,8 @@ function __loadLessonRowsFromSheet_(phaseDef, opts) {
     //   固定 index ではなくヘッダー名で探す。値の読み方はボードと同じ extractHighlight に任せる。
     const header = data[0] || [];
     const highlightCol = header.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
+    // 「ほかの児童に見せない」の印 (HIDDEN 列。toggleAnswerHidden_ が初回に足す)。
+    const hiddenCol = header.findIndex(h => String(h).toUpperCase().trim() === 'HIDDEN');
     const values = data.slice(1);
     const out = [];
     for (let i = 0; i < values.length; i++) {
@@ -3475,7 +3504,8 @@ function __loadLessonRowsFromSheet_(phaseDef, opts) {
         numericY: __cellToNumOrNull_(v[5]),
         reason: String(v[6] || ''),
         addedInsight: String(v[7] || ''),
-        highlight: extractHighlight(v, header, highlightCol)
+        highlight: extractHighlight(v, header, highlightCol),
+        hidden: extractHighlight(v, header, hiddenCol)
       });
     }
     return out;

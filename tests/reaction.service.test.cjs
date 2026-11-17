@@ -1142,3 +1142,29 @@ test('resolveReactionMode: 正しい値はそのまま、旧 config は showReac
   assert.equal(ctx.resolveReactionMode({}), 'off');
   assert.equal(ctx.resolveReactionMode(null), 'off');
 });
+
+// 「ほかの児童に見せない」の印は、ハイライトと同じ処理で HIDDEN 列に書く。
+test('processHighlightDirect: 列の名前を渡すとその列に書き、無ければ末尾に足す (HIGHLIGHT には触れない)', () => {
+  const ctx = loadReactionContext();
+  const sheet = createMockSheet({
+    headers: ['Q1', 'HIGHLIGHT'],
+    rows: [['answer-a', 'TRUE']]
+  });
+
+  const on = ctx.processHighlightDirect_(sheet, 2, null, 'HIDDEN');
+  assert.equal(on.highlighted, true);
+  assert.equal(on.provisioned, true);
+  assert.equal(sheet._data[0][2], 'HIDDEN');
+  assert.equal(sheet._data[1][2], 'TRUE');
+  assert.equal(sheet._data[1][1], 'TRUE', 'ハイライトはそのまま');
+
+  const off = ctx.processHighlightDirect_(sheet, 2, null, 'HIDDEN');
+  assert.equal(off.highlighted, false);
+  assert.equal(sheet._data[1][2], 'FALSE');
+});
+
+test('resolveReactionColumns_: HIDDEN 列の位置も返す (無ければ -1)', () => {
+  const ctx = loadReactionContext();
+  assert.equal(ctx.resolveReactionColumns_(['Q1', 'HIGHLIGHT', 'hidden']).HIDDEN, 2);
+  assert.equal(ctx.resolveReactionColumns_(['Q1', 'HIGHLIGHT']).HIDDEN, -1);
+});

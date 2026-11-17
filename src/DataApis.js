@@ -1026,7 +1026,13 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
   const viewerRows = (typeof applyViewerReactions_ === 'function')
     ? applyViewerReactions_(Array.isArray(result.data) ? result.data : [], viewerContext.email || null)
     : (Array.isArray(result.data) ? result.data : []);
-  const rows = Array.isArray(viewerRows) ? viewerRows : [];
+  // 「ほかの児童に見せない」にした回答 (hidden) は、本人以外には返さない。先生のボードにも返さない
+  //   (電子黒板に映るため。先生は管理パネルの回答一覧で見る)。本人には今までどおり返し、
+  //   印そのものは誰にも載せない (本人が気づく手がかりを画面に渡さない)。
+  //   Why ここか: 行は閲覧者で共有する cache に全件入っている。ボードへ返す出口はここ 1 つ。
+  const viewerKey = String(viewerContext.email || '').trim().toLowerCase();
+  const rows = (Array.isArray(viewerRows) ? viewerRows : []).filter(item =>
+    !(item && item.hidden) || (Boolean(viewerKey) && String(item.email || '').trim().toLowerCase() === viewerKey));
 
   // Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡するために
   //      仮名化された emailHash を全モードで wire に乗せる。生メアドは showNames=false なら除去。
@@ -1038,6 +1044,7 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
     const rawEmail = item.email;
     for (const key in item) {
       if (!includeIdentity && (key === 'email' || key === 'name')) continue;
+      if (key === 'hidden') continue;
       const v = item[key];
       cleaned[key] = v instanceof Date ? v.toISOString() : v;
     }

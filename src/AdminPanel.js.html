@@ -4960,6 +4960,7 @@
       expanded: new Set(),              // 理由を全文表示中のカード (rowIndex)
       pendingHl: new Set(),             // ハイライト送信中の rowIndex (連打防止)
       pendingDel: new Set(),            // 削除送信中の rowIndex (連打防止)
+      pendingHide: new Set(),           // 「見せない」送信中の rowIndex (連打防止)
       // 押した ★ の値を、サーバの読み込みで確かめられるまで上書きで保つ (key = シート:行)。
       //   Why: 押す前に始まった polling が古い行を持って帰り、★ を消していた。確定の応答も
       //   入れ替わる前の行に書いていたので、次の読み込み (最大 10 秒) まで ★ が消えたままだった。
@@ -5366,6 +5367,21 @@
       '</button>';
     }
 
+    // 「ほかの児童に見せない」ボタン。☆ と同じ作り (押すとその場で切り替わり、押し直せば戻る)。
+    //   押せるのは「いまボードに出ているシート」の行だけ (呼び出し側が判定する)。
+    function liveHideButton(a) {
+      const hidden = Boolean(a.hidden);
+      const busy = live.pendingHide.has(a.rowIndex);
+      const can = Number.isInteger(a.rowIndex) && a.rowIndex >= 2;
+      return '<button type="button" class="icon-btn live-hide-btn' + (busy ? ' is-busy' : '') + '"' +
+        ' data-live-hide="' + (can ? a.rowIndex : '') + '" aria-pressed="' + hidden + '"' +
+        ' aria-label="' + (hidden ? 'ほかの児童にも見せる' : 'ほかの児童に見せない') + '"' +
+        ' title="' + (hidden ? 'ほかの児童にも見せる（いまは見せていません）' : 'ほかの児童に見せない') + '"' +
+        (can && !busy ? '' : ' disabled') + '>' +
+        '<svg class="icon" aria-hidden="true"><use href="#i-eye' + (hidden ? '-off' : '') + '"></use></svg>' +
+      '</button>';
+    }
+
     // 削除ボタン (ボードの管理モードの削除と同じ処理)。押すと確認を出す。
     function liveDelButton(a) {
       const can = Number.isInteger(a.rowIndex) && a.rowIndex >= 2 && Boolean(a.timestamp);
@@ -5392,15 +5408,17 @@
 
     function liveCard(r, axis, showClass, src, esc) {
       const fresh = liveFreshness(r);
-      return '<article class="' + liveAnswerClass(Boolean(r.highlight), fresh) + '">' +
+      return '<article class="' + liveAnswerClass(Boolean(r.highlight), fresh, r.hidden ? 'is-hidden-answer' : '') + '">' +
         '<div class="live-answer-head">' +
           livePosMap(r, axis, esc) +
           '<div class="live-card-who">' +
             '<span class="live-name">' + esc(liveDisplayName(r)) + '</span>' +
             (showClass && r.class ? '<span class="live-class">' + esc(r.class) + '</span>' : '') +
             (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
+            (r.hidden ? '<span class="live-hidden-badge">ほかの児童には見せていません</span>' : '') +
           '</div>' +
           liveHlButton(r) +
+          liveHideButton(r) +
           liveDelButton(r) +
         '</div>' +
         liveReason(r, src, esc) +
@@ -5553,6 +5571,38 @@
       });
     }
 
+    // 「ほかの児童に見せない」を切り替える。確認は出さない (押し直せば戻せる)。
+    //   楽観更新はしない: 隠れたように見せてから失敗すると、ボードに出たままの回答を見落とす。
+    function liveToggleHidden(btn) {
+      const rowIndex = Number(btn.dataset.liveHide);
+      const d = live.data;
+      if (!rowIndex || !d || !d.phase || live.pendingHide.has(rowIndex)) return;
+      const src = d.phase.sourceSheetName || '';
+      const row = (d.rows || []).find((r) => r.rowIndex === rowIndex);
+      if (!row) return;
+      const lessonId = live.lessonId;
+      live.pendingHide.add(rowIndex);
+      liveRender();
+      gasRun('lesson.toggleHidden', {
+        userId, lessonId, rowIndex, sheetName: src,
+        // 行ロックの中で「その行がこの児童か」を照合してもらう (行番号がずれていたら書かない)。
+        expectedEmail: String(row.email || '')
+      }).then((res) => {
+        if (!res || !res.success) throw new Error(window.serverMessage(res, '切り替えられませんでした'));
+        window.notifications.success(res.hidden
+          ? 'ほかの児童に見えないようにしました。ボードからも数秒で消えます（本人の画面には残ります）'
+          : 'ほかの児童にも見えるように戻しました', { duration: 3500 });
+      }).catch((err) => {
+        const msg = (err && err.message) || '切り替えられませんでした';
+        window.notifications.error(msg.replace(/^(PHASE|ROW)_CHANGED:\s*/, ''));
+      }).finally(() => {
+        live.pendingHide.delete(rowIndex);
+        live.sig = '';
+        liveRender();
+        liveFetch();
+      });
+    }
+
     // 回答を 1 つ削除する。確認 → サーバ (シートと時刻を照合してから消す) → 一覧を読み直す。
     //   楽観更新はしない: 消えたように見せてから失敗すると、残っている回答を見落とす。
     function liveDeleteAnswer(btn) {
@@ -5607,6 +5657,8 @@
         }
         const hlBtn = event.target.closest('[data-live-hl]');
         if (hlBtn && !hlBtn.disabled) { liveToggleHighlight(hlBtn); return; }
+        const hideBtn = event.target.closest('[data-live-hide]');
+        if (hideBtn && !hideBtn.disabled) { liveToggleHidden(hideBtn); return; }
         const delBtn = event.target.closest('[data-live-del]');
         if (delBtn && !delBtn.disabled) { liveDeleteAnswer(delBtn); return; }
         if (event.target.closest('#lesson-live-names')) {

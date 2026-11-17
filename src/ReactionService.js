@@ -412,8 +412,11 @@ function processReactionDirect_(sheet, rowNumber, reactionType, actorEmail, prel
  * @param {Sheet} sheet
  * @param {number} rowNumber
  * @param {Array} [preloadedHeaders]
+ * @param {string} [columnName] - 印を書く列の見出し (既定 'HIGHLIGHT')
  */
-function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
+function processHighlightDirect_(sheet, rowNumber, preloadedHeaders, columnName) {
+  // 印の列の名前。既定は HIGHLIGHT。「ほかの児童に見せない」は同じ作りで HIDDEN 列に書く。
+  const flagColumn = columnName || 'HIGHLIGHT';
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
     ? preloadedHeaders
     : readHeaderRowOnly_(sheet);
@@ -430,7 +433,7 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
 
   let provisioned = false;
 
-  let highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
+  let highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === flagColumn);
 
   // Why (lazy provisioning): 旧来は throw して教師にデータソース再接続を強制していたが、
   //   新規ボードで初回 HIGHLIGHT 押下時に必ず失敗する UX 破壊フロー。
@@ -442,7 +445,7 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
         //   を足した直後だと、同じ列に HIGHLIGHT を書いて見出しを潰す。書く前に 1 行目を読み直す。
         const freshHeaders = readHeaderRowOnly_(sheet);
         if (freshHeaders.length > 0) {
-          const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === 'HIGHLIGHT');
+          const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === flagColumn);
           if (freshIdx !== -1) {
             highlightColIndex = freshIdx;
           } else {
@@ -453,14 +456,14 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
       }
       if (highlightColIndex === -1) {
         // 新しいボードで初めて ★ を押したときの正常な動き (WARN にしない)。
-        console.log('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
+        console.log('processHighlightDirect: lazy-provisioning ' + flagColumn + ' column', {
           currentHeaderCount: headers.length,
           rowNumber
         });
         try {
           const newCol = headers.length + 1;
-          sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
-          headers.push('HIGHLIGHT');
+          sheet.getRange(1, newCol, 1, 1).setValues([[flagColumn]]);
+          headers.push(flagColumn);
           highlightColIndex = newCol - 1;
           provisioned = true;
           if (typeof invalidateSheetHeadersCache_ === 'function') {
@@ -505,7 +508,7 @@ function processHighlightDirect_(sheet, rowNumber, preloadedHeaders) {
  * @returns {{UNDERSTAND:number, LIKE:number, CURIOUS:number, HIGHLIGHT:number}} 見つからない列は -1
  */
 function resolveReactionColumns_(headers) {
-  const map = { UNDERSTAND: -1, LIKE: -1, CURIOUS: -1, HIGHLIGHT: -1 };
+  const map = { UNDERSTAND: -1, LIKE: -1, CURIOUS: -1, HIGHLIGHT: -1, HIDDEN: -1 };
   if (!Array.isArray(headers)) return map;
   for (let i = 0; i < headers.length; i++) {
     const h = String(headers[i] == null ? '' : headers[i]).toUpperCase().trim();
@@ -703,6 +706,34 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
       highlighted: result.highlighted,
       provisioned: Boolean(result.provisioned),
       message: result.highlighted ? 'ハイライトしました' : 'ハイライトを解除しました'
+    })
+  });
+}
+
+/**
+ * 回答を「ほかの児童に見せない」にする / 戻す (管理パネルの回答一覧から)。
+ *
+ * ハイライトと同じ作り: 回答シートの末尾の HIDDEN 列に TRUE / FALSE を書く (列は初回に足す)。
+ * 行ロック・行の正体の照合・ボードの cache の無効化は executeBoardRowOperation_ が行う。
+ * 読む側は buildSafePublishedDataResult_ が、本人以外に返す行から外す。回答そのものは消えない。
+ * 名前が _ で終わるのは、画面から直接呼ばせないため (入口は dispatchAdminOperation だけ)。
+ */
+function toggleAnswerHidden_(targetUserId, rowIndex, expect) {
+  return executeBoardRowOperation_({
+    targetUserId,
+    rowIndex,
+    expect,
+    lockKeyPrefix: 'hidden',
+    label: 'toggleAnswerHidden_',
+    openContext: 'hidden_processing',
+    concurrentMessage: '同じ回答を処理中です。お待ちください。',
+    requireEditor: true,
+    process: (sheet, rowNumber, _actorEmail, preloadedHeaders) =>
+      processHighlightDirect_(sheet, rowNumber, preloadedHeaders, 'HIDDEN'),
+    formatSuccess: (result) => ({
+      success: true,
+      hidden: result.highlighted,
+      message: result.highlighted ? 'ほかの児童に見えないようにしました' : 'ほかの児童にも見えるように戻しました'
     })
   });
 }

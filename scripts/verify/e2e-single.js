@@ -227,6 +227,26 @@ check('児童(授業)', '「出会う」で全員の回答が見え、名前は�
   const named = rowsOf(r).filter((x) => x.name).length;
   return { pass: ok(r) && rowsOf(r).length === 2 && named === 0, note: ok(r) ? `見えた行 ${rowsOf(r).length}・名前つき ${named}` : text(r) };
 });
+check('先生(授業)', 'ほかの児童に見せない (lesson.toggleHidden): 本人には残り、ほかの児童と先生のボードから消え、戻せる', () => {
+  const live = () => op('lesson.liveAnswers', { userId, lessonId }).data;
+  const before = live();
+  const src = (before.phase && before.phase.sourceSheetName) || '';
+  const row = (before.rows || []).find((x) => x.email === STUDENT[1]);
+  if (!row) return { pass: false, note: '一覧に 2 人目の回答がありません' };
+  const toggle = () => op('lesson.toggleHidden', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src, expectedEmail: row.email });
+  const seen = (as) => rowsOf(inv('getPublishedSheetData', [null, 'newest', false, userId], as)).length;
+  const all = seen(STUDENT[0]);
+  const on = toggle();
+  const other = seen(STUDENT[0]);
+  const self = seen(STUDENT[1]);
+  const teacher = seen();
+  const listed = (live().rows || []).filter((x) => x.hidden).length;
+  const off = toggle();
+  const back = seen(STUDENT[0]);
+  const pass = ok(on) && on.hidden === true && other === all - 1 && self === all && teacher === all - 1
+    && listed === 1 && ok(off) && off.hidden === false && back === all;
+  return { pass, note: ok(on) ? `ほかの児童 ${all}→${other}→${back} 行 / 本人 ${self} 行 / 先生のボード ${teacher} 行 / 一覧の印 ${listed}` : text(on) };
+});
 check('児童(授業)', '「出会う」の間は送れない (サーバが断る)', () => { const r = submit(STUDENT[0], 1, 1, 1); return { pass: !ok(r), note: text(r) }; });
 // 投稿フェーズへ戻して置き直す流れ: 他の子はまた見えなくなり、行も記録も増えず、最新の位置だけが残る
 check('先生(授業)', '「考える」へ戻すと、他の子の回答はまた見えない', () => {

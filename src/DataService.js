@@ -522,7 +522,10 @@ function processRawDataBatch(ctx) {
           //   API 層 (buildSafePublishedDataResult_) が voters から閲覧者ごとに reacted を付け直し、
           //   voters は wire に載せる前に落とす。付け直さないと最初に読んだ児童の 👍 が全員に出る。
           reactions: extractReactions(row, headers, viewerEmail, reactionIndices, { includeVoters: true }),
-          highlight: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIGHLIGHT : null)
+          highlight: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIGHLIGHT : null),
+          // 「ほかの児童に見せない」の印 (HIDDEN 列。無ければ false)。行を外すのは API 層
+          //   (buildSafePublishedDataResult_) で、閲覧者ごとに決める。ここでは印を運ぶだけ。
+          hidden: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIDDEN : null)
         };
 
         // Why: answer/reason は board モードの必須コンテンツ。両方空ならスキップ。

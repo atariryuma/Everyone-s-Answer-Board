@@ -1289,6 +1289,31 @@ test('toggleLessonHighlight: フェーズが変わって一覧のシートが古
   assert.equal(called, false);
 });
 
+test('toggleLessonHidden_: 一覧が見ていたシート・行を toggleAnswerHidden_ に照合させて委ねる。フェーズが変われば書かない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  const calls = [];
+  h.context.toggleAnswerHidden_ = (uid, row, expect) => { calls.push([uid, row, Object.assign({}, expect)]); return { success: true, hidden: true }; };
+
+  const res = h.context.toggleLessonHidden_('u1', lessonId, 3, 'phase1', 'b@example.com');
+  assert.equal(res.success, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], 3);
+  assert.equal(calls[0][2].expectedSheetName, 'phase1');
+  assert.deepEqual(Object.assign({}, calls[0][2].rowIdentity), { column: 2, value: 'b@example.com' });
+
+  const stale = h.context.toggleLessonHidden_('u1', lessonId, 3, 'phaseX', 'b@example.com');
+  assert.equal(stale.success, false);
+  assert.match(stale.message, /^PHASE_CHANGED/);
+  assert.equal(calls.length, 1);
+
+  h.setEmail('a@example.com');
+  const student = h.context.toggleLessonHidden_('u1', lessonId, 3, 'phase1', 'b@example.com');
+  assert.equal(student.success, false);
+  assert.equal(calls.length, 1);
+});
+
 // 管理パネルの回答一覧からの削除。ボードの deleteAnswerRow に委ねる前に、一覧のシートが
 //   いまボードの config が指すシートかを確かめる (別のフェーズの同じ行番号を消さない)。
 function stubBoardConfig(h, sheetName) {
