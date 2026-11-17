@@ -1476,7 +1476,8 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx, lessonId) {
 
   let rawRows;
   try {
-    const fetched = getPublishedSheetData(null, 'newest', true, userId);
+    // 記録は先生だけが見るので、「ほかの児童に見せない」にした回答も入れる (includeHidden)。
+    const fetched = getPublishedSheetData(null, 'newest', true, userId, { includeHidden: true });
     if (!fetched || fetched.success === false || !Array.isArray(fetched.data)) {
       baseSnapshot.reason = 'CAPTURE_FAILED:' + ((fetched && fetched.error) || 'unknown');
       return baseSnapshot;
@@ -3331,8 +3332,9 @@ function toggleLessonHidden_(userId, lessonId, rowIndex, sheetName, expectedEmai
  * @param {number} rowIndex - __readAllLessonRows_ の rowIndex
  * @param {string} sheetName - 一覧が読んだシート (phase.sourceSheetName)
  * @param {string} expectedTimestamp - 一覧が見ていたその行の時刻 (必須。行がずれていたら消さない)
+ * @param {string} expectedEmail - 一覧が見ていたその行の児童 (必須。授業モードのシートは 1 児童 1 行)
  */
-function deleteLessonAnswer_(userId, lessonId, rowIndex, sheetName, expectedTimestamp) {
+function deleteLessonAnswer_(userId, lessonId, rowIndex, sheetName, expectedTimestamp, expectedEmail) {
   try {
     // 削除は所有者と管理者だけ (共同編集者は ☆ まで。ボードの削除と同じ線引き)。
     const auth = __requireLessonOwner_(userId, lessonId);
@@ -3352,7 +3354,12 @@ function deleteLessonAnswer_(userId, lessonId, rowIndex, sheetName, expectedTime
     if (!expectedTimestamp) {
       return createErrorResponse('ROW_CHANGED: 対象の回答を確かめられませんでした。一覧を読み込み直します');
     }
-    return deleteAnswerRow(userId, rowIndex, expectedTimestamp);
+    // 時刻に加えて、その行の児童 (メール) も行ロックの中で照合してもらう。
+    //   Why: 時刻が同じ回答が 2 つあると、行が繰り上がったあとの別の児童の行でも時刻は一致する。
+    if (!expectedEmail) {
+      return createErrorResponse('ROW_CHANGED: 対象の回答を確かめられませんでした。一覧を読み込み直します');
+    }
+    return deleteAnswerRow(userId, rowIndex, expectedTimestamp, { column: LESSON_NATIVE_COL_EMAIL, value: expectedEmail });
   } catch (error) {
     logError_('deleteLessonAnswer_', error);
     return createExceptionResponse(error);

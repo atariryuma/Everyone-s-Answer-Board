@@ -811,3 +811,20 @@ test('deleteAnswerRow: 削除後にボード cache の version を上げ、行�
   assert.ok(removed.includes('sheet_rows_ss-1_Sheet1'), '行数 cache を捨てる');
   assert.equal(cache.store.has('sheet_rows_ss-1_Sheet1'), false);
 });
+
+test('deleteAnswerRow: 時刻が同じでも、その行の児童が違えば消さない (expectedIdentity)', () => {
+  const same = new Date('2026-05-01T00:00:00Z');
+  const { ctx, deleted } = loadDeleteContext([
+    [same, 'a@example.com'],
+    [same, 'b@example.com']
+  ]);
+  // 一覧は 2 行目を a のつもりで見ていたが、行が繰り上がって 2 行目は b になっている、の逆を模す:
+  //   2 行目 (a) を b のつもりで消そうとする → 時刻は一致するが、児童が違うので止める
+  const wrong = ctx.deleteAnswerRow('u1', 2, '2026-05-01T00:00:00.000Z', { column: 2, value: 'b@example.com' });
+  assert.equal(wrong.success, false);
+  assert.equal(deleted.length, 0);
+
+  const right = ctx.deleteAnswerRow('u1', 2, '2026-05-01T00:00:00.000Z', { column: 2, value: ' A@Example.com ' });
+  assert.equal(right.success, true);
+  assert.deepEqual(deleted[0], { start: 2, count: 1 });
+});

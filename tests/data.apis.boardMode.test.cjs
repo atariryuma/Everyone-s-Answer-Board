@@ -323,3 +323,36 @@ test('hidden: 先生のボード (電子黒板に映る) にも返さない。�
     { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg, { isAdmin: false, isOwnBoard: true });
   assert.deepEqual(Array.from(anon.data, r => r.id), ['row_3', 'row_4']);
 });
+
+test('hidden: 授業の記録を取るとき (includeHidden) は全件を返す。印は載せない', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult_(
+    { data: HIDDEN_ROWS(), header: 'q', sheetName: 's' }, hiddenCfg,
+    { isAdmin: true, isOwnBoard: true, email: 'teacher@example.com', includeHidden: true });
+  assert.deepEqual(Array.from(result.data, r => r.id), ['row_2', 'row_3', 'row_4']);
+  assert.equal(result.data.some(r => 'hidden' in r), false);
+});
+
+// 児童の読み込みは、新しい版を読んでいる間、直前の結果 (押す前の行) を返すことがある。
+//   押したばかりの回答を覚えておき、直前の結果にも印を付け直す。
+test('hidden: 押したばかりの回答は、直前の結果 (印の無い古い行) にも印を付け直す。戻したら外れる', () => {
+  const store = new Map();
+  const ctx = loadDataApisContext({
+    CacheService: { getScriptCache: () => ({
+      get: (k) => (store.has(k) ? store.get(k) : null), put: (k, v) => { store.set(k, v); }, remove: (k) => { store.delete(k); }
+    }) },
+    safeJsonParse_: (text, fallback) => { try { return text ? JSON.parse(text) : fallback; } catch (_) { return fallback; } }
+  });
+  const staleRows = () => ({ success: true, stale: true, data: HIDDEN_ROWS().map(r => Object.assign({}, r, { hidden: false })) });
+
+  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u1').data.filter(r => r.hidden).length, 0);
+
+  ctx.noteRecentlyHidden_('u1', 'B@example.com', true);
+  const marked = ctx.markRecentlyHiddenRows_(staleRows(), 'u1');
+  assert.deepEqual(Array.from(marked.data.filter(r => r.hidden), r => r.id), ['row_3']);
+  // ほかのボードの覚えは見ない
+  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u2').data.filter(r => r.hidden).length, 0);
+
+  ctx.noteRecentlyHidden_('u1', 'b@example.com', false);
+  assert.equal(ctx.markRecentlyHiddenRows_(staleRows(), 'u1').data.filter(r => r.hidden).length, 0);
+});

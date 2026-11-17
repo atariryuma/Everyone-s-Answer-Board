@@ -1017,6 +1017,44 @@ function __limitRowsToLessonClasses_(result, viewerEmail, isOwnBoard, isAdmin, p
   }
 }
 
+// 「ほかの児童に見せない」を押したばかりの回答 (児童のメール) を、短い間だけ覚える。
+//   Why: 児童の読み込みは、新しい版を読んでいる間・読みに失敗している間、直前の結果 (LATEST。
+//   key に版が入らず 60 秒残る) を返す。それは押す前の行なので印が無く、絞り込みを通ってしまう。
+//   直前の結果を返すときだけこの覚えを見て、印を付け直す (ふだんの読み込みでは cache を読まない)。
+const RECENTLY_HIDDEN_TTL_SEC = 120;   // LATEST (60 秒) より長く
+function recentlyHiddenKey_(userId) { return 'board_hidden_recent_' + userId; }
+
+function noteRecentlyHidden_(userId, email, hidden) {
+  const key = String(email || '').trim().toLowerCase();
+  if (!userId || !key || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    const list = safeJsonParse_(cache.get(recentlyHiddenKey_(userId)), []);
+    const next = (Array.isArray(list) ? list : []).filter(e => e !== key);
+    if (hidden) next.push(key);
+    cache.put(recentlyHiddenKey_(userId), JSON.stringify(next.slice(-50)), RECENTLY_HIDDEN_TTL_SEC);
+  } catch (error) {
+    // 黙って落とさない: 覚え損ねると、隠した回答が直前の結果からほかの児童に最大 60 秒出うる。
+    console.warn('noteRecentlyHidden_ failed (a just-hidden answer may show from a stale board read):', error && error.message);
+  }
+}
+
+function markRecentlyHiddenRows_(result, userId) {
+  try {
+    if (!result || !Array.isArray(result.data) || typeof CacheService === 'undefined') return result;
+    const list = safeJsonParse_(CacheService.getScriptCache().get(recentlyHiddenKey_(userId)), []);
+    if (!Array.isArray(list) || list.length === 0) return result;
+    const hiddenEmails = new Set(list);
+    return Object.assign({}, result, {
+      data: result.data.map(r => (r && hiddenEmails.has(String(r.email || '').trim().toLowerCase()))
+        ? Object.assign({}, r, { hidden: true }) : r)
+    });
+  } catch (error) {
+    console.warn('markRecentlyHiddenRows_ failed (a just-hidden answer may show from a stale board read):', error && error.message);
+    return result;
+  }
+}
+
 function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
@@ -1031,8 +1069,11 @@ function buildSafePublishedDataResult_(result, config, viewerContext = {}) {
   //   印そのものは誰にも載せない (本人が気づく手がかりを画面に渡さない)。
   //   Why ここか: 行は閲覧者で共有する cache に全件入っている。ボードへ返す出口はここ 1 つ。
   const viewerKey = String(viewerContext.email || '').trim().toLowerCase();
+  //   例外は授業の記録 (アーカイブ) を取るとき (viewerContext.includeHidden)。記録は先生だけが
+  //   見るので全件を残す。getPublishedSheetData が所有者・管理者のときだけ立てる。
   const rows = (Array.isArray(viewerRows) ? viewerRows : []).filter(item =>
-    !(item && item.hidden) || (Boolean(viewerKey) && String(item.email || '').trim().toLowerCase() === viewerKey));
+    viewerContext.includeHidden === true || !(item && item.hidden)
+    || (Boolean(viewerKey) && String(item.email || '').trim().toLowerCase() === viewerKey));
 
   // Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡するために
   //      仮名化された emailHash を全モードで wire に乗せる。生メアドは showNames=false なら除去。
@@ -1427,7 +1468,11 @@ function normalizeSortOrder_(v) {
   return (typeof v === 'string' && BOARD_SORT_ORDERS_.indexOf(v) !== -1) ? v : 'newest';
 }
 
-function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) {
+/**
+ * @param {Object} [internalOpts] - { includeHidden }: 「ほかの児童に見せない」にした回答も返す。
+ *   授業の記録 (__captureSnapshot_) 用。所有者・管理者のときだけ効く (児童が渡しても無視する)。
+ */
+function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId, internalOpts) {
   classFilter = normalizeClassFilter_(classFilter);
   sortOrder = normalizeSortOrder_(sortOrder);
   adminMode = adminMode || false;
@@ -1487,7 +1532,10 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
             { allowStale: isViewerOnly, config: targetUserConfig })
         : getUserSheetData_(targetUser.userId, options, targetUser, targetUserConfig);
 
-      const result = cacheableResult;
+      // 直前の結果 (stale) は「見せない」を押す前の行かもしれない。押したばかりの回答には印を付け直す。
+      const result = (cacheableResult && cacheableResult.stale)
+        ? markRecentlyHiddenRows_(cacheableResult, targetUser.userId)
+        : cacheableResult;
 
       if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
@@ -1500,7 +1548,10 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           lessonPhase
         ),
         targetUserConfig,
-        { isAdmin: isSystemAdmin, isOwnBoard, email: viewerEmail }
+        {
+          isAdmin: isSystemAdmin, isOwnBoard, email: viewerEmail,
+          includeHidden: Boolean(internalOpts && internalOpts.includeHidden === true) && (isSystemAdmin || isOwnBoard)
+        }
       );
     }
 

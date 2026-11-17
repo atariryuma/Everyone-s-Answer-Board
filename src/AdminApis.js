@@ -1200,8 +1200,9 @@ function dispatchAdminOperation(operation, params) {
       if (!Number.isInteger(rowIndex) || rowIndex < 2) {
         return createErrorResponse('rowIndex が不正です', null, { error: 'INVALID_ROW_INDEX' });
       }
+      { const e = reqStr('expectedEmail'); if (e) return e; }
       return deleteLessonAnswer_(params.userId, params.lessonId, rowIndex, params.sheetName,
-        String(params.expectedTimestamp).slice(0, 64));
+        String(params.expectedTimestamp).slice(0, 64), String(params.expectedEmail).slice(0, 254));
     }
     case 'lesson.delete': {
       { const e = reqStr('userId'); if (e) return e; }

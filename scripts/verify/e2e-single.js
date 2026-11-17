@@ -282,8 +282,8 @@ check('先生(授業)', '回答を消す (lesson.deleteAnswer): 古いシート�
   const src = (live.phase && live.phase.sourceSheetName) || '';
   const row = (live.rows || [])[0];
   if (!row) return { pass: false, note: '一覧に回答がありません' };
-  const stale = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src + '_old', expectedTimestamp: row.timestamp });
-  const r = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src, expectedTimestamp: row.timestamp });
+  const stale = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src + '_old', expectedTimestamp: row.timestamp, expectedEmail: row.email });
+  const r = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src, expectedTimestamp: row.timestamp, expectedEmail: row.email });
   const after = (op('lesson.liveAnswers', { userId, lessonId }).data.rows || []).length;
   return { pass: !ok(stale) && ok(r) && after === (live.rows || []).length - 1, note: ok(r) ? `${(live.rows || []).length} 行 → ${after} 行` : text(r) };
 });

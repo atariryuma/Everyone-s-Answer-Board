@@ -690,9 +690,11 @@ function toComparableTimestamp_(v) {
  *   指定時、 削除直前に実シートの当該行 timestamp (列A) と照合し、 不一致なら abort する。
  *   deleteRows は後続行を 1 行ずつ繰り上げるため、 古い snapshot に基づく rowIndex で
  *   別の生徒の回答を誤削除する race を防ぐ (identity verification)。
+ * @param {{column:number, value:string}} [expectedIdentity] - その行の column 列 (1-based) が value で
+ *   あること (大文字小文字・前後空白は無視)。時刻が同じ回答が 2 つあっても別の行を消さないため。
  * @returns {Object} 削除結果
  */
-function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
+function deleteAnswerRow(userId, rowIndex, expectedTimestamp, expectedIdentity) {
   try {
     const currentEmail = getCurrentEmail();
     const user = findUserById_(userId, { requestingUser: currentEmail });
@@ -765,6 +767,14 @@ function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
         const expected = toComparableTimestamp_(expectedTimestamp);
         if (actual && expected && actual !== expected) {
           console.warn('deleteAnswerRow: timestamp mismatch (row shifted?)', { userId, rowIndex });
+          return createDataServiceErrorResponse('対象の回答が変更されています。画面を更新してからもう一度お試しください。');
+        }
+      }
+
+      if (expectedIdentity && typeof expectedIdentity.column === 'number' && expectedIdentity.column >= 1 && expectedIdentity.value) {
+        const norm = (v) => String(v === null || v === undefined ? '' : v).trim().toLowerCase();
+        if (norm(rowData[expectedIdentity.column - 1]) !== norm(expectedIdentity.value)) {
+          console.warn('deleteAnswerRow: row identity mismatch (row shifted?)', { userId, rowIndex });
           return createDataServiceErrorResponse('対象の回答が変更されています。画面を更新してからもう一度お試しください。');
         }
       }

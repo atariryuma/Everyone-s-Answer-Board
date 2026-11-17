@@ -1326,11 +1326,12 @@ test('deleteLessonAnswer_: 一覧のシートがボードと同じなら、行�
   seedThinkPhase(h, lessonId);
   stubBoardConfig(h, 'phase1');
   const calls = [];
-  h.context.deleteAnswerRow = (uid, row, ts) => { calls.push([uid, row, ts]); return { success: true }; };
+  h.context.deleteAnswerRow = (uid, row, ts, id) => { calls.push([uid, row, ts, Object.assign({}, id)]); return { success: true }; };
 
-  const res = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  const res = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z', 'b@example.com');
   assert.equal(res.success, true);
-  assert.deepEqual(calls, [['u1', 3, '2026-11-17T01:00:00.000Z']]);
+  // 時刻と、その行の児童 (メールの列) の両方を行ロックの中で照合させる
+  assert.deepEqual(calls, [['u1', 3, '2026-11-17T01:00:00.000Z', { column: 2, value: 'b@example.com' }]]);
 });
 
 test('deleteLessonAnswer_: フェーズが変わっていれば消さない (一覧のシートが古い / ボードが別のシート)', () => {
@@ -1342,19 +1343,19 @@ test('deleteLessonAnswer_: フェーズが変わっていれば消さない (一
 
   // ボードの config がまだ別のシートを指している
   stubBoardConfig(h, 'other');
-  const stale = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  const stale = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z', 'b@example.com');
   assert.equal(stale.success, false);
   assert.match(stale.message, /^PHASE_CHANGED/);
 
   // 一覧が見ていたシートが、いまのフェーズのシートではない
   stubBoardConfig(h, 'phase1');
-  const old = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phaseX', '2026-11-17T01:00:00.000Z');
+  const old = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phaseX', '2026-11-17T01:00:00.000Z', 'b@example.com');
   assert.equal(old.success, false);
   assert.match(old.message, /^PHASE_CHANGED/);
   assert.equal(called, false);
 });
 
-test('deleteLessonAnswer_: 時刻が無ければ消さない / 児童からは呼べない', () => {
+test('deleteLessonAnswer_: 時刻かメールが無ければ消さない / 児童からは呼べない', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
   seedThinkPhase(h, lessonId);
@@ -1362,12 +1363,15 @@ test('deleteLessonAnswer_: 時刻が無ければ消さない / 児童からは�
   let called = false;
   h.context.deleteAnswerRow = () => { called = true; return { success: true }; };
 
-  const noTs = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '');
+  const noTs = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '', 'b@example.com');
   assert.equal(noTs.success, false);
   assert.match(noTs.message, /^ROW_CHANGED/);
+  const noEmail = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z', '');
+  assert.equal(noEmail.success, false);
+  assert.match(noEmail.message, /^ROW_CHANGED/);
 
   h.setEmail('a@example.com');
-  const student = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  const student = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z', 'b@example.com');
   assert.equal(student.success, false);
   assert.equal(called, false);
 });

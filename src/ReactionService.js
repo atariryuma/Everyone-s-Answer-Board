@@ -719,7 +719,7 @@ function toggleHighlight(targetUserId, rowIndex, expect) {
  * 名前が _ で終わるのは、画面から直接呼ばせないため (入口は dispatchAdminOperation だけ)。
  */
 function toggleAnswerHidden_(targetUserId, rowIndex, expect) {
-  return executeBoardRowOperation_({
+  const res = executeBoardRowOperation_({
     targetUserId,
     rowIndex,
     expect,
@@ -736,6 +736,12 @@ function toggleAnswerHidden_(targetUserId, rowIndex, expect) {
       message: result.highlighted ? 'ほかの児童に見えないようにしました' : 'ほかの児童にも見えるように戻しました'
     })
   });
+  // 児童の読み込みが直前の結果 (押す前の行) を返す間も外せるよう、押した回答を短い間だけ覚える。
+  const email = expect && expect.rowIdentity && expect.rowIdentity.value;
+  if (res && res.success && email && typeof noteRecentlyHidden_ === 'function') {
+    noteRecentlyHidden_(targetUserId, email, res.hidden === true);
+  }
+  return res;
 }
 
 /**

@@ -5624,7 +5624,8 @@
         gasRun('lesson.deleteAnswer', {
           userId, lessonId, rowIndex, sheetName: src,
           // 行ロックの中で「その行がこの時刻の回答か」を照合してもらう (行番号がずれていたら消さない)。
-          expectedTimestamp: String(row.timestamp || '')
+          expectedTimestamp: String(row.timestamp || ''),
+          expectedEmail: String(row.email || '')
         }).then((res) => {
           if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を削除できませんでした'));
           window.notifications.success('回答を削除しました。ボードからも数秒で消えます', { duration: 2500 });
