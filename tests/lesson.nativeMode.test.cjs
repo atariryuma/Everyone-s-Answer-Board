@@ -1289,6 +1289,64 @@ test('toggleLessonHighlight: フェーズが変わって一覧のシートが古
   assert.equal(called, false);
 });
 
+// 管理パネルの回答一覧からの削除。ボードの deleteAnswerRow に委ねる前に、一覧のシートが
+//   いまボードの config が指すシートかを確かめる (別のフェーズの同じ行番号を消さない)。
+function stubBoardConfig(h, sheetName) {
+  h.context.getUserConfig = () => ({ success: true, config: { spreadsheetId: 'native_ss_1', sheetName } });
+}
+
+test('deleteLessonAnswer_: 一覧のシートがボードと同じなら、行と時刻を deleteAnswerRow に渡す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  stubBoardConfig(h, 'phase1');
+  const calls = [];
+  h.context.deleteAnswerRow = (uid, row, ts) => { calls.push([uid, row, ts]); return { success: true }; };
+
+  const res = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  assert.equal(res.success, true);
+  assert.deepEqual(calls, [['u1', 3, '2026-11-17T01:00:00.000Z']]);
+});
+
+test('deleteLessonAnswer_: フェーズが変わっていれば消さない (一覧のシートが古い / ボードが別のシート)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  let called = false;
+  h.context.deleteAnswerRow = () => { called = true; return { success: true }; };
+
+  // ボードの config がまだ別のシートを指している
+  stubBoardConfig(h, 'other');
+  const stale = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  assert.equal(stale.success, false);
+  assert.match(stale.message, /^PHASE_CHANGED/);
+
+  // 一覧が見ていたシートが、いまのフェーズのシートではない
+  stubBoardConfig(h, 'phase1');
+  const old = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phaseX', '2026-11-17T01:00:00.000Z');
+  assert.equal(old.success, false);
+  assert.match(old.message, /^PHASE_CHANGED/);
+  assert.equal(called, false);
+});
+
+test('deleteLessonAnswer_: 時刻が無ければ消さない / 児童からは呼べない', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  stubBoardConfig(h, 'phase1');
+  let called = false;
+  h.context.deleteAnswerRow = () => { called = true; return { success: true }; };
+
+  const noTs = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '');
+  assert.equal(noTs.success, false);
+  assert.match(noTs.message, /^ROW_CHANGED/);
+
+  h.setEmail('a@example.com');
+  const student = h.context.deleteLessonAnswer_('u1', lessonId, 3, 'phase1', '2026-11-17T01:00:00.000Z');
+  assert.equal(student.success, false);
+  assert.equal(called, false);
+});
+
 // =====================================================================
 // config パッチが実際の検証を通るか (本番で「開始」が失敗した回帰)
 //

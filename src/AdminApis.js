@@ -476,6 +476,7 @@ function markWelcomeSeen() {
 const __FRONTEND_USER_DISPATCH_OPS = Object.freeze(new Set([
   'lesson.list', 'lesson.create', 'lesson.delete', 'lesson.duplicate',
   'lesson.templates', 'lesson.review', 'lesson.liveAnswers', 'lesson.toggleHighlight',
+  'lesson.deleteAnswer',
   'lesson.closeForms', 'lesson.updateDraft',
   'lesson.start', 'lesson.advance', 'lesson.end', 'lesson.knownClasses',
   // reopenLesson は内部で所有者 / 管理者を検証する。allowlist に無いと教師の「再開する」が
@@ -1178,6 +1179,18 @@ function dispatchAdminOperation(operation, params) {
       }
       const expectedEmail = typeof params.expectedEmail === 'string' ? params.expectedEmail.slice(0, 254) : '';
       return toggleLessonHighlight(params.userId, params.lessonId, rowIndex, params.sheetName, expectedEmail);
+    }
+    case 'lesson.deleteAnswer': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      { const e = reqStr('sheetName'); if (e) return e; }
+      { const e = reqStr('expectedTimestamp'); if (e) return e; }
+      const rowIndex = Number(params.rowIndex);
+      if (!Number.isInteger(rowIndex) || rowIndex < 2) {
+        return createErrorResponse('rowIndex が不正です', null, { error: 'INVALID_ROW_INDEX' });
+      }
+      return deleteLessonAnswer_(params.userId, params.lessonId, rowIndex, params.sheetName,
+        String(params.expectedTimestamp).slice(0, 64));
     }
     case 'lesson.delete': {
       { const e = reqStr('userId'); if (e) return e; }

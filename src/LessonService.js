@@ -3290,6 +3290,48 @@ function toggleLessonHighlight(userId, lessonId, rowIndex, sheetName, expectedEm
   }
 }
 
+/**
+ * 授業中の回答一覧から、回答を 1 つ削除する (管理パネル。ボードの管理モードの削除と同じ処理)。
+ *
+ * 削除そのものはボードと同じ deleteAnswerRow (同じ行ロック・同じ cache の無効化) に委ねる。
+ * ここで確かめるのは「一覧が見ていたシートが、いまボードの config が指すシートか」だけ。
+ * Why: deleteAnswerRow はボードの config が指すシートの行番号を消す。フェーズ切替の直後に
+ *   押すと、別のフェーズのシートの同じ行番号 (別の児童) を消す。
+ * 名前が _ で終わるのは、画面から直接呼ばせないため (入口は dispatchAdminOperation だけ)。
+ *
+ * @param {string} userId
+ * @param {string} lessonId
+ * @param {number} rowIndex - __readAllLessonRows_ の rowIndex
+ * @param {string} sheetName - 一覧が読んだシート (phase.sourceSheetName)
+ * @param {string} expectedTimestamp - 一覧が見ていたその行の時刻 (必須。行がずれていたら消さない)
+ */
+function deleteLessonAnswer_(userId, lessonId, rowIndex, sheetName, expectedTimestamp) {
+  try {
+    // 削除は所有者と管理者だけ (共同編集者は ☆ まで。ボードの削除と同じ線引き)。
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    if (!auth.found || !auth.found.lesson) return createErrorResponse('授業が見つかりません');
+    const lessonJson = auth.found.lesson.lessonJson || {};
+    const phase = (lessonJson.phases || [])[__activePhaseIndex_(lessonJson)];
+    if (!phase) return createErrorResponse('現在のフェーズが見つかりません');
+    const patch = __buildPhaseConfigPatch_(phase, lessonJson, lessonId);
+    const changed = () => createErrorResponse('PHASE_CHANGED: フェーズが切り替わりました。一覧を読み込み直します');
+    if (String(sheetName || '') !== String(patch.sheetName || '')) return changed();
+    const cfg = getUserConfig(userId);
+    const config = (cfg && cfg.success && cfg.config) || null;
+    if (!config || config.spreadsheetId !== patch.spreadsheetId || config.sheetName !== patch.sheetName) {
+      return changed();
+    }
+    if (!expectedTimestamp) {
+      return createErrorResponse('ROW_CHANGED: 対象の回答を確かめられませんでした。一覧を読み込み直します');
+    }
+    return deleteAnswerRow(userId, rowIndex, expectedTimestamp);
+  } catch (error) {
+    logError_('deleteLessonAnswer_', error);
+    return createExceptionResponse(error);
+  }
+}
+
 // 1 フェーズ分の全回答を読む (航跡 / 見取り / 教師の回答一覧)。
 // 回答シートの読みは cache し、key にボードの data version (getBoardDataVersion_) を含める。
 //   Why cache か: 「ふりかえる」に入った瞬間、学級全員が同時に自分の航跡を読む (= 入力フェーズの

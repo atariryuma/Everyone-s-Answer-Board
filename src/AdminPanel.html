@@ -387,6 +387,11 @@
     }
     .live-hl-btn:disabled { opacity: 0.45; cursor: default; }
     .live-hl-btn.is-busy { cursor: progress; }
+    /* 削除: ☆ と同じ大きさ。色は hover のときだけ (ふだんは目立たせない) */
+    .live-del-btn { flex: none; width: 2.25rem; height: 2.25rem; background: transparent; color: var(--theme-text-muted); }
+    .live-del-btn:hover:not(:disabled) { color: var(--status-error); border-color: var(--status-error); }
+    .live-del-btn:disabled { opacity: 0.45; cursor: default; }
+    .live-del-btn.is-busy { cursor: progress; }
     /* 理由は 4 行で畳み、押すと全文 */
     .live-reason {
       margin: var(--space-2) 0 0; font-size: var(--font-size-sm); line-height: 1.55;

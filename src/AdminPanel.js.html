@@ -4959,6 +4959,7 @@
       baselineDone: false,              // 最初の読み込みで見えた分は NEW にしない
       expanded: new Set(),              // 理由を全文表示中のカード (rowIndex)
       pendingHl: new Set(),             // ハイライト送信中の rowIndex (連打防止)
+      pendingDel: new Set(),            // 削除送信中の rowIndex (連打防止)
       // 押した ★ の値を、サーバの読み込みで確かめられるまで上書きで保つ (key = シート:行)。
       //   Why: 押す前に始まった polling が古い行を持って帰り、★ を消していた。確定の応答も
       //   入れ替わる前の行に書いていたので、次の読み込み (最大 10 秒) まで ★ が消えたままだった。
@@ -5365,6 +5366,18 @@
       '</button>';
     }
 
+    // 削除ボタン (ボードの管理モードの削除と同じ処理)。押すと確認を出す。
+    function liveDelButton(a) {
+      const can = Number.isInteger(a.rowIndex) && a.rowIndex >= 2 && Boolean(a.timestamp);
+      const busy = live.pendingDel.has(a.rowIndex);
+      return '<button type="button" class="icon-btn live-del-btn' + (busy ? ' is-busy' : '') + '"' +
+        ' data-live-del="' + (can ? a.rowIndex : '') + '"' +
+        ' aria-label="この回答を削除" title="この回答を削除"' +
+        (can && !busy ? '' : ' disabled') + '>' +
+        '<svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>' +
+      '</button>';
+    }
+
     function liveReason(a, sheetName, esc) {
       const key = liveRowKey(sheetName, a.rowIndex);
       return '<p class="live-reason' + (live.expanded.has(key) ? ' is-expanded' : '') + '" data-live-row="' + esc(key) + '">' +
@@ -5388,6 +5401,7 @@
             (fresh ? '<span class="live-badge">' + esc(fresh) + '</span>' : '') +
           '</div>' +
           liveHlButton(r) +
+          liveDelButton(r) +
         '</div>' +
         liveReason(r, src, esc) +
       '</article>';
@@ -5539,6 +5553,44 @@
       });
     }
 
+    // 回答を 1 つ削除する。確認 → サーバ (シートと時刻を照合してから消す) → 一覧を読み直す。
+    //   楽観更新はしない: 消えたように見せてから失敗すると、残っている回答を見落とす。
+    function liveDeleteAnswer(btn) {
+      const rowIndex = Number(btn.dataset.liveDel);
+      const d = live.data;
+      if (!rowIndex || !d || !d.phase || live.pendingDel.has(rowIndex)) return;
+      const src = d.phase.sourceSheetName || '';
+      const row = (d.rows || []).find((r) => r.rowIndex === rowIndex);
+      if (!row) return;
+      const lessonId = live.lessonId;
+      const who = live.hideNames ? 'この回答' : '「' + (row.name || row.email || '名前なし') + '」の回答';
+      window.modals.confirm(
+        who + 'を削除します。ボードからも消え、元に戻せません。',
+        { title: '回答を削除', variant: 'danger', okLabel: '削除する' }
+      ).then((ok) => {
+        if (!ok || lessonId !== live.lessonId) return;
+        live.pendingDel.add(rowIndex);
+        liveRender();
+        gasRun('lesson.deleteAnswer', {
+          userId, lessonId, rowIndex, sheetName: src,
+          // 行ロックの中で「その行がこの時刻の回答か」を照合してもらう (行番号がずれていたら消さない)。
+          expectedTimestamp: String(row.timestamp || '')
+        }).then((res) => {
+          if (!res || !res.success) throw new Error(window.serverMessage(res, '回答を削除できませんでした'));
+          window.notifications.success('回答を削除しました。ボードからも数秒で消えます', { duration: 2500 });
+        }).catch((err) => {
+          const msg = (err && err.message) || '回答を削除できませんでした';
+          window.notifications.error(msg.replace(/^(PHASE|ROW)_CHANGED:\s*/, ''));
+        }).finally(() => {
+          live.pendingDel.delete(rowIndex);
+          // 成功でも失敗でも読み直す (行番号がずれるので、古い一覧のまま次を押させない)。
+          live.sig = '';
+          liveRender();
+          liveFetch();
+        });
+      });
+    }
+
     (function initLessonLive() {
       const root = document.getElementById('lesson-live');
       if (!root) return;
@@ -5555,6 +5607,8 @@
         }
         const hlBtn = event.target.closest('[data-live-hl]');
         if (hlBtn && !hlBtn.disabled) { liveToggleHighlight(hlBtn); return; }
+        const delBtn = event.target.closest('[data-live-del]');
+        if (delBtn && !delBtn.disabled) { liveDeleteAnswer(delBtn); return; }
         if (event.target.closest('#lesson-live-names')) {
           live.hideNames = !live.hideNames;
           liveStore(LIVE_STORE_NAMES, live.hideNames ? '1' : '0');
