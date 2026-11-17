@@ -74,7 +74,7 @@ const OPERATIONS = [
   'lesson.list', 'lesson.review', 'lesson.reviewGrid', 'lesson.delete',
   'lesson.duplicate', 'lesson.templates', 'lesson.knownClasses',
   'lesson.closeForms', 'lesson.reorderPhases', 'lesson.recaptureArchive',
-  'lesson.liveAnswers', 'lesson.toggleHighlight',
+  'lesson.liveAnswers', 'lesson.toggleHighlight', 'lesson.deleteAnswer',
   // 共有の本体からの引っ越し (scripts/migrate-to-single.js)
   'migrate.importLesson', 'migrate.importConfig', 'migrate.importLessonAnswers',
 ];

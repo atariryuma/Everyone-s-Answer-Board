@@ -257,6 +257,16 @@ check('児童(授業)', '「もう一度考える」で送る', () => { const a 
 check('児童(授業)', '自分の考えの移り変わり (getMyLessonTrajectory)', () => { const r = inv('getMyLessonTrajectory', [userId], STUDENT[0]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 check('児童(授業)', '更新を確かめる (getNotificationUpdate, 授業中)', () => { const r = inv('getNotificationUpdate', [userId, {}], STUDENT[1]); return { pass: ok(r) && r.lessonPhase !== undefined, note: ok(r) ? `フェーズ ${r.lessonPhase && r.lessonPhase.phaseIndex}` : text(r) }; });
 check('授業', 'アーカイブを取り直す (lesson.recaptureArchive, いま映しているフェーズ)', () => { const r = op('lesson.recaptureArchive', { userId, lessonId, phaseIndex: 3 }); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
+check('先生(授業)', '回答を消す (lesson.deleteAnswer): 古いシート名では消さず、いまのシートなら消える', () => {
+  const live = op('lesson.liveAnswers', { userId, lessonId }).data;
+  const src = (live.phase && live.phase.sourceSheetName) || '';
+  const row = (live.rows || [])[0];
+  if (!row) return { pass: false, note: '一覧に回答がありません' };
+  const stale = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src + '_old', expectedTimestamp: row.timestamp });
+  const r = op('lesson.deleteAnswer', { userId, lessonId, rowIndex: row.rowIndex, sheetName: src, expectedTimestamp: row.timestamp });
+  const after = (op('lesson.liveAnswers', { userId, lessonId }).data.rows || []).length;
+  return { pass: !ok(stale) && ok(r) && after === (live.rows || []).length - 1, note: ok(r) ? `${(live.rows || []).length} 行 → ${after} 行` : text(r) };
+});
 check('先生(授業)', 'フェーズを進める: ふりかえる', () => { const r = inv('advanceLessonPhase', [userId, lessonId, 'next', null]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 check('授業', '授業を終える → アーカイブ (lesson.end)', () => { const r = op('lesson.end', { userId, lessonId }); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 check('授業', 'ふりかえり (lesson.review)', () => {
