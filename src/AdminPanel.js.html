@@ -5453,6 +5453,7 @@
     }
 
     // 削除ボタン (ボードの管理モードの削除と同じ処理)。押すと確認を出す。
+    //   出すのは「見せない」にした回答だけ (liveCard が判定する)。
     function liveDelButton(a) {
       const can = Number.isInteger(a.rowIndex) && a.rowIndex >= 2 && Boolean(a.timestamp);
       const busy = live.pendingDel.has(a.rowIndex);
@@ -5489,7 +5490,9 @@
           '</div>' +
           liveHlButton(r) +
           liveHideButton(r) +
-          liveDelButton(r) +
+          // ごみ箱は「見せない」にした回答にだけ出す (隠す → 消す の 2 段階)。
+          //   Why: 削除は戻せない。☆ の隣に常に置くと、授業中の押し間違いで回答が消える。
+          (r.hidden ? liveDelButton(r) : '') +
         '</div>' +
         (Array.isArray(reasons) && reasons.length
           ? '<ul class="live-why" aria-label="おすすめの理由">' +
