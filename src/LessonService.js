@@ -3264,7 +3264,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
 const LESSON_FOCUS_WORDS_MAX = 15;
 const LESSON_FOCUS_WORD_LEN = 20;
-// 側ごとに返す候補の数。画面は各側の先頭 3 件を出し、☆ が付いたら同じ側の次を上げる。
+// 側ごとに返す候補の数。画面は各側の先頭 3 件を出す。多めに返すのは、画面でクラスを
+//   絞り込んだときにも 3 件そろうようにするため。
 const LESSON_RECOMMEND_PER_SIDE = 6;
 
 // 注目する言葉を配列にそろえる (文字列ならカンマ・読点・改行で分ける)。重複と空を落とす。
@@ -3322,7 +3323,9 @@ function __prevPositionsForSource_(phases, phaseIndex, sourceSheetName, boardUse
  * 位置の動きは順位に使わない。事実として札に添えるだけ (moved / same)。
  *   Why: 「位置でなく理由で見取る」が授業の方針。動いた児童を上に出すと、動くことが
  *   良い例に見える。
- * ☆ を付けた回答と、見せないにした回答は候補にしない (先生がもう扱ったもの)。
+ * ☆ を付けた回答も候補に入れる (2026-11-18 に持ち主が決めた: ☆ の有無で評価を変えない。
+ *   外すと、良い回答ほど先に ☆ が付いておすすめから消え、残りだけの順位になる)。
+ * 見せないにした回答は候補にしない。
  *
  * @param {Array<Object>} rows - 一覧の行 (__readAllLessonRows_ の形)
  * @param {Object} [opts] - { focusWords, boardMode, prevByEmail, perSide }
@@ -3345,7 +3348,7 @@ function __recommendLessonAnswers_(rows, opts) {
     return x < mid ? 'low' : 'high';
   };
 
-  // 少数の側: 人数は ☆ 済みの回答も含めて数える (立場の分布そのものを見るため)。
+  // 少数の側: 立場の分布そのものを見る (見せないにした回答も人数には数える)。
   const sideCount = { low: 0, mid: 0, high: 0 };
   list.forEach((r) => { sideCount[sideOf(r)] += 1; });
   const present = Object.keys(sideCount).filter(k => sideCount[k] > 0);
@@ -3355,7 +3358,7 @@ function __recommendLessonAnswers_(rows, opts) {
     if (sideCount[sorted[0]] < sideCount[sorted[1]] && sideCount[sorted[0]] * 3 <= list.length) fewSide = sorted[0];
   }
 
-  const infos = list.filter(r => !r.highlight && !r.hidden).map((r) => {
+  const infos = list.filter(r => !r.hidden).map((r) => {
     const text = __foldForMatch_(String(r.reason || '') + '\n' + String(r.addedInsight || ''));
     const hits = words.filter(w => text.indexOf(w.folded) >= 0).map(w => w.raw);
     const x = num(r.numericX);

@@ -5313,7 +5313,7 @@
     //   Why 側ごとか: 先生が決めたいのは「だれとだれを対比させるか」。下の「位置ごと」と同じ並びに
     //   しておけば、そのまま指名の計画になる。
     //   候補はサーバが側ごとに読む順で返す (LessonService.js の __recommendLessonAnswers_)。ここでは
-    //   いま表示している行のうち ☆ の付いていない先頭 3 件を取るだけ。☆ を押すと同じ側の次が上がる。
+    //   いま表示している行のうち先頭 3 件を取るだけ。☆ を付けた回答も外さない (☆ の有無で評価を変えない)。
     //   候補のいない側の列は出さない。
     const LIVE_RECOMMEND_PER_SIDE = 3;
     const LIVE_SIDES = ['low', 'mid', 'high'];
@@ -5331,7 +5331,7 @@
       (Array.isArray(recommend) ? recommend : []).forEach((rec) => {
         const row = byRow.get(rec.rowIndex);
         // 行番号だけで結ぶと、削除で番号が詰まった直後に別の児童を指すので、メールも確かめる。
-        if (!row || row.highlight || row.hidden || (rec.email && rec.email !== row.email)) return;
+        if (!row || row.hidden || (rec.email && rec.email !== row.email)) return;
         if (queue[rec.side]) queue[rec.side].push({ rec, row });
       });
       const cols = LIVE_SIDES
@@ -5342,7 +5342,7 @@
       el.innerHTML =
         '<header class="live-recommend-head">' +
           '<h4 id="lesson-live-recommend-title" class="live-recommend-title">おすすめ</h4>' +
-          '<span class="live-recommend-note">立場ごとに、言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。上から第 1〜第 3 候補で、☆ を付けると次の候補が上がります。</span>' +
+          '<span class="live-recommend-note">立場ごとに、言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。上から第 1〜第 3 候補です。☆ を付けた回答もそのまま残ります。</span>' +
         '</header>' +
         '<div class="live-rec-cols">' + cols.map((c) => (
           '<section class="live-rec-slot">' +

@@ -2640,7 +2640,7 @@ test('__recommendLessonAnswers_: 全角半角・空白の違いは同じ言葉�
   assert.equal(rec[0].reasons[0].kind, 'word');
 });
 
-test('__recommendLessonAnswers_: ☆ 済みと「見せない」の回答は候補にしない', () => {
+test('__recommendLessonAnswers_: ☆ 済みの回答も候補に入れる (☆ の有無で評価を変えない)。「見せない」は外す', () => {
   const h = loadContext();
   const rows = [
     recRow(2, 3, 3, '許せない', { highlight: true }),
@@ -2648,7 +2648,7 @@ test('__recommendLessonAnswers_: ☆ 済みと「見せない」の回答は候�
     recRow(4, 3, 3, '許せない')
   ];
   const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['許せない'], boardMode: 'matrix' }));
-  assert.deepEqual(rec.map(r => r.rowIndex), [4]);
+  assert.deepEqual(rec.map(r => r.rowIndex), [2, 4]);
 });
 
 test('__recommendLessonAnswers_: 基準に当たる回答が無い側も空にしない (理由の長い回答を出す。理由が空なら出さない)', () => {
