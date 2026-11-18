@@ -2677,12 +2677,12 @@ test('__recommendLessonAnswers_: 端の立場と書き足しは、側の中で�
   assert.equal(rec[1].reasons[0].kind, 'added');
 });
 
-test('__recommendLessonAnswers_: 側ごとの候補は 4 件まで', () => {
+test('__recommendLessonAnswers_: 側ごとの候補は 6 件まで', () => {
   const h = loadContext();
   const rows = [];
   for (let i = 2; i < 12; i++) rows.push(recRow(i, 5, 3, '許せない ' + i));
   const rec = Array.from(h.context.__recommendLessonAnswers_(rows, { focusWords: ['許せない'], boardMode: 'matrix' }));
-  assert.deepEqual(rec.map(r => r.rowIndex), [2, 3, 4, 5], '同じ強さなら先に届いた順');
+  assert.deepEqual(rec.map(r => r.rowIndex), [2, 3, 4, 5, 6, 7], '同じ強さなら先に届いた順');
 });
 
 test('__recommendLessonAnswers_: 位置の動きは順位に使わず、事実として札に添えるだけ', () => {

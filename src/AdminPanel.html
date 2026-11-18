@@ -402,7 +402,8 @@
     .live-recommend-head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
     .live-recommend-title { margin: 0; font-size: var(--font-size-sm); font-weight: 700; color: var(--theme-text-primary); }
     .live-recommend-note { font-size: var(--font-size-xs); color: var(--theme-text-muted); }
-    .live-rec-slot { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+    .live-rec-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--space-3); align-items: start; }
+    .live-rec-slot { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
     .live-rec-side { margin: 0; font-size: var(--font-size-xs); font-weight: 700; color: var(--theme-text-secondary); }
     /* 注目する言葉: 色は足さず、太字と下線だけ (カードを色だらけにしない) */
     .live-word { font-weight: 700; color: var(--theme-text-primary); border-bottom: 1px solid currentColor; }

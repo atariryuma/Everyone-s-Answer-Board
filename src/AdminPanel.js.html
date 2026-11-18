@@ -5309,20 +5309,14 @@
       body.innerHTML = liveRenderGroups(rows, axis, card, esc);
     }
 
-    // おすすめ: 横軸の側 (左寄り / まん中 / 右寄り) ごとに 1 件ずつ、計 3 件を出す。
+    // おすすめ: 横軸の側 (左寄り / まん中 / 右寄り) ごとに、第 3 候補までを上から読む順で出す。
     //   Why 側ごとか: 先生が決めたいのは「だれとだれを対比させるか」。下の「位置ごと」と同じ並びに
     //   しておけば、そのまま指名の計画になる。
     //   候補はサーバが側ごとに読む順で返す (LessonService.js の __recommendLessonAnswers_)。ここでは
-    //   いま表示している行のうち ☆ の付いていない先頭を取るだけ。☆ を押すと同じ側の次が出る。
-    //   誰もいない (候補が尽きた) 側の分は、人数の多い側からもう 1 件出す。
-    const LIVE_RECOMMEND_SHOWN = 3;
+    //   いま表示している行のうち ☆ の付いていない先頭 3 件を取るだけ。☆ を押すと同じ側の次が上がる。
+    //   候補のいない側の列は出さない。
+    const LIVE_RECOMMEND_PER_SIDE = 3;
     const LIVE_SIDES = ['low', 'mid', 'high'];
-    function liveSideOf(r, axis) {
-      const mid = ((Number(axis.min) || 1) + (Number(axis.max) || 5)) / 2;
-      const x = r.numericX;
-      if (x === null || x === undefined || !Number.isFinite(Number(x)) || Number(x) === mid) return 'mid';
-      return Number(x) < mid ? 'low' : 'high';
-    }
     function liveSideTitle(side, axis) {
       const xl = (axis.x && axis.x.min) || '';
       const xh = (axis.x && axis.x.max) || '';
@@ -5340,28 +5334,21 @@
         if (!row || row.highlight || row.hidden || (rec.email && rec.email !== row.email)) return;
         if (queue[rec.side]) queue[rec.side].push({ rec, row });
       });
-      const count = { low: 0, mid: 0, high: 0 };
-      rows.forEach((r) => { count[liveSideOf(r, axis)] += 1; });
-      const picks = [];
-      LIVE_SIDES.forEach((side) => { if (queue[side].length) picks.push(queue[side].shift()); });
-      while (picks.length < LIVE_RECOMMEND_SHOWN) {
-        const rest = LIVE_SIDES.filter((side) => queue[side].length).sort((a, b) => count[b] - count[a]);
-        if (!rest.length) break;
-        picks.push(queue[rest[0]].shift());
-      }
-      if (!picks.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-      picks.sort((a, b) => LIVE_SIDES.indexOf(a.rec.side) - LIVE_SIDES.indexOf(b.rec.side));
+      const cols = LIVE_SIDES
+        .map((side) => ({ side, picks: queue[side].slice(0, LIVE_RECOMMEND_PER_SIDE) }))
+        .filter((c) => c.picks.length);
+      if (!cols.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
       el.classList.remove('hidden');
       el.innerHTML =
         '<header class="live-recommend-head">' +
           '<h4 id="lesson-live-recommend-title" class="live-recommend-title">おすすめ</h4>' +
-          '<span class="live-recommend-note">立場のちがう回答を 1 件ずつ、言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。☆ を付けると次の候補が出ます。</span>' +
+          '<span class="live-recommend-note">立場ごとに、言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。上から第 1〜第 3 候補で、☆ を付けると次の候補が上がります。</span>' +
         '</header>' +
-        '<div class="live-list">' + picks.map((x) => (
-          '<div class="live-rec-slot">' +
-            '<p class="live-rec-side">' + esc(liveSideTitle(x.rec.side, axis)) + '</p>' +
-            liveCard(x.row, axis, showClass, src, esc, x.rec.reasons) +
-          '</div>'
+        '<div class="live-rec-cols">' + cols.map((c) => (
+          '<section class="live-rec-slot">' +
+            '<p class="live-rec-side">' + esc(liveSideTitle(c.side, axis)) + '</p>' +
+            c.picks.map((x) => liveCard(x.row, axis, showClass, src, esc, x.rec.reasons)).join('') +
+          '</section>'
         )).join('') + '</div>';
     }
 

@@ -3264,8 +3264,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
 const LESSON_FOCUS_WORDS_MAX = 15;
 const LESSON_FOCUS_WORD_LEN = 20;
-// 側ごとに返す候補の数。画面は各側の先頭 1 件を出し、☆ が付いたら同じ側の次を出す。
-const LESSON_RECOMMEND_PER_SIDE = 4;
+// 側ごとに返す候補の数。画面は各側の先頭 3 件を出し、☆ が付いたら同じ側の次を上げる。
+const LESSON_RECOMMEND_PER_SIDE = 6;
 
 // 注目する言葉を配列にそろえる (文字列ならカンマ・読点・改行で分ける)。重複と空を落とす。
 function __normalizeFocusWords_(value) {
