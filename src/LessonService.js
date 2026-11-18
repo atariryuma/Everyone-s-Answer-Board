@@ -3264,9 +3264,8 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
 const LESSON_FOCUS_WORDS_MAX = 15;
 const LESSON_FOCUS_WORD_LEN = 20;
-const LESSON_RECOMMEND_LIMIT = 6;
-// 「大きく動いた」と呼ぶ下限 (5 段階の目盛りで 2 つ分)。1 つ隣への移動は拾わない。
-const LESSON_RECOMMEND_MOVED_MIN = 2;
+// 側ごとに返す候補の数。画面は各側の先頭 1 件を出し、☆ が付いたら同じ側の次を出す。
+const LESSON_RECOMMEND_PER_SIDE = 4;
 
 // 注目する言葉を配列にそろえる (文字列ならカンマ・読点・改行で分ける)。重複と空を落とす。
 function __normalizeFocusWords_(value) {
@@ -3311,23 +3310,28 @@ function __prevPositionsForSource_(phases, phaseIndex, sourceSheetName, boardUse
 /**
  * 先生が読む候補を選ぶ (純粋な計算。シートも cache も触らない)。
  *
- * 選ぶ基準は 4 つ。どれも「読む順の目安」で、評価ではない (画面にもそう書く):
- *   - word : 注目する言葉を理由に含む
- *   - moved: 前の入力フェーズから位置が大きく動いた (prevByEmail があるときだけ)
- *   - few  : 横軸で少数の側にいる (その側の人数が全体の 1/3 以下で、最も少ない)
- *   - edge : 横軸か縦軸の端にいる
- * 基準を順に回して 1 件ずつ取り、まだ出ていない側 (左 / まん中 / 右) の回答を先に取る。
- *   Why: 言葉に当たった回答だけで埋めると、同じ立場の回答が並んで指名の対比に使えない。
+ * 横軸の側 (low = 左寄り / mid = まん中 / high = 右寄り) ごとに、読む順に並べて返す。
+ *   Why 側ごとか: 先生が授業中に決めたいのは「だれとだれを対比させるか」。総合順に並べると
+ *   同じ側の回答が続き、指名の対比に使えない (2026-11-18、指導案に沿って流れを追って決めた)。
+ * 側の中では、当てはまる基準が多い回答を先にする:
+ *   - word  : 注目する言葉を理由か書き足しに含む (一番重い)
+ *   - added : 書き足しがある
+ *   - edge  : 横軸か縦軸の端にいる
+ * どれにも当たらない回答は、理由の長い順に後ろへ続ける (detail)。
+ *   Why: 対比には各側から 1 人要る。基準に当たる回答が無い側を空にしない。
+ * 位置の動きは順位に使わない。事実として札に添えるだけ (moved / same)。
+ *   Why: 「位置でなく理由で見取る」が授業の方針。動いた児童を上に出すと、動くことが
+ *   良い例に見える。
  * ☆ を付けた回答と、見せないにした回答は候補にしない (先生がもう扱ったもの)。
  *
  * @param {Array<Object>} rows - 一覧の行 (__readAllLessonRows_ の形)
- * @param {Object} [opts] - { focusWords, boardMode, prevByEmail, limit }
- * @returns {Array<Object>} [{ rowIndex, email, reasons: [{ kind, label }] }] 上から読む順
+ * @param {Object} [opts] - { focusWords, boardMode, prevByEmail, perSide }
+ * @returns {Array<Object>} [{ rowIndex, email, side, reasons: [{ kind, label }] }] 側ごとに読む順
  */
 function __recommendLessonAnswers_(rows, opts) {
   const o = opts || {};
   const list = Array.isArray(rows) ? rows.filter(r => r && Number.isInteger(r.rowIndex)) : [];
-  const limit = Number.isInteger(o.limit) ? o.limit : LESSON_RECOMMEND_LIMIT;
+  const perSide = Number.isInteger(o.perSide) ? o.perSide : LESSON_RECOMMEND_PER_SIDE;
   const mid = (LESSON_SCALE_MIN + LESSON_SCALE_MAX) / 2;
   const half = LESSON_SCALE_MAX - mid;
   const isMatrix = o.boardMode === 'matrix';
@@ -3356,67 +3360,46 @@ function __recommendLessonAnswers_(rows, opts) {
     const hits = words.filter(w => text.indexOf(w.folded) >= 0).map(w => w.raw);
     const x = num(r.numericX);
     const y = isMatrix ? num(r.numericY) : null;
-    const dx = x === null ? 0 : Math.abs(x - mid);
-    const dy = y === null ? 0 : Math.abs(y - mid);
+    const edge = (x !== null && Math.abs(x - mid) >= half) || (y !== null && Math.abs(y - mid) >= half);
+    const added = String(r.addedInsight || '').trim().length > 0;
     const p = prev && r.email ? prev[r.email] : null;
-    let moved = 0;
+    let movedFact = null;
     if (p && x !== null && num(p.numericX) !== null) {
-      const mx = x - num(p.numericX);
-      const my = (isMatrix && y !== null && num(p.numericY) !== null) ? y - num(p.numericY) : 0;
-      moved = Math.sqrt(mx * mx + my * my);
+      const sameY = !isMatrix || y === null || num(p.numericY) === null || y === num(p.numericY);
+      movedFact = (x === num(p.numericX) && sameY) ? 'same' : 'moved';
     }
     const side = sideOf(r);
     return {
-      row: r, side, hits, moved,
-      edge: (dx >= half || dy >= half) ? Math.sqrt(dx * dx + dy * dy) : 0,
-      few: fewSide !== null && side === fewSide
+      row: r, side, hits, edge, added, movedFact,
+      few: fewSide !== null && side === fewSide,
+      len: __foldForMatch_(r.reason).length,
+      // 言葉が一番重い (2 個め・3 個めは少しだけ足す)。少数の側は側の中で全員同じなので数えない。
+      score: (hits.length ? 2 + Math.min(hits.length - 1, 2) * 0.5 : 0) + (added ? 1 : 0) + (edge ? 1 : 0)
     };
   });
 
   // 同じ強さなら先に届いた回答を先に (新着で並びが入れ替わりにくい)。
   const byArrival = (a, b) => String(a.row.timestamp || '').localeCompare(String(b.row.timestamp || ''))
     || (a.row.rowIndex - b.row.rowIndex);
-  const cats = {
-    word: infos.filter(i => i.hits.length > 0).sort((a, b) => (b.hits.length - a.hits.length) || byArrival(a, b)),
-    moved: infos.filter(i => i.moved >= LESSON_RECOMMEND_MOVED_MIN).sort((a, b) => (b.moved - a.moved) || byArrival(a, b)),
-    few: infos.filter(i => i.few).sort(byArrival),
-    edge: infos.filter(i => i.edge > 0).sort((a, b) => (b.edge - a.edge) || byArrival(a, b))
-  };
-  const order = prev ? ['moved', 'word', 'few', 'edge'] : ['word', 'few', 'edge'];
-  const labelOf = (kind, i) => {
-    if (kind === 'word') return '言葉：' + i.hits.join('・');
-    if (kind === 'moved') return '● から大きく動いた';
-    if (kind === 'few') return '少数の立場';
-    return '端の立場';
+  const reasonsOf = (i) => {
+    const out = [];
+    if (i.hits.length) out.push({ kind: 'word', label: '言葉：' + i.hits.join('・') });
+    if (i.added) out.push({ kind: 'added', label: '書き足しあり' });
+    if (i.edge) out.push({ kind: 'edge', label: '端の立場' });
+    if (i.few) out.push({ kind: 'few', label: '少数の立場' });
+    if (i.score === 0) out.push({ kind: 'detail', label: '理由がくわしい' });
+    if (i.movedFact) out.push({ kind: i.movedFact, label: i.movedFact === 'moved' ? '● から動いた' : '● と同じ位置' });
+    return out;
   };
 
-  const chosen = [];
-  const taken = new Set();
-  const usedSides = new Set();
-  let progressed = true;
-  while (chosen.length < limit && progressed) {
-    progressed = false;
-    for (let c = 0; c < order.length && chosen.length < limit; c++) {
-      const rest = cats[order[c]].filter(i => !taken.has(i.row.rowIndex));
-      if (!rest.length) continue;
-      const pick = rest.find(i => !usedSides.has(i.side)) || rest[0];
-      taken.add(pick.row.rowIndex);
-      usedSides.add(pick.side);
-      chosen.push({ info: pick, first: order[c] });
-      progressed = true;
-    }
-  }
-
-  return chosen.map(({ info, first }) => {
-    const kinds = [first].concat(order.filter(k => k !== first && (
-      (k === 'word' && info.hits.length > 0) || (k === 'moved' && info.moved >= LESSON_RECOMMEND_MOVED_MIN)
-      || (k === 'few' && info.few) || (k === 'edge' && info.edge > 0))));
-    return {
-      rowIndex: info.row.rowIndex,
-      email: info.row.email || '',
-      reasons: kinds.map(k => ({ kind: k, label: labelOf(k, info) }))
-    };
+  const out = [];
+  ['low', 'mid', 'high'].forEach((side) => {
+    infos.filter(i => i.side === side && (i.score > 0 || i.len > 0))
+      .sort((a, b) => (b.score - a.score) || (a.score === 0 ? b.len - a.len : 0) || byArrival(a, b))
+      .slice(0, perSide)
+      .forEach((i) => out.push({ rowIndex: i.row.rowIndex, email: i.row.email || '', side, reasons: reasonsOf(i) }));
   });
+  return out;
 }
 
 // 短い sig (djb2)。一覧の polling で「前回と同じか」だけを判定する。暗号用途ではない。

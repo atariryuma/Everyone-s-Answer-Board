@@ -5309,26 +5309,60 @@
       body.innerHTML = liveRenderGroups(rows, axis, card, esc);
     }
 
-    // おすすめ: サーバが選んだ候補 (最大 6 件) から、いま表示している行のうち ☆ の付いていない
-    //   先頭 3 件を出す。☆ を押すと外れ、次の候補が上がる (授業中の操作を ☆ だけにする)。
-    //   選び方は LessonService.js の __recommendLessonAnswers_。ここでは並べるだけ。
+    // おすすめ: 横軸の側 (左寄り / まん中 / 右寄り) ごとに 1 件ずつ、計 3 件を出す。
+    //   Why 側ごとか: 先生が決めたいのは「だれとだれを対比させるか」。下の「位置ごと」と同じ並びに
+    //   しておけば、そのまま指名の計画になる。
+    //   候補はサーバが側ごとに読む順で返す (LessonService.js の __recommendLessonAnswers_)。ここでは
+    //   いま表示している行のうち ☆ の付いていない先頭を取るだけ。☆ を押すと同じ側の次が出る。
+    //   誰もいない (候補が尽きた) 側の分は、人数の多い側からもう 1 件出す。
     const LIVE_RECOMMEND_SHOWN = 3;
+    const LIVE_SIDES = ['low', 'mid', 'high'];
+    function liveSideOf(r, axis) {
+      const mid = ((Number(axis.min) || 1) + (Number(axis.max) || 5)) / 2;
+      const x = r.numericX;
+      if (x === null || x === undefined || !Number.isFinite(Number(x)) || Number(x) === mid) return 'mid';
+      return Number(x) < mid ? 'low' : 'high';
+    }
+    function liveSideTitle(side, axis) {
+      const xl = (axis.x && axis.x.min) || '';
+      const xh = (axis.x && axis.x.max) || '';
+      if (side === 'low') return xl ? '「' + xl + '」寄り' : '左寄り';
+      if (side === 'high') return xh ? '「' + xh + '」寄り' : '右寄り';
+      return 'まん中';
+    }
     function liveRenderRecommend(el, recommend, rows, axis, showClass, src, esc) {
       if (!el) return;
       const byRow = new Map(rows.map((r) => [r.rowIndex, r]));
-      const picks = (Array.isArray(recommend) ? recommend : [])
-        .map((rec) => ({ rec, row: byRow.get(rec.rowIndex) }))
+      const queue = { low: [], mid: [], high: [] };
+      (Array.isArray(recommend) ? recommend : []).forEach((rec) => {
+        const row = byRow.get(rec.rowIndex);
         // 行番号だけで結ぶと、削除で番号が詰まった直後に別の児童を指すので、メールも確かめる。
-        .filter((x) => x.row && !x.row.highlight && !x.row.hidden && (!x.rec.email || x.rec.email === x.row.email))
-        .slice(0, LIVE_RECOMMEND_SHOWN);
+        if (!row || row.highlight || row.hidden || (rec.email && rec.email !== row.email)) return;
+        if (queue[rec.side]) queue[rec.side].push({ rec, row });
+      });
+      const count = { low: 0, mid: 0, high: 0 };
+      rows.forEach((r) => { count[liveSideOf(r, axis)] += 1; });
+      const picks = [];
+      LIVE_SIDES.forEach((side) => { if (queue[side].length) picks.push(queue[side].shift()); });
+      while (picks.length < LIVE_RECOMMEND_SHOWN) {
+        const rest = LIVE_SIDES.filter((side) => queue[side].length).sort((a, b) => count[b] - count[a]);
+        if (!rest.length) break;
+        picks.push(queue[rest[0]].shift());
+      }
       if (!picks.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      picks.sort((a, b) => LIVE_SIDES.indexOf(a.rec.side) - LIVE_SIDES.indexOf(b.rec.side));
       el.classList.remove('hidden');
       el.innerHTML =
         '<header class="live-recommend-head">' +
           '<h4 id="lesson-live-recommend-title" class="live-recommend-title">おすすめ</h4>' +
-          '<span class="live-recommend-note">言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。☆ を付けると次の候補が出ます。</span>' +
+          '<span class="live-recommend-note">立場のちがう回答を 1 件ずつ、言葉と位置から自動で選んだ、読む順の目安です（評価ではありません）。☆ を付けると次の候補が出ます。</span>' +
         '</header>' +
-        '<div class="live-list">' + picks.map((x) => liveCard(x.row, axis, showClass, src, esc, x.rec.reasons)).join('') + '</div>';
+        '<div class="live-list">' + picks.map((x) => (
+          '<div class="live-rec-slot">' +
+            '<p class="live-rec-side">' + esc(liveSideTitle(x.rec.side, axis)) + '</p>' +
+            liveCard(x.row, axis, showClass, src, esc, x.rec.reasons) +
+          '</div>'
+        )).join('') + '</div>';
     }
 
     // 絞り込み中の注記。絞り込みが無いときは出さない。
@@ -5465,11 +5499,33 @@
       '</button>';
     }
 
+    // 注目する言葉を太字にした HTML を返す (言葉以外は escape する)。
+    //   Why 太字か: 言葉は字面で当てるので「我慢した」も「我慢じゃない」も当たる。前後をすぐ読めるようにする。
+    //   ここは見た目だけなので、文字どおりの一致で探す (全角半角のゆれまでは追わない。札はサーバが付ける)。
+    function liveMarkWords(text, esc) {
+      const raw = String(text || '');
+      const words = (live.data && Array.isArray(live.data.focusWords)) ? live.data.focusWords.filter(Boolean) : [];
+      if (!raw || !words.length) return esc(raw);
+      const pattern = words.slice().sort((x, y) => y.length - x.length)
+        .map((w) => String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+      const re = new RegExp(pattern, 'gi');
+      let out = '';
+      let last = 0;
+      let m = re.exec(raw);
+      while (m) {
+        if (!m[0]) { re.lastIndex += 1; m = re.exec(raw); continue; }
+        out += esc(raw.slice(last, m.index)) + '<strong class="live-word">' + esc(m[0]) + '</strong>';
+        last = m.index + m[0].length;
+        m = re.exec(raw);
+      }
+      return out + esc(raw.slice(last));
+    }
+
     function liveReason(a, sheetName, esc) {
       const key = liveRowKey(sheetName, a.rowIndex);
       return '<p class="live-reason' + (live.expanded.has(key) ? ' is-expanded' : '') + '" data-live-row="' + esc(key) + '">' +
-        esc(a.reason || '') + '</p>' +
-        (a.addedInsight ? '<p class="live-insight">＋ ' + esc(a.addedInsight) + '</p>' : '');
+        liveMarkWords(a.reason, esc) + '</p>' +
+        (a.addedInsight ? '<p class="live-insight">＋ ' + liveMarkWords(a.addedInsight, esc) + '</p>' : '');
     }
 
     // 回答 1 件の枠 (カードと ● → ★ のセルで共通)。枠の見た目・NEW・ハイライトは .live-answer が持つ。
