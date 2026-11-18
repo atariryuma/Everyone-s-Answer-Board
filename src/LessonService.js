@@ -3262,7 +3262,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
 
 // ---------- おすすめ (先生が読む候補) ----------
 
-const LESSON_FOCUS_WORDS_MAX = 10;
+const LESSON_FOCUS_WORDS_MAX = 15;
 const LESSON_FOCUS_WORD_LEN = 20;
 const LESSON_RECOMMEND_LIMIT = 6;
 // 「大きく動いた」と呼ぶ下限 (5 段階の目盛りで 2 つ分)。1 つ隣への移動は拾わない。

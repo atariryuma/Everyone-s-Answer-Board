@@ -2688,10 +2688,10 @@ test('__recommendLessonAnswers_: 前の位置があれば、大きく動いた�
   assert.equal(rec[0].reasons[0].kind, 'moved');
 });
 
-test('__normalizeFocusWords_: 文字列も配列も受け、重複・空を落として 10 個・20 字までにする', () => {
+test('__normalizeFocusWords_: 文字列も配列も受け、重複・空を落として 15 個・20 字までにする', () => {
   const h = loadContext();
   assert.deepEqual(Array.from(h.context.__normalizeFocusWords_('許せない、 思いやり,許せない,,')), ['許せない', '思いやり']);
-  assert.equal(Array.from(h.context.__normalizeFocusWords_(Array.from({ length: 30 }, (_, i) => 'w' + i))).length, 10);
+  assert.equal(Array.from(h.context.__normalizeFocusWords_(Array.from({ length: 30 }, (_, i) => 'w' + i))).length, 15);
   assert.equal(Array.from(h.context.__normalizeFocusWords_(['あ'.repeat(50)]))[0].length, 20);
   assert.deepEqual(Array.from(h.context.__normalizeFocusWords_(null)), []);
 });
