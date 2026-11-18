@@ -2725,3 +2725,41 @@ test('updateLessonDraft: 注目する言葉は実行中でも直せて、一覧�
   assert.equal(rec[1].rowIndex, 3, '「迷う」と書いた児童はまん中');
   assert.equal(rec[1].reasons[0].label, '言葉：迷う');
 });
+
+test('getLessonLiveAnswers: 「もう一度考える」では前のフェーズのシートを 1 回だけ読み、未提出とおすすめの両方に使う', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  seedThinkPhase(h, lessonId);
+  advanceAsTeacher(h, lessonId, 3);
+  submitAs(h, 'a@example.com', { lessonId, phaseIndex: 3, numericX: 5, numericY: 2, reason: '考えが変わった', class: '6年1組', name: 'あおい' });
+  h.setEmail('teacher@example.com');
+
+  const reads = {};
+  const original = h.context.__readAllLessonRows_;
+  h.context.__readAllLessonRows_ = (p, opts) => {
+    reads[p.sheetName] = (reads[p.sheetName] || 0) + 1;
+    return original(p, opts);
+  };
+  const res = h.context.getLessonLiveAnswers('u1', lessonId);
+  h.context.__readAllLessonRows_ = original;
+
+  assert.equal(res.success, true, res.message);
+  assert.equal(reads.phase1, 1, '前の入力フェーズ (考える) のシートは 1 回だけ: ' + JSON.stringify(reads));
+  assert.deepEqual(Array.from(res.data.pending).map(p => p.name).sort(), ['ちひろ', 'ぼたん'], '未提出は今までどおり');
+  const rec = Array.from(res.data.recommend);
+  assert.equal(rec.length, 1);
+  assert.ok(Array.from(rec[0].reasons).some(w => w.kind === 'moved'), '● からの動きも同じ読みから出る');
+});
+
+test('__prevInputPhaseForSource_: 最初の入力フェーズには前が無い。あとのフェーズは直前の入力フェーズを返す', () => {
+  const h = loadContext();
+  const phases = [
+    { sheetName: 'p1', screenRole: 'input' }, { sheetName: '', screenRole: 'browse' },
+    { sheetName: '', screenRole: 'discuss' }, { sheetName: 'p4', screenRole: 'reinput' },
+    { sheetName: '', screenRole: 'reflect' }
+  ];
+  assert.equal(h.context.__prevInputPhaseForSource_(phases, 0, 'p1'), null);
+  assert.equal(h.context.__prevInputPhaseForSource_(phases, 1, 'p1'), null, '「出会う」は「考える」のシートを見ている');
+  assert.equal(h.context.__prevInputPhaseForSource_(phases, 3, 'p4').sheetName, 'p1');
+  assert.equal(h.context.__prevInputPhaseForSource_(phases, 4, 'p4').sheetName, 'p1', '「ふりかえる」は「もう一度考える」のシートを見ている');
+});

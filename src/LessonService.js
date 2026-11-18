@@ -3176,6 +3176,15 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       if (c && classesInData.indexOf(c) < 0) classesInData.push(c);
     });
 
+    // 前のフェーズのシートは、未提出とおすすめ (● からの動き) の両方が使う。同じシートを
+    //   1 回の呼び出しで 2 度読まないよう、ここで覚える (読みは行 cache 越し)。
+    const phaseRowsMemo = new Map();
+    const readPhaseRows = (p) => {
+      const key = String(p.spreadsheetId || '') + ':' + String(p.sheetName || '');
+      if (!phaseRowsMemo.has(key)) phaseRowsMemo.set(key, __readAllLessonRows_(p, { boardUserId: userId }));
+      return phaseRowsMemo.get(key);
+    };
+
     // 未提出: 2 回目以降の入力フェーズだけ分かる (名簿は持たないので、前の入力フェーズに
     //   答えた児童を母集団にする)。最初の入力フェーズでは null = 「分からない」。
     const screenRole = __phaseScreenRole_(phase);
@@ -3190,7 +3199,7 @@ function getLessonLiveAnswers(userId, lessonId, options) {
       }
       if (prevInput) {
         const answered = new Set(rows.map(r => r.email));
-        pending = __rowsInClasses_(__readAllLessonRows_(prevInput, { boardUserId: userId }), scopeClasses)
+        pending = __rowsInClasses_(readPhaseRows(prevInput), scopeClasses)
           .filter(r => !answered.has(r.email))
           .map(r => ({ name: r.name, email: r.email, class: r.class }));
       }
@@ -3221,10 +3230,11 @@ function getLessonLiveAnswers(userId, lessonId, options) {
     //   「もう一度考える」のシートを見ているときは、前の入力フェーズの位置も渡す (● からの動き)。
     const boardMode = (patch.displaySettings && patch.displaySettings.boardMode) || 'matrix';
     const focusWords = __normalizeFocusWords_(lessonJson.focusWords);
+    const prevPhase = __prevInputPhaseForSource_(phases, phaseIndex, source.sheetName);
     const recommend = __recommendLessonAnswers_(rows, {
       focusWords,
       boardMode,
-      prevByEmail: __prevPositionsForSource_(phases, phaseIndex, source.sheetName, userId)
+      prevByEmail: prevPhase ? __positionsByEmail_(readPhaseRows(prevPhase)) : null
     });
     const sig = __liveAnswersSig_(rowsSig + (change ? '|' + JSON.stringify(change.students) : '|-')
       + '|' + JSON.stringify(recommend) + '|' + focusWords.join('\u0001'));
@@ -3285,27 +3295,31 @@ function __foldForMatch_(text) {
 }
 
 /**
- * いま見ているシートが 2 回目以降の入力フェーズなら、その前の入力フェーズの位置を email ごとに返す。
- * 最初の入力フェーズ (前が無い) では null。読みは行 cache 越し (未提出の計算と同じシート)。
+ * いま見ているシートが 2 回目以降の入力フェーズなら、その前の入力フェーズ (の定義) を返す。
+ * 最初の入力フェーズ (前が無い) では null。シートは読まない (読むのは呼び出し側)。
  */
-function __prevPositionsForSource_(phases, phaseIndex, sourceSheetName, boardUserId) {
+function __prevInputPhaseForSource_(phases, phaseIndex, sourceSheetName) {
+  const list = Array.isArray(phases) ? phases : [];
   let srcIdx = -1;
-  for (let i = 0; i < phases.length; i++) {
-    if (phases[i] && phases[i].sheetName && phases[i].sheetName === sourceSheetName) { srcIdx = i; break; }
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && list[i].sheetName && list[i].sheetName === sourceSheetName) { srcIdx = i; break; }
   }
   if (srcIdx < 0) srcIdx = phaseIndex;
   for (let i = srcIdx - 1; i >= 0; i--) {
-    const p = phases[i];
+    const p = list[i];
     if (p && p.sheetName && p.sheetName !== sourceSheetName
-      && LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(p)) >= 0) {
-      const map = {};
-      __readAllLessonRows_(p, { boardUserId }).forEach((r) => {
-        if (r && r.email) map[r.email] = { numericX: r.numericX, numericY: r.numericY };
-      });
-      return map;
-    }
+      && LESSON_INPUT_ROLES.indexOf(__phaseScreenRole_(p)) >= 0) return p;
   }
   return null;
+}
+
+// 回答の行から、email ごとの位置だけを取り出す (おすすめの「● からの動き」用)。
+function __positionsByEmail_(rows) {
+  const map = {};
+  (Array.isArray(rows) ? rows : []).forEach((r) => {
+    if (r && r.email) map[r.email] = { numericX: r.numericX, numericY: r.numericY };
+  });
+  return map;
 }
 
 /**

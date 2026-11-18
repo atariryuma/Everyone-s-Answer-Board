@@ -5406,12 +5406,11 @@
       const max = Number(axis.max) || 5;
       const mid = (min + max) / 2;
       const hasMid = Number.isInteger(mid);
-      const xl = (axis.x && axis.x.min) || '';
-      const xh = (axis.x && axis.x.max) || '';
+      // 見出しはおすすめの列と同じ関数で作る (片方だけ直して食い違わないように)。
       const groups = [
-        { title: xl ? '「' + xl + '」寄り' : '左寄り', range: min + '〜' + (Math.ceil(mid) - 1), rows: [] },
-        { title: 'まん中', range: String(mid), rows: [] },
-        { title: xh ? '「' + xh + '」寄り' : '右寄り', range: (Math.floor(mid) + 1) + '〜' + max, rows: [] }
+        { title: liveSideTitle('low', axis), range: min + '〜' + (Math.ceil(mid) - 1), rows: [] },
+        { title: liveSideTitle('mid', axis), range: String(mid), rows: [] },
+        { title: liveSideTitle('high', axis), range: (Math.floor(mid) + 1) + '〜' + max, rows: [] }
       ];
       rows.forEach((r) => {
         const x = r.numericX;
@@ -5489,13 +5488,26 @@
     // 注目する言葉を太字にした HTML を返す (言葉以外は escape する)。
     //   Why 太字か: 言葉は字面で当てるので「我慢した」も「我慢じゃない」も当たる。前後をすぐ読めるようにする。
     //   ここは見た目だけなので、文字どおりの一致で探す (全角半角のゆれまでは追わない。札はサーバが付ける)。
+    // 言葉が変わったときだけ検索の式を作り直す (カード 1 枚ごとに作らない)。言葉が無ければ null。
+    const liveWordsCache = { key: null, re: null };
+    function liveWordsRegex() {
+      const words = (live.data && Array.isArray(live.data.focusWords)) ? live.data.focusWords.filter(Boolean) : [];
+      const key = words.join('\u0001');
+      if (liveWordsCache.key !== key) {
+        liveWordsCache.key = key;
+        liveWordsCache.re = words.length
+          ? new RegExp(words.slice().sort((x, y) => y.length - x.length)
+            .map((w) => String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi')
+          : null;
+      }
+      return liveWordsCache.re;
+    }
+
     function liveMarkWords(text, esc) {
       const raw = String(text || '');
-      const words = (live.data && Array.isArray(live.data.focusWords)) ? live.data.focusWords.filter(Boolean) : [];
-      if (!raw || !words.length) return esc(raw);
-      const pattern = words.slice().sort((x, y) => y.length - x.length)
-        .map((w) => String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-      const re = new RegExp(pattern, 'gi');
+      const re = liveWordsRegex();
+      if (!raw || !re) return esc(raw);
+      re.lastIndex = 0;
       let out = '';
       let last = 0;
       let m = re.exec(raw);
