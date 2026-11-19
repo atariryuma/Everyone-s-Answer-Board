@@ -1146,6 +1146,39 @@ body.highlight-busy .highlight-btn:not(.loading) {
   border: 1px solid var(--theme-border-subtle);
 }
 
+/* 「考える」で送ったあと、分布を見ている間の帯。自分の考えの画面へ戻れる。 */
+.lesson-peek-bar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - 2rem);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--theme-bg-surface);
+  border: 1px solid var(--theme-border-subtle);
+  color: var(--theme-text-primary);
+  box-shadow: var(--shadow-lg);
+}
+.lesson-peek-note {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+.lesson-peek-back {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--theme-border-subtle);
+  background: transparent;
+  color: var(--theme-text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
 /* 教師の待機画面 (入力フェーズ): 問いと送信済み人数だけ。投影しても分布は見えない。 */
 .lesson-teacher-wait {
   max-width: 44rem;

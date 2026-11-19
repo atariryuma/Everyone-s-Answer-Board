@@ -968,6 +968,12 @@ function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnB
     const rows = Array.isArray(result.data) ? result.data : [];
     const me = String(viewerEmail || '').trim().toLowerCase();
     const mine = rows.filter(r => r && String(r.email || '').trim().toLowerCase() === me);
+    // 「考える」(input) では、送った児童には学級全体を返す (送った人から分布を読める)。
+    //   Why: 全員が送るまで待ってから「出会う」で読ませると、入力 3〜5 分 + 読む時間で長くなった
+    //   (2026-11-19 6年2組の授業研で指導主事から)。自分の考えは送った時点でシートに残るので、
+    //   「周りより先に自分の考えを持つ」は崩れない。「もう一度考える」(reinput) は送っても隠したまま
+    //   (最初の考えと今を比べる時間で、他者の位置は要らない)。判定できないときも隠したまま。
+    if (!unknown && phase && phase.screenRole === 'input' && mine.length > 0) return result;
     return Object.assign({}, result, { data: mine });
   } catch (error) {
     // 判定できないときは「見せない」側に倒さない: 授業モードでなければ通常のボードなので、
