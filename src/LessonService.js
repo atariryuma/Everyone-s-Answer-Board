@@ -1326,6 +1326,23 @@ function __lessonLateInputOf_(phase, lessonJson) {
 }
 
 /**
+ * 「考える」(input) が、一度でもその後の「出会う」へ進んだか。
+ *   進んだあとは、教師が考えるへ戻しても、送ってある児童は置き直せない (まだの子は送れる)。
+ *   Why: 戻すと、出会うで分布を見た子が見たあとに考えを変えられた (2026-11-20 の 3組の試し)。
+ */
+function __lessonInputLockedAfterBrowse_(lessonJson, inputIdx) {
+  const phases = (lessonJson && Array.isArray(lessonJson.phases)) ? lessonJson.phases : [];
+  if (__phaseScreenRole_(phases[inputIdx]) !== LESSON_SCREEN_ROLES.INPUT) return false;
+  const trans = (lessonJson && Array.isArray(lessonJson.profileTransitions)) ? lessonJson.profileTransitions : [];
+  return trans.some((t) => {
+    const to = Number(t && t.to);
+    if (!Number.isInteger(to) || to === inputIdx) return false;
+    const late = __lessonLateInputOf_(phases[to], lessonJson);
+    return Boolean(late && late.phaseIndex === inputIdx);
+  });
+}
+
+/**
  * 授業全体の座標系を決める phase (= 最初の入力フェーズ)。
  *
  * Why 授業で 1 つに揃えるか: ● 最初 → ★ いま の比較は、両方が同じ軸の上にあって
@@ -2579,7 +2596,9 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
       // 対象クラス。児童のボードで見せる範囲 (__limitRowsToLessonClasses_) もこれで決まる。
       classes: __lessonTargetClasses_(lessonJson),
       // 「出会う」の間だけ、まだ「考える」を送っていない児童が送れる先 (無ければ null)。
-      lateInput: __lessonLateInputOf_(phase, lessonJson)
+      lateInput: __lessonLateInputOf_(phase, lessonJson),
+      // 一度出会うへ進んだ考える: 送ってある児童は置き直せない (画面は置き直すを出さない)。
+      replaceLocked: __lessonInputLockedAfterBrowse_(lessonJson, idx)
     };
   } catch (error) {
     logError_('__computeViewerLessonPhase_', error);
@@ -2939,6 +2958,9 @@ function submitLessonAnswer(targetUserId, payload) {
       // 出会うで送れるのは、まだ送っていない児童の 1 回だけ。送った子が分布を見たあとで置き直さない。
       if (isLate && existingRow > 0) {
         return refuse('ALREADY_SENT', 'もう送ってあります');
+      }
+      if (!isLate && existingRow > 0 && __lessonInputLockedAfterBrowse_(lessonJson, writeIdx)) {
+        return refuse('REPLACE_LOCKED', 'みんなの考えを見る時間のあとなので、置き直しはできません');
       }
       const resolvedName = __resolveLessonSubmitName_(
         actorEmail, p.name, __lessonNamePairsFromSheetData_(sheetRead.data),

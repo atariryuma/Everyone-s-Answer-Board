@@ -475,6 +475,34 @@ test('submitLessonAnswer: 出会うの間は、まだ送っていない児童だ
   assert.equal(h.nativeSheets.get('phase1')._data[1][6], '時間内に送った');
 });
 
+test('submitLessonAnswer: 一度出会うへ進んだあと考えるへ戻しても、送ってある子は置き直せない (まだの子は送れる)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: '最初' });
+  // 出会うへ進む前は置き直せる
+  const before = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 3, reason: '直した' });
+  assert.equal(before.success, true, before.message);
+  advanceAsTeacher(h, lessonId, 1);
+  advanceAsTeacher(h, lessonId, 0);   // 考えるへ戻す
+  h.setEmail('child1@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).replaceLocked, true);
+  const again = submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 1, numericY: 1, reason: '見てから変えた' });
+  assert.equal(again.success, false);
+  assert.equal(again.error, 'REPLACE_LOCKED');
+  assert.equal(h.nativeSheets.get('phase1')._data[1][6], '直した');
+  const fresh = submitAs(h, 'child2@example.com', { lessonId, phaseIndex: 0, numericX: 2, numericY: 2, reason: 'はじめて送る' });
+  assert.equal(fresh.success, true, fresh.message);
+});
+
+test('__getViewerLessonPhase_: 出会うへ進む前の考えるは置き直せる (replaceLocked=false)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  h.setEmail('child1@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).replaceLocked, false);
+});
+
 test('submitLessonAnswer: 議論に進んだら、考えるには送れない (出会うの間だけ)', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);

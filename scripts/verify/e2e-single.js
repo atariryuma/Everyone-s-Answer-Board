@@ -261,21 +261,21 @@ check('先生(授業)', '「考える」へ戻すと、他の子の回答はま�
   const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]);
   return { pass: ok(a) && ok(r) && rowsOf(r).length === 1, note: ok(a) ? `見えた行 ${rowsOf(r).length}` : text(a) };
 });
-check('児童(授業)', '戻したあとに置き直しても行が増えず、新しい位置になる', () => {
+check('児童(授業)', '出会うのあとで考えるへ戻しても、送ってある子は置き直せない (REPLACE_LOCKED)', () => {
   const a = submit(STUDENT[0], 0, 5, 1);
   const r = op('lesson.liveAnswers', { userId, lessonId });
   const spots = ((r.data && r.data.rows) || []).map(spotOf);
-  return { pass: ok(a) && ok(r) && spots.length === 2 && spots.includes('5,1') && !spots.includes('3,3'), note: ok(a) ? `先生の一覧 ${spots.length} 行` : text(a) };
+  return { pass: !ok(a) && a.error === 'REPLACE_LOCKED' && ok(r) && spots.length === 2 && spots.includes('3,3') && !spots.includes('5,1'), note: `${text(a)} / 先生の一覧 ${spots.length} 行` };
 });
 check('先生(授業)', 'もう一度「出会う」へ進むと、記録は倍にならない', () => {
   const a = inv('advanceLessonPhase', [userId, lessonId, 'next', null]);
   const snaps = (op('lesson.review', { userId, lessonId }).data.lesson.lessonJson.snapshots || []).filter((s) => s.phaseIndex === 0);
   return { pass: ok(a) && snaps.length === 1 && snaps[0].rowCount === 2, note: ok(a) ? `記録 ${snaps.length} 件・${snaps[0] ? snaps[0].rowCount : 0} 行` : text(a) };
 });
-check('児童(授業)', '置き直した位置が「出会う」で見える', () => {
+check('児童(授業)', '「出会う」では、戻す前の位置のまま見える', () => {
   const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[1]);
   const spots = rowsOf(r).map(spotOf);
-  return { pass: ok(r) && spots.length === 2 && spots.includes('5,1') && !spots.includes('3,3'), note: ok(r) ? `見えた行 ${spots.length}` : text(r) };
+  return { pass: ok(r) && spots.length === 2 && spots.includes('3,3') && !spots.includes('5,1'), note: ok(r) ? `見えた行 ${spots.length}` : text(r) };
 });
 // 出会うの間に、まだ「考える」を送っていない子 (3 人目) は、送ってから見る (2026-11-20)。
 const LATE = `verify-student-3@${domain}`;
