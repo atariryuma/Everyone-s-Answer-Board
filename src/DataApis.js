@@ -963,17 +963,17 @@ function __maskOthersDuringInputPhase_(result, targetUserId, viewerEmail, isOwnB
     // フェーズを判定できなかった (読み込み失敗) ときは「授業中でない」と同じにせず、自分の行だけを返す。
     //   Why: 「考える」の最中に読みが失敗すると、他の児童の回答がそのまま見えていた。
     const unknown = !phase && typeof __lessonPhaseUnknown_ === 'function' && __lessonPhaseUnknown_(targetUserId);
-    if (!unknown && (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput'))) return result;
+    // 「出会う」で、まだ「考える」を送っていない児童にも隠す (送ってから見る)。
+    //   Why: 教師は全員を待たずに出会うへ進める。遅い子は出会うの間に送れる (__lessonLateInputOf_) ので、
+    //   送る前に分布が見えると、他の考えに寄せて書けてしまう。出会うのボードは考えるのシートなので、
+    //   自分の行があるか = 送ったか。
+    const lateGate = !unknown && phase && phase.screenRole === 'browse' && phase.lateInput;
+    if (!unknown && !lateGate && (!phase || (phase.screenRole !== 'input' && phase.screenRole !== 'reinput'))) return result;
 
     const rows = Array.isArray(result.data) ? result.data : [];
     const me = String(viewerEmail || '').trim().toLowerCase();
     const mine = rows.filter(r => r && String(r.email || '').trim().toLowerCase() === me);
-    // 「考える」(input) では、送った児童には学級全体を返す (送った人から分布を読める)。
-    //   Why: 全員が送るまで待ってから「出会う」で読ませると、入力 3〜5 分 + 読む時間で長くなった
-    //   (2026-11-19 6年2組の授業研で指導主事から)。自分の考えは送った時点でシートに残るので、
-    //   「周りより先に自分の考えを持つ」は崩れない。「もう一度考える」(reinput) は送っても隠したまま
-    //   (最初の考えと今を比べる時間で、他者の位置は要らない)。判定できないときも隠したまま。
-    if (!unknown && phase && phase.screenRole === 'input' && mine.length > 0) return result;
+    if (lateGate && mine.length > 0) return result;
     return Object.assign({}, result, { data: mine });
   } catch (error) {
     // 判定できないときは「見せない」側に倒さない: 授業モードでなければ通常のボードなので、

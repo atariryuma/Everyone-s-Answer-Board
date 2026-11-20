@@ -1301,6 +1301,31 @@ function __nativeDataSourcePhase_(phase, lessonJson) {
 }
 
 /**
+ * 「出会う」(browse) の間に、まだ送っていない児童が送れる「考える」(input) フェーズ。
+ *
+ * Why: 30 人だと送るのが早い子と遅い子がいる。全員を待つと時間がかかるので、教師は考える時間を
+ *   取ったら「出会う」へ進める。遅い子の考えを捨てないよう、出会うの間だけ、まだ送っていない子は
+ *   考えるに送れる。送るまで他の児童の回答は返さない (DataApis の __maskOthersDuringInputPhase_)。
+ *   送った子が見たあとで置き直すのは認めない (1 回だけ。submitLessonAnswer が既にある行を断る)。
+ *   「考える」の間は送っても分布を見せない: 見たいがために、考えずに早く送るのを防ぐ (2026-11-20)。
+ * 「もう一度考える」(reinput) の後の出会うには付けない (最初の考えを持つ時間ではない)。
+ *
+ * @returns {Object|null} { phaseIndex, phaseName, question, formTemplate }
+ */
+function __lessonLateInputOf_(phase, lessonJson) {
+  if (__phaseScreenRole_(phase) !== LESSON_SCREEN_ROLES.BROWSE) return null;
+  const src = __nativeDataSourcePhase_(phase, lessonJson);
+  if (!src || __phaseScreenRole_(src) !== LESSON_SCREEN_ROLES.INPUT) return null;
+  const phases = (lessonJson && Array.isArray(lessonJson.phases)) ? lessonJson.phases : [];
+  return {
+    phaseIndex: phases.indexOf(src),
+    phaseName: src.name || '',
+    question: src.question || '',
+    formTemplate: src.formTemplate || 'matrix'
+  };
+}
+
+/**
  * 授業全体の座標系を決める phase (= 最初の入力フェーズ)。
  *
  * Why 授業で 1 つに揃えるか: ● 最初 → ★ いま の比較は、両方が同じ軸の上にあって
@@ -1510,6 +1535,20 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx, lessonId) {
 //   そこで capture すると同じ行がもう一度アーカイブに積まれ (重複)、切替のたびに
 //   ボード全体の読みと archive の書きを余分に払う (切替が遅くなる主因の 1 つ)。
 //   Form 経由の授業はフェーズごとに Form とシートが違うので従来どおり全フェーズを capture する。
+/**
+ * フェーズを離れる (進む・戻る・終える) ときに記録を取り直すフェーズの番号。無ければ -1。
+ *   入力フェーズはそのフェーズ。「考える」の後の「出会う」は「考える」を取り直す:
+ *   出会うの間に、まだ送っていなかった児童が考えるに送れる (__lessonLateInputOf_) ので、
+ *   考えるを離れたときの記録には、その分が入っていない。ボードは出会うの間も考えるのシートを
+ *   映しているので、離れる直前に写せば遅れて届いた考えも入る (同じフェーズの記録は置き換え)。
+ */
+function __snapshotPhaseOnLeave_(lessonJson, phaseIdx) {
+  if (__shouldSnapshotPhase_(lessonJson, phaseIdx)) return phaseIdx;
+  if (!__isNativePhase_({}, lessonJson)) return -1;
+  const late = __lessonLateInputOf_(((lessonJson && lessonJson.phases) || [])[phaseIdx], lessonJson);
+  return late ? late.phaseIndex : -1;
+}
+
 function __shouldSnapshotPhase_(lessonJson, phaseIdx) {
   if (!__isNativePhase_({}, lessonJson)) return true;
   const phases = (lessonJson && lessonJson.phases) || [];
@@ -1809,8 +1848,9 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
     // Why: 移行 *前* に outgoing phase の rows を freeze する。順序を逆にすると
     //   user config が次 phase の columnMapping を指した状態で capture することになり、
     //   replay が破綻する。capture は config 切替より前 (= 現状 fromIdx) で行う。
-    if (__shouldSnapshotPhase_(lessonJson, fromIdx)) {
-      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx, lessonId));
+    const leaveSnapIdx = __snapshotPhaseOnLeave_(lessonJson, fromIdx);
+    if (leaveSnapIdx >= 0) {
+      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, leaveSnapIdx, lessonId));
     }
 
     lessonJson.profileTransitions = lessonJson.profileTransitions || [];
@@ -1969,8 +2009,9 @@ function endLesson(userId, lessonId, options) {
 
     // 現フェーズの rows を freeze して snapshots に upsert。capture 失敗時は reason 付き空 snapshot
     //   が積まれ、endLesson 自体は成功する (lesson は必ず completed に遷移する原則)。
-    if (__shouldSnapshotPhase_(lessonJson, currentIdx)) {
-      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, currentIdx, lessonId));
+    const endSnapIdx = __snapshotPhaseOnLeave_(lessonJson, currentIdx);
+    if (endSnapIdx >= 0) {
+      __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, endSnapIdx, lessonId));
     }
 
     const endedAt = new Date().toISOString();
@@ -2516,7 +2557,9 @@ function __computeViewerLessonPhase_(targetUserId, opts) {
       //   Why: 児童の画面はボードのクラスフィルタが入力画面の下に隠れていて選べず、
       //   全員がクラス空欄で記録されていた (教師のクラス絞り込みが効かない)。
       // 対象クラス。児童のボードで見せる範囲 (__limitRowsToLessonClasses_) もこれで決まる。
-      classes: __lessonTargetClasses_(lessonJson)
+      classes: __lessonTargetClasses_(lessonJson),
+      // 「出会う」の間だけ、まだ「考える」を送っていない児童が送れる先 (無ければ null)。
+      lateInput: __lessonLateInputOf_(phase, lessonJson)
     };
   } catch (error) {
     logError_('__computeViewerLessonPhase_', error);
@@ -2786,12 +2829,19 @@ function submitLessonAnswer(targetUserId, payload) {
     if (p.lessonId && String(p.lessonId) !== String(phase.lessonId)) {
       return refuse('LESSON_MISMATCH', 'PHASE_CHANGED: 授業が切り替わりました。画面を読み込み直してください');
     }
-    if (p.phaseIndex !== undefined && p.phaseIndex !== null && Number(p.phaseIndex) !== phase.phaseIndex) {
+    // 「出会う」の間だけ、まだ送っていない児童は「考える」に送れる (__lessonLateInputOf_)。
+    //   書き込む先は、端末が指したフェーズがサーバの決めた送り先と一致したときだけ変える。
+    const lateIdx = (phase.screenRole === LESSON_SCREEN_ROLES.BROWSE && phase.lateInput)
+      ? phase.lateInput.phaseIndex : null;
+    const isLate = lateIdx !== null && p.phaseIndex !== undefined && p.phaseIndex !== null
+      && Number(p.phaseIndex) === lateIdx;
+    const writeIdx = isLate ? lateIdx : phase.phaseIndex;
+    if (!isLate && p.phaseIndex !== undefined && p.phaseIndex !== null && Number(p.phaseIndex) !== phase.phaseIndex) {
       // 読み込み直しても前のフェーズには送れないので、読み込み直しは促さない
       //   (児童の画面はこの code で「書いたことは端末に残っている」と伝える)。
       return refuse('PHASE_MISMATCH', 'PHASE_CHANGED: 送る前にフェーズが進んだので、送れませんでした');
     }
-    if (LESSON_INPUT_ROLES.indexOf(phase.screenRole) < 0) {
+    if (!isLate && LESSON_INPUT_ROLES.indexOf(phase.screenRole) < 0) {
       return refuse('NOT_INPUT_PHASE', 'いまは考えを送る時間ではありません');
     }
 
@@ -2799,7 +2849,7 @@ function submitLessonAnswer(targetUserId, payload) {
     const found = __findLessonByIdCached_(phase.lessonId, { noStale: true });
     if (!found || !found.lesson) return refuse('LESSON_NOT_FOUND', '授業が見つかりません');
     const lessonJson = found.lesson.lessonJson || {};
-    const phaseDef = (lessonJson.phases || [])[phase.phaseIndex];
+    const phaseDef = (lessonJson.phases || [])[writeIdx];
     if (!phaseDef || !phaseDef.spreadsheetId || !phaseDef.sheetName) {
       return refuse('SHEET_NOT_CONFIGURED', '回答シートが未設定です');
     }
@@ -2834,7 +2884,7 @@ function submitLessonAnswer(targetUserId, payload) {
     // 「自分の行を探す → 足すか書き換える」を、この授業・フェーズ・児童ごとの lock で包む。
     //   Why: 二重にタップすると、2 つの実行がどちらも「行が無い」と見て appendRow し、同じ児童の行が 2 つできた。
     //   回答の削除 (行が繰り上がる) の最中は書かない (blockedBy): 探した行番号が別の児童の行を指しうる。
-    const submitLockKey = 'lesson_submit:' + String(phase.lessonId) + ':' + String(phase.phaseIndex) + ':' + String(actorEmail).trim().toLowerCase();
+    const submitLockKey = 'lesson_submit:' + String(phase.lessonId) + ':' + String(writeIdx) + ':' + String(actorEmail).trim().toLowerCase();
     const submitLock = (typeof acquireCacheLock_ === 'function')
       ? acquireCacheLock_(submitLockKey, {
         ttlSec: 30, waitMs: 8000,
@@ -2866,9 +2916,13 @@ function submitLessonAnswer(targetUserId, payload) {
       if (existingRow === LESSON_ROW_READ_FAILED) {
         return refuse('SHEET_READ_FAILED', 'いま混み合っています。少し待ってからもう一度送ってください');
       }
+      // 出会うで送れるのは、まだ送っていない児童の 1 回だけ。送った子が分布を見たあとで置き直さない。
+      if (isLate && existingRow > 0) {
+        return refuse('ALREADY_SENT', 'もう送ってあります');
+      }
       const resolvedName = __resolveLessonSubmitName_(
         actorEmail, p.name, __lessonNamePairsFromSheetData_(sheetRead.data),
-        () => __loadOtherPhaseLessonNames_(phase.lessonId, lessonJson, phase.phaseIndex, targetUserId)
+        () => __loadOtherPhaseLessonNames_(phase.lessonId, lessonJson, writeIdx, targetUserId)
       );
       if (resolvedName.taken) {
         return refuse('NAME_TAKEN', 'その名前は、ほかの人がもう使っています。名字もつけて入れ直してください（こまったら先生に知らせてください）');
@@ -2923,7 +2977,7 @@ function submitLessonAnswer(targetUserId, payload) {
     }
 
     return createSuccessResponse('考えを送りました', {
-      phaseIndex: phase.phaseIndex,
+      phaseIndex: writeIdx,
       updated: existingRow > 0
     });
   } catch (error) {

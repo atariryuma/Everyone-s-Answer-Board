@@ -1673,12 +1673,23 @@
       //   誰にも見えていなかった (2026-10-28 の理科で、送る前に進んだ児童が気づけなかった)。
       this.state.lessonUnsentNote = this.__nextLessonUnsentNote(prev, phase);
       this.__confirmLessonUnsentNote(this.state.lessonUnsentNote);
+      const prevSent = this.state.lessonSent;
       this.state.lessonDraft = null;
       this.state.lessonPrevPoint = null;
       this.state.lessonSent = null;
       this.state.lessonEditing = false;
       this.state.lessonRecordKey = null;
-      this.state.lessonBrowsing = null;
+      this.state.lessonLateNeedKey = null;
+      // 「考える」→「出会う」: 送ったかどうかは「考える」の画面が知っている。持ち越して、
+      //   送った子には分布を、まだの子には書きかけのまま考えるの入力画面を、すぐ出す (読み込みを待たない)。
+      const late = this.__lessonLateInputPhase(phase);
+      if (late && prev && prev.lessonId === late.lessonId && prev.phaseIndex === late.phaseIndex) {
+        if (prevSent && prevSent.lessonId === late.lessonId && prevSent.phaseIndex === late.phaseIndex) {
+          this.state.lessonSent = prevSent;
+        } else {
+          this.state.lessonLateNeedKey = this.__lessonLateKey(late);
+        }
+      }
       // 「進みました」は児童向け。教師は自分で進めるので出さない (切替時の success と二重になる)。
       if (prev && this.state.isEditor !== true) {
         this.showToast(phase.phaseName ? `「${phase.phaseName}」に進みました` : 'フェーズが進みました');
@@ -1856,7 +1867,7 @@
     __renderLessonScreen() {
       const phase = this.state.lessonPhase;
       this.__renderLessonUnsentNote();
-      if (!phase) { this.__clearLessonFocus(); this.__removeLessonPeekBar(); return this.__teardownLessonScreen(); }
+      if (!phase) { this.__clearLessonFocus(); return this.__teardownLessonScreen(); }
 
       // 教師 (編集者) は答える側ではなく、分布を映す側。入力画面はかぶせない。
       //   ただし入力フェーズ (考える / もう一度考える) の間は分布も出さない。
@@ -1882,19 +1893,16 @@
         return;
       }
 
+      // 出会う: 「考える」を送った子は分布を見る。まだの子は、送ってから見る (サーバも送るまで返さない)。
+      let inputPhase = phase;
       if (phase.screenRole === 'browse') {
-        this.__removeLessonPeekBar();
-        this.__teardownLessonScreen();
-        return;
+        const late = this.__lessonLateInputPhase(phase);
+        if (!late || this.__lessonSentFor(late)) {
+          this.__teardownLessonScreen();
+          return;
+        }
+        inputPhase = late;
       }
-
-      // 「考える」で送った児童が、みんなの考えを見ている間はボード (分布) を見せる。
-      if (this.__isLessonBrowsingAfterSend(phase)) {
-        this.__teardownLessonScreen();
-        this.__renderLessonPeekBar();
-        return;
-      }
-      this.__removeLessonPeekBar();
 
       let host = document.getElementById('lessonScreen');
       if (!host) {
@@ -1909,9 +1917,46 @@
         this.__renderLessonDiscuss(host, phase);
       } else if (phase.screenRole === 'reflect') {
         this.__renderLessonReflect(host, phase);
+      } else if (inputPhase.late && this.state.lessonLateNeedKey !== this.__lessonLateKey(inputPhase)) {
+        // 出会うで読み込み直した: 送ったかどうかを自分の記録で確かめてから、分布か入力画面を出す
+        //   (送った子に入力画面を一瞬でも見せない)。
+        host.innerHTML = '<div class="lesson-card"><p class="lesson-hint">読み込み中...</p></div>';
+        this.__loadMyLessonRecord(inputPhase);
       } else {
-        this.__renderLessonInput(host, phase);
+        this.__renderLessonInput(host, inputPhase);
       }
+    }
+
+    // ---- 出会うの間に、まだ送っていない「考える」を送る ----
+    //   サーバが出会うのフェーズに付けて返す lateInput (送れる先) を、入力画面用のフェーズの形にする。
+    //   入力の関数 (書きかけ・送信・自分の記録) はこのフェーズを見るので、考えると同じ動きになる。
+    __lessonLateInputPhase(phase) {
+      if (!phase || this.state.isEditor === true || phase.screenRole !== 'browse') return null;
+      const li = phase.lateInput;
+      if (!li || li.phaseIndex === undefined || li.phaseIndex === null) return null;
+      return Object.assign({}, phase, {
+        phaseIndex: li.phaseIndex,
+        phaseName: li.phaseName || '',
+        question: li.question || '',
+        formTemplate: li.formTemplate || phase.formTemplate,
+        screenRole: 'input',
+        late: true
+      });
+    }
+
+    // 入力の関数が使うフェーズ。出会うで、まだ送っていない子は「考える」。
+    __lessonInputPhase() {
+      const phase = this.state.lessonPhase;
+      return this.__lessonLateInputPhase(phase) || phase;
+    }
+
+    __lessonLateKey(phase) {
+      return phase ? phase.lessonId + ':' + phase.phaseIndex : '';
+    }
+
+    __lessonSentFor(phase) {
+      const sent = this.state.lessonSent;
+      return !!(phase && sent && sent.lessonId === phase.lessonId && sent.phaseIndex === phase.phaseIndex);
     }
 
     // 議論フェーズ: 端末に用事がないことを、画面自身が伝える。
@@ -2044,6 +2089,9 @@
       const needClass = classes.length > 1 && classes.indexOf(storedClass) < 0;
       host.innerHTML =
         '<div class="lesson-card">' +
+          (phase.late
+            ? '<p class="lesson-hint">「' + esc(phase.phaseName || '考える') + '」の考えを、まだ送っていません。送ると、みんなの考えが見られます</p>'
+            : '') +
           '<h2 class="lesson-title">' + esc(phase.question || 'いまの考えは？') + '</h2>' +
           (isReinput ? '<div id="lessonPrevNote" class="lesson-prev-note hidden"></div>' : '') +
           (needClass
@@ -2070,7 +2118,9 @@
             (sentHere ? '置き直して おくる' : '考えをおくる') + '</button>' +
           (sentHere
             ? '<button id="lessonCancelEdit" class="lesson-submit lesson-submit-secondary" type="button">やめる</button>'
-            : '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>') +
+            : (phase.late
+              ? '<p class="lesson-hint">おくったあとは、置き直せません</p>'
+              : '<p class="lesson-hint">おくったあとでも、この時間の中なら置き直せます</p>')) +
         '</div>';
 
       if (phase.formTemplate === 'numberline') this.__buildLessonScale(isReinput);
@@ -2111,10 +2161,6 @@
      */
     __renderLessonSent(host, phase, sent) {
       const esc = this.__escape.bind(this);
-      // 「考える」だけ、送った人から分布を見られる (サーバも送った人にだけ全体を返す)。
-      //   見たあとに置き直すと「自分の考え」ではなくなるので、見たら置き直しを出さない。
-      const canPeek = phase.screenRole === 'input';
-      const peeked = canPeek && this.__lessonPeeked(phase);
       host.innerHTML =
         '<div class="lesson-card">' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
@@ -2130,15 +2176,8 @@
                 '<span class="lesson-quote-label">＋ 加わったこと</span>' + esc(sent.addedInsight) +
               '</div>'
             : '') +
-          (canPeek
-            ? '<button id="lessonPeek" class="lesson-submit" type="button">みんなの考えを見る</button>' +
-              '<p class="lesson-hint">できるだけ、自分とちがう考えを見つけよう</p>'
-            : '') +
-          (peeked
-            ? '<p class="lesson-hint">みんなの考えを見たので、置き直しはできません</p>'
-            : '<button id="lessonReplace" class="lesson-submit lesson-submit-secondary" type="button">置き直す</button>' +
-              '<p class="lesson-hint">この時間の中なら、置き直せます</p>' +
-              (canPeek ? '<p class="lesson-hint">みんなの考えを見たあとは、置き直せません</p>' : '')) +
+          '<button id="lessonReplace" class="lesson-submit lesson-submit-secondary" type="button">置き直す</button>' +
+          '<p class="lesson-hint">この時間の中なら、置き直せます</p>' +
         '</div>';
 
       // 格子は読むだけ。自分の位置を選択状態で見せる。
@@ -2157,69 +2196,6 @@
           this.__renderLessonScreen();
         });
       }
-      const peek = document.getElementById('lessonPeek');
-      if (peek) peek.addEventListener('click', () => this.__startLessonPeek(phase));
-    }
-
-    // ---- 「考える」で送ったあとに、みんなの考えを見る ----
-    //   Why: 全員が送るのを待って「出会う」で読ませると長くなった (2026-11-19 授業研)。
-    //   送った人から読めば、待つ時間が読む時間になる。見たかどうかは端末に残す
-    //   (再読み込みで置き直しが復活しないように)。サーバは置き直しを止めないので、これは画面の約束。
-    __lessonPeekKey(phase) {
-      return phase ? 'lessonPeek:' + phase.lessonId + ':' + phase.phaseIndex : '';
-    }
-
-    __lessonPeeked(phase) {
-      const key = this.__lessonPeekKey(phase);
-      if (!key) return false;
-      if (this.state.lessonPeekedKey === key) return true;
-      try { return localStorage.getItem(key) === '1'; } catch (_) { return false; /* 残せない端末では state だけで判断 */ }
-    }
-
-    __isLessonBrowsingAfterSend(phase) {
-      if (!phase || phase.screenRole !== 'input') return false;
-      const key = this.__lessonPeekKey(phase);
-      const sent = this.state.lessonSent;
-      const sentHere = !!(sent && sent.lessonId === phase.lessonId && sent.phaseIndex === phase.phaseIndex);
-      return sentHere && this.state.lessonBrowsing === key;
-    }
-
-    __startLessonPeek(phase) {
-      const key = this.__lessonPeekKey(phase);
-      this.state.lessonPeekedKey = key;
-      this.state.lessonBrowsing = key;
-      try { localStorage.setItem(key, '1'); } catch (_) { /* 残せない端末では、この画面の間だけ覚える */ }
-      this.__renderLessonScreen();
-      // 送るまでは自分の行しか届いていない。送ったので全体を読み直す。
-      if (typeof this.loadSheetData === 'function') {
-        this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
-      }
-    }
-
-    __renderLessonPeekBar() {
-      if (document.getElementById('lessonPeekBar')) return;
-      const bar = document.createElement('div');
-      bar.id = 'lessonPeekBar';
-      bar.className = 'lesson-peek-bar';
-      const note = document.createElement('span');
-      note.className = 'lesson-peek-note';
-      note.textContent = 'できるだけ、自分とちがう考えを見つけよう';
-      const back = document.createElement('button');
-      back.type = 'button';
-      back.className = 'lesson-peek-back';
-      back.textContent = '自分の考えにもどる';
-      back.addEventListener('click', () => {
-        this.state.lessonBrowsing = null;
-        this.__renderLessonScreen();
-      });
-      bar.appendChild(note);
-      bar.appendChild(back);
-      document.body.appendChild(bar);
-    }
-
-    __removeLessonPeekBar() {
-      const bar = document.getElementById('lessonPeekBar');
-      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
     }
 
     /**
@@ -2243,9 +2219,16 @@
     __fetchMyLessonRecord(phase) {
       this.runGas('getMyLessonTrajectory', this.state.userId)
         .then((res) => {
-          const cur = this.state.lessonPhase;
+          const cur = this.__lessonInputPhase();
           if (!cur || cur.lessonId !== phase.lessonId || cur.phaseIndex !== phase.phaseIndex) return;
           const phases = (res && res.success && res.data && res.data.phases) || [];
+          // 出会うで読み込み直した: 「考える」に行が無ければ、入力画面を出す (送ってから見る)。
+          if (phase.late && !(res && res.success)) throw new Error('record unavailable');
+          if (phase.late && !phases.some((p) => p.phaseIndex === phase.phaseIndex)) {
+            this.state.lessonLateNeedKey = this.__lessonLateKey(phase);
+            if (document.getElementById('lessonScreen')) this.__renderLessonScreen();
+            return;
+          }
           if (!phases.length) return;
           const first = phases[0];
           const mine = phases.filter((p) => p.phaseIndex === phase.phaseIndex)[0];
@@ -2277,7 +2260,15 @@
             }
           }
         })
-        .catch(() => { this.state.lessonRecordKey = null; /* 次の描画で読み直す */ });
+        .catch(() => {
+          this.state.lessonRecordKey = null; /* 次の描画で読み直す */
+          // 出会うで確かめられないときは入力画面を出す。送ってあれば、サーバが「もう送ってあります」と
+          //   断り、分布へ進む (確かめられないまま「読み込み中」で止めない)。
+          if (phase.late) {
+            this.state.lessonLateNeedKey = this.__lessonLateKey(phase);
+            if (document.getElementById('lessonScreen')) this.__renderLessonScreen();
+          }
+        });
     }
 
     /**
@@ -2489,7 +2480,8 @@
 
     // 投稿。サーバがフェーズ権能を再検証するので、ここは UX の担当。
     async __submitLessonAnswer() {
-      const phase = this.state.lessonPhase;
+      // 出会うで、まだ送っていない子は「考える」に送る (サーバも出会うの間だけ受け付ける)。
+      const phase = this.__lessonInputPhase();
       const draft = this.state.lessonDraft;
       const btn = document.getElementById('lessonSubmit');
       if (!phase) return;
@@ -2553,6 +2545,16 @@
         if (!res || !res.success) {
           // サーバーが断った (理由コードは res.error)。サーバー側にも同じ記録が残る。
           this.__reportLessonSubmit('REFUSED:' + ((res && res.error) || 'UNKNOWN'), phase);
+          // 出会うで「もう送ってあります」: 端末は知らなかったが、考えるで届いていた。分布へ進める。
+          if (phase.late && res && res.error === 'ALREADY_SENT') {
+            this.__clearLessonDraft(phase);
+            this.state.lessonSent = { lessonId: phase.lessonId, phaseIndex: phase.phaseIndex, reason: '' };
+            this.__renderLessonScreen();
+            if (typeof this.loadSheetData === 'function') {
+              this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+            }
+            return;
+          }
           // 送る前にフェーズが進んでいた。読み込み直しても前のフェーズには送れないので、
           //   書いたことが端末に残っている (位置もことばも入力のたびに保存済み) ことを伝える。
           //   置き直しは戻っても復元されない (「送りました」画面になる) ので、届いている方を伝える。
@@ -2581,6 +2583,10 @@
         };
         this.state.lessonEditing = false;
         this.__renderLessonScreen();
+        // 出会うで送った: ここまでは自分の行しか届いていない。送ったので全体を読み直す。
+        if (phase.late && typeof this.loadSheetData === 'function') {
+          this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+        }
       };
 
       const onFail = (err) => {
@@ -2635,7 +2641,7 @@
     }
 
     __persistLessonDraft() {
-      const phase = this.state.lessonPhase;
+      const phase = this.__lessonInputPhase();
       const key = this.__lessonDraftKey(phase);
       if (!key || ['input', 'reinput'].indexOf(phase.screenRole) < 0) return;
       try {
@@ -2692,11 +2698,16 @@
      */
     __nextLessonUnsentNote(prev, phase) {
       if (this.state.isEditor === true || !phase) return null;
-      if (prev && this.__hasUnsentLessonDraft(prev)) {
+      // 「考える」→「出会う」: まだの子は出会うで続きを書いて送れるので、案内は出さない。
+      const late = this.__lessonLateInputPhase(phase);
+      if (late && prev && prev.lessonId === late.lessonId && prev.phaseIndex === late.phaseIndex) return null;
+      // 出会うで書きかけのまま次へ進んだ: 案内するのは「考える」の書きかけ。
+      const prevInput = this.__lessonLateInputPhase(prev) || prev;
+      if (prevInput && this.__hasUnsentLessonDraft(prevInput)) {
         return {
-          lessonId: prev.lessonId,
-          phaseIndex: prev.phaseIndex,
-          phaseName: prev.phaseName || '',
+          lessonId: prevInput.lessonId,
+          phaseIndex: prevInput.phaseIndex,
+          phaseName: prevInput.phaseName || '',
           confirmed: false
         };
       }

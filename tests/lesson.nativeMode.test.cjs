@@ -445,6 +445,64 @@ test('submitLessonAnswer: browse フェーズも拒否する (出会う時間は
   assert.equal(res.success, false);
 });
 
+test('submitLessonAnswer: 出会うの間は、まだ送っていない児童だけ「考える」に 1 回送れる', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: '時間内に送った' });
+  advanceAsTeacher(h, lessonId, 1);   // 出会う。child2 はまだ送っていない
+
+  const late = submitAs(h, 'child2@example.com', {
+    lessonId, phaseIndex: 0, numericX: 1, numericY: 5, reason: '出会うに入ってから送った'
+  });
+  assert.equal(late.success, true, late.message);
+  assert.equal(late.data.phaseIndex, 0);
+  const rows = h.nativeSheets.get('phase1')._data;
+  assert.equal(rows.length, 3, '考えるのシートに足される');
+  assert.equal(rows[2][1], 'child2@example.com');
+
+  // 送ったあと (分布を見たあと) の置き直しは断る
+  const again = submitAs(h, 'child2@example.com', {
+    lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '見てから変えた'
+  });
+  assert.equal(again.success, false);
+  assert.equal(again.error, 'ALREADY_SENT');
+  // 時間内に送った児童も、出会うでは置き直せない
+  const early = submitAs(h, 'child1@example.com', {
+    lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '見てから変えた'
+  });
+  assert.equal(early.error, 'ALREADY_SENT');
+  assert.equal(h.nativeSheets.get('phase1')._data[1][6], '時間内に送った');
+});
+
+test('submitLessonAnswer: 議論に進んだら、考えるには送れない (出会うの間だけ)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  advanceAsTeacher(h, lessonId, 2);
+  const res = submitAs(h, 'child2@example.com', {
+    lessonId, phaseIndex: 0, numericX: 1, numericY: 5, reason: 'x'
+  });
+  assert.equal(res.success, false);
+  assert.equal(res.error, 'PHASE_MISMATCH');
+});
+
+test('__getViewerLessonPhase_: 出会うは、送れる先として「考える」を返す (ほかのフェーズは null)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  h.setEmail('child1@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).lateInput, null);
+  advanceAsTeacher(h, lessonId, 1);
+  h.setEmail('child1@example.com');
+  const browse = h.context.__getViewerLessonPhase_('u1', { fresh: true });
+  assert.equal(browse.lateInput.phaseIndex, 0);
+  assert.equal(browse.lateInput.phaseName, '考える');
+  advanceAsTeacher(h, lessonId, 2);
+  h.setEmail('child1@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).lateInput, null);
+});
+
 test('submitLessonAnswer: フェーズがズレた投稿は PHASE_CHANGED で弾く', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
@@ -780,10 +838,24 @@ test('授業モードの snapshot は入力フェーズだけ (出会う / 議�
   const lessonId = startNativeLesson(h);
   h.context.getPublishedSheetData = () => ({ success: true, data: [{ rowIndex: 2, class: '6年1組', answer: 3, reason: 'r', numericX: 3, numericY: 4 }] });
   h.context.advanceLessonPhase('u1', lessonId, 'next');   // 考える → 出会う (考えるを capture)
-  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 出会う → 議論する (capture しない)
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 出会う → 議論する (考えるを取り直す。同じ番号なので置き換え)
   h.context.advanceLessonPhase('u1', lessonId, 'next');   // 議論する → もう一度考える (capture しない)
   const snaps = h.context.__findLessonById_(lessonId).lesson.lessonJson.snapshots || [];
   assert.deepEqual(Array.from(snaps.map(s => s.phaseIndex)), [0]);
+});
+
+test('出会うから進むときに考えるの記録を取り直す (出会うで遅れて送った考えも記録に入る)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const row = (i) => ({ rowIndex: i + 1, class: '6年1組', answer: 3, reason: 'r' + i, numericX: 3, numericY: 4 });
+  let rows = [row(1)];
+  h.context.getPublishedSheetData = () => ({ success: true, data: rows.slice() });
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 考える → 出会う (1 人分)
+  rows = [row(1), row(2)];                                // 出会うの間に 2 人目が送った
+  h.context.advanceLessonPhase('u1', lessonId, 'next');   // 出会う → 議論する (考えるを取り直す)
+  const snaps = h.context.__findLessonById_(lessonId).lesson.lessonJson.snapshots || [];
+  assert.deepEqual(Array.from(snaps.map(s => s.phaseIndex)), [0], '考えるの記録は 1 つのまま (置き換え)');
+  assert.equal(snaps[0].rowCount, 2);
 });
 
 test('__getViewerLessonPhase_: フェーズを進めると screenRole が変わる', () => {
@@ -1580,8 +1652,8 @@ test('lesson 行 cache: 教師がフェーズを進めると cache が捨てら�
   assert.equal(h.context.__getViewerLessonPhase_('u1').screenRole, 'input');
   const keyBefore = h.context.__lessonRecordCacheKey_(lessonId);
 
-  // 教師が「出会う」へ
-  advanceAsTeacher(h, lessonId, 1);
+  // 教師が「議論する」へ (出会うの間は、まだ送っていない児童が考えるに送れるので、議論で確かめる)
+  advanceAsTeacher(h, lessonId, 2);
   assert.ok(ops.includes('remove:' + keyBefore), '__updateLessonRow_ が lesson 行 cache を捨てる');
   // 版も上がる: 書き込みの直前に読み始めた古い loader が put し直しても、新しい key は別物。
   assert.notEqual(h.context.__lessonRecordCacheKey_(lessonId), keyBefore, 'lesson 行 cache の版が上がる');

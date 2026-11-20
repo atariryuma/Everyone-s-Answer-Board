@@ -206,11 +206,8 @@ check('授業', 'ボードを公開した状態にする (republishMyBoard)', ()
 check('授業', '授業のナビ (getActiveLessonNav)', () => { const r = inv('getActiveLessonNav', [userId]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 // 名前は児童ごとに変える (ほかのメールにひも付いた名前では送れない: NAME_TAKEN)。
 const submit = (who, phaseIndex, x, y) => inv('submitLessonAnswer', [userId, { lessonId, phaseIndex, numericX: x, numericY: y, reason: `検証 ${phaseIndex}`, class: CLS, name: `けんしょう${STUDENT.indexOf(who) + 1}` }], who);
-// 「考える」: 送った子にだけ学級全体を返す (送った人から分布を読める。2026-11-19)。まだ送っていない子には返さない。
-check('児童(授業)', '「考える」で送る (1 人目)', () => { const a = submit(STUDENT[0], 0, 2, 4); return { pass: ok(a), note: ok(a) ? '' : text(a) }; });
-check('児童(授業)', '「考える」でまだ送っていない子には、他の子の回答が見えない', () => { const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[1]); return { pass: ok(r) && rowsOf(r).length === 0, note: ok(r) ? `見えた行 ${rowsOf(r).length}` : text(r) }; });
-check('児童(授業)', '「考える」で送る (2 人目)', () => { const b = submit(STUDENT[1], 0, 4, 2); return { pass: ok(b), note: ok(b) ? '' : text(b) }; });
-check('児童(授業)', '「考える」で送った子には、全員の回答が見える', () => { const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]); return { pass: ok(r) && rowsOf(r).length === 2, note: ok(r) ? `見えた行 ${rowsOf(r).length}` : text(r) }; });
+check('児童(授業)', '「考える」で送る (submitLessonAnswer × 2 人)', () => { const a = submit(STUDENT[0], 0, 2, 4); const b = submit(STUDENT[1], 0, 4, 2); return { pass: ok(a) && ok(b), note: ok(a) && ok(b) ? '' : text(ok(a) ? b : a) }; });
+check('児童(授業)', '「考える」の間は他の子の回答が見えない', () => { const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]); return { pass: ok(r) && rowsOf(r).length === 1, note: ok(r) ? `見えた行 ${rowsOf(r).length}` : text(r) }; });
 const spotOf = (row) => `${row.numericX},${row.numericY}`;
 check('児童(授業)', '同じフェーズで送り直すと行が増えず、新しい位置になる', () => {
   submit(STUDENT[0], 0, 3, 3);
@@ -258,11 +255,11 @@ check('先生(授業)', 'ほかの児童に見せない (lesson.toggleHidden): �
   return { pass, note: ok(on) ? `ほかの児童 ${all}→${other}→${back} 行 / 本人 ${self} 行 / 先生のボード ${teacher} 行 / 一覧の印 ${listed}` : text(on) };
 });
 check('児童(授業)', '「出会う」の間は送れない (サーバが断る)', () => { const r = submit(STUDENT[0], 1, 1, 1); return { pass: !ok(r), note: text(r) }; });
-// 投稿フェーズへ戻して置き直す流れ: 行も記録も増えず、最新の位置だけが残る
-check('先生(授業)', '「考える」へ戻しても、送ってある子には全員の回答が見える', () => {
+// 投稿フェーズへ戻して置き直す流れ: 他の子はまた見えなくなり、行も記録も増えず、最新の位置だけが残る
+check('先生(授業)', '「考える」へ戻すと、他の子の回答はまた見えない', () => {
   const a = inv('advanceLessonPhase', [userId, lessonId, 'previous', null]);
   const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[0]);
-  return { pass: ok(a) && ok(r) && rowsOf(r).length === 2, note: ok(a) ? `見えた行 ${rowsOf(r).length}` : text(a) };
+  return { pass: ok(a) && ok(r) && rowsOf(r).length === 1, note: ok(a) ? `見えた行 ${rowsOf(r).length}` : text(a) };
 });
 check('児童(授業)', '戻したあとに置き直しても行が増えず、新しい位置になる', () => {
   const a = submit(STUDENT[0], 0, 5, 1);
@@ -279,6 +276,23 @@ check('児童(授業)', '置き直した位置が「出会う」で見える', (
   const r = inv('getPublishedSheetData', [null, 'newest', false, userId], STUDENT[1]);
   const spots = rowsOf(r).map(spotOf);
   return { pass: ok(r) && spots.length === 2 && spots.includes('5,1') && !spots.includes('3,3'), note: ok(r) ? `見えた行 ${spots.length}` : text(r) };
+});
+// 出会うの間に、まだ「考える」を送っていない子 (3 人目) は、送ってから見る (2026-11-20)。
+const LATE = `verify-student-3@${domain}`;
+const seenBy = (as) => rowsOf(inv('getPublishedSheetData', [null, 'newest', false, userId], as)).length;
+check('児童(授業)', '「出会う」で、まだ送っていない子には他の子の回答が見えない', () => {
+  const n = seenBy(LATE);
+  return { pass: n === 0, note: `見えた行 ${n}` };
+});
+check('児童(授業)', '「出会う」で、まだ送っていない子は「考える」に送れて、送ったら全員が見える', () => {
+  const a = inv('submitLessonAnswer', [userId, { lessonId, phaseIndex: 0, numericX: 1, numericY: 5, reason: '検証 遅れて送る', class: CLS, name: 'けんしょう3' }], LATE);
+  const n = seenBy(LATE);
+  return { pass: ok(a) && n === 3, note: ok(a) ? `見えた行 ${n}` : text(a) };
+});
+check('児童(授業)', '「出会う」では、送ってあった子は置き直せない (もう送ってあります)', () => {
+  const a = submit(STUDENT[0], 0, 1, 1);
+  const b = inv('submitLessonAnswer', [userId, { lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '見てから変えた', class: CLS, name: 'けんしょう3' }], LATE);
+  return { pass: !ok(a) && a.error === 'ALREADY_SENT' && !ok(b) && b.error === 'ALREADY_SENT', note: `${text(a)} / ${text(b)}` };
 });
 check('先生(授業)', 'フェーズを進める: 議論する', () => { const r = inv('advanceLessonPhase', [userId, lessonId, 'next', null]); return { pass: ok(r), note: ok(r) ? '' : text(r) }; });
 check('児童(授業)', '「議論する」では送れない (サーバが断る)', () => { const r = submit(STUDENT[0], 2, 1, 1); return { pass: !ok(r), note: text(r) }; });
@@ -304,7 +318,7 @@ check('授業', 'ふりかえり (lesson.review)', () => {
   const snaps = (r.data && r.data.lesson && r.data.lesson.lessonJson.snapshots) || [];
   return { pass: ok(r) && snaps.length > 0, note: ok(r) ? `アーカイブ ${snaps.length} フェーズ・${snaps.reduce((n, s) => n + (Number(s.rowCount) || (s.rows || []).length), 0)} 行` : text(r) };
 });
-check('授業', '見取りグリッド (lesson.reviewGrid)', () => { const r = op('lesson.reviewGrid', { userId, lessonId }); return { pass: ok(r) && (r.data.students || []).length === 2, note: ok(r) ? `児童 ${(r.data.students || []).length} 人` : text(r) }; });
+check('授業', '見取りグリッド (lesson.reviewGrid)', () => { const r = op('lesson.reviewGrid', { userId, lessonId }); return { pass: ok(r) && (r.data.students || []).length === 3, note: ok(r) ? `児童 ${(r.data.students || []).length} 人` : text(r) }; });
 check('授業', '再開する → もう一度終える (lesson.reopen / end)', () => { const a = op('lesson.reopen', { userId, lessonId }); const b = op('lesson.end', { userId, lessonId }); return { pass: ok(a) && ok(b), note: ok(a) && ok(b) ? '' : text(ok(a) ? b : a) }; });
 check('授業', '複製する (lesson.duplicate)', () => { const r = op('lesson.duplicate', { userId, lessonId, options: {} }); const id = r.data && (r.data.lessonId || (r.data.lesson && r.data.lesson.lessonId)); if (id) nativeIds.push(id); return { pass: Boolean(id), note: id ? '' : text(r) }; });
 

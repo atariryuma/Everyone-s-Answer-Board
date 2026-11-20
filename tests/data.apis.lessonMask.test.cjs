@@ -39,20 +39,8 @@ const ROWS = {
   ]
 };
 
-test('input フェーズ: まだ送っていない児童には、他者の行を返さない', () => {
+test('input フェーズ: 児童には自分の行だけを返す', () => {
   const ctx = loadContext({ screenRole: 'input', phaseIndex: 0, lessonId: 'l1' });
-  const out = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child9@example.com', false, false);
-  assert.equal(out.data.length, 0);
-});
-
-test('input フェーズ: 送った児童には全員の行を返す (送った人から分布を読める)', () => {
-  const ctx = loadContext({ screenRole: 'input', phaseIndex: 0, lessonId: 'l1' });
-  const out = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child1@example.com', false, false);
-  assert.equal(out.data.length, 3);
-});
-
-test('reinput フェーズ: 送った児童にも自分の行だけ', () => {
-  const ctx = loadContext({ screenRole: 'reinput', phaseIndex: 3, lessonId: 'l1' });
   const out = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child1@example.com', false, false);
   assert.equal(out.data.length, 1);
   assert.equal(out.data[0].email, 'child1@example.com');
@@ -68,6 +56,24 @@ test('browse フェーズ: 全員の考えを返す (出会う時間)', () => {
   const ctx = loadContext({ screenRole: 'browse', phaseIndex: 1, lessonId: 'l1' });
   const out = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child1@example.com', false, false);
   assert.equal(out.data.length, 3);
+});
+
+test('input フェーズ: 送った児童にも他者は返さない (見たくて早く送るのを防ぐ)', () => {
+  const ctx = loadContext({ screenRole: 'input', phaseIndex: 0, lessonId: 'l1' });
+  const out = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child1@example.com', false, false);
+  assert.deepEqual(out.data.map(r => r.email), ['child1@example.com']);
+});
+
+test('「考える」の後の出会う: 送った児童には全員、まだの児童には何も返さない (送ってから見る)', () => {
+  const phase = { screenRole: 'browse', phaseIndex: 1, lessonId: 'l1',
+    lateInput: { phaseIndex: 0, phaseName: '考える', question: 'Q', formTemplate: 'matrix' } };
+  const ctx = loadContext(phase);
+  const sent = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child1@example.com', false, false);
+  assert.equal(sent.data.length, 3);
+  const notYet = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'child9@example.com', false, false);
+  assert.equal(notYet.data.length, 0);
+  const teacher = ctx.__maskOthersDuringInputPhase_(ROWS, 'u1', 'teacher@example.com', true, false);
+  assert.equal(teacher.data.length, 3, '教師には全員 (投影・☆ 選び)');
 });
 
 test('教師 (own board) は input フェーズでも全員を見られる (投影して授業を進める)', () => {
@@ -102,7 +108,7 @@ test('フェーズ判定が例外でも掲示板を壊さない (fail-open で�
 });
 
 test('元の result を破壊しない (cache に入っている共有オブジェクトを汚さない)', () => {
-  const ctx = loadContext({ screenRole: 'reinput', phaseIndex: 3, lessonId: 'l1' });
+  const ctx = loadContext({ screenRole: 'input', phaseIndex: 0, lessonId: 'l1' });
   const original = { success: true, data: ROWS.data.slice() };
   const out = ctx.__maskOthersDuringInputPhase_(original, 'u1', 'child1@example.com', false, false);
   assert.equal(out.data.length, 1);

@@ -396,3 +396,65 @@ test('ほかの人が使っている名前で断られた (NAME_TAKEN): 覚え�
   assert.equal(rendered, 1, '名前の欄を出すために描き直す');
   assert.equal(app.state.lessonDraft.reason, '理由', '書いたことは消さない');
 });
+
+// =====================================================================
+// 出会うの間に、まだ送っていない「考える」を送る (2026-11-20)
+//   教師は全員を待たずに出会うへ進める。遅い子は書きかけのまま続きを書いて送り、送ってから分布を見る。
+// =====================================================================
+
+const meetLate = Object.assign({}, meet, {
+  lateInput: { phaseIndex: 0, phaseName: '考える', question: '考えるの問い', formTemplate: 'matrix' }
+});
+const discussAfter = { lessonId: 'L1', phaseIndex: 2, screenRole: 'discuss', phaseName: '議論する' };
+
+test('出会う (送れる先あり): まだ送っていない子は、案内ではなく考えるの入力画面になり、書きかけが続く', () => {
+  const { app, store } = loadApp();
+  app.state.lessonPhase = think;
+  app.state.lessonDraft = { numericX: 2, numericY: 4, reason: 'あと少し' };
+  app.__persistLessonDraft();
+  app.__renderLessonScreen = () => {};
+  app.__applyLessonPhase(meetLate);
+
+  assert.equal(app.state.lessonUnsentNote, null, '「まだ送れていません」は出さない (出会うで送れる)');
+  assert.equal(app.state.lessonLateNeedKey, 'L1:0');
+  const input = app.__lessonInputPhase();
+  assert.equal(input.phaseIndex, 0);
+  assert.equal(input.screenRole, 'input');
+  assert.equal(input.question, '考えるの問い');
+  assert.equal(input.late, true);
+  assert.equal(app.__restoreLessonDraft(input).reason, 'あと少し', '考えるの書きかけがそのまま出る');
+  // 出会うの間に書き足した分も、考えるの書きかけとして残る
+  app.state.lessonDraft = { numericX: 2, numericY: 4, reason: 'あと少しで書けた' };
+  app.__persistLessonDraft();
+  assert.equal(JSON.parse(store.get('lessonDraft:u1:L1:0')).reason, 'あと少しで書けた');
+});
+
+test('出会う (送れる先あり): 考えるで送ってあった子は、送った記録を持ち越して分布を見る', () => {
+  const { app } = loadApp();
+  app.state.lessonPhase = think;
+  app.state.lessonSent = { lessonId: 'L1', phaseIndex: 0, numericX: 3, numericY: 3, reason: '送った' };
+  app.__renderLessonScreen = () => {};
+  app.__applyLessonPhase(meetLate);
+  assert.equal(app.__lessonSentFor(app.__lessonLateInputPhase(meetLate)), true);
+  assert.equal(app.state.lessonLateNeedKey, null);
+});
+
+test('出会うで書きかけのまま議論へ進んだら、考えるの「まだ送れていません」を出す', () => {
+  const { app } = loadApp();
+  app.state.lessonPhase = think;
+  app.state.lessonDraft = { numericX: 1, numericY: 1, reason: '書きかけ' };
+  app.__persistLessonDraft();
+  app.__renderLessonScreen = () => {};
+  app.__applyLessonPhase(meetLate);
+  app.__applyLessonPhase(discussAfter);
+  const note = app.state.lessonUnsentNote;
+  assert.equal(note && note.phaseIndex, 0);
+  assert.equal(note && note.phaseName, '考える');
+});
+
+test('教師の画面には、出会うの入力画面を出さない (分布を映す側)', () => {
+  const { app } = loadApp();
+  app.state.isEditor = true;
+  assert.equal(app.__lessonLateInputPhase(meetLate), null);
+  assert.equal(app.__lessonLateInputPhase(meet), null, '送れる先の無い出会う (旧いサーバ) では今までどおり');
+});
