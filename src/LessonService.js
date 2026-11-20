@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global acquireCacheLock_, releaseCacheLock_, answerSheetStructLockKey_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, packJsonForCache_, unpackJsonFromCache_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_, formatTimestamp */
+/* global acquireCacheLock_, releaseCacheLock_, answerSheetStructLockKey_, openDatabase, openSpreadsheet, getCurrentEmail, isAdministrator, findUserByEmail_, findUserById_, getUserConfig, findPublishedBoardOwner_, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile_, getAllUsers_, getConfigOrDefault, getCachedProperty_, bumpBoardDataVersion_, emailToShortHash_, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator_, logError_, sanitizeQuadrantLabels, saveToCacheWithSizeCheck_, withStampedeGuard_, packJsonForCache_, unpackJsonFromCache_, prewarmBoardDataCache_, getColumnAnalysis, invalidateSheetRowCountCache_, formatTimestamp, clearDatabaseUserCache_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -1880,7 +1880,27 @@ function advanceLessonPhase(userId, lessonId, direction, targetIndex, options) {
 
     // user config を次フェーズに切替 (board が即座に新フェーズに対応; 冪等)
     const target = phases[toIdx];
-    const patchResult = applyConfigPatch_(userId, __boardPatchForPhase_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+    let patchResult = applyConfigPatch_(userId, __boardPatchForPhase_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+    // ボードの設定の保存が、別の保存と重なって断られた (etag_mismatch)。
+    //   Why: 2026-11-20 の 3組の試しで、続けて切り替えると「Configuration has been modified by another user」が
+    //   出た (授業は進んでいるのに、ボードの設定だけが前のまま)。重なったのは切替どうし (押し直し・別の端末) で、
+    //   どちらも同じ「授業のフェーズに合わせる」書き込み。授業がまだ toIdx にいるときだけ、users の cache を
+    //   古くして読み直し、1 回だけかけ直す。もう別のフェーズへ進んでいたら、後の切替の設定を上書きしない。
+    if (!patchResult.success && patchResult.error === 'etag_mismatch') {
+      const now = __findLessonByIdCached_(lessonId, { noStale: true });
+      const nowIdx = (now && now.lesson) ? __activePhaseIndex_(now.lesson.lessonJson || {}) : -1;
+      if (nowIdx !== toIdx) {
+        console.warn('[lesson/advance] config patch superseded by a later switch', { lessonId, toIdx, nowIdx });
+        return createSuccessResponse(`フェーズ ${toIdx + 1}: ${target.name} に切替えたあと、別の切替が行われました`, {
+          lesson: (now && now.lesson) || result.lesson,
+          activePhaseIndex: nowIdx >= 0 ? nowIdx : toIdx,
+          superseded: true
+        });
+      }
+      if (typeof clearDatabaseUserCache_ === 'function') clearDatabaseUserCache_();
+      patchResult = applyConfigPatch_(userId, __boardPatchForPhase_(target, lessonJson, lessonId), { publish: false, replaceKeys: ['columnMapping'] });
+      if (patchResult.success) console.warn('[lesson/advance] config patch retried after etag_mismatch', { lessonId, toIdx });
+    }
     if (!patchResult.success) {
       // 授業 (lesson row) は既に次フェーズ。もう一度同じフェーズを押せば config だけ再適用される。
       return createErrorResponse(

@@ -734,6 +734,43 @@ test('advanceLessonPhase: config patch が落ちても授業は進んでおり�
   assert.equal(h.context.__activePhaseIndex_(h.context.__findLessonById_(lessonId).lesson.lessonJson), 1);
 });
 
+test('advanceLessonPhase: ボードの設定が別の保存と重なった (etag_mismatch) ら、読み直して 1 回だけかけ直す', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  const orig = h.context.applyConfigPatch_;
+  let calls = 0, cleared = 0;
+  h.context.clearDatabaseUserCache_ = () => { cleared++; };
+  h.context.applyConfigPatch_ = (...args) => {
+    calls++;
+    if (calls === 1) return { success: false, error: 'etag_mismatch', message: 'Configuration has been modified by another user' };
+    return orig(...args);
+  };
+  const res = h.context.advanceLessonPhase('u1', lessonId, 'next');
+  assert.equal(res.success, true, res.message);
+  assert.equal(calls, 2);
+  assert.equal(cleared, 1, 'users の cache を古くしてから読み直す');
+});
+
+test('advanceLessonPhase: 重なった相手が後の切替で別のフェーズへ進んでいたら、かけ直さない (後の設定を上書きしない)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  let calls = 0;
+  h.context.applyConfigPatch_ = () => {
+    calls++;
+    // 書き込みの間に、別の端末の切替が授業を 2 へ進めた
+    const found = h.context.__findLessonById_(lessonId).lesson;
+    const lj = JSON.parse(JSON.stringify(found.lessonJson));
+    lj.profileTransitions.push({ ts: new Date().toISOString(), from: 1, to: 2 });
+    h.context.__updateLessonRow_(lessonId, { lessonJson: lj });
+    return { success: false, error: 'etag_mismatch', message: 'Configuration has been modified by another user' };
+  };
+  const res = h.context.advanceLessonPhase('u1', lessonId, 'next');
+  assert.equal(calls, 1, 'かけ直していない');
+  assert.equal(res.success, true);
+  assert.equal(res.data.superseded, true);
+  assert.equal(res.data.activePhaseIndex, 2);
+});
+
 test('updateLessonDraft: 授業モードの classes は実行中でも直せて、児童の選択肢に届く', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
