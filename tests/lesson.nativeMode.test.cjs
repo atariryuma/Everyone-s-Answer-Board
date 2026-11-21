@@ -50,6 +50,7 @@ function createSheet(headers, name) {
     getDataRange: () => ({ getValues: () => data.map((r) => r.slice()) }),
     appendRow: (row) => { data.push(row.slice()); },
     deleteRow: (i) => { data.splice(i - 1, 1); },
+    deleteRows: (i, n) => { data.splice(i - 1, n); },
     createTextFinder: (query) => ({
       matchEntireCell: () => ({
         findNext: () => {
@@ -87,6 +88,7 @@ function loadContext(overrides = {}) {
     getSheets: () => Array.from(nativeSheets.values()),
     addEditor: (email) => { editorsAdded.push(email); },
     getSheetByName: (n) => nativeSheets.get(n) || null,
+    deleteSheet: (sh) => { for (const [k, v] of nativeSheets) if (v === sh) nativeSheets.delete(k); },
     insertSheet: (n) => {
       const s = createSheet([], n);
       s._data.length = 0;  // header は呼び出し側が appendRow する
@@ -155,7 +157,7 @@ function loadContext(overrides = {}) {
   context.__nativeSheetName_ = (ss, lessonJson, phaseIdx) => `phase${phaseIdx + 1}`;
 
   return {
-    context, lessonsSheet, nativeSheets, cacheBumps, editorsAdded, boardConfig,
+    context, lessonsSheet, responsesSheet, nativeSheets, cacheBumps, editorsAdded, boardConfig,
     setEmail: (e) => { currentEmail = e; }
   };
 }
@@ -495,6 +497,34 @@ test('submitLessonAnswer: 一度出会うへ進んだあと考えるへ戻して
   assert.equal(fresh.success, true, fresh.message);
 });
 
+test('学級を切り替えたら、前の学級で出会うへ進んだ記録では置き直しを止めない (学級ごとに数え直す)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  advanceAsTeacher(h, lessonId, 1);   // 前の学級で出会うへ
+  advanceAsTeacher(h, lessonId, 3);
+  // 前の学級の切替は前の日 (テストは同じミリ秒に起きるので、時刻を過去にずらす)
+  const prev = h.context.__findLessonById_(lessonId).lesson;
+  const pj = JSON.parse(JSON.stringify(prev.lessonJson));
+  pj.profileTransitions.forEach((t) => { t.ts = '2026-11-19T00:00:00.000Z'; });
+  delete pj.classesChangedAt;
+  h.context.__updateLessonRow_(lessonId, { lessonJson: pj });
+  h.setEmail('teacher@example.com');
+  const u = h.context.updateLessonDraft('u1', lessonId, 'classes', ['6年4組']);
+  assert.equal(u.success, true, u.message);
+  advanceAsTeacher(h, lessonId, 0);   // 次の学級の考える
+  h.setEmail('child9@example.com');
+  assert.equal(h.context.__getViewerLessonPhase_('u1', { fresh: true }).replaceLocked, false);
+  submitAs(h, 'child9@example.com', { lessonId, phaseIndex: 0, numericX: 2, numericY: 2, reason: '最初', class: '6年4組' });
+  const again = submitAs(h, 'child9@example.com', { lessonId, phaseIndex: 0, numericX: 3, numericY: 3, reason: '直した', class: '6年4組' });
+  assert.equal(again.success, true, again.message);
+  // この学級で出会うへ進んで戻したら、止める
+  advanceAsTeacher(h, lessonId, 1);
+  advanceAsTeacher(h, lessonId, 0);
+  const locked = submitAs(h, 'child9@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 4, reason: '見てから', class: '6年4組' });
+  assert.equal(locked.error, 'REPLACE_LOCKED');
+});
+
 test('__getViewerLessonPhase_: 出会うへ進む前の考えるは置き直せる (replaceLocked=false)', () => {
   const h = loadContext();
   const lessonId = startNativeLesson(h);
@@ -797,6 +827,35 @@ test('advanceLessonPhase: 重なった相手が後の切替で別のフェーズ
   assert.equal(res.success, true);
   assert.equal(res.data.superseded, true);
   assert.equal(res.data.activePhaseIndex, 2);
+});
+
+test('purgeLessonData_: 終わった授業を、回答シートのタブ・記録の行・授業の行ごと消す (確かめつき)', () => {
+  const h = loadContext();
+  const lessonId = startNativeLesson(h);
+  h.context.getConfigOrDefault = withActiveLesson(lessonId);
+  submitAs(h, 'child1@example.com', { lessonId, phaseIndex: 0, numericX: 4, numericY: 2, reason: 'r' });
+  h.context.getPublishedSheetData = () => ({ success: true, data: [{ rowIndex: 2, class: '6年1組', answer: 4, reason: 'r', numericX: 4, numericY: 2 }] });
+  advanceAsTeacher(h, lessonId, 1);   // 記録が lesson_responses に入る
+  h.responsesSheet._data.push(['other_lesson', 0, 2, '', '', '', 'ほかの授業', 1, 1]);
+  const name = h.context.__findLessonById_(lessonId).lesson.name;
+  h.setEmail('teacher@example.com');
+  assert.match(h.context.purgeLessonData_('u1', lessonId, name).message, /実行中/);
+  h.context.endLesson('u1', lessonId);
+  h.context.__boardLessonId_ = () => '';
+  assert.match(h.context.purgeLessonData_('u1', lessonId, 'ちがう名前').message, /一致しません/);
+
+  const before = h.nativeSheets.size;
+  const dry = h.context.purgeLessonData_('u1', lessonId, name, { dryRun: true });
+  assert.equal(dry.success, true, dry.message);
+  assert.equal(h.nativeSheets.size, before, 'dryRun は消さない');
+  assert.ok(dry.data.archiveRows >= 1);
+
+  const res = h.context.purgeLessonData_('u1', lessonId, name);
+  assert.equal(res.success, true, res.message);
+  assert.equal(h.nativeSheets.size, 0, '回答シートのタブが消える');
+  const left = h.responsesSheet._data.slice(1).map((r) => r[0]);
+  assert.deepEqual(left, ['other_lesson'], 'ほかの授業の記録は残る');
+  assert.equal(h.context.__findLessonById_(lessonId).notFound, true, '授業の行も消える');
 });
 
 test('updateLessonDraft: 授業モードの classes は実行中でも直せて、児童の選択肢に届く', () => {

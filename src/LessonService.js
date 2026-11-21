@@ -797,6 +797,11 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
     // 注目する言葉は、形をここで整える (配列・重複なし・数と長さの上限)。先生の一覧の「おすすめ」
     //   にしか使わないので、実行中でも直せる (児童の画面にも回答シートにも関わらない)。
     if (!isNameField) __setByPath_(lessonJson, fieldPath, fieldPath === 'focusWords' ? __normalizeFocusWords_(value) : value);
+    // 対象の学級を変えた時刻。学級ごとに「出会うへ進んだあと」を数え直す (__lessonInputLockedAfterBrowse_)。
+    if (fieldPath === 'classes'
+        && JSON.stringify((found.lesson.lessonJson || {}).classes || []) !== JSON.stringify(lessonJson.classes || [])) {
+      lessonJson.classesChangedAt = new Date().toISOString();
+    }
 
     // Why: IME 入力中など、同じ値が複数回送られてくるケースがある。
     //   既存値と一致するなら sheet 書き込みを skip して I/O と etag 進行を抑制。
@@ -1108,6 +1113,98 @@ function deleteLesson(userId, lessonId) {
   }
 }
 
+/**
+ * 終わった授業を、回答ごと消す (管理用の API だけから。名前が _ で終わるので画面からは呼べない)。
+ *   消すもの: この授業のフェーズが持つ回答シートのタブ・lesson_responses の記録の行・授業の行。
+ * Why: 授業の削除 (deleteLesson) は授業の行だけを消し、児童の回答の入ったタブと記録が残る。
+ *   試しに作った授業を消すとき (2026-11-21、6年3組の試し) に、回答まで消す手段が無かった。
+ * 間違って消さないための確かめ: 終わった授業だけ・ボードにつながっていない・授業名の一致。
+ *   ほかの授業も同じタブを指していたら、そのタブは消さない。dryRun なら数えるだけ。
+ *
+ * @returns {Object} { sheets: [{name, removed}], archiveRows, lessonRow }
+ */
+function purgeLessonData_(userId, lessonId, confirmName, options) {
+  try {
+    const dryRun = Boolean(options && options.dryRun);
+    const auth = __requireLessonOwner_(userId, lessonId);
+    if (auth.error) return auth.error;
+    const lesson = auth.found.lesson;
+    if (lesson.state === 'active') {
+      return createErrorResponse('実行中の授業は消せません。先に「終了」してください');
+    }
+    if (String(confirmName || '') !== String(lesson.name || '')) {
+      return createErrorResponse('授業名が一致しません (間違って消さないための確かめ。--confirmName に授業名をそのまま渡す)');
+    }
+    const boardId = __boardLessonId_(userId);
+    if (boardId === null) return createErrorResponse('ボードの設定を読めませんでした。少し待ってから、もう一度');
+    if (boardId === lessonId) return createErrorResponse('ボードがこの授業につながっています。先にほかの授業へ切り替えてください');
+
+    // 1. 回答シートのタブ (この授業のフェーズが指すものだけ。ほかの授業も指していれば残す)
+    const key = (ss, name) => String(ss) + '\u0000' + String(name);
+    const shared = new Set();
+    __listLessonsForUser_(userId).forEach((l) => {
+      if (!l || l.lessonId === lessonId) return;
+      ((l.lessonJson && l.lessonJson.phases) || []).forEach((ph) => {
+        if (ph && ph.spreadsheetId && ph.sheetName) shared.add(key(ph.spreadsheetId, ph.sheetName));
+      });
+    });
+    const targets = [];
+    ((lesson.lessonJson && lesson.lessonJson.phases) || []).forEach((ph) => {
+      if (!ph || !ph.spreadsheetId || !ph.sheetName) return;
+      const k = key(ph.spreadsheetId, ph.sheetName);
+      if (targets.some((t) => t.k === k)) return;
+      targets.push({ k, spreadsheetId: ph.spreadsheetId, name: ph.sheetName, shared: shared.has(k) });
+    });
+    const sheets = targets.map((t) => {
+      if (t.shared) return { name: t.name, removed: false, reason: 'ほかの授業も使っている' };
+      const access = openSpreadsheet(t.spreadsheetId, { context: 'lesson_purge' });
+      const sh = access && access.getSheet(t.name);
+      if (!sh) return { name: t.name, removed: false, reason: '見つからない' };
+      if (!dryRun) access.spreadsheet.deleteSheet(sh);
+      return { name: t.name, removed: !dryRun };
+    });
+
+    // 2. 記録 (lesson_responses) の行。下から、続いた範囲ごとに消す。
+    let archiveRows = 0;
+    const rs = __getResponsesSheet_();
+    if (rs) {
+      const values = rs.getDataRange().getValues();
+      const rows = [];
+      for (let i = 1; i < values.length; i++) {
+        if (String(values[i][0]) === String(lessonId)) rows.push(i + 1);
+      }
+      archiveRows = rows.length;
+      if (!dryRun && rows.length) {
+        let end = rows.length - 1;
+        while (end >= 0) {
+          let start = end;
+          while (start > 0 && rows[start - 1] === rows[start] - 1) start--;
+          rs.deleteRows(rows[start], end - start + 1);
+          end = start - 1;
+        }
+      }
+    }
+
+    // 3. 授業の行
+    let lessonRow = false;
+    if (!dryRun) {
+      const del = __deleteLessonRow_(lessonId);
+      if (!del.success) {
+        return createErrorResponse('回答と記録は消しましたが、授業の行を消せませんでした: ' + (del.message || del.error || ''),
+          { sheets, archiveRows });
+      }
+      lessonRow = true;
+      __invalidateViewerLessonPhase_(userId);
+    }
+    console.log('[lesson/purge]', JSON.stringify({ lessonId, dryRun, sheets: sheets.map((x) => x.removed), archiveRows, lessonRow }));
+    return createSuccessResponse(dryRun ? '消すものを数えました (まだ消していません)' : '授業を回答ごと消しました',
+      { dryRun, sheets, archiveRows, lessonRow });
+  } catch (error) {
+    logError_('purgeLessonData_', error);
+    return createExceptionResponse(error);
+  }
+}
+
 // ----- Lifecycle: startLesson / advanceLessonPhase / endLesson -----
 
 // ----- ボードにつながっている授業 -----
@@ -1334,7 +1431,11 @@ function __lessonInputLockedAfterBrowse_(lessonJson, inputIdx) {
   const phases = (lessonJson && Array.isArray(lessonJson.phases)) ? lessonJson.phases : [];
   if (__phaseScreenRole_(phases[inputIdx]) !== LESSON_SCREEN_ROLES.INPUT) return false;
   const trans = (lessonJson && Array.isArray(lessonJson.profileTransitions)) ? lessonJson.profileTransitions : [];
+  // 1 つの授業を学級ごとに回すので、対象の学級を変えたあとの切替だけを見る
+  //   (前の学級で出会うへ進んだ記録で、次の学級の子の置き直しを止めない)。
+  const since = (lessonJson && lessonJson.classesChangedAt) ? String(lessonJson.classesChangedAt) : '';
   return trans.some((t) => {
+    if (since && !(t && String(t.ts || '') >= since)) return false;
     const to = Number(t && t.to);
     if (!Number.isInteger(to) || to === inputIdx) return false;
     const late = __lessonLateInputOf_(phases[to], lessonJson);
