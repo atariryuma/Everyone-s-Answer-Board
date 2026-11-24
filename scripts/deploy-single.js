@@ -79,14 +79,16 @@ function checkGeneratedFresh() {
 //   Why 無ければ止める: このファイルは git に入らないので、別の PC に clone しただけでは無い。
 //   無いまま配置すると送り先が空で焼き込まれ、本番のエラーの報告が黙って止まる (2026-11-11 に気づいた)。
 //   報告なしで配置したいときだけ --no-ops-report を付ける。
+//   2026-11-16 に報告そのものをやめた (学校の GAS を外のサービスにつながない)。今はいつも --no-ops-report を付け、
+//   このファイルは置かない。ここで止まるのは「フラグの付け忘れ」に気づくため。ファイルを写して通さないこと。
 const OPS_REPORT_CONFIG = path.join(__dirname, 'ops-report.local.json');
 function loadOpsReport(opts) {
   const o = opts || {};
   if (o.skip) return { url: '', token: '' };
   const file = o.file || OPS_REPORT_CONFIG;
-  const hint = '配置すると本番のエラーの報告が止まるので、配置しません。' +
-    '配置している PC の scripts/ops-report.local.json をこの PC の scripts/ に写してください ' +
-    '(報告なしで配置するなら --no-ops-report)。';
+  const hint = '--no-ops-report の付け忘れなので、配置しません。' +
+    'エラーの報告は 2026-11-16 にやめたので、--no-ops-report を付けて配置し直してください ' +
+    '(このファイルを写して通さないこと。CLAUDE.md の「配置」)。';
   if (!fs.existsSync(file)) throw new Error('scripts/ops-report.local.json がありません。' + hint);
   let j = null;
   try {
