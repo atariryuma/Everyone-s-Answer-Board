@@ -132,3 +132,13 @@ CLAUDE.md にはアクセスの表と要点のみを置き、実装詳細・設�
 - 児童の画面は授業中 5 秒 ±20% おきに更新を確かめ、議論・ふりかえりは 15 秒に落とす。失敗が続くと
   8 → 16 → 20 秒に伸ばす (止めない)
 - 授業での工夫: URL は一斉に開かせず、班ごとに数秒ずらす
+
+## 兄弟プロジェクト (StudyQuest との連携)
+
+「みんなの回答ボード」 = 集合可視化の場、 一方「[StudyQuest](file:///Users/ryuma/slide_generator)」 (= slide_generator) は個別マイプラン学習 (3 touch 構造) の場。 両者は **データだけで疎結合に連携**:
+
+- 連携責任: **StudyQuest 側に Answer Board Bridge 機能を実装** (回答ボード側はゼロ変更)
+- 状態: **構想のみ（未実装）**。StudyQuest 側に bridge 実装も設計書もまだ無い（`docs/answerboard-bridge.md` は不在）。着手するときは [StudyQuest docs/](file:///Users/ryuma/slide_generator/docs/) に設計書を置いてここからリンクし直す
+- 動作: StudyQuest タッチ 3 (ふりかえり) → prefilled Google Form URL 生成 → 回答ボード Form に submit → matrix/wordcloud で集合可視化
+- 文献的根拠: 個別最適な学びの継続困難 5 大要因 (教師負担集中・実践知の継承困難・進度差対応・学力低下・標準化テンション) → アプリは「1 単元 8 時間中 7-10% だけ介入」 の minimum viable 個別最適を堅持
+- 回答ボード側で新規 API / OAuth scope 追加なし。 Google Form の prefilled URL (`?usp=pp_url&entry.XXX=...`) が連携プロトコル

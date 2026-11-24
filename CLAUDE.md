@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Stack**: Zero-dependency, direct GAS API calls, V8 runtime, Tailwind CSS frontend
 **Language**: Comments and UI strings are in Japanese; code identifiers are in English
 
+このファイルにあるのは**どの仕事にも要る決まり**だけ。分野ごとの規則は `.claude/rules/` にある (下の「分野の規則」)。
+
 ---
 
 ## Critical: GAS Single Global Scope
@@ -24,68 +26,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm test                                 # Run all tests
 node --test tests/main.doPost.test.cjs   # Run a single test file
+npm run lint                             # CLAUDE.md ルール違反検出（setTimeout/innerHTML+var/getValue ループ等）
+npm run lint:errors                      # error severity のみ（CI 用）
+npm run lint:eslint                      # ESLint（バグ予防レベル）
+npm run test:coverage                    # node --test のカバレッジ
 npm run deploy                           # 全員の配置を更新 (URL はそのまま。deploy-single.js deploy --all)
 npm run deploy:single -- deploy --name <名前>   # 1 人分だけ更新
 npm run deploy:single -- create --name <名前> --adminEmail <先生のメール>   # 先生を足す
 npm run verify:e2e -- <検証用の名前>    # 検証用の配置で画面の機能を端から端まで動かす (75 項目)
+npm run api -- systemDiagnosis           # 配置の後に壊れていないか確認 (Admin API)
 ```
 
-**配置の形**: 先生ごとに 1 つ、先生の Drive のスプレッドシートに紐づいたアプリを「先生として実行」で配置する
-(`src/appsscript.json` の `webapp.executeAs = USER_DEPLOYING`)。データ (users / lessons / 授業の回答シート) は
-そのスプレッドシート 1 つに入る。配置ごとに違うのは `src/Deployment.js` (先生のメールと DB の SS ID) だけで、
-`scripts/deploy-single.js` が焼き込む。先生ごとの値は `scripts/single-tenants.json` (git に入れない)。
-**エラーの報告 (ops-monitor) は 2026-11-16 にやめた。配置はいつも `--no-ops-report` を付ける。**
-学校のアカウントの GAS を外のサービスにつながない、という判断 (市の決まりと、担当が替わっても回る形にするため)。
-受け口の登録も消してあるので、前の配置が送っても受け取られない。`scripts/ops-report.local.json` は置かない
-(フラグを付け忘れると、ファイルが無いので配置が止まる。それで気づける)。別の PC から配置するときは `single-tenants.json` だけを写す。
-Why: 2026-10-29 から児童アカウントは「開いた人として実行」の Apps Script を一切開けない (管理側の設定)。
+**配置**: 先生ごとに 1 つ、「先生として実行」(`USER_DEPLOYING`) で配置する。**配置はいつも `--no-ops-report` を付ける**。
+詳しくは `.claude/rules/deploy.md`。
 
 **Dev workflow**: Edit locally → `npm test` → `npm run deploy:single -- deploy --name <検証用の名前>` →
 `npm run verify:e2e -- <検証用の名前>` → `npm run deploy` → Git commit → `git push`
 
-**検証用の配置** (名前の例 `<先生>-verify`): `extraFiles: ["scripts/verify/DevInvoke.js"]` 付き。admin API の `dev.invoke` で
-画面が `google.script.run` で呼ぶ処理を名前で呼べる (児童のふりは `as`)。本番の先生には付けない。
-
 **CI** (.github/workflows/ci.yml): Syntax check + `npm run lint:errors` + `npm test`（品質ゲートのみ。配置はローカルで行う）
 
----
-
-## Admin API (配置の状態取得・操作)
-
-doPost の `adminApi` アクションに API キー認証でアクセス。ディスパッチャーは `src/AdminApis.js:dispatchAdminOperation()`。
-`npm run api` の送り先は `single-tenants.json` の配置 (`--tenant <名前>`、省略時は検証用を除く最初の配置)。
-
-```bash
-npm run api -- systemDiagnosis                # DB接続・設定・デプロイ状態の健康診断
-npm run api -- getLogs                        # 記録は無い (案内だけを返す。ops-monitor への報告は 2026-11-16 にやめた)
-npm run api -- getUserConfig --userId X       # ボードの設定
-npm run api -- setUserConfig --userId X --patch '{...}'  # config パッチ適用
-npm run api -- previewBoard --userId X        # viewer 視点の公開ボードプレビュー
-```
-
-**いつ使うか:**
-
-- 配置の後 → `systemDiagnosis` で壊れていないか確認
-- エラー調査時 → Apps Script の「実行数」(先生が見る。ops-monitor への報告は 2026-11-16 にやめた)、`perfMetrics` でボトルネック特定 (`getLogs` は記録が無いので案内だけを返す)
-- 設定変更後 → `listProperties` で反映を確認
-
-**実行ログ**: 先生ごとの配置は既定の GCP project で動くので、Cloud Logging を CLI から読めない。
-Apps Script エディタの「実行数」で見る。フロントエンドのエラーも `reportClientError` で同じ場所に出る。
-
-**全コマンド一覧**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-2。
-
----
-
-## Code Quality (lint / pre-commit)
-
-```bash
-npm run lint                # CLAUDE.md ルール違反検出（setTimeout/innerHTML+var/getValue ループ等）
-npm run lint:errors         # error severity のみ（CI 用）
-npm run lint:eslint         # ESLint（バグ予防レベル）
-npm run test:coverage       # node --test のカバレッジ
-```
-
 pre-commit hook は `npm install` 時に自動有効化される（`postinstall` で `git config core.hooksPath .githooks`）。コミット前に syntax + lint + test が自動実行される。緊急時は `git commit --no-verify`。
+
+---
+
+## 進めかた ―― 少ない人数で、安い確かめから (2026-11-24)
+
+WILD LEAGUE (`wild-league`) と exomemory で 2026-11-24 に決めた進めかたを、同じ日にこのリポジトリにも入れた
+(元の文は `wild-league` の `CLAUDE.md` の同じ名前の節。外部記憶にも要点がある)。
+
+1. **同時に動かすのは 3 つまで。** 分野ごとに常設の担当を置かない。仕事が済んだセッションはアーカイブし、
+   次の仕事は新しいセッションに短い頼み (何を・どのファイル・終わりの条件) で渡す。
+2. **人にしか判断できないもの (画面の見た目・言葉・授業での使い勝手) は、いちばん安い見本を先に出す。**
+   画面の写し 1 枚・文の案への返事をもらう前に、仕組み・テストを作らない。
+3. **頼む前に方向を決める。** 分からない所は、動かす前に 1〜2 問だけ聞く。
+4. **係は中継しない。** 数回のツール呼び出しで済むことは自分でやる。別のセッションに渡すのは、
+   1 つの仕事として独り立ちするもの (ブランチや配置で終わるもの) だけ。
+5. **AI にできない評価に容量を使わない。** 測れること (テスト・lint・`systemDiagnosis`・`verify:e2e`) は機械で測る。
+   「100 点を」のような際限のない基準には、客観的な指標を示して了承を得る。
+6. **機械的な仕事は Codex へ** (広く読む調べもの・仕様のはっきりした実装・テスト書き。目安は 30 行を超えるか複数のファイル)。
+   手順は `codex-task` スキル (無い PC では Codex に渡さず進める)。Codex はコミットしないので、差分を読んで取り込む。
+   書いた側と確かめる側は別の会社にする (Claude が書いたら `codex-review`)。
+   **Codex に渡さないもの**: 配置 (`npm run deploy*`)・Admin API (`npm run api`)・`verify:e2e`・
+   `scripts/single-tenants.json` / `.single-stage/` / `.clasp*.json` (先生のメール・API キー・scriptId が入る)・
+   クラスルームへの投稿・本番のスプレッドシートの中身。Codex に渡すのは手元のコードとテスト (`npm test`) だけ。
+7. **まとまった変更を配置したら、掃除を 1 回。** 使われなくなったコード・設定・テスト・文書を洗い出して消す。
+   消してよいか迷うもの (テストからしか呼ばれない関数・データの欄) は、消さずに一覧にしてオーナーに聞く。消したら `npm test` と `npm run lint:errors` を通す。
+
+**直す前に確かめること:**
+
+- 「統一しよう」「重複を消そう」と思ったら、まず実装を読んで本当に同じ仕事かを確かめる。名前が似ているだけの
+  別物を統合すると壊れる (2026-08-30 の全体の統一で、重複に見えた 3 組のうち 2 組が別物だった)。
+  使用回数 0 も、使う先生が少ないうちは削除の根拠にしない。
+- 「全体をきれいに」と頼まれたら、孤立した関数の grep だけで済ませず、クローン検出で重複を実測する。
+- レビューで最優先は correctness / scope (未宣言変数、関数の外の参照、catch の変数名の誤り)。単一のグローバル
+  スコープで型も bundler も無く、エラーの経路でだけ落ちるバグが残りやすい。ファイルの行数では減点しない。
+- **入口・許可の判定・`appsscript.json` を変える配置は、授業のある日に入れない** (理由と確かめ方は `.claude/rules/deploy.md`)。
+
+---
+
+## 分野の規則 ―― 触る前に、その分野のファイルを読む
+
+- Claude Code は、下の「読みこまれるとき」に当たるファイルを開く・書くと、その分野のファイルを自動で読みこむ。
+- ⚠ **Grep や Glob で見つけただけでは、読みこまれるとは限らない**。直す前に、対象のファイルを 1 度 Read で開くこと。
+- Codex などほかの AI は自動では読まない。触る分野のファイルを、自分で開いてから始める (Codex に渡す指示にも、読むファイルを書く)。
+- 分野をまたぐ仕事は両方読む。迷ったら読む。
+- 規則を足す・直すときは、その分野のファイルへ。このファイルには「どの仕事にも要ること」だけを足す。
+
+| 分野 | ファイル | 読みこまれるとき (主なもの) |
+| --- | --- | --- |
+| 配置・Admin API・入口・clasp | `.claude/rules/deploy.md` | `scripts/deploy-single.js` `scripts/admin-api.js` `scripts/verify/**` `src/appsscript.json` `src/main.js` `src/AdminApis.js` `src/SystemController.js` |
+| 画面 (テーマ・include・共通 API) | `.claude/rules/frontend.md` | `src/**/*.html` `scripts/gen-*.js` `scripts/theme-*.js` |
+| ボード (データ・表示モード・公開) | `.claude/rules/board.md` | `src/validators.js` `src/ConfigService.js` `src/DataService.js` `src/DataApis.js` `src/ColumnMappingService.js` |
+| 授業モード (native 入力) | `.claude/rules/lesson.md` | `src/LessonService.js` `src/LessonWorkspace.html` `src/DataApis.js` |
+
+詳しい説明は `docs/` (仕組み [ARCHITECTURE.md](docs/ARCHITECTURE.md)・テーマ [THEME.md](docs/THEME.md)・コマンド [DEVELOPMENT.md](docs/DEVELOPMENT.md))。
+StudyQuest との連携 (構想のみ) も ARCHITECTURE.md の末尾。
 
 ---
 
@@ -133,28 +148,6 @@ main.js (doGet/doPost routing, auth)
 
 **設計詳細**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-### Theme / Color アーキテクチャ
-
-ダークモード既定 + ライトモード対応。全 CSS は **semantic theme token** 経由で記述する。
-
-**新規 CSS の Do/Don't**:
-
-- ✅ **Do**: `var(--theme-text-primary)` / `var(--theme-bg-surface)` / `var(--theme-border-subtle)` (文脈依存の色)
-- ✅ **Do**: brand identity / status は `var(--brand-like)` / `var(--status-success)` (theme 非依存)
-- ✅ **Do**: 新規 UI は semantic primitives (`.card` / `.modal-card` / `.box`) を使う。inline Tailwind chain を新規追加しない
-- ❌ **Don't**: ハードコード hex/rgba (`color: #94a3b8` / `background: rgba(255,255,255,0.1)`)
-- ❌ **Don't**: Tailwind `dark:` prefix (CI で機械検証・禁止)。light/dark は `--theme-*` token + `body.theme-light` で表現
-
-**色を変更したいとき**: [UnifiedStyles.css.html](src/UnifiedStyles.css.html) の `:root` (dark) と `body.theme-light` (light) の token を書き換えるだけで全体反映。
-
-**寸法も token 経由で書く**: 角丸・文字サイズ・余白は生値を書かず `var(--radius-md)` /
-`var(--font-size-sm)` / `var(--space-4)` を使う。スケールと同値の生値は `check:tokens` が検出する
-(`npm run tokenize:dim` で一括変換)。値を散らすとスケールを一括で変えられなくなる。
-
-**検証**: `npm run theme:contrast` (WCAG AA) / `theme:matrix` (全 token + contrast) / `theme:perfect` (統合ゲート) / `check:tokens` (寸法 token)。
-
-**パレット設計哲学・token 一覧・primitives 表・status box token・themeManager API・保守 CLI 詳細**: [docs/THEME.md](docs/THEME.md)。
-
 ### Cache アーキテクチャ (3 層、 意図的分離)
 
 3 つの層はそれぞれ異なる用途。統合 facade を作らない (semantic clarity を失う + cost 非対称性が見えなくなる)。
@@ -176,93 +169,6 @@ main.js (doGet/doPost routing, auth)
 2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck_`
 3. すでに `getCachedProperty_` で読む config への参照 → 何もしない (透過的)
 
-### Frontend
-
-HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
-
-- `SharedUtilities.html`: Common JS utilities including `escapeHtml()`
-- `page.js.html` / `AdminPanel.js.html`: Single-file JS (no physical splitting - intentional)
-- Top-level side effects forbidden - `google.script.run`, DOM manipulation, and auto-timers must be inside `init()` only
-- **include 対象に scriptlet を書かない** - `include()` は `createHtmlOutputFromFile().getContent()` (単なるファイル連結) であり、テンプレート評価をしない。`<? ?>` を書いても実行されず生テキストとして出る。`check:gas` 項目 11 が機械検証する
-- Include order は `scripts/gen-pagehead.js` の `ORDER` が唯一の定義。変更は独立コミットで
-
-### Canonical Frontend APIs (Use these, don't reinvent)
-
-新規コードを書くときは以下の集約 API を使う。ad-hoc DOM 操作や native `confirm/alert` を新規に書かない。
-
-| 用途 | API | 場所 |
-| ---- | --- | ---- |
-| 右上トースト (success/error/warning/info) | `notifications.success/error/warning/info(msg, opts?)` | [SharedUtilities.html](src/SharedUtilities.html) |
-| 中央上バナー (ボード切替予告等) | `notifications.banner(msg, { html?, duration? })` | 同上 |
-| 確認 / アラートモーダル | `await modals.confirm(msg, opts?)` / `await modals.alert(msg)` | 同上 |
-| リダイレクトモーダル (公開遷移用) | `showRedirectModal({ title, message, redirectUrl, variant? })` | 同上 |
-| サーバ呼び出し (Promise) | `await runServer('funcName', arg1, arg2)` | 同上 |
-| 安全な JSON parse (fallback 返却) | `safeJsonParse(text, fallback)` | 同上 |
-| サーバ応答のエラー文言取り出し | `serverMessage(res, fallback)` | 同上 |
-| HTML escape | `sharedUtilities.security.escapeHtml(s)` | 同上 |
-| ローディングオーバーレイ | `setLoading(true, msg)` / `setLoading(false)` | 同上 |
-| デバウンス (key 共有可) | `sharedUtilities.debounce.debounce(fn, key, delayMs)` | 同上 |
-| ボタンの処理中 UX | `sharedUtilities.buttons.withBusy(btn, asyncFn, { busyText })` | 同上 |
-
-**禁止 / 非推奨パターン:**
-
-- 新規の右上トースト DOM、中央バナー DOM、`#notification-container` を手書きしない (上記 API に集約)
-- 新規の native `confirm()` / `alert()` (緊急 fallback 用途を除く) → `modals.confirm/alert` を使う
-- `withSuccessHandler/withFailureHandler` の手書きチェーン → `runServer(...)` を使う
-- `JSON.parse(...)` を try/catch なしで呼ぶ → `safeJsonParse(...)` を使う
-- `res.message || res.error` と手書きする → `serverMessage(res, fallback)` を使う
-  (サーバの失敗レスポンスは `message` のみ / `error` のみの 2 系統が混在する。
-   書き忘れた 1 か所だけが「エラーなのに何も出ない」になるので読み手を 1 本にする)
-
-### Data Store
-
-先生のスプレッドシートが DB。`users` シート (先生 1 人分) の `configJson` 列にボードの設定、`lessons` / `lesson_responses` に授業とアーカイブ、授業モードの回答シートは「授業名｜番号 フェーズ名」で同じスプレッドシートに入る (see `src/SystemController.js` `USERS_SHEET_HEADERS`)。
-
-アプリが作ったフォーム (`createTemplateForm`) は回答シートの列の並びが決まっているので、作った時点の割り当て
-(`templateColumnMapping_`) を使い、推定しない (回答 0 件では尺度の列を数値と見分けられないため)。
-回答シートには種類を developer metadata で書き添え、`getColumnAnalysis` が見出しの並びを確かめて使う。
-
-### Visualization Modes
-
-`config.displaySettings.boardMode` で表示モードを切替。**許可値・ラベル・必須列の唯一の定義は
-`src/validators.js` の `BOARD_MODES` 配列**（select の option / クライアント allowlist / ラベル表は
-すべてここから導出される。増やすときは配列に 1 行足す）:
-
-| key | ラベル | 必須マッピング | テンプレ生成 |
-| --- | ------ | -------------- | ------------ |
-| `auto` | 自動判定（推奨・既定） | — (サーバが解決) | — |
-| `board` | 掲示板（カード一覧） | `answer` | ✓ |
-| `numberline` | 数直線（d3 ビーズワーム） | `numericX` | ✓ |
-| `matrix` | マトリクス（2軸散布図） | `numericX` + `numericY` | ✓ |
-| `wordcloud` | ワードランキング | `answer` | — |
-| `pie` | 円グラフ | `answer` | ✓ |
-
-管理パネル「📝 Googleフォーム選択」の種別 select から、テンプレ生成対応モード
-(`TEMPLATE_BOARD_MODES`) の Forms 構造を 1 クリックで生成可能（`createTemplateForm(templateType)`）。
-生成時は `boardMode` も自動セットされる。
-
-M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md](docs/SPEC_visualization_modes.md)
-（2026-05 の初期設計書。wordcloud / pie はその後の追加なので同書には載っていない）。
-
-### 授業モード (native 入力) — 掲示板モードとは独立した縦の経路
-
-テンプレ `dialogue-reconsider-5phase`（考える→出会う→議論する→もう一度考える→ふりかえる）は
-`lessonJson.inputMode='native'` で動く。**Form も列推定も通らない**。掲示板モード
-（Form + リアクション + StudyQuest 連携）は無変更で並走する。混ぜないこと。
-
-- **フェーズが児童画面の権能を決める**。`phase.screenRole` = `input`/`browse`/`discuss`/`reinput`/`reflect`。
-  「議論中は投稿できない」は UI ではなく `submitLessonAnswer` のサーバ検証で保証する。
-- **「考える」では他者の行を返さない**（`__maskOthersDuringInputPhase_`）。viewer cache は
-  全件を保持し、mask は cache 取得後に viewer ごとに適用する（順序を逆にすると他人の分が cache される）。
-- **児童同士に名前を見せない**（native phase は `showNames:false` が既定）。教師は `isOwnBoard` で見える。
-- **記録する名前はサーバが決める**（`__resolveLessonSubmitName_`）。名簿は無いので、その授業の回答シートにある
-  「メール → 名前」を使う。自分のメールに名前があればそれ（端末の値は使わない）、無ければ端末の名前。ただし
-  ほかのメールの名前と同じなら `NAME_TAKEN` で断る。端末が送る `name` をそのままシートに書かない。
-- **`answer` と `reason` を同じ列にしない**。`validateMapping` は `numericX/Y` だけ重複を免除する。
-  違反すると config 保存が落ち、教師が「開始」を押した瞬間に失敗する（`__nativeColumnMapping_`）。
-- 投稿を受け付けないフェーズは**直前の入力フェーズのシート**を見る（自分のシートは空）。
-  軸ラベルは授業を通して 1 つの座標系に揃える（● → ★ の比較が成立する条件）。
-
 ---
 
 ## Must-Follow Rules
@@ -283,7 +189,7 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 - **`error` は「このレスポンスは失敗」の意味だけに使う**。`success: true` の応答に
   診断コードを載せたいときは `reason` を使う (`if (res.error)` の誤判定を防ぐ)。
 - 唯一の例外は `DatabaseCore.js` の `DB_NOT_CONFIGURED` (理由をコード側に明記済)。
-- 読み取り側は `serverMessage(res, fallback)` を使う (上の canonical API 表を参照)。
+- 読み取り側は `serverMessage(res, fallback)` を使う (`.claude/rules/frontend.md` の canonical API 表を参照)。
 
 ### 診断可能性 (不具合の原因を追える状態を保つ)
 
@@ -319,35 +225,9 @@ M1 (numberline) / M2 (matrix) の設計背景: [docs/SPEC_visualization_modes.md
 
 ### Maintenance Rules (from README)
 
-- `publishApp` accepts only allowlisted fields with `etag` conflict detection - maintain both
 - `doPost` actions are allowlist-managed; adding an action requires adding its input validation simultaneously
-- Include order は `scripts/gen-pagehead.js` の `ORDER` で定義。変更は独立コミットで
-- **生成物を手で編集しない** - `src/UtilityStyles.css.html` (`gen:utilities`) と `src/SharedPageHead.html` (`gen:pagehead`) は生成物。元ファイルを直したら再生成する。`deploy-single.js` の preflight と CI が鮮度を検証する
-
-### Board Publish Lifecycle (single source of truth)
-
-`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **3 関数のみ**。直接 saveUserConfig_ で書き換えてはいけない（DRY 違反 + テスト不可）：
-
-| 関数 | 場所 | 役割 |
-| ---- | ---- | ---- |
-| `publishApp(publishConfig)` | `SystemController.js` | 初回公開 / 設定差し替えを伴う公開（allowlist + etag 検証） |
-| `republishMyBoard(options?)` | `AdminApis.js` | 所有者が自分のボードを再び公開する（state のみ） |
-| `unpublishBoard(targetUserId?, options?)` | `AdminApis.js` | 所有者 or 管理者がボードの公開を終了する |
-
-**統一不変条件**（`__applyPublishStateChange_` で集約）：
-
-- `publishedAt` は「現在の状態の発生時刻」（公開中 = now / 非公開 = null）
-- `lastAccessedAt` は変更時に touch
-- `options.sourceEtag` を渡せば etag conflict 検出が有効化される（楽観ロック）
-- 認可: 自分のボード or 管理者（`requireAdmin: true` 指定時は管理者のみ）
-- 戻り値: `{ success, message, userId, isPublished, boardPublished, publishedAt, etag, redirectUrl }` で統一
-
-**UI 用語**：
-
-- アクション: 「公開する」「再び公開する」「公開を終了する」
-- 状態: 「公開中」「非公開」
-
-詳細仕様とテスト: `tests/admin.publishLifecycle.test.cjs`
+- `config.isPublished` / `config.publishedAt` を書き換えてよいのは `publishApp` / `republishMyBoard` / `unpublishBoard` の 3 関数だけ (`.claude/rules/board.md`)
+- Include order と生成物 (`UtilityStyles.css.html` / `SharedPageHead.html`) の決まりは `.claude/rules/frontend.md`
 
 ---
 
@@ -360,28 +240,5 @@ Tests run in Node.js using `node:test` (no frameworks). GAS globals are stubbed 
 ## clasp + Git
 
 - **Never commit**: `.clasp.json`, `.clasprc.json`, `scripts/single-tenants.json` (scriptId / API キー / 先生ごとの値)、`scripts/ops-report.local.json` (報告先と鍵)
-- **Do commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`
-- 配置は `.single-stage/<名前>/` で組み立てて clasp に渡す (`-P . -I .` 必須。付けないと親の `.clasp.json` を拾う)
-- File extension: `.js` locally (clasp convention), shows as `.gs` in GAS editor
-
-### Required Script Properties
-
-配置の初回に `ensureDeploymentBootstrap_` が `Deployment.js` の値から入れる (手で入れる必要はない):
-
-| Property | Description |
-| -------- | ----------- |
-| `ADMIN_EMAIL` | この配置の先生 (管理者) |
-| `DATABASE_SPREADSHEET_ID` | 先生のスプレッドシート (DB) |
-| `ADMIN_API_KEY` | Admin API の鍵 (初回に `setupApiKey` で決める。`single-tenants.json` に控える) |
-
----
-
-## 兄弟プロジェクト (StudyQuest との連携)
-
-「みんなの回答ボード」 = 集合可視化の場、 一方「[StudyQuest](file:///Users/ryuma/slide_generator)」 (= slide_generator) は個別マイプラン学習 (3 touch 構造) の場。 両者は **データだけで疎結合に連携**:
-
-- 連携責任: **StudyQuest 側に Answer Board Bridge 機能を実装** (回答ボード側はゼロ変更)
-- 状態: **構想のみ（未実装）**。StudyQuest 側に bridge 実装も設計書もまだ無い（`docs/answerboard-bridge.md` は不在）。着手するときは [StudyQuest docs/](file:///Users/ryuma/slide_generator/docs/) に設計書を置いてここからリンクし直す
-- 動作: StudyQuest タッチ 3 (ふりかえり) → prefilled Google Form URL 生成 → 回答ボード Form に submit → matrix/wordcloud で集合可視化
-- 文献的根拠: 個別最適な学びの継続困難 5 大要因 (教師負担集中・実践知の継承困難・進度差対応・学力低下・標準化テンション) → アプリは「1 単元 8 時間中 7-10% だけ介入」 の minimum viable 個別最適を堅持
-- 回答ボード側で新規 API / OAuth scope 追加なし。 Google Form の prefilled URL (`?usp=pp_url&entry.XXX=...`) が連携プロトコル
+- **Do commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`, `.claude/rules/*.md`
+- clasp の使い方と Script Properties は `.claude/rules/deploy.md`
