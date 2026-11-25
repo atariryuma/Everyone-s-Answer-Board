@@ -12,6 +12,7 @@
  *   node scripts/deploy-single.js deploy --name <名前>      # 1 人分を更新 (URL はそのまま)
  *   node scripts/deploy-single.js deploy --all              # 全員分を更新
  *   node scripts/deploy-single.js list
+ *   node scripts/deploy-single.js template [--user <clasp の名前>]   # 配る用のひな形を作る / 更新する (docs/DISTRIBUTION.md)
  *   scripts/ops-report.local.json (エラーの報告先) が無いと配置しない。報告なしで配置するなら --no-ops-report。
  *
  * 先生ごとの値は scripts/single-tenants.json (git に入れない)。
@@ -149,6 +150,7 @@ function create(args, ops) {
   const user = args.user || 'organization';
   if (!name || !adminEmail) throw new Error('--name と --adminEmail が必要です');
   if (!TENANT_NAME_RE.test(name)) throw new Error('--name は英数字・-・_ だけにしてください (フォルダ名に使う)');
+  if (name === TEMPLATE_STAGE_NAME) throw new Error(`「${TEMPLATE_STAGE_NAME}」はひな形の作業フォルダの名前なので使えません`);
   const cfg = loadConfig();
   if (cfg.tenants.some((t) => t.name === name)) throw new Error(`「${name}」は既にあります (deploy を使ってください)`);
 
@@ -163,6 +165,35 @@ function create(args, ops) {
   saveConfig(cfg);
   console.log(`✓ スプレッドシートとスクリプトを作りました: ${name}`);
   deployOne(tenant, cfg, ops);
+}
+
+// ひな形: ほかの先生が「コピーを作成」して使うスプレッドシート (紐づけスクリプト付き)。
+//   Deployment.js は空のまま push する。コピー先では、コピーした先生 (持ち主) が管理者に、そのスプレッドシートが
+//   DB になる (src/helpers.js の ensureCopiedDeploymentBootstrap_)。ひな形そのものは配置しない (push だけ)。
+//   報告先 (ops) は必ず空: ひな形は外の人に見せるので、鍵を焼き込まない。
+const TEMPLATE_STAGE_NAME = '_template';
+function template(args) {
+  const cfg = loadConfig();
+  const isNew = !cfg.template;
+  if (isNew) {
+    const user = args.user;
+    if (!user || user === true) throw new Error('ひな形を初めて作るときは --user <clasp の名前> が必要です (どのアカウントの Drive に置くかを決める)');
+    const dir = path.join(STAGE_ROOT, TEMPLATE_STAGE_NAME);
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    const title = typeof args.title === 'string' ? args.title : 'みんなの回答ボード（ひな形）';
+    clasp(dir, user, ['create', '--type', 'sheets', '--title', title, '--rootDir', '.']);
+    const project = JSON.parse(fs.readFileSync(path.join(dir, '.clasp.json'), 'utf8'));
+    cfg.template = { user, scriptId: project.scriptId, spreadsheetId: project.parentId };
+    saveConfig(cfg);
+    console.log('✓ ひな形のスプレッドシートとスクリプトを作りました');
+  }
+  const t = cfg.template;
+  const dir = stage({ name: TEMPLATE_STAGE_NAME, adminEmail: '', spreadsheetId: '', scriptId: t.scriptId }, { url: '', token: '' });
+  console.log('▶ ひな形: push');
+  clasp(dir, t.user, ['push', '--force']);
+  console.log(`✓ ひな形を更新しました。配る URL: https://docs.google.com/spreadsheets/d/${t.spreadsheetId}/copy`);
+  if (isNew) console.log('  (初回だけ) スプレッドシートの共有を「リンクを知っている全員・閲覧者」にしてください。手引き: docs/DISTRIBUTION.md');
 }
 
 function deployOne(tenant, cfg, ops) {
@@ -190,7 +221,11 @@ function main() {
     for (const t of loadConfig().tenants) console.log(`${t.name}\t${t.adminEmail}\t${t.deploymentId || '(未デプロイ)'}`);
     return;
   }
-  if (cmd !== 'create' && cmd !== 'deploy') throw new Error('使い方: create / deploy / list (ファイル冒頭の説明を参照)');
+  if (cmd === 'template') {
+    checkGeneratedFresh();
+    return template(args);
+  }
+  if (cmd !== 'create' && cmd !== 'deploy') throw new Error('使い方: create / deploy / template / list (ファイル冒頭の説明を参照)');
   // 何かを作る・push する前に確かめる (1 人目だけ配置して止まる、を避ける)
   const ops = loadOpsReport({ skip: args['no-ops-report'] === true });
   if (!ops.url) console.log('⚠ --no-ops-report: エラーの報告先を空にして配置します (この配置からは報告が届きません)');

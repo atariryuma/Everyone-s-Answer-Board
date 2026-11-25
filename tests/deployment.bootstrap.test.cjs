@@ -64,6 +64,89 @@ test('焼き込みが空 (リポジトリの Deployment.js のまま): 何もし
   assert.deepEqual(ensured, []);
 });
 
+// ---------------------------------------------------------------------
+// コピーして配った配置 (焼き込みが空 + スプレッドシートに紐づいたスクリプト)
+// ---------------------------------------------------------------------
+
+function loadCopied({ ownerEmail = 'Owner@Example.com', props = {}, bound = true } = {}) {
+  const loaded = loadHelpers({ admin: '', db: '', props });
+  const { context } = loaded;
+  const cacheStore = {};
+  const reads = [];
+  const orig = context.PropertiesService.getScriptProperties;
+  context.PropertiesService.getScriptProperties = () => {
+    const p = orig();
+    return Object.assign({}, p, { getProperty: (k) => { reads.push(k); return p.getProperty(k); } });
+  };
+  context.CacheService = { getScriptCache: () => ({
+    get: (k) => (k in cacheStore ? cacheStore[k] : null),
+    put: (k, v) => { cacheStore[k] = v; },
+    remove: (k) => { delete cacheStore[k]; }
+  }) };
+  context.SpreadsheetApp.getActiveSpreadsheet = () => (bound ? { id: 'copied-ss', getId: () => 'copied-ss' } : null);
+  context.DriveApp = { getFileById: () => ({
+    getOwner: () => (ownerEmail ? { getEmail: () => ownerEmail } : null)
+  }) };
+  return Object.assign(loaded, { cacheStore, reads });
+}
+
+test('コピーした配置: 持ち主を管理者に、紐づいたスプレッドシートを DB にする', () => {
+  const { context, props, ensured } = loadCopied();
+  context.ensureDeploymentBootstrap_();
+  assert.equal(props.ADMIN_EMAIL, 'owner@example.com', '小文字にそろえる');
+  assert.equal(props.DATABASE_SPREADSHEET_ID, 'copied-ss');
+  assert.deepEqual(ensured, ['copied-ss:users', 'copied-ss:lessons', 'copied-ss:lesson_responses']);
+  assert.equal(context.getCachedProperty_('ADMIN_EMAIL'), 'owner@example.com');
+  assert.equal(context.getCachedProperty_('DATABASE_SPREADSHEET_ID'), 'copied-ss');
+});
+
+test('コピーした配置: 持ち主を読めない (共有ドライブ) なら準備しない', () => {
+  const { context, props, ensured } = loadCopied({ ownerEmail: '' });
+  context.ensureDeploymentBootstrap_();
+  assert.deepEqual(props, {});
+  assert.deepEqual(ensured, []);
+  assert.equal(context.getCachedProperty_('ADMIN_EMAIL'), null);
+});
+
+test('コピーした配置: スプレッドシートに紐づいていなければ準備しない', () => {
+  const { context, props } = loadCopied({ bound: false });
+  context.ensureDeploymentBootstrap_();
+  assert.deepEqual(props, {});
+});
+
+test('コピーした配置: 準備済みなら上書きしない', () => {
+  const { context, props, ensured } = loadCopied({
+    props: { ADMIN_EMAIL: 'first@example.com', DATABASE_SPREADSHEET_ID: 'first-ss' }
+  });
+  context.ensureDeploymentBootstrap_();
+  assert.equal(props.ADMIN_EMAIL, 'first@example.com');
+  assert.deepEqual(ensured, []);
+});
+
+test('コピーした配置: 管理者と DB は cache から読み、実行ごとにプロパティを読まない', () => {
+  const props = { ADMIN_EMAIL: 'owner@example.com', DATABASE_SPREADSHEET_ID: 'copied-ss' };
+  const first = loadCopied({ props });
+  assert.equal(first.context.getCachedProperty_('ADMIN_EMAIL'), 'owner@example.com');
+  assert.equal(first.context.getCachedProperty_('DATABASE_SPREADSHEET_ID'), 'copied-ss');
+  assert.equal(first.reads.length, 2, '最初の実行だけ 2 つ読む');
+  // 次の実行 (メモリは空、cache は残っている)
+  const next = loadCopied({ props });
+  Object.assign(next.cacheStore, first.cacheStore);
+  assert.equal(next.context.getCachedProperty_('ADMIN_EMAIL'), 'owner@example.com');
+  assert.equal(next.context.getCachedProperty_('DATABASE_SPREADSHEET_ID'), 'copied-ss');
+  assert.deepEqual(next.reads, []);
+});
+
+test('コピーした配置: 管理者を書き換えたら cache を捨てて新しい値を読む', () => {
+  const { context, cacheStore } = loadCopied({
+    props: { ADMIN_EMAIL: 'owner@example.com', DATABASE_SPREADSHEET_ID: 'copied-ss' }
+  });
+  assert.equal(context.getCachedProperty_('ADMIN_EMAIL'), 'owner@example.com');
+  context.setCachedProperty_('ADMIN_EMAIL', 'next@example.com');
+  assert.deepEqual(cacheStore, {});
+  assert.equal(context.getCachedProperty_('ADMIN_EMAIL'), 'next@example.com');
+});
+
 test('getCachedProperty_: 管理者と DB は焼き込みから返し、プロパティを読まない (児童の確認ごとに読まない)', () => {
   const reads = [];
   const { context } = loadHelpers({ props: { ADMIN_EMAIL: 'old@example.com', OTHER: 'x' } });

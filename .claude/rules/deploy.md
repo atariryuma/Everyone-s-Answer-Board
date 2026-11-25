@@ -37,6 +37,11 @@ Why: 2026-10-29 から児童アカウントは「開いた人として実行」�
 **検証用の配置** (名前の例 `<先生>-verify`): `extraFiles: ["scripts/verify/DevInvoke.js"]` 付き。admin API の `dev.invoke` で
 画面が `google.script.run` で呼ぶ処理を名前で呼べる (児童のふりは `as`)。本番の先生には付けない。
 
+**ほかの先生に配る (ひな形のコピー)**: `deploy-single.js template` が、`Deployment.js` を空にしたひな形を push する。
+コピー先では、スプレッドシートの持ち主が管理者に、そのスプレッドシートが DB になる (`ensureCopiedDeploymentBootstrap_`)。
+焼き込みが無いので、管理者と DB は CacheService に置いて読む (`copiedDeploymentProperty_`。実行ごとにプロパティを読まない)。
+ひな形に鍵・報告先・先生のメールを入れない。手順と、まだ確かめていないことは [docs/DISTRIBUTION.md](../../docs/DISTRIBUTION.md)。
+
 ## 配置してよい日
 
 - **入口 (`doGet` / `DO_GET_HANDLERS`)・許可の判定 (`checkSpreadsheetAccess_` / `teacherOnlyError_`)・

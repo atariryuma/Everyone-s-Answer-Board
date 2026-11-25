@@ -131,6 +131,7 @@ npm run deploy                                    # 全員の配置を更新 (UR
 npm run deploy:single -- deploy --name <名前>     # 1 人分だけ更新
 npm run deploy:single -- create --name <名前> --adminEmail <先生のメール> [--user organization] [--title <SS 名>]
 npm run deploy:single -- list
+npm run deploy:single -- template [--user <clasp の名前>]   # ほかの先生に配るひな形を作る / 新しくする (DISTRIBUTION.md)
 ```
 
 - `create` は先生の Drive にスプレッドシート + 紐づけスクリプトを作り、配置する。先生がその URL を 1 度
