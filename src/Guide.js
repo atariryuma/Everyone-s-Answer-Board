@@ -9,7 +9,7 @@
  * 手順の文を変えたら GUIDE_VERSION を上げる (開いたときに書き直す)。docs/DISTRIBUTION.md の手順とそろえる。
  */
 
-/* global DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, getWebAppUrl */
+/* global DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, getWebAppUrl, teacherOnlyError_, createSuccessResponse */
 
 const GUIDE_SHEET_NAME = 'はじめに';
 const GUIDE_VERSION = '1';
@@ -154,4 +154,53 @@ function markGuideReady_(ss) {
     [GUIDE_STATUS_READY],
     [url || '（URL を読めませんでした。準備の 6 で開いた URL をブックマークしてください）']
   ]);
+}
+
+// ─── 管理パネルの「はじめの 4 歩」 ─────────────────────────────────────
+// コピーした配置の先生に、準備のあと授業で使えるようになるまでを管理パネルで案内する (AdminPanel.html の #first-steps)。
+//   1 準備 (管理パネルが開けた時点で済み) / 2 授業をつくる (画面が授業の数で判定) /
+//   3 URL を配る (URL コピーを押した) / 4 児童が開いた (先生・共同編集者でない人にボードを返した)。
+//   3 と 4 はスクリプトのプロパティに残す。焼き込みのある配置では出さず、何も書かない。
+const FIRST_STEPS_SHARED_KEY = 'FIRST_STEPS_URL_SHARED';
+const FIRST_STEPS_CHILD_KEY = 'FIRST_STEPS_CHILD_OPENED';
+const FIRST_STEPS_CHILD_CACHE_KEY = 'first_steps_child_opened';
+
+/** 管理パネルが開くときに読む。先生だけ。 */
+function getFirstStepsState() {
+  const denied = teacherOnlyError_();
+  if (denied) return denied;
+  if (isBakedDeployment_()) return createSuccessResponse('', { show: false });
+  const props = PropertiesService.getScriptProperties();
+  return createSuccessResponse('', {
+    show: true,
+    urlShared: props.getProperty(FIRST_STEPS_SHARED_KEY) === '1',
+    childOpened: props.getProperty(FIRST_STEPS_CHILD_KEY) === '1'
+  });
+}
+
+/** 管理パネルで「URL コピー」を押したとき。先生だけ。 */
+function markFirstStepUrlShared() {
+  const denied = teacherOnlyError_();
+  if (denied) return denied;
+  if (!isBakedDeployment_()) PropertiesService.getScriptProperties().setProperty(FIRST_STEPS_SHARED_KEY, '1');
+  return createSuccessResponse('', { urlShared: true });
+}
+
+/**
+ * 児童にボードを返したことを 1 度だけ残す (main.js の handleViewMode_ から)。
+ * 児童が開くたびに通るので、済んだあとは CacheService を 1 回読むだけにする (プロパティを読まない)。
+ * 失敗しても児童の画面は止めない。
+ */
+function noteChildOpenedBoard_() {
+  if (isBakedDeployment_()) return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache.get(FIRST_STEPS_CHILD_CACHE_KEY)) return;
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty(FIRST_STEPS_CHILD_KEY) !== '1') props.setProperty(FIRST_STEPS_CHILD_KEY, '1');
+    cache.put(FIRST_STEPS_CHILD_CACHE_KEY, '1', 21600);
+  } catch (e) {
+    // 4 歩目の印が付かないだけ (次に児童が開いたときにもう一度試す)
+    console.warn('noteChildOpenedBoard_: 印を残せませんでした:', e && e.message);
+  }
 }

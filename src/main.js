@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -303,7 +303,12 @@ function handleViewMode_(params, currentEmail) {
     //   client 側に一覧をコピーしないための注入。
     boardModes: VALIDATOR_BOARD_MODES
   });
-  return template.evaluate().setTitle('回答ボード');
+  const output = template.evaluate().setTitle('回答ボード');
+  // コピーした配置の「はじめの 4 歩」: 児童 (先生・共同編集者でない人) にボードを返すことを 1 度だけ残す。
+  //   画面を組み立て終えてから残す (組み立てに失敗したのに「児童が開けた」にしない)。
+  //   焼き込みのある配置では何もしない。中で失敗しても投げない (児童の画面を止めない)。
+  if (!isEditor && typeof noteChildOpenedBoard_ === 'function') noteChildOpenedBoard_();
+  return output;
 }
 
 function handleReviewMode_(params, currentEmail) {

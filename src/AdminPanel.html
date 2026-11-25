@@ -286,6 +286,46 @@
       padding-bottom: 100px;
     }
 
+    /* はじめの 4 歩 (コピーした配置の先生への道しるべ) */
+    .first-steps { border-color: var(--theme-accent-cyan); margin-bottom: var(--space-4); }
+    .first-steps[hidden] { display: none; }
+    .first-steps-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+    .first-steps-count { font-size: var(--font-size-sm); color: var(--theme-text-secondary); white-space: nowrap; }
+    .first-steps-lead { font-size: var(--font-size-sm); color: var(--theme-text-secondary); margin: var(--space-1) 0 var(--space-3); }
+    .first-steps-list { list-style: none; margin: 0; padding: 0; }
+    .first-step {
+      display: flex; align-items: flex-start; gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-top: 1px solid var(--theme-border-subtle);
+    }
+    .first-step-mark {
+      flex: none; width: var(--space-6); height: var(--space-6);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--theme-border-strong);
+      font-size: var(--font-size-xs); color: var(--theme-text-muted);
+    }
+    .first-step-body { flex: 1; min-width: 0; }
+    .first-step-title { font-size: var(--font-size-sm); color: var(--theme-text-primary); }
+    .first-step-desc { font-size: var(--font-size-sm); color: var(--theme-text-secondary); }
+    .first-step-action { display: none; white-space: nowrap; }
+    .first-step-help { display: none; margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--theme-text-secondary); }
+    .first-step-help summary { cursor: pointer; color: var(--theme-accent-cyan); }
+    .first-step-help p { margin-top: var(--space-2); }
+    .first-step.is-current .first-step-mark { border-color: var(--theme-accent-cyan); color: var(--theme-accent-cyan); }
+    .first-step.is-current .first-step-title { font-weight: 600; }
+    .first-step.is-current .first-step-action { display: inline-flex; }
+    .first-step.is-done .first-step-mark { border-color: var(--status-success); color: var(--status-success); }
+    .first-step.is-done .first-step-title,
+    .first-step.is-done .first-step-desc { color: var(--theme-text-muted); }
+    .first-step.is-stuck .first-step-help { display: block; }
+    @media (max-width: 640px) {
+      /* 狭い画面では、ボタンを文の下の行へ送る (横に並べると文が細く折れる) */
+      .first-step { flex-wrap: wrap; }
+      .first-step-body { flex: 1 1 calc(100% - var(--space-6) - var(--space-3)); }
+      .first-step-action { margin-left: calc(var(--space-6) + var(--space-3)); }
+    }
+
     /* 「初めての方へ」ヒント box — cyan accent overlay (両モード対応) */
     .first-time-hint-box {
       background: var(--theme-accent-cyan-soft);
@@ -491,6 +531,54 @@
   <!-- data-normal-mode: body.mode-create-lesson / body.mode-run-lesson 時に CSS で非表示。
        これで wizard / Runner が main workspace を takeover する。 -->
   <main class="app-main" data-normal-mode>
+
+      <!-- はじめの 4 歩: ひな形をコピーした先生に、授業で使えるようになるまでを案内する。
+           出すか・どこまで済んだかは AdminPanel.js.html の initFirstSteps が決める (getFirstStepsState)。
+           全部済んだら出さない。焼き込みのある配置では出さない。 -->
+      <section id="first-steps" class="card first-steps" hidden aria-labelledby="first-steps-title">
+        <div class="first-steps-head">
+          <h2 id="first-steps-title" class="section-title">はじめの 4 歩</h2>
+          <span id="first-steps-count" class="first-steps-count"></span>
+        </div>
+        <p class="first-steps-lead">授業で使えるようになるまでの道しるべです。済んだら自動で印が付き、全部済むとこのカードは消えます。</p>
+        <ol class="first-steps-list">
+          <li class="first-step" data-step="ready">
+            <span class="first-step-mark" aria-hidden="true">1</span>
+            <div class="first-step-body">
+              <div class="first-step-title">アプリの準備</div>
+              <div class="first-step-desc">済みました。次からは、このページをブックマークから開くだけです。</div>
+            </div>
+          </li>
+          <li class="first-step" data-step="lesson">
+            <span class="first-step-mark" aria-hidden="true">2</span>
+            <div class="first-step-body">
+              <div class="first-step-title">授業をつくる</div>
+              <div class="first-step-desc">型を選ぶだけで、児童が考えを書く画面まで用意されます。3 分ほどです。</div>
+            </div>
+            <button id="first-steps-create" class="btn btn-primary text-sm first-step-action" type="button">新しい授業をつくる</button>
+          </li>
+          <li class="first-step" data-step="share">
+            <span class="first-step-mark" aria-hidden="true">3</span>
+            <div class="first-step-body">
+              <div class="first-step-title">児童に URL を配る</div>
+              <div class="first-step-desc">授業を始めると、下の「URLコピー」が押せます。押して、クラスルームなどに貼ります。</div>
+            </div>
+          </li>
+          <li class="first-step" data-step="child">
+            <span class="first-step-mark" aria-hidden="true">4</span>
+            <div class="first-step-body">
+              <div class="first-step-title">児童のアカウントで開けるか確かめる</div>
+              <div class="first-step-desc">授業の前に 1 度だけ。児童が 1 人でも開くと、次にこのページを開いたときに印が付きます。</div>
+              <details class="first-step-help">
+                <summary>児童が開けないときは</summary>
+                <p>Google のエラーの画面になるときは、デプロイの設定を確かめます。スプレッドシートの「拡張機能」→「Apps Script」→「デプロイ」→「デプロイを管理」で、「次のユーザーとして実行」が「自分」、「アクセスできるユーザー」が組織内の全員になっているかを見てください。</p>
+                <p>合っているのに開けないときは、組織の設定で止められています。学校や市の管理者に相談してください（アプリでは直せません）。</p>
+                <p>「同一ドメインのアカウントで」と出るときは、児童と先生のアカウントの @ より後ろが違います。今は、先生と同じ組織の児童だけが開けます。</p>
+              </details>
+            </div>
+          </li>
+        </ol>
+      </section>
 
       <!-- ステータスバー: 公開状態と主要操作。状態は非公開でも隠さない。 -->
       <div id="board-status-bar" class="card status-bar">

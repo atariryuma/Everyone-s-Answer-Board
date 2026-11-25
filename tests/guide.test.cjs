@@ -140,3 +140,66 @@ test('案内の行: 状態と URL の行の位置が定数と合っている', (
   assert.equal(lines[vm.runInContext('GUIDE_URL_ROW', context) - 1][1], '管理パネルの URL');
   assert.equal(lines[lines.length - 1][1], vm.runInContext('GUIDE_VERSION_LABEL', context));
 });
+
+// ---------------------------------------------------------------------
+// 管理パネルの「はじめの 4 歩」
+// ---------------------------------------------------------------------
+
+function loadSteps({ admin = '', db = '', teacher = true, props = {}, cacheFails = false } = {}) {
+  const loaded = load({ admin, db });
+  const { context } = loaded;
+  const cache = {};
+  const counts = { propReads: 0, propWrites: 0 };
+  context.teacherOnlyError_ = () => (teacher ? null : { success: false, message: '管理者権限が必要です' });
+  context.createSuccessResponse = (message, data) => ({ success: true, message, data });
+  context.PropertiesService = { getScriptProperties: () => ({
+    getProperty: (k) => { counts.propReads += 1; return k in props ? props[k] : null; },
+    setProperty: (k, v) => { counts.propWrites += 1; props[k] = v; }
+  }) };
+  context.CacheService = { getScriptCache: () => {
+    if (cacheFails) throw new Error('cache down');
+    return { get: (k) => cache[k] || null, put: (k, v) => { cache[k] = v; } };
+  } };
+  return Object.assign(loaded, { props, cache, counts });
+}
+
+test('はじめの 4 歩: コピーした配置の先生には、今の印を返す', () => {
+  const { context } = loadSteps({ props: { FIRST_STEPS_URL_SHARED: '1' } });
+  const res = context.getFirstStepsState();
+  assert.deepEqual(JSON.parse(JSON.stringify(res.data)), { show: true, urlShared: true, childOpened: false });
+});
+
+test('はじめの 4 歩: 焼き込みのある配置では出さず、印も書かない', () => {
+  const { context, props } = loadSteps({ admin: 't@example.com', db: 'ss' });
+  assert.equal(context.getFirstStepsState().data.show, false);
+  context.markFirstStepUrlShared();
+  context.noteChildOpenedBoard_();
+  assert.deepEqual(props, {});
+});
+
+test('はじめの 4 歩: 先生でなければ読めず、印も付けられない (児童の画面から呼ばれても)', () => {
+  const { context, props } = loadSteps({ teacher: false });
+  assert.equal(context.getFirstStepsState().success, false);
+  assert.equal(context.markFirstStepUrlShared().success, false);
+  assert.deepEqual(props, {});
+});
+
+test('はじめの 4 歩: URL コピーで 3 歩目の印が付く', () => {
+  const { context, props } = loadSteps();
+  assert.equal(context.markFirstStepUrlShared().success, true);
+  assert.equal(props.FIRST_STEPS_URL_SHARED, '1');
+});
+
+test('はじめの 4 歩: 児童が開くと 1 度だけ印を書き、そのあとはプロパティを読まない', () => {
+  const { context, props, counts } = loadSteps();
+  context.noteChildOpenedBoard_();
+  assert.equal(props.FIRST_STEPS_CHILD_OPENED, '1');
+  assert.deepEqual(counts, { propReads: 1, propWrites: 1 });
+  for (let i = 0; i < 30; i += 1) context.noteChildOpenedBoard_();
+  assert.deepEqual(counts, { propReads: 1, propWrites: 1 }, '2 人目からは cache だけ');
+});
+
+test('はじめの 4 歩: 印を残せなくても投げない (児童の画面を止めない)', () => {
+  const { context } = loadSteps({ cacheFails: true });
+  assert.doesNotThrow(() => context.noteChildOpenedBoard_());
+});
