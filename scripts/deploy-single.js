@@ -131,7 +131,8 @@ function stage(tenant, ops) {
     `const DEPLOY_ADMIN_EMAIL = ${str(tenant.adminEmail)};\n` +
     `const DEPLOY_DATABASE_SPREADSHEET_ID = ${str(tenant.spreadsheetId)};\n` +
     `const DEPLOY_OPS_REPORT_URL = ${str(ops.url)};\n` +
-    `const DEPLOY_OPS_REPORT_TOKEN = ${str(ops.token)};\n`);
+    `const DEPLOY_OPS_REPORT_TOKEN = ${str(ops.token)};\n` +
+    `const DEPLOY_TEMPLATE_SPREADSHEET_ID = ${str(tenant.templateSpreadsheetId)};\n`);
   // 検証用の配置にだけ足すファイル (single-tenants.json の extraFiles、リポジトリからの相対パス)。
   //   例: scripts/verify/DevInvoke.js (画面の処理を admin API から直接呼ぶ入口)。本番の先生には付けない。
   for (const rel of tenant.extraFiles || []) {
@@ -189,7 +190,8 @@ function template(args) {
     console.log('✓ ひな形のスプレッドシートとスクリプトを作りました');
   }
   const t = cfg.template;
-  const dir = stage({ name: TEMPLATE_STAGE_NAME, adminEmail: '', spreadsheetId: '', scriptId: t.scriptId }, { url: '', token: '' });
+  // ひな形の ID を焼き込む: ひな形そのものでデプロイして開いても、準備が走らないようにする (src/Deployment.js)
+  const dir = stage({ name: TEMPLATE_STAGE_NAME, adminEmail: '', spreadsheetId: '', scriptId: t.scriptId, templateSpreadsheetId: t.spreadsheetId }, { url: '', token: '' });
   console.log('▶ ひな形: push');
   clasp(dir, t.user, ['push', '--force']);
   console.log(`✓ ひな形を更新しました。配る URL: https://docs.google.com/spreadsheets/d/${t.spreadsheetId}/copy`);

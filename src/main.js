@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global movedDestination_, movedTargetUrl_, noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global isTemplateItself_, movedDestination_, movedTargetUrl_, noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -134,6 +134,15 @@ function doGet(e) {
         currentEmail,
         false,
         '管理者と同一ドメインのアカウントでアクセスしてください。'
+      );
+    }
+
+    // 配る用のひな形そのものでは、アプリを開かせない (コピーしてから使ってもらう)。コピーした配置では ID が違うので素通り。
+    if (typeof isTemplateItself_ === 'function' && isTemplateItself_()) {
+      return createAccessRestrictedTemplate(
+        currentEmail,
+        false,
+        'これは配る用のひな形です。スプレッドシートの「ファイル」→「コピーを作成」でコピーして、コピーした方でデプロイしてください。'
       );
     }
 

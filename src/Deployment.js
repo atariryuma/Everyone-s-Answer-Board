@@ -12,6 +12,11 @@
  */
 const DEPLOY_ADMIN_EMAIL = '';
 const DEPLOY_DATABASE_SPREADSHEET_ID = '';
+// 配る用のひな形のスプレッドシート (deploy-single.js の template が焼き込む。コピーにも同じ値が入る)。
+//   ひな形そのものでは準備をしない・アプリを開かせない (helpers.js の isTemplateItself_)。
+//   Why: 2026-11-26、ひな形でデプロイして開き、持ち主の登録と「準備ができました」がひな形に書かれた。
+//   そのままコピーされると、どのコピーにも持ち主のメールが入る。
+const DEPLOY_TEMPLATE_SPREADSHEET_ID = '';
 // ops-monitor への報告の送り先と鍵（OpsReport.js）。空なら送らない。
 const DEPLOY_OPS_REPORT_URL = '';
 const DEPLOY_OPS_REPORT_TOKEN = '';

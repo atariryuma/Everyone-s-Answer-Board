@@ -3,7 +3,7 @@
  *   認証ショートカット、emailToShortHash_（仮名化）。
  */
 
-/* global markGuideReady_, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
+/* global DEPLOY_TEMPLATE_SPREADSHEET_ID, markGuideReady_, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
@@ -64,6 +64,29 @@ function forgetCopiedDeploymentProperty_() {
   }
 }
 
+function templateSpreadsheetId_() {
+  return typeof DEPLOY_TEMPLATE_SPREADSHEET_ID === 'string' ? DEPLOY_TEMPLATE_SPREADSHEET_ID : '';
+}
+
+/**
+ * 配る用のひな形そのものを開いているか (doGet から)。ひな形ではアプリを開かせず、コピーするよう案内する。
+ * 準備が済んでしまったひな形 (プロパティが残っている) は DB の ID で分かる。まだのひな形は紐づけ元を読む
+ * (準備ができていない配置でだけ通るので、児童が開くたびには読まない)。
+ */
+function isTemplateItself_() {
+  const templateId = templateSpreadsheetId_();
+  if (!templateId) return false;
+  try {
+    const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
+    if (dbId) return dbId === templateId;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    return Boolean(ss && ss.getId() === templateId);
+  } catch (e) {
+    console.warn('isTemplateItself_: 確かめられませんでした (ひな形ではないとして続ける):', e && e.message);
+    return false;
+  }
+}
+
 /**
  * コピーして配った配置 (焼き込みが空で、スプレッドシートに紐づいたスクリプト) の初回の準備。
  *
@@ -77,6 +100,8 @@ function ensureCopiedDeploymentBootstrap_() {
   if (props0.getProperty('ADMIN_EMAIL') && props0.getProperty('DATABASE_SPREADSHEET_ID')) return;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) return;   // スプレッドシートに紐づいていない (リポジトリの Deployment.js のまま単体で置いた)
+  // ひな形そのものでは準備しない (持ち主の登録をひな形に書くと、どのコピーにも写る)
+  if (templateSpreadsheetId_() && ss.getId() === templateSpreadsheetId_()) return;
   const owner = DriveApp.getFileById(ss.getId()).getOwner();
   const ownerEmail = owner ? String(owner.getEmail() || '').trim().toLowerCase() : '';
   if (!ownerEmail) {

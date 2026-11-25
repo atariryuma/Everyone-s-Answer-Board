@@ -114,6 +114,29 @@ test('コピーした配置: スプレッドシートに紐づいていなけれ
   assert.deepEqual(props, {});
 });
 
+test('ひな形そのもの: 準備しない (持ち主の登録をひな形に書かない)。コピーは ID が違うので準備する', () => {
+  const tpl = loadCopied();
+  vm.runInContext("var DEPLOY_TEMPLATE_SPREADSHEET_ID = 'copied-ss';", tpl.context);
+  tpl.context.ensureDeploymentBootstrap_();
+  assert.deepEqual(tpl.props, {});
+  assert.deepEqual(tpl.ensured, []);
+  assert.equal(tpl.context.isTemplateItself_(), true);
+
+  const copy = loadCopied();
+  vm.runInContext("var DEPLOY_TEMPLATE_SPREADSHEET_ID = 'template-ss';", copy.context);
+  copy.context.ensureDeploymentBootstrap_();
+  assert.equal(copy.props.DATABASE_SPREADSHEET_ID, 'copied-ss');
+  assert.equal(copy.context.isTemplateItself_(), false);
+});
+
+test('ひな形そのもの: 準備が済んでしまっていても (プロパティが残っていても) ひな形と分かる', () => {
+  const dirty = loadCopied({ props: { ADMIN_EMAIL: 'owner@example.com', DATABASE_SPREADSHEET_ID: 'copied-ss' } });
+  vm.runInContext("var DEPLOY_TEMPLATE_SPREADSHEET_ID = 'copied-ss';", dirty.context);
+  assert.equal(dirty.context.isTemplateItself_(), true);
+  // ひな形の ID が焼き込まれていない (自分で配置した先生・古い版) なら、いつも false
+  assert.equal(loadCopied().context.isTemplateItself_(), false);
+});
+
 test('コピーした配置: 準備済みなら上書きしない', () => {
   const { context, props, ensured } = loadCopied({
     props: { ADMIN_EMAIL: 'first@example.com', DATABASE_SPREADSHEET_ID: 'first-ss' }
