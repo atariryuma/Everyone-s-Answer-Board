@@ -40,6 +40,8 @@ Why: 2026-10-29 から児童アカウントは「開いた人として実行」�
 **ほかの先生に配る (ひな形のコピー)**: `deploy-single.js template` が、`Deployment.js` を空にしたひな形を push する。
 コピー先では、スプレッドシートの持ち主が管理者に、そのスプレッドシートが DB になる (`ensureCopiedDeploymentBootstrap_`)。
 焼き込みが無いので、管理者と DB は CacheService に置いて読む (`copiedDeploymentProperty_`。実行ごとにプロパティを読まない)。
+先生への案内はコピーの最初のタブ「はじめに」(`src/Guide.js` の `onOpen`。焼き込みのある配置では何もしない)。
+ダイアログ・サイドバーは足さない (`appsscript.json` に権限が増え、動いている配置の先生に許可のし直しが要る)。
 ひな形に鍵・報告先・先生のメールを入れない。手順と、まだ確かめていないことは [docs/DISTRIBUTION.md](../../docs/DISTRIBUTION.md)。
 
 ## 配置してよい日

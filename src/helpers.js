@@ -3,7 +3,7 @@
  *   認証ショートカット、emailToShortHash_（仮名化）。
  */
 
-/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
+/* global markGuideReady_, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
@@ -93,6 +93,12 @@ function ensureCopiedDeploymentBootstrap_() {
     __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
     setCachedProperty_('ADMIN_EMAIL', ownerEmail);
     setCachedProperty_('DATABASE_SPREADSHEET_ID', ss.getId());
+    try {
+      if (typeof markGuideReady_ === 'function') markGuideReady_(ss);
+    } catch (e) {
+      // 案内のタブの印が ⏳ のまま残るだけ (アプリは動く)
+      console.warn('ensureCopiedDeploymentBootstrap_: 「はじめに」に準備完了を書けませんでした:', e && e.message);
+    }
   } finally {
     lock.releaseLock();
   }
