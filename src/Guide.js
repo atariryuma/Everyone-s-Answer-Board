@@ -115,7 +115,7 @@ function ensureGuideSheet_(ss) {
     // 書き直す前に、準備が済んだ印と URL を控える (初回の準備は 1 度しか走らない)
     const s = values[GUIDE_STATUS_ROW - 1];
     const u = values[GUIDE_URL_ROW - 1];
-    if (s && s[1] === GUIDE_STATUS_READY && u) status = { url: String(u[1] || '') };
+    if (s && String(s[1]).indexOf('✅') === 0 && u) status = { text: String(s[1]), url: String(u[1] || '') };
     sheet.clear();
   } else {
     sheet = ss.insertSheet(GUIDE_SHEET_NAME, 0);
@@ -123,7 +123,7 @@ function ensureGuideSheet_(ss) {
 
   const rows = GUIDE_LINES.map((l) => [l[1], l[2]]);
   if (status) {
-    rows[GUIDE_STATUS_ROW - 1][1] = GUIDE_STATUS_READY;
+    rows[GUIDE_STATUS_ROW - 1][1] = status.text;
     rows[GUIDE_URL_ROW - 1][1] = status.url;
   }
   // 「1」などを数や日付に変えさせない・「=」で始まっても式にしない
@@ -153,6 +153,20 @@ function markGuideReady_(ss) {
   sheet.getRange(GUIDE_STATUS_ROW, 2, 2, 1).setValues([
     [GUIDE_STATUS_READY],
     [url || '（URL を読めませんでした。準備の 6 で開いた URL をブックマークしてください）']
+  ]);
+}
+
+/**
+ * 前の回答ボードを引き継いだことを「はじめに」に書く (Relocation.js の adoptPreviousBoard から)。
+ * データは前のスプレッドシートに入ったままなので、消さないように名前を書いておく。
+ */
+function markGuideAdopted_(ss, previousName) {
+  ensureGuideSheet_(ss);
+  const sheet = ss.getSheetByName(GUIDE_SHEET_NAME);
+  const url = typeof getWebAppUrl === 'function' ? String(getWebAppUrl() || '') : '';
+  sheet.getRange(GUIDE_STATUS_ROW, 2, 2, 1).setValues([
+    ['✅ 前の回答ボードを引き継ぎました。授業や回答は、スプレッドシート「' + previousName + '」に入っています。そちらは消さないでください。'],
+    [url]
   ]);
 }
 

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+  <title>新しい場所に移りました - みんなの回答ボード</title>
+  <?!= include('SharedPageHead'); ?>
+    <script>
+      // 引っ越し先 (src/Relocation.js の movedTargetUrl_ が組み立てた、Apps Script のウェブアプリの URL)
+      var MOVED_URL = '<?= moveUrl ?>';
+
+      function openMoved() {
+        window.open(MOVED_URL, '_top');
+      }
+
+      // 自動で移る。ブラウザが止めたとき (押していないのにページを替えられない) は、下のボタンで移る。
+      window.addEventListener('load', function () {
+        try { openMoved(); } catch (e) { /* 下のボタンから開ける */ }
+      });
+    </script>
+</head>
+  <body class="app-body min-h-screen flex items-center justify-center p-4">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
+    <div class="max-w-lg w-full text-center space-y-6">
+      <h1 class="text-2xl font-bold text-theme">回答ボードは新しい場所に移りました</h1>
+      <p class="text-theme-secondary leading-relaxed">
+        自動で移ります。移らないときは、下のボタンを押してください。
+      </p>
+      <div class="flex items-center justify-center pt-4">
+        <button type="button" class="btn btn-primary" onclick="openMoved()">
+          新しい回答ボードを開く
+        </button>
+      </div>
+    </div>
+  </body>
+</html>

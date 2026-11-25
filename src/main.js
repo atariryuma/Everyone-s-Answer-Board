@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global movedDestination_, movedTargetUrl_, noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -147,6 +147,17 @@ function doGet(e) {
     const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
     if (!setupDone) {
       return createAccessRestrictedTemplate(currentEmail, false, 'このアプリはまだ準備できていません。管理者に連絡してください。');
+    }
+
+    // コピーした配置が新しい版へ引っ越していたら、開いた人を新しい方へ送る (Relocation.js)。
+    //   焼き込みのある配置では何もしない。moved は送られてきた印 (同じ送り先へは、もう一度送らない)。
+    if (typeof movedDestination_ === 'function') {
+      const movedTo = movedDestination_(typeof params.moved === 'string' ? params.moved : '');
+      if (movedTo) {
+        const moved = HtmlService.createTemplateFromFile('Moved.html');
+        moved.moveUrl = movedTargetUrl_(movedTo, params);
+        return moved.evaluate().setTitle('回答ボード');
+      }
     }
 
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;

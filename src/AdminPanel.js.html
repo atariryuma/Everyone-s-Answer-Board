@@ -3221,8 +3221,89 @@
         picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     }
+    initAdoptPrevious();
     renderFirstSteps();
+    // カードが「授業をつくる」を案内している間は、授業タブから始める。
+    //   Why: データソース未接続だと init がボード設定タブを選ぶ (フォームをつなぎたい先生向け)。
+    //   コピーしたばかりの先生には、カードの 2 歩目と違うタブが開いて迷う (2026-11-26 に実物で分かった)。
+    if (window.__firstStepsVisible() && typeof window.__adminSelectTab === 'function') {
+      window.__adminSelectTab('lessons');
+    }
     if (firstSteps.copied) noteFirstStepUrlShared();
+  }
+
+  // 前の回答ボードを引き継ぐ (新しい版にコピーし直した先生)。済んだら開き直す (DB が替わるので、画面の中身を全部読み直す)。
+  async function adoptPreviousBoard(idOrUrl, name) {
+    const ok = await window.modals.confirm(
+      (name ? '「' + name + '」' : '貼った URL のスプレッドシート') + 'の授業・回答・設定を引き継ぎます。' +
+      '前に配った URL を開いた人は、こちらへ送られます。よろしいですか？');
+    if (!ok) return;
+    window.setLoading(true, '引き継いでいます…');
+    try {
+      const res = await runServer('adoptPreviousBoard', idOrUrl);
+      if (!res || !res.success) {
+        showError(window.serverMessage(res, '引き継げませんでした'));
+        return;
+      }
+      showSuccess('引き継ぎました。ページを開き直します。');
+      // トップの URL から開き直す (引き継いだ DB の userId で管理パネルが開く)
+      const top = await runServer('getWebAppUrl').catch(() => '');
+      if (top) window.open(top, '_top');
+      else showSuccess('引き継ぎました。ブックマークから開き直してください。');
+    } catch (e) {
+      showError('引き継げませんでした: ' + (e && e.message ? e.message : ''));
+    } finally {
+      window.setLoading(false);
+    }
+  }
+
+  function initAdoptPrevious() {
+    const findBtn = document.getElementById('first-steps-find-previous');
+    const list = document.getElementById('first-steps-previous-list');
+    const urlInput = document.getElementById('first-steps-previous-url');
+    const urlBtn = document.getElementById('first-steps-adopt-url');
+    if (!findBtn || !list || !urlInput || !urlBtn) return;
+    const note = (text) => {
+      list.textContent = '';
+      const li = document.createElement('li');
+      li.textContent = text;
+      list.appendChild(li);
+    };
+    findBtn.addEventListener('click', () => window.sharedUtilities.buttons.withBusy(findBtn, async () => {
+      const res = await runServer('findPreviousBoards');
+      if (!res || !res.success) {
+        note(window.serverMessage(res, '探せませんでした'));
+        return;
+      }
+      const boards = (res.data && res.data.boards) || [];
+      if (boards.length === 0) {
+        note('見つかりませんでした。下に、前のスプレッドシートの URL を貼ってください。');
+        return;
+      }
+      list.textContent = '';
+      boards.forEach((b) => {
+        const li = document.createElement('li');
+        const label = document.createElement('span');
+        const day = b.updatedAt ? new Date(b.updatedAt).toLocaleDateString('ja-JP') : '';
+        label.textContent = '「' + b.name + '」 授業 ' + b.lessonCount + ' 件' + (day ? '・最後に使った日 ' + day : '');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-primary text-sm';
+        btn.textContent = '引き継ぐ';
+        btn.addEventListener('click', () => adoptPreviousBoard(b.id, b.name));
+        li.appendChild(label);
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    }, { busyText: '探しています…' }));
+    urlBtn.addEventListener('click', () => {
+      const value = urlInput.value.trim();
+      if (!value) {
+        showError('前のスプレッドシートの URL を貼ってください');
+        return;
+      }
+      adoptPreviousBoard(value, '');
+    });
   }
 
   // URL をコピーできたときに呼ぶ (コピーに失敗したときは呼ばない)。

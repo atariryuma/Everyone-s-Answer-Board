@@ -93,6 +93,8 @@ function ensureCopiedDeploymentBootstrap_() {
     __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
     setCachedProperty_('ADMIN_EMAIL', ownerEmail);
     setCachedProperty_('DATABASE_SPREADSHEET_ID', ss.getId());
+    // 紐づいたスプレッドシートを控える (引き継いで DB を付け替えたあとも、どれがアプリの本体かが分かるように。Relocation.js)
+    props.setProperty('CONTAINER_SPREADSHEET_ID', ss.getId());
     try {
       if (typeof markGuideReady_ === 'function') markGuideReady_(ss);
     } catch (e) {

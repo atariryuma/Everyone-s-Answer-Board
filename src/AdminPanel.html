@@ -319,6 +319,17 @@
     .first-step.is-done .first-step-title,
     .first-step.is-done .first-step-desc { color: var(--theme-text-muted); }
     .first-step.is-stuck .first-step-help { display: block; }
+    .first-steps-adopt {
+      padding-top: var(--space-3); border-top: 1px solid var(--theme-border-subtle);
+      font-size: var(--font-size-sm); color: var(--theme-text-secondary);
+    }
+    .first-steps-adopt summary { cursor: pointer; color: var(--theme-accent-cyan); }
+    .first-steps-adopt p { margin: var(--space-2) 0 var(--space-3); }
+    .first-steps-previous-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+    .first-steps-previous-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+    .first-steps-adopt-manual { margin-top: var(--space-4); }
+    .first-steps-adopt-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+    .first-steps-adopt-row input { flex: 1; min-width: 0; }
     @media (max-width: 640px) {
       /* 狭い画面では、ボタンを文の下の行へ送る (横に並べると文が細く折れる) */
       .first-step { flex-wrap: wrap; }
@@ -578,6 +589,20 @@
             </div>
           </li>
         </ol>
+        <!-- 新しい版にコピーし直した先生向け: 前のスプレッドシートを、そのままデータの置き場として使う (Relocation.js)。 -->
+        <details class="first-steps-adopt">
+          <summary>前から回答ボードを使っている方へ（授業や回答を引き継ぐ）</summary>
+          <p>新しい版にコピーし直したときは、前の回答ボードの授業・回答・設定をそのまま引き継げます。前に配った URL を開いた児童は、自動でこちらへ送られます。</p>
+          <button id="first-steps-find-previous" class="btn btn-secondary text-sm" type="button">前の回答ボードを探す</button>
+          <ul id="first-steps-previous-list" class="first-steps-previous-list"></ul>
+          <div class="first-steps-adopt-manual">
+            <label for="first-steps-previous-url">見つからないときは、前のスプレッドシートの URL を貼ってください。</label>
+            <div class="first-steps-adopt-row">
+              <input id="first-steps-previous-url" class="modern-input" type="url" placeholder="https://docs.google.com/spreadsheets/d/…">
+              <button id="first-steps-adopt-url" class="btn btn-secondary text-sm" type="button">引き継ぐ</button>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- ステータスバー: 公開状態と主要操作。状態は非公開でも隠さない。 -->
