@@ -1443,3 +1443,66 @@ test('loadSheetData: 読み込み中でなければ、すぐに 1 回だけ読�
   assert.equal(calls.length, 1);
   assert.equal(instance.state.__pendingReload, undefined);
 });
+
+// =====================================================================
+// もう一度考えるを送った子には、先生の切替を待たずに ● → ★ (ふりかえると同じ画面) を見せる
+// =====================================================================
+
+function makeSentScreen(screenRole, prevPoint) {
+  const { instance, ctx } = makeLessonInstance();
+  ctx.document.getElementById = () => null;
+  instance.state.isEditor = false;
+  instance.state.lessonPrevPoint = prevPoint;
+  instance.__buildLessonGrid = () => {};
+  instance.__buildLessonScale = () => {};
+  instance.__escape = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const host = { innerHTML: '' };
+  const phase = { lessonId: 'l1', phaseIndex: 3, screenRole, formTemplate: 'matrix', question: 'いまはどこ？' };
+  const sent = { lessonId: 'l1', phaseIndex: 3, numericX: 4, numericY: 2, reason: 'いまの<b>ことば</b>' };
+  instance.__renderLessonSent(host, phase, sent);
+  return { host, instance };
+}
+
+test('授業画面: もう一度考えるを送ると、最初の考えといまの考えを並べて見せる (置き直せる)', () => {
+  const { host, instance } = makeSentScreen('reinput', { numericX: 1, numericY: 5, reason: 'さいしょのことば' });
+  assert.ok(host.innerHTML.includes('さいしょの考えと、いまの考え'));
+  assert.ok(host.innerHTML.includes('● 最初のことば') && host.innerHTML.includes('さいしょのことば'));
+  assert.ok(host.innerHTML.includes('★ いまのことば'));
+  assert.ok(host.innerHTML.includes('lessonReplace'), '置き直すを残す');
+  assert.ok(!host.innerHTML.includes('<b>ことば'), '児童の文は escape する');
+  assert.equal(instance.state.lessonDraft.numericX, 4);
+});
+
+test('授業画面: 最初の考えが無い (まだ読めていない・考えるを送っていない) ときは「送りました」のまま', () => {
+  const { host } = makeSentScreen('reinput', null);
+  assert.ok(!host.innerHTML.includes('さいしょの考えと、いまの考え'));
+  assert.ok(host.innerHTML.includes('あなたのことば'));
+});
+
+test('授業画面: 考える (input) を送ったときは、今までどおり「送りました」', () => {
+  const { host } = makeSentScreen('input', { numericX: 1, numericY: 5, reason: 'x' });
+  assert.ok(!host.innerHTML.includes('さいしょの考えと、いまの考え'));
+  assert.ok(host.innerHTML.includes('あなたのことば'));
+});
+
+test('授業画面: 送ったあとで最初の考えが届いたら、● → ★ の画面に描き直す', async () => {
+  const { instance, ctx } = makeLessonInstance();
+  const phase = { lessonId: 'l1', phaseIndex: 3, screenRole: 'reinput', formTemplate: 'matrix' };
+  instance.state.isEditor = false;
+  instance.state.lessonPhase = phase;
+  instance.state.lessonSent = { lessonId: 'l1', phaseIndex: 3, numericX: 4, numericY: 2, reason: 'いま' };
+  let inPlace = 0;
+  let redraw = 0;
+  ctx.document.getElementById = (id) => (id === 'lessonScreen' ? {} : null);
+  instance.__applyLessonRecordInPlace = () => { inPlace++; return true; };
+  instance.__renderLessonScreen = () => { redraw++; };
+  instance.runGas = () => Promise.resolve({ success: true, data: { phases: [
+    { phaseIndex: 0, numericX: 1, numericY: 5, reason: 'さいしょ' },
+    { phaseIndex: 3, numericX: 4, numericY: 2, reason: 'いま' }
+  ] } });
+  instance.__fetchMyLessonRecord(phase);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(instance.state.lessonPrevPoint.reason, 'さいしょ');
+  assert.equal(redraw, 1, '描き直す');
+  assert.equal(inPlace, 0, '「送りました」の格子には足さない');
+});

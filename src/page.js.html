@@ -2161,6 +2161,14 @@
      */
     __renderLessonSent(host, phase, sent) {
       const esc = this.__escape.bind(this);
+      // もう一度考えるを送った子には、先生の切替を待たずに「ふりかえる」と同じ ● → ★ を見せる。
+      //   最初の考え (lessonPrevPoint) がまだ読めていない・考えるを送っていない子は、下の「送りました」のまま
+      //   (記録が届いたら __fetchMyLessonRecord が描き直す)。
+      const prev = phase.screenRole === 'reinput' ? this.state.lessonPrevPoint : null;
+      if (prev) {
+        this.__renderLessonEarlyReflect(host, phase, sent, prev);
+        return;
+      }
       host.innerHTML =
         '<div class="lesson-card">' +
           '<h2 class="lesson-title">' + esc(phase.question || '') + '</h2>' +
@@ -2193,6 +2201,39 @@
       else this.__buildLessonGrid(phase.screenRole === 'reinput');
       const grid = document.getElementById('lessonGrid') || document.getElementById('lessonScale');
       if (grid) grid.classList.add('is-readonly');
+      const btn = document.getElementById('lessonReplace');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          this.state.lessonEditing = true;
+          this.__renderLessonScreen();
+        });
+      }
+    }
+
+    /**
+     * もう一度考えるを送ったあとの画面。「ふりかえる」と同じ、自分の ● 最初 → ★ いま とことば。
+     *
+     * Why 先に見せるか: 送った子が、先生の切替を待つ間に自分の変化を読み始められる (2026-11-25)。
+     *   学級の分布は出さないので、まだ書いている子の考えには触れない。
+     * サーバは呼ばない: 最初の考えは入力画面が読んだもの、いまの考えは送ったものを使う。
+     * 「ふりかえる」の問いは出さない (児童の入口は今のフェーズの問いしか返さない)。
+     */
+    __renderLessonEarlyReflect(host, phase, sent, prev) {
+      host.innerHTML =
+        '<div class="lesson-card">' +
+          '<p class="lesson-sent-title">' +
+            '<svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg> 考えを送りました' +
+          '</p>' +
+          '<h2 class="lesson-title">さいしょの考えと、いまの考え</h2>' +
+          '<div class="lesson-trajectory">' + this.__buildTrajectoryHtml([prev, sent]) + '</div>' +
+          '<button id="lessonReplace" class="lesson-submit lesson-submit-secondary" type="button">置き直す</button>' +
+          '<p class="lesson-hint">この時間の中なら、置き直せます</p>' +
+        '</div>';
+      // 置き直すときの入力画面は「送りました」画面と同じく、送った値から始める。
+      this.state.lessonDraft = {
+        numericX: sent.numericX, numericY: sent.numericY,
+        reason: sent.reason || '', addedInsight: sent.addedInsight || ''
+      };
       const btn = document.getElementById('lessonReplace');
       if (btn) {
         btn.addEventListener('click', () => {
@@ -2257,6 +2298,12 @@
           //   位置は必ず選び直し、理由は必ず書き直す (前と同じ場所・同じ考えでもよい)。
           //   Why その場で反映するか: 画面を作り直すと、打ち始めていた児童の入力のフォーカスと
           //   日本語変換が切れる。
+          // 送ったあとで最初の考えが届いた (記録を読む前に送った・読み直しが遅れた): 「送りました」の格子に
+          //   ● を足すのではなく、● → ★ の画面に描き直す (__renderLessonSent が切り替える)。
+          if (isReinput && this.__lessonSentFor(phase) && !this.state.lessonEditing) {
+            if (document.getElementById('lessonScreen')) this.__renderLessonScreen();
+            return;
+          }
           if (isReinput) {
             if (!this.__applyLessonRecordInPlace(this.state.lessonPrevPoint)
                 && document.getElementById('lessonScreen')) {
