@@ -12,7 +12,7 @@
 /* global DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, getWebAppUrl, teacherOnlyError_, createSuccessResponse */
 
 const GUIDE_SHEET_NAME = 'はじめに';
-const GUIDE_VERSION = '1';
+const GUIDE_VERSION = '2';
 const GUIDE_VERSION_LABEL = '案内の版';
 const GUIDE_STATUS_ROW = 3;
 const GUIDE_URL_ROW = 4;
@@ -27,7 +27,7 @@ const GUIDE_LINES = [
   ['status', '管理パネルの URL', '（準備が済むと、ここに出ます）'],
   ['note', '', ''],
   ['section', '準備', '最初の 1 回だけ。5 分ほどです。'],
-  ['step', '1', 'このスプレッドシートが、自分の「マイドライブ」にあることを確かめます（共有ドライブでは動きません）。もらった URL から「コピーを作成」したものなら、そのままで大丈夫です。'],
+  ['step', '1', 'まず、このスプレッドシートを自分のものにします。上のメニューの「ファイル」→「コピーを作成」を押し、できたコピーの方で 2 から先を進めます（すでにコピーした方を開いているなら、そのまま 2 へ）。コピーは自分の「マイドライブ」に置きます（共有ドライブでは動きません）。'],
   ['step', '2', '上のメニューの「拡張機能」→「Apps Script」を押します。新しいタブが開きます。'],
   ['step', '3', '開いたタブの右上の青いボタン「デプロイ」→「新しいデプロイ」を押します。「種類の選択」と出たら、歯車から「ウェブアプリ」を選びます。'],
   ['step', '4', '「次のユーザーとして実行」が「自分」、「アクセスできるユーザー」が「（あなたの学校や市の組織の名前）内の全員」になっていることを確かめて、「デプロイ」を押します。'],

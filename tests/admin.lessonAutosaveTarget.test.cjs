@@ -94,3 +94,51 @@ test('授業を開く・編集をやめる・戻るボタンの前に、書き�
   const pop = SRC.slice(SRC.indexOf("window.addEventListener('popstate'"), SRC.indexOf("window.addEventListener('popstate'") + 600);
   assert.match(pop, /flushLessonSaves\(\);\s*currentLessonId = null;/);
 });
+
+test('確認の段を描く処理は、一覧の欄が無くても設定漏れの警告まで落ちずに描く', () => {
+  // Why: native / firstInput を一覧のブロックの中だけで宣言していて、警告のブロックが
+  //   「native is not defined」で落ち、保存は通ったのに表示が「保存失敗」になった (2026-11-26)。
+  const start = SRC.indexOf('function renderConfirmStep(lessonJson)');
+  const fn = SRC.slice(start, SRC.indexOf('// ---------- Per-field autosave', start));
+  const els = { 'lesson-summary-warnings': { innerHTML: '' }, 'lesson-summary-phase-list': { innerHTML: '' },
+    'lesson-summary-classes': { textContent: '' } };
+  const ctx = {
+    document: { getElementById: (id) => els[id] || null, querySelector: () => ({ hidden: false }) },
+    window: { sharedUtilities: { security: { escapeHtml: (s) => String(s) } } },
+    applyLessonModeCopy: () => {}, roleLabel: (r) => r, PHASE_TEMPLATE_OPTIONS: []
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fn + '\nthis.render = renderConfirmStep;', ctx);
+  const lessonJson = { inputMode: 'native', classes: ['6年1組'],
+    phases: [{ name: '考える', question: 'q', screenRole: 'input', formTemplate: 'matrix', templateOptions: {} }] };
+  ctx.render(lessonJson);
+  assert.equal(els['lesson-summary-classes'].textContent, '6年1組');
+  assert.match(els['lesson-summary-warnings'].innerHTML, /軸の両端が空です/);
+  delete els['lesson-summary-phase-list'];   // 一覧の欄が無い画面でも落ちない
+  ctx.render(lessonJson);
+});
+
+test('作ったフォームは、先生がこの画面に戻ってきたときに 1 回だけ読み取って接続する', () => {
+  const block = SRC.slice(SRC.indexOf('// ---- template form return: begin ----'), SRC.indexOf('// ---- template form return: end ----'));
+  const listeners = {};
+  const target = (name) => ({
+    addEventListener: (ev, fn) => { (listeners[name + ':' + ev] ||= new Set()).add(fn); },
+    removeEventListener: (ev, fn) => { (listeners[name + ':' + ev] || new Set()).delete(fn); }
+  });
+  const fire = (key) => [...(listeners[key] || [])].forEach((fn) => fn());
+  let validated = 0;
+  const ctx = { document: { hidden: false, ...target('doc') }, window: target('win'), validateCompleteUrl: () => { validated++; } };
+  vm.createContext(ctx);
+  vm.runInContext(block + '\nthis.wait = connectTemplateFormOnReturn_;', ctx);
+  ctx.wait();
+  fire('win:focus');                        // 一度も離れていない → 何もしない
+  assert.equal(validated, 0);
+  ctx.document.hidden = true; fire('doc:visibilitychange');
+  assert.equal(validated, 0);
+  ctx.document.hidden = false; fire('doc:visibilitychange'); fire('win:focus');
+  assert.equal(validated, 1, '戻ったら 1 回だけ');
+  ctx.document.hidden = true; fire('doc:visibilitychange');
+  ctx.document.hidden = false; fire('doc:visibilitychange');
+  assert.equal(validated, 1, '2 回めの戻りでは読み直さない');
+  assert.match(SRC, /connectTemplateFormOnReturn_\(\);\s*showSuccess\(result\.message/);
+});

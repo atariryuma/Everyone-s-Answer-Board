@@ -1334,6 +1334,10 @@
 
       // 手順はアプリ側で出す。列の自動推定はフォーム編集後に走らせたいので、
       //   ここでは自動接続しない (質問を編集すると列構成が変わるため)。
+      //   代わりに、フォームを直して この画面に戻ってきたときに 1 回だけ読み取って接続する。
+      //   Why: 下の手順に「戻れば自動で読み取られます」と書きながら何もしておらず、戻っても未接続で、
+      //   フォームの URL を貼り直すまで先へ進めなかった (2026-11-26 の ひな形の検証)。
+      connectTemplateFormOnReturn_();
       showSuccess(result.message || `${guide.label}のフォームを作成しました`);
       if (window.modals && typeof window.modals.alert === 'function') {
         window.modals.alert(
@@ -1350,6 +1354,33 @@
       showError(error.message || 'フォーム作成中にエラーが発生しました');
     });
   }
+
+  // ---- template form return: begin ----
+  // アプリが作ったフォームを、先生がこの画面に戻ってきたときに 1 回だけ読み取って接続する。
+  //   タブで開けば visibilitychange、別ウィンドウで開けば focus が来るので両方を待つ。
+  //   作り直したときは前の待ちを捨てる (古いフォームを接続しない)。
+  let stopWaitingTemplateFormReturn = null;
+  function connectTemplateFormOnReturn_() {
+    if (stopWaitingTemplateFormReturn) stopWaitingTemplateFormReturn();
+    let left = document.hidden;   // 新しいタブがもう前に出ていれば、次に見えたときが「戻り」
+    const markLeft = () => { left = true; };
+    const handler = () => {
+      if (document.hidden) { left = true; return; }
+      if (!left) return;          // 一度も離れていない (ポップアップが止められた等)
+      stopWaitingTemplateFormReturn();
+      validateCompleteUrl();
+    };
+    stopWaitingTemplateFormReturn = () => {
+      document.removeEventListener('visibilitychange', handler);
+      window.removeEventListener('focus', handler);
+      window.removeEventListener('blur', markLeft);
+      stopWaitingTemplateFormReturn = null;
+    };
+    document.addEventListener('visibilitychange', handler);
+    window.addEventListener('focus', handler);
+    window.addEventListener('blur', markLeft);
+  }
+  // ---- template form return: end ----
 
   /**
    * フォームURL自動解析（リアルタイム）+ 自動検証＆接続
@@ -4757,13 +4788,16 @@
       if (step3Hidden) return;
       const phaseListEl = document.getElementById('lesson-summary-phase-list');
       const warningsEl = document.getElementById('lesson-summary-warnings');
+      // 下の「一覧」と「設定漏れ警告」の両方が使うので、ブロックの外に置く。
+      //   Why: 一覧のブロックの中だけで宣言していたため、警告のブロックが native is not defined で落ち、
+      //   保存は通っているのに自動保存の表示が「保存失敗」になっていた (確認の段を開いているときだけ)。
+      const native = Boolean(lessonJson && lessonJson.inputMode === 'native');
+      let firstInput = -1;
+      phases.forEach((p, i) => { if (firstInput < 0 && (p.screenRole === 'input' || p.screenRole === 'reinput')) firstInput = i; });
 
       // 各フェーズの内容を一覧表示 (設定漏れに気づかせる)。
       if (phaseListEl) {
         const esc = window.sharedUtilities.security.escapeHtml;
-        const native = Boolean(lessonJson && lessonJson.inputMode === 'native');
-        let firstInput = -1;
-        phases.forEach((p, i) => { if (firstInput < 0 && (p.screenRole === 'input' || p.screenRole === 'reinput')) firstInput = i; });
         const detailFor = (p, i) => {
           const o = p.templateOptions || {};
           if (native) {
