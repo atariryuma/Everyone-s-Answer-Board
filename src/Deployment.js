@@ -11,3 +11,6 @@ const DEPLOY_DATABASE_SPREADSHEET_ID = '';
 // ops-monitor への報告の送り先と鍵（OpsReport.js）。空なら送らない。
 const DEPLOY_OPS_REPORT_URL = '';
 const DEPLOY_OPS_REPORT_TOKEN = '';
+// 配る用のひな形のスプレッドシートの ID。ひな形の GAS にだけ入れる (ひな形そのものではアプリを開かせず、
+//   コピーするよう案内する。helpers.js の isTemplateItself_)。先生ごとの配置では空のまま。
+const DEPLOY_TEMPLATE_SPREADSHEET_ID = '';

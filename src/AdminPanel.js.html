@@ -228,6 +228,9 @@
         }
       } catch (e) { /* タブ初期選択は best-effort */ }
 
+      // はじめの 4 歩は待たない (出せなくても管理パネルは使える)
+      initFirstSteps().catch((e) => console.warn('initFirstSteps skipped:', e && e.message));
+
       try { initSaveConfigWrapper(); } catch (e) { console.warn('initSaveConfigWrapper skipped:', e.message); }
       try { initPublishToggleWrapper(); } catch (e) { console.warn('initPublishToggleWrapper skipped:', e.message); }
       try { initThemeSelect(); } catch (e) { console.warn('initThemeSelect skipped:', e.message); }
@@ -3182,6 +3185,175 @@
     window.__adminSelectTab = select;
   }
 
+  // ─── はじめの 4 歩 (コピーした配置の先生への道しるべ) ───────────────────
+  // 出すか・3 歩目と 4 歩目の印はサーバが持つ (getFirstStepsState)。2 歩目は授業の数・つないだフォームで決める。
+  //   全部済んだらカードを出さない。焼き込みのある配置ではサーバが show:false を返す。
+  //   copied: 状態を読み終える前に URL をコピーした (読み終えたときに 3 歩目の印を送る)。
+  const firstSteps = { show: false, urlShared: false, childOpened: false, hasLesson: false, copied: false };
+
+  function renderFirstSteps() {
+    const card = document.getElementById('first-steps');
+    if (!card) return;
+    const done = {
+      ready: true,
+      lesson: firstSteps.hasLesson || firstSteps.urlShared || firstSteps.childOpened,
+      share: firstSteps.urlShared || firstSteps.childOpened,
+      child: firstSteps.childOpened
+    };
+    const order = ['ready', 'lesson', 'share', 'child'];
+    const doneCount = order.filter((k) => done[k]).length;
+    const visible = firstSteps.show && doneCount < order.length;
+    card.hidden = !visible;
+    // 授業の一覧の下の「はじめての方へ」は役目が重なるので、カードを出している間は出さない
+    const hint = document.getElementById('first-time-hint');
+    if (hint && visible) hint.classList.add('hidden');
+    if (!visible) return;
+    const current = order.find((k) => !done[k]);
+    order.forEach((key, i) => {
+      const li = card.querySelector('[data-step="' + key + '"]');
+      if (!li) return;
+      li.classList.toggle('is-done', done[key]);
+      li.classList.toggle('is-current', key === current);
+      // URL は配ったのに、まだ誰も開けていない: 直し方を出す
+      li.classList.toggle('is-stuck', key === 'child' && key === current);
+      const mark = li.querySelector('.first-step-mark');
+      if (mark) mark.textContent = done[key] ? '✓' : String(i + 1);
+    });
+    const count = document.getElementById('first-steps-count');
+    if (count) count.textContent = doneCount + ' / ' + order.length + ' 済み';
+  }
+  window.__firstStepsVisible = () => {
+    const card = document.getElementById('first-steps');
+    return Boolean(card && !card.hidden);
+  };
+  window.__firstStepsSetHasLesson = (hasLesson) => {
+    // つないだフォームがあれば、授業が 0 件でも 2 歩目は済み (授業を消したら、済みを外す)
+    firstSteps.hasLesson = Boolean(hasLesson) || Boolean((systemState.config || {}).spreadsheetId);
+    renderFirstSteps();
+  };
+
+  async function initFirstSteps() {
+    const res = await runServer('getFirstStepsState');
+    if (!res || !res.success || !res.data || !res.data.show) return;
+    firstSteps.show = true;
+    firstSteps.urlShared = Boolean(res.data.urlShared);
+    firstSteps.childOpened = Boolean(res.data.childOpened);
+    const cfg = systemState.config || {};
+    if (cfg.spreadsheetId || document.querySelectorAll('#lesson-list li [data-lesson-open]').length > 0) {
+      firstSteps.hasLesson = true;
+    }
+    const createBtn = document.getElementById('first-steps-create');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        if (typeof window.__adminSelectTab === 'function') window.__adminSelectTab('lessons');
+        const picker = document.querySelector('details.lesson-template-picker');
+        if (!picker) return;
+        picker.open = true;
+        picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+    initAdoptPrevious();
+    renderFirstSteps();
+    // カードが「授業をつくる」を案内している間は、授業タブから始める。
+    //   Why: データソース未接続だと init がボード設定タブを選ぶ (フォームをつなぎたい先生向け)。
+    //   コピーしたばかりの先生には、カードの 2 歩目と違うタブが開いて迷う (2026-11-26 に実物で分かった)。
+    if (window.__firstStepsVisible() && typeof window.__adminSelectTab === 'function') {
+      window.__adminSelectTab('lessons');
+    }
+    if (firstSteps.copied) noteFirstStepUrlShared();
+  }
+
+  // 前の回答ボードを引き継ぐ (新しい版にコピーし直した先生)。済んだら開き直す (DB が替わるので、画面の中身を全部読み直す)。
+  async function adoptPreviousBoard(idOrUrl, name) {
+    const ok = await window.modals.confirm(
+      (name ? '「' + name + '」' : '貼った URL のスプレッドシート') + 'の授業・回答・設定を引き継ぎます。' +
+      '前に配った URL を開いた人は、こちらへ送られます。よろしいですか？');
+    if (!ok) return;
+    window.setLoading(true, '引き継いでいます…');
+    try {
+      const res = await runServer('adoptPreviousBoard', idOrUrl);
+      if (!res || !res.success) {
+        showError(window.serverMessage(res, '引き継げませんでした'));
+        return;
+      }
+      showSuccess('引き継ぎました。ページを開き直します。');
+      // トップの URL から開き直す (引き継いだ DB の userId で管理パネルが開く)
+      const top = await runServer('getWebAppUrl').catch(() => '');
+      if (top) window.open(top, '_top');
+      else showSuccess('引き継ぎました。ブックマークから開き直してください。');
+    } catch (e) {
+      showError('引き継げませんでした: ' + (e && e.message ? e.message : ''));
+    } finally {
+      window.setLoading(false);
+    }
+  }
+
+  function initAdoptPrevious() {
+    const findBtn = document.getElementById('first-steps-find-previous');
+    const list = document.getElementById('first-steps-previous-list');
+    const urlInput = document.getElementById('first-steps-previous-url');
+    const urlBtn = document.getElementById('first-steps-adopt-url');
+    if (!findBtn || !list || !urlInput || !urlBtn) return;
+    const note = (text) => {
+      list.textContent = '';
+      const li = document.createElement('li');
+      li.textContent = text;
+      list.appendChild(li);
+    };
+    findBtn.addEventListener('click', () => window.sharedUtilities.buttons.withBusy(findBtn, async () => {
+      const res = await runServer('findPreviousBoards');
+      if (!res || !res.success) {
+        note(window.serverMessage(res, '探せませんでした'));
+        return;
+      }
+      const boards = (res.data && res.data.boards) || [];
+      if (boards.length === 0) {
+        note('見つかりませんでした。下に、前のスプレッドシートの URL を貼ってください。');
+        return;
+      }
+      list.textContent = '';
+      boards.forEach((b) => {
+        const li = document.createElement('li');
+        const label = document.createElement('span');
+        const day = b.updatedAt ? new Date(b.updatedAt).toLocaleDateString('ja-JP') : '';
+        label.textContent = '「' + b.name + '」 授業 ' + b.lessonCount + ' 件' + (day ? '・最後に使った日 ' + day : '');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-primary text-sm';
+        btn.textContent = '引き継ぐ';
+        btn.addEventListener('click', () => adoptPreviousBoard(b.id, b.name));
+        li.appendChild(label);
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    }, { busyText: '探しています…' }));
+    urlBtn.addEventListener('click', () => {
+      const value = urlInput.value.trim();
+      if (!value) {
+        showError('前のスプレッドシートの URL を貼ってください');
+        return;
+      }
+      adoptPreviousBoard(value, '');
+    });
+  }
+
+  // URL をコピーできたときに呼ぶ (コピーに失敗したときは呼ばない)。
+  function noteFirstStepUrlShared() {
+    firstSteps.copied = true;
+    if (!firstSteps.show || firstSteps.urlShared) return;
+    firstSteps.urlShared = true;
+    renderFirstSteps();
+    const undo = (why) => {
+      // 印がサーバに残らないだけ (次にコピーしたときにもう一度送る)。画面の印も戻す
+      firstSteps.urlShared = false;
+      renderFirstSteps();
+      console.warn('markFirstStepUrlShared failed:', why);
+    };
+    runServer('markFirstStepUrlShared')
+      .then((res) => { if (!res || !res.success) undo(window.serverMessage(res, 'unknown')); })
+      .catch((e) => undo(e && e.message));
+  }
+
   function copyViewUrl(url) {
     if (!url) {
       showError('コピーするURLがありません');
@@ -3193,6 +3365,7 @@
         .writeText(url)
         .then(() => {
           showSuccess('閲覧用URLをコピーしました！');
+          noteFirstStepUrlShared();
           const btn = document.getElementById('copyViewUrlBtn');
           const originalText = btn.textContent;
           btn.textContent = 'コピー完了';
@@ -3222,6 +3395,7 @@
     try {
       document.execCommand('copy');
       showSuccess('閲覧用URLをコピーしました！');
+      noteFirstStepUrlShared();
     } catch (err) {
       prompt('以下のURLをコピーしてください:', url);
     }
@@ -3322,6 +3496,13 @@
         const hintEl = document.getElementById('first-time-hint');
         if (hintEl) {
           hintEl.classList.toggle('hidden', lessons.length !== 0);
+        }
+        // はじめの 4 歩の 2 歩目 (授業をつくる)。カードが出ている間は上のヒントを出さない。
+        if (typeof window.__firstStepsSetHasLesson === 'function') {
+          window.__firstStepsSetHasLesson(lessons.length > 0);
+        }
+        if (hintEl && typeof window.__firstStepsVisible === 'function' && window.__firstStepsVisible()) {
+          hintEl.classList.add('hidden');
         }
         // 実行中の授業があれば、ボード設定タブをロックする (授業が config を管理している)。
         //   2 つ開始中なら、ロックの案内はボードにつながっている方を指す。

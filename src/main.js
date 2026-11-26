@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
+/* global isTemplateItself_, movedDestination_, movedTargetUrl_, noteChildOpenedBoard_, applyViewerReactions_, VALIDATOR_BOARD_MODES, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData_, addReaction, toggleHighlight, findUserByEmail_, findUserById_, findPublishedBoardOwner_, getConfigOrDefault, getCachedProperty_, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty_, getQuestionText_, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator_, submitLessonAnswer, sameEmail_, findPublishedBoardOwner_, fullJitterBackoffMs_, ensureDeploymentBootstrap_, processLoginAction */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -137,6 +137,15 @@ function doGet(e) {
       );
     }
 
+    // 配る用のひな形そのものでは、アプリを開かせない (コピーしてから使ってもらう)。コピーした配置では ID が違うので素通り。
+    if (typeof isTemplateItself_ === 'function' && isTemplateItself_()) {
+      return createAccessRestrictedTemplate(
+        currentEmail,
+        false,
+        'これは配る用のひな形です。スプレッドシートの「ファイル」→「コピーを作成」でコピーして、コピーした方でデプロイしてください。'
+      );
+    }
+
     // 停止中は管理者も含めて案内だけ。再開は Admin API (`npm run api -- enableApp`) で行う。
     if (checkAppAccessRestriction()) {
       return createAccessRestrictedTemplate(currentEmail, true);
@@ -147,6 +156,17 @@ function doGet(e) {
     const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
     if (!setupDone) {
       return createAccessRestrictedTemplate(currentEmail, false, 'このアプリはまだ準備できていません。管理者に連絡してください。');
+    }
+
+    // コピーした配置が新しい版へ引っ越していたら、開いた人を新しい方へ送る (Relocation.js)。
+    //   焼き込みのある配置では何もしない。moved は送られてきた印 (同じ送り先へは、もう一度送らない)。
+    if (typeof movedDestination_ === 'function') {
+      const movedTo = movedDestination_(typeof params.moved === 'string' ? params.moved : '');
+      if (movedTo) {
+        const moved = HtmlService.createTemplateFromFile('Moved.html');
+        moved.moveUrl = movedTargetUrl_(movedTo, params);
+        return moved.evaluate().setTitle('回答ボード');
+      }
     }
 
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
@@ -303,7 +323,12 @@ function handleViewMode_(params, currentEmail) {
     //   client 側に一覧をコピーしないための注入。
     boardModes: VALIDATOR_BOARD_MODES
   });
-  return template.evaluate().setTitle('回答ボード');
+  const output = template.evaluate().setTitle('回答ボード');
+  // コピーした配置の「はじめの 4 歩」: 児童 (先生・共同編集者でない人) にボードを返すことを 1 度だけ残す。
+  //   画面を組み立て終えてから残す (組み立てに失敗したのに「児童が開けた」にしない)。
+  //   焼き込みのある配置では何もしない。中で失敗しても投げない (児童の画面を止めない)。
+  if (!isEditor && typeof noteChildOpenedBoard_ === 'function') noteChildOpenedBoard_();
+  return output;
 }
 
 function handleReviewMode_(params, currentEmail) {

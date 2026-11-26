@@ -3,7 +3,7 @@
  *   認証ショートカット、emailToShortHash_（仮名化）。
  */
 
-/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
+/* global DEPLOY_TEMPLATE_SPREADSHEET_ID, markGuideReady_, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig, DEPLOY_ADMIN_EMAIL, DEPLOY_DATABASE_SPREADSHEET_ID, __ensureSheetWithHeaders_, USERS_SHEET_HEADERS, LESSONS_SHEET_HEADERS, LESSON_RESPONSES_SHEET_HEADERS */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
@@ -16,7 +16,119 @@ function bakedDeploymentProperty_(key) {
   if (typeof DEPLOY_ADMIN_EMAIL === 'undefined') return null;
   if (key === 'ADMIN_EMAIL' && DEPLOY_ADMIN_EMAIL) return String(DEPLOY_ADMIN_EMAIL).trim().toLowerCase();
   if (key === 'DATABASE_SPREADSHEET_ID' && DEPLOY_DATABASE_SPREADSHEET_ID) return String(DEPLOY_DATABASE_SPREADSHEET_ID);
+  if (!DEPLOY_ADMIN_EMAIL && !DEPLOY_DATABASE_SPREADSHEET_ID) return copiedDeploymentProperty_(key);
   return null;
+}
+
+// コピーして配った配置 (焼き込みが空) の管理者と DB。ensureCopiedDeploymentBootstrap_ がプロパティに入れた値を、
+//   CacheService に 2 つまとめて置いて読む。
+//   Why: 焼き込みが無いと isAdministrator と openDatabase が実行ごとにプロパティを 2 回読み、児童 30 人の
+//   5 秒おきの確認だけで 1 日 50 万回の上限に近づく。CacheService の読みはこの上限に数えられない。
+const COPIED_DEPLOYMENT_CACHE_KEY = 'copied_deployment_v1';
+const COPIED_DEPLOYMENT_CACHE_TTL = 21600;
+let copiedDeploymentMemo_ = null;   // 1 回の実行の中だけ (2 つそろった値だけを覚える)
+
+function copiedDeploymentProperty_(key) {
+  if (key !== 'ADMIN_EMAIL' && key !== 'DATABASE_SPREADSHEET_ID') return null;
+  if (copiedDeploymentMemo_) return copiedDeploymentMemo_[key];
+  const complete = (p) => !!(p && p.ADMIN_EMAIL && p.DATABASE_SPREADSHEET_ID);
+  const cache = typeof CacheService !== 'undefined' ? CacheService.getScriptCache() : null;
+  let pair = null;
+  try {
+    const raw = cache ? cache.get(COPIED_DEPLOYMENT_CACHE_KEY) : null;
+    pair = raw ? JSON.parse(raw) : null;
+  } catch (_) { /* cache 不通・壊れた値はプロパティを読めば済む */ }
+  if (!complete(pair)) {
+    const props = PropertiesService.getScriptProperties();
+    pair = {
+      ADMIN_EMAIL: String(props.getProperty('ADMIN_EMAIL') || '').trim().toLowerCase(),
+      DATABASE_SPREADSHEET_ID: String(props.getProperty('DATABASE_SPREADSHEET_ID') || '')
+    };
+    if (complete(pair) && cache) {
+      try {
+        cache.put(COPIED_DEPLOYMENT_CACHE_KEY, JSON.stringify(pair), COPIED_DEPLOYMENT_CACHE_TTL);
+      } catch (_) { /* cache 不通は機能的に無害 (次の実行もプロパティを読むだけ) */ }
+    }
+  }
+  if (complete(pair)) copiedDeploymentMemo_ = pair;
+  return pair[key] || null;
+}
+
+function forgetCopiedDeploymentProperty_() {
+  copiedDeploymentMemo_ = null;
+  try {
+    if (typeof CacheService !== 'undefined') CacheService.getScriptCache().remove(COPIED_DEPLOYMENT_CACHE_KEY);
+  } catch (e) {
+    // 消せないと、変えた管理者・DB が最大 6 時間古いまま読まれる
+    console.warn('forgetCopiedDeploymentProperty_: cache を消せませんでした:', e && e.message);
+  }
+}
+
+function templateSpreadsheetId_() {
+  return typeof DEPLOY_TEMPLATE_SPREADSHEET_ID === 'string' ? DEPLOY_TEMPLATE_SPREADSHEET_ID : '';
+}
+
+/**
+ * 配る用のひな形そのものを開いているか (doGet から)。ひな形ではアプリを開かせず、コピーするよう案内する。
+ * 準備が済んでしまったひな形 (プロパティが残っている) は DB の ID で分かる。まだのひな形は紐づけ元を読む
+ * (準備ができていない配置でだけ通るので、児童が開くたびには読まない)。
+ */
+function isTemplateItself_() {
+  const templateId = templateSpreadsheetId_();
+  if (!templateId) return false;
+  try {
+    const dbId = getCachedProperty_('DATABASE_SPREADSHEET_ID');
+    if (dbId) return dbId === templateId;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    return Boolean(ss && ss.getId() === templateId);
+  } catch (e) {
+    console.warn('isTemplateItself_: 確かめられませんでした (ひな形ではないとして続ける):', e && e.message);
+    return false;
+  }
+}
+
+/**
+ * コピーして配った配置 (焼き込みが空で、スプレッドシートに紐づいたスクリプト) の初回の準備。
+ *
+ * 管理者 = そのスプレッドシートの持ち主 (ひな形を「コピーを作成」した先生)、DB = そのスプレッドシート。
+ * 最初に開いた人では決めない (児童が先に開いても児童は持ち主ではない)。
+ * 共有ドライブに置いたコピーは持ち主がいないので準備しない (案内の画面のまま。手引きに書いてある)。
+ */
+function ensureCopiedDeploymentBootstrap_() {
+  if (typeof SpreadsheetApp === 'undefined' || typeof SpreadsheetApp.getActiveSpreadsheet !== 'function') return;
+  const props0 = PropertiesService.getScriptProperties();
+  if (props0.getProperty('ADMIN_EMAIL') && props0.getProperty('DATABASE_SPREADSHEET_ID')) return;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;   // スプレッドシートに紐づいていない (リポジトリの Deployment.js のまま単体で置いた)
+  // ひな形そのものでは準備しない (持ち主の登録をひな形に書くと、どのコピーにも写る)
+  if (templateSpreadsheetId_() && ss.getId() === templateSpreadsheetId_()) return;
+  const owner = DriveApp.getFileById(ss.getId()).getOwner();
+  const ownerEmail = owner ? String(owner.getEmail() || '').trim().toLowerCase() : '';
+  if (!ownerEmail) {
+    console.warn('ensureCopiedDeploymentBootstrap_: スプレッドシートの持ち主を読めません (共有ドライブでは使えません)');
+    return;
+  }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;   // 同時に開いた別の人がそろえている。次の呼び出しで済んでいる
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty('ADMIN_EMAIL') && props.getProperty('DATABASE_SPREADSHEET_ID')) return;
+    __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
+    __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
+    __ensureSheetWithHeaders_(ss, 'lesson_responses', LESSON_RESPONSES_SHEET_HEADERS);
+    setCachedProperty_('ADMIN_EMAIL', ownerEmail);
+    setCachedProperty_('DATABASE_SPREADSHEET_ID', ss.getId());
+    // 紐づいたスプレッドシートを控える (引き継いで DB を付け替えたあとも、どれがアプリの本体かが分かるように。Relocation.js)
+    props.setProperty('CONTAINER_SPREADSHEET_ID', ss.getId());
+    try {
+      if (typeof markGuideReady_ === 'function') markGuideReady_(ss);
+    } catch (e) {
+      // 案内のタブの印が ⏳ のまま残るだけ (アプリは動く)
+      console.warn('ensureCopiedDeploymentBootstrap_: 「はじめに」に準備完了を書けませんでした:', e && e.message);
+    }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
@@ -55,7 +167,9 @@ function getCachedProperty_(key) {
  * プロパティが既にあれば上書きしない (先生が後から変えた値を守る)。
  */
 function ensureDeploymentBootstrap_() {
-  if (typeof DEPLOY_ADMIN_EMAIL === 'undefined' || !DEPLOY_ADMIN_EMAIL || !DEPLOY_DATABASE_SPREADSHEET_ID) return;
+  if (typeof DEPLOY_ADMIN_EMAIL === 'undefined') return;
+  if (!DEPLOY_ADMIN_EMAIL && !DEPLOY_DATABASE_SPREADSHEET_ID) return ensureCopiedDeploymentBootstrap_();
+  if (!DEPLOY_ADMIN_EMAIL || !DEPLOY_DATABASE_SPREADSHEET_ID) return;
   // プロパティそのものを見る (getCachedProperty_ はこの 2 つを焼き込みから返すので、そろったか分からない)。
   const props0 = PropertiesService.getScriptProperties();
   if (props0.getProperty('ADMIN_EMAIL') && props0.getProperty('DATABASE_SPREADSHEET_ID')) return;
@@ -114,6 +228,7 @@ function clearPropertyCache_(key = null) {
 function setCachedProperty_(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, value);
   delete RUNTIME_PROPERTIES_CACHE[key];
+  if (key === 'ADMIN_EMAIL' || key === 'DATABASE_SPREADSHEET_ID') forgetCopiedDeploymentProperty_();
 }
 
 /**
