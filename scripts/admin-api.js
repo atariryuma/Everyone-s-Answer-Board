@@ -92,7 +92,10 @@ function resolveTenant(args) {
   const tenant = name ? tenants.find((t) => t.name === name) : tenants.find((t) => !(t.extraFiles || []).length);
   if (!tenant) throw new Error(name ? `配置「${name}」がありません` : '送り先の配置がありません');
   if (!tenant.apiKey) throw new Error(`配置「${tenant.name}」の API キーがありません (setupApiKey を先に)`);
-  const url = `https://script.google.com/a/macros/${tenant.adminEmail.split('@')[1]}/s/${tenant.deploymentId}/exec`;
+  const domain = tenant.adminEmail.split('@')[1];
+  // 個人の Gmail の配置の URL には /a/<ドメイン>/ が付かない
+  const base = domain === 'gmail.com' ? 'https://script.google.com/macros' : `https://script.google.com/a/macros/${domain}`;
+  const url = `${base}/s/${tenant.deploymentId}/exec`;
   return { tenant, url, rest };
 }
 

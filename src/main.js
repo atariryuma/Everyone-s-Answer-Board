@@ -18,6 +18,9 @@ function getCurrentEmail() {
   if (_apiKeyAdminEmail) return _apiKeyAdminEmail;
   try {
     const email = Session.getActiveUser().getEmail();
+    // 個人の Gmail の配置だけ: メールが返らない参加者を端末の番号で見分ける (scripts/gmail/GuestMode.js)。
+    //   学校の配置にはこの関数が無いので何もしない。
+    if (!email && typeof guestEmail_ === 'function') return guestEmail_() || null;
     return email || null;
   } catch (error) {
     logError_('getCurrentEmail', error);
@@ -125,6 +128,12 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
+    // 個人の Gmail の配置だけ (scripts/gmail/GuestMode.js)。学校の配置には無いので素通り。
+    if (typeof guestBeginGet_ === 'function') {
+      const guestPage = guestBeginGet_(e);
+      if (guestPage) return guestPage;
+    }
+
     const currentEmail = getCurrentEmail();
 
     // セットアップ完了後は管理者ドメイン外アクセスを遮断
@@ -170,7 +179,8 @@ function doGet(e) {
     }
 
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
-    return handler(params, currentEmail);
+    const out = handler(params, currentEmail);
+    return (typeof guestDecorateOutput_ === 'function') ? guestDecorateOutput_(out) : out;
   } catch (error) {
     // e 自体が無い呼び出し (エディタからの実行等) で catch の中が TypeError を投げると、
     //   ErrorBoundary ではなく GAS の生エラー画面になる。e?.parameter で守る。

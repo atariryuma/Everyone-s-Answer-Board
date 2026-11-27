@@ -9,6 +9,7 @@
  *
  * 使い方:
  *   node scripts/deploy-single.js create --name <名前> --adminEmail <先生のメール> [--user organization]
+ *     個人の Gmail で: … --user gmail --webappAccess ANYONE --extraFile scripts/gmail/GuestMode.js
  *   node scripts/deploy-single.js deploy --name <名前>      # 1 人分を更新 (URL はそのまま)
  *   node scripts/deploy-single.js deploy --all              # 全員分を更新
  *   node scripts/deploy-single.js list
@@ -125,6 +126,15 @@ function stage(tenant, ops) {
     fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
   }
   fs.copyFileSync(path.join(SRC, 'appsscript.json'), path.join(dir, 'appsscript.json'));
+  // 公開範囲をこの配置だけ変える (single-tenants.json の webappAccess)。個人の Gmail の配置は DOMAIN が使えないので ANYONE。
+  //   学校の配置は書かないので、src/appsscript.json の DOMAIN のまま。
+  if (tenant.webappAccess) {
+    if (!/^(DOMAIN|ANYONE|ANYONE_ANONYMOUS|MYSELF)$/.test(tenant.webappAccess)) throw new Error('webappAccess は DOMAIN / ANYONE / ANYONE_ANONYMOUS / MYSELF のどれかです');
+    const manifestPath = path.join(dir, 'appsscript.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifest.webapp.access = tenant.webappAccess;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  }
   const str = (v) => JSON.stringify(String(v || ''));
   fs.writeFileSync(path.join(dir, 'Deployment.js'),
     '// scripts/deploy-single.js が書いたファイル。src/Deployment.js の説明を参照。\n' +
@@ -162,6 +172,9 @@ function create(args, ops) {
   clasp(dir, user, ['create', '--type', 'sheets', '--title', title, '--rootDir', '.']);
   const project = JSON.parse(fs.readFileSync(path.join(dir, '.clasp.json'), 'utf8'));
   const tenant = { name, adminEmail: adminEmail.toLowerCase(), user, scriptId: project.scriptId, spreadsheetId: project.parentId, deploymentId: '' };
+  // 個人の Gmail の配置: --webappAccess ANYONE --extraFile scripts/gmail/GuestMode.js (GuestMode.js の説明)
+  if (typeof args.webappAccess === 'string') tenant.webappAccess = args.webappAccess;
+  if (typeof args.extraFile === 'string') tenant.extraFiles = [args.extraFile];
   cfg.tenants.push(tenant);
   saveConfig(cfg);
   console.log(`✓ スプレッドシートとスクリプトを作りました: ${name}`);
@@ -213,7 +226,10 @@ function deployOne(tenant, cfg, ops) {
     tenant.deploymentId = m[1];
     saveConfig(cfg);
   }
-  console.log(`✓ ${tenant.name}: @${m[2]}  https://script.google.com/a/macros/${tenant.adminEmail.split('@')[1]}/s/${tenant.deploymentId}/exec`);
+  const domain = tenant.adminEmail.split('@')[1];
+  // 個人の Gmail の配置の URL には /a/<ドメイン>/ が付かない
+  const base = domain === 'gmail.com' ? 'https://script.google.com/macros' : `https://script.google.com/a/macros/${domain}`;
+  console.log(`✓ ${tenant.name}: @${m[2]}  ${base}/s/${tenant.deploymentId}/exec`);
 }
 
 function main() {
